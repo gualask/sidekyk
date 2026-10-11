@@ -19,7 +19,9 @@ instant when you bring it up, close to idle when it sits in the background.
 
 ## Roadmap
 
-What is done and what is still missing is tracked in [ROADMAP.md](ROADMAP.md).
+What is done and what is still missing is tracked in [ROADMAP.md](ROADMAP.md). Sidekyk is
+growing into a project workspace (changes, files, notes, several projects): the direction is in
+[docs/evolution.md](docs/evolution.md).
 
 ## Requirements
 

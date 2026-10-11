@@ -1,6 +1,6 @@
 # Repository Guidelines
 
-Sidekyk is a lightweight Tauri 2 desktop companion for reviewing what changed in a local git working tree, typically while a coding agent (Codex, Claude Code, …) edits it. It is read-only: it never writes to the index or the working tree. Product scope and the roadmap are in `README.md`; the layering rules are in `docs/architecture.md`.
+Sidekyk is a lightweight Tauri 2 desktop companion for reviewing what changed in a local git working tree, typically while a coding agent (Codex, Claude Code, …) edits it. It is read-only: it never writes to the index or the working tree. Product scope and the roadmap are in `README.md` and `ROADMAP.md`, where the product is heading in `docs/evolution.md`; the layering rules are in `docs/architecture.md`.
 
 ## Golden Rule: Performance
 

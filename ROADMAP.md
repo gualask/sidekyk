@@ -1,8 +1,10 @@
 # Roadmap
 
-What Sidekyk does today and what is still missing, in priority order: first seeing what the agent
-is doing, then giving it feedback. Items move to **Done** as they land; each one should keep the
-app read-only and follow the performance golden rule in `AGENTS.md`.
+What Sidekyk does today and what is still missing, in priority order. Sidekyk is growing from a
+changes viewer into a project workspace (changes, files, notes, several projects); the direction,
+the decisions taken and the open ones are in [docs/evolution.md](docs/evolution.md). Items move to
+**Done** as they land; each one keeps repositories read-only and follows the performance golden
+rule in `AGENTS.md`.
 
 ## To do
 
@@ -39,6 +41,15 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 - [ ] First paint and file switch timings as a repeatable script (today measured by hand on the
       `large` fixture), and the same in the packaged app
 
+## Next: workspace foundation
+
+- [ ] Panel model: one module per panel with a common contract (id, title, icon, component,
+      summary for the overview); panels off screen run no queries and load lazily
+- [ ] Projects as app data, replacing the single last repository: add, remove, switch. Only the
+      active project runs snapshots; the others keep a light watcher that only marks changes
+- [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full
+      screen, with the Changes panel as today's view
+
 ## Next: see what the agent is doing
 
 - [ ] Tray icon with the change count, and a menu to show the window or quit
@@ -49,6 +60,27 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
       tree against the merge base (`git diff --merge-base <default>`), so commits and uncommitted
       edits show together and an edit that undoes a commit shows as unchanged. The default branch
       comes from `upstream/HEAD`, `origin/HEAD` or `init.defaultBranch`; without one, stay on HEAD
+
+## Then: explore the repository
+
+- [ ] Files panel: tree from `git ls-files` plus untracked files, virtualized
+- [ ] File view through the backend, size-limited, on the virtualized rows of the diff view
+- [ ] Search by name (fuzzy)
+- [ ] Search in contents in the backend (`git grep` or ripgrep's crates), streaming and
+      cancellable
+
+## Then: notes
+
+- [ ] Notes panel, stored at application level in the app data directory (format and granularity
+      decided at implementation)
+- [ ] Optional sync and backup with Google Drive: OAuth 2.0 for desktop apps (loopback, PKCE),
+      tokens in the OS credential store, sync in the backend, local first, conflicts kept as both
+      versions (see docs/evolution.md for the checked facts and the open decisions)
+
+## Then: all projects at a glance
+
+- [ ] Semantic zoom level 0: one card per project (changes in progress, last activity, notes),
+      doubling as the project switcher
 
 ## Then: feedback to the agent
 
@@ -64,7 +96,6 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 
 ## App
 
-- [ ] Recent repositories in a switcher
 - [ ] Settings: theme override, shortcut, diff context lines
 - [ ] Italian and English UI (as in Fyler)
 - [ ] Real app icon
@@ -79,6 +110,7 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 
 - Writing to git: staging, committing, reverting. Sidekyk only shows; the agent or the terminal
   changes things.
+- Editing files: the explorer only shows them; "open in editor" is the way to change one.
 - Running or embedding the agent.
 - Replacing the `git` CLI with an in-process library (`gix`, libgit2) while process startup is
   not what the timings show as slow.
