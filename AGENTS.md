@@ -29,6 +29,7 @@ Renderer code is in `src/`: composition root and shell in `src/app`, the review 
 - `pnpm lint`: Biome lint and format check. `pnpm format` fixes formatting.
 - `pnpm typecheck`, `pnpm knip`, `pnpm boundaries:check`: types, dead code, layer rules.
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests, including end-to-end tests against a real git in a scratch repository.
+- `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml snapshot_timing -- --ignored --nocapture`: snapshot timing on a real repository, to compare before and after a change on the hot path.
 - `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
 
 Before handing off, run every check that covers the change and leave zero errors and zero warnings.

@@ -22,7 +22,7 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 - [x] Ignore changes in gitignored paths (`git check-ignore --stdin`, cached per directory and
       cleared when a `.gitignore` changes), so a build or a dependency install does not refresh
       the app over and over
-- [ ] Run the snapshot's git commands in parallel (`std::thread::scope`)
+- [x] Run the snapshot's git commands in parallel (`std::thread::scope`)
 - [ ] At most one snapshot in flight per repository; later requests coalesce into it
 - [ ] Bound the total bytes and the number of untracked files read for line counts
 - [ ] Virtualized diff and file list for very large changes (`@tanstack/react-virtual`)

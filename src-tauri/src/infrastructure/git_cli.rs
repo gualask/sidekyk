@@ -167,6 +167,27 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_before_the_first_commit_adds_up_staged_and_unstaged() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        git(root, &["init", "-q", "-b", "main"]);
+        write(root, "a.ts", "one\n");
+        git(root, &["add", "a.ts"]);
+        write(root, "a.ts", "one\ntwo\n");
+        write(root, "b.ts", "x\ny\n");
+
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, root).unwrap();
+        let value = snapshot_json(&load_snapshot(&backend, &repo.info).unwrap());
+
+        // a.ts: +1 staged and +1 unstaged; b.ts: +2 untracked
+        assert_eq!(
+            value["totals"],
+            json!({ "files": 2, "additions": 4, "deletions": 0 })
+        );
+    }
+
+    #[test]
     fn diffs_cover_each_area_and_refuse_paths_outside_the_repository() {
         let dir = scratch_repo();
         let backend = LocalRepositoryBackend::default();
@@ -232,5 +253,31 @@ mod tests {
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "not_a_repository");
+    }
+
+    /// Times the snapshot on a real repository:
+    /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release snapshot_timing -- --ignored --nocapture`
+    #[test]
+    #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
+    fn snapshot_timing() {
+        let repo = std::env::var("SIDEKYK_BENCH_REPO").expect("SIDEKYK_BENCH_REPO is set");
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, Path::new(&repo)).unwrap();
+        load_snapshot(&backend, &repo.info).unwrap();
+
+        let mut runs: Vec<_> = (0..20)
+            .map(|_| {
+                let start = std::time::Instant::now();
+                load_snapshot(&backend, &repo.info).unwrap();
+                start.elapsed()
+            })
+            .collect();
+        runs.sort();
+        println!(
+            "snapshot: median {:?}, min {:?}, max {:?}",
+            runs[runs.len() / 2],
+            runs[0],
+            runs[runs.len() - 1]
+        );
     }
 }

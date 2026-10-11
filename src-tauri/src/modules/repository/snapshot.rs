@@ -61,20 +61,35 @@ pub(crate) fn load_snapshot(
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RepositorySnapshot> {
     let root = Path::new(&repository.root);
-    let status = parse_porcelain_v2(&git_checked(
-        backend,
-        root,
-        &[
-            "status",
-            "--porcelain=v2",
-            "-z",
-            "--branch",
-            "--untracked-files=all",
-        ],
-        &[0],
-    )?);
-    let unstaged = by_path(numstat(backend, root, &[])?);
-    let staged = by_path(numstat(backend, root, &["--cached"])?);
+    // The four commands are independent, so they run together and the snapshot costs about as
+    // much as the slowest one. The diff against HEAD fails before the first commit; its result
+    // is only used when status reports a commit.
+    let (status, unstaged, staged, against_head) = std::thread::scope(|scope| {
+        let unstaged = scope.spawn(|| numstat(backend, root, &[]));
+        let staged = scope.spawn(|| numstat(backend, root, &["--cached"]));
+        let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
+        let status = git_checked(
+            backend,
+            root,
+            &[
+                "status",
+                "--porcelain=v2",
+                "-z",
+                "--branch",
+                "--untracked-files=all",
+            ],
+            &[0],
+        );
+        let join = |handle: std::thread::ScopedJoinHandle<'_, _>| {
+            handle
+                .join()
+                .unwrap_or_else(|_| Err(anyhow::anyhow!("git thread panicked")))
+        };
+        (status, join(unstaged), join(staged), join(against_head))
+    });
+    let status = parse_porcelain_v2(&status?);
+    let unstaged = by_path(unstaged?);
+    let staged = by_path(staged?);
 
     let mut files = Vec::new();
     let mut untracked_counts = Vec::new();
@@ -108,7 +123,7 @@ pub(crate) fn load_snapshot(
     // Against HEAD a line edited, staged, then edited again counts once. Before the first commit
     // there is no HEAD, and the staged and unstaged counts are added up instead.
     let tracked = if status.branch.commit.is_some() {
-        sum(by_path(numstat(backend, root, &["HEAD"])?).into_values())
+        sum(by_path(against_head?).into_values())
     } else {
         sum(staged.into_values().chain(unstaged.into_values()))
     };

@@ -71,6 +71,10 @@ When the selected file leaves the list, the selection falls back to the first fi
 4. Totals compare against HEAD (`git diff HEAD --numstat`), so a line staged and edited again
    counts once. Before the first commit the staged and unstaged counts are added instead.
 
+The four git commands are independent and run in parallel, so a snapshot costs about as much as
+the slowest of them. `snapshot_timing` (an ignored test, see `AGENTS.md`) measures it on any
+repository.
+
 ### Diffs
 
 `git diff [--cached] --no-color --no-ext-diff -U3 -- <path>`; a staged rename passes both paths;
