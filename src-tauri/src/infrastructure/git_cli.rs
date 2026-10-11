@@ -35,6 +35,9 @@ impl LocalRepositoryBackend {
         };
         let mut command = Command::new(bin);
         command
+            // A repository's config can name an fsmonitor command, which git would run on every
+            // refresh. Sidekyk opens any folder, so it never lets a repository run code.
+            .args(["-c", "core.fsmonitor=false"])
             .args(args)
             .current_dir(cwd)
             // Never take index.lock: a refresh must not fight the agent's own git commands, and
@@ -244,6 +247,25 @@ mod tests {
         ));
         assert!(ignored.any_visible(&backend, &changed(&["vendor/kept.js"])));
         assert!(ignored.any_visible(&backend, &changed(&["target/a.o", "src/cart.ts"])));
+    }
+
+    #[test]
+    fn a_repository_cannot_run_an_fsmonitor_command() {
+        let dir = scratch_repo();
+        let marker = dir.path().join("fsmonitor-ran");
+        let hook = dir.path().join("hook.sh");
+        std::fs::write(&hook, format!("#!/bin/sh\ntouch '{}'\n", marker.display())).unwrap();
+        std::fs::set_permissions(&hook, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+        git(
+            dir.path(),
+            &["config", "core.fsmonitor", hook.to_str().unwrap()],
+        );
+
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        load_snapshot(&backend, &repo.info).unwrap();
+        assert!(!marker.exists(), "the repository's fsmonitor command ran");
     }
 
     #[test]

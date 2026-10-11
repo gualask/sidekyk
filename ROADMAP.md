@@ -27,7 +27,7 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 - [ ] Bound the total bytes and the number of untracked files read for line counts
 - [ ] Virtualized diff and file list for very large changes (`@tanstack/react-virtual`)
 - [ ] Release profile with LTO and one codegen unit
-- [ ] Run git with `-c core.fsmonitor=false`, so a repository's config cannot run a command on
+- [x] Run git with `-c core.fsmonitor=false`, so a repository's config cannot run a command on
       every refresh
 - [ ] Timings for snapshot, diff and first paint, to measure every change against
 

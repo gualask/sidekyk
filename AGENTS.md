@@ -54,6 +54,7 @@ Command names, arguments, responses, the `repository-changed` event and the `{ c
 ## Invariants
 
 - Read-only. No command may stage, commit, revert or write files. Git runs with `GIT_OPTIONAL_LOCKS=0` so a refresh never takes `index.lock` while the agent runs git, and never rewrites the index (which would wake the watcher again).
+- Git runs with `-c core.fsmonitor=false`: Sidekyk opens any folder, and a repository's config must never make it run a command.
 - Paths from the frontend pass `checked_path` (relative, no `..`) before reaching git.
 - In the git dir, only the index, HEAD, refs and `info/` trigger `repository-changed` (never `*.lock`). In the working tree, a change triggers it unless git ignores the path (`git check-ignore`, with ignored directories remembered until a `.gitignore`, the index or the excludes change). The frontend then invalidates every `['repository', …]` query.
 - Docs and code comments are in English.
