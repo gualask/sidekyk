@@ -35,6 +35,9 @@ debug = 1
 incremental = false
 
 [profile.release]
+# Whole-program optimization: a smaller, faster binary for a longer release build.
+lto = true
+codegen-units = 1
 strip = "debuginfo"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
