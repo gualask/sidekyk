@@ -12,7 +12,9 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "sidekyk_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+# Desktop only: the staticlib and cdylib of Tauri's template exist for iOS and Android, and on
+# desktop they only add hundreds of megabytes to every build.
+crate-type = ["rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
@@ -30,9 +32,19 @@ notify-debouncer-mini = "0.7"
 [dev-dependencies]
 tempfile = "3"
 
+# Profiles tuned for disk use first: a full dev, test and clippy cycle takes about 1 GB of
+# `target/` instead of 2.2 GB, at the cost of slower clean builds.
 [profile.dev]
-debug = 1
+# File and line in backtraces, without full debug info.
+debug = "line-tables-only"
+# Incremental caches grow with every change and are never pruned.
 incremental = false
+
+[profile.dev.package."*"]
+# Dependencies carry no debug info, and are lightly optimized: smaller artifacts and a faster
+# dev app, built once.
+debug = false
+opt-level = 1
 
 [profile.release]
 # Whole-program optimization: a smaller, faster binary for a longer release build.
