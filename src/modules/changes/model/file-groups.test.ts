@@ -10,6 +10,7 @@ function file(path: string, area: ChangedFile['area']): ChangedFile {
         kind: area === 'untracked' ? 'untracked' : 'modified',
         additions: 1,
         deletions: 0,
+        binary: false,
     };
 }
 

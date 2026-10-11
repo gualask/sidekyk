@@ -78,6 +78,7 @@ export function FileList({
                                             <LineCounts
                                                 additions={file.additions}
                                                 deletions={file.deletions}
+                                                binary={file.binary}
                                             />
                                         </span>
                                     </button>

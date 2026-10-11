@@ -48,7 +48,11 @@ export function DiffView({ root, file }: { root: string; file: ChangedFile }) {
                 </div>
                 <span className="chip shrink-0">{AREA_LABEL[file.area]}</span>
                 <span className="shrink-0 text-xs">
-                    <LineCounts additions={file.additions} deletions={file.deletions} />
+                    <LineCounts
+                        additions={file.additions}
+                        deletions={file.deletions}
+                        binary={file.binary}
+                    />
                 </span>
                 <button
                     type="button"

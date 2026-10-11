@@ -1,11 +1,34 @@
 //! Parser for `git diff --numstat -z`, plus line counting for untracked files.
 
+/// Lines added and removed in one file. Both are `None` for a binary file, and for a file that
+/// was not counted.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct Counts {
+    pub(super) additions: Option<u32>,
+    pub(super) deletions: Option<u32>,
+    pub(super) binary: bool,
+}
+
+impl Counts {
+    pub(super) const BINARY: Self = Self {
+        additions: None,
+        deletions: None,
+        binary: true,
+    };
+
+    pub(super) fn lines(additions: u32, deletions: u32) -> Self {
+        Self {
+            additions: Some(additions),
+            deletions: Some(deletions),
+            binary: false,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct LineCounts {
     pub(super) path: String,
-    /// `None` for binary files.
-    pub(super) additions: Option<u32>,
-    pub(super) deletions: Option<u32>,
+    pub(super) counts: Counts,
 }
 
 /// Each record is `<added>\t<deleted>\t<path>`. A rename leaves the path empty and puts
@@ -30,8 +53,15 @@ pub(super) fn parse_numstat_z(bytes: &[u8]) -> Vec<LineCounts> {
         };
         counts.push(LineCounts {
             path: path.to_string(),
-            additions: added.parse().ok(),
-            deletions: deleted.parse().ok(),
+            counts: if added == "-" && deleted == "-" {
+                Counts::BINARY
+            } else {
+                Counts {
+                    additions: added.parse().ok(),
+                    deletions: deleted.parse().ok(),
+                    binary: false,
+                }
+            },
         });
     }
 
@@ -61,18 +91,15 @@ mod tests {
             vec![
                 LineCounts {
                     path: "src/a b.ts".into(),
-                    additions: Some(3),
-                    deletions: Some(1),
+                    counts: Counts::lines(3, 1),
                 },
                 LineCounts {
                     path: "logo.png".into(),
-                    additions: None,
-                    deletions: None,
+                    counts: Counts::BINARY,
                 },
                 LineCounts {
                     path: "new.ts".into(),
-                    additions: Some(2),
-                    deletions: Some(0),
+                    counts: Counts::lines(2, 0),
                 },
             ]
         );

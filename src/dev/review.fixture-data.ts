@@ -71,6 +71,18 @@ index 0000000..e69de29
 Binary files /dev/null and b/public/logo.png differ
 `;
 
+/** A new file too large for its lines to be counted. */
+const SEED_SQL = `diff --git a/db/seed.sql b/db/seed.sql
+new file mode 100644
+index 0000000..3f2a9c1
+--- /dev/null
++++ b/db/seed.sql
+@@ -0,0 +1,3 @@
++INSERT INTO coupons (code, percent) VALUES ('WELCOME10', 10);
++INSERT INTO coupons (code, percent) VALUES ('SPRING15', 15);
++INSERT INTO coupons (code, percent) VALUES ('VIP25', 25);
+`;
+
 type FixtureFile = ChangedFile & { diff: string };
 
 const FILES: FixtureFile[] = [
@@ -81,6 +93,7 @@ const FILES: FixtureFile[] = [
         kind: 'modified',
         additions: 3,
         deletions: 1,
+        binary: false,
         diff: TOTAL_TS,
     },
     {
@@ -90,6 +103,7 @@ const FILES: FixtureFile[] = [
         kind: 'deleted',
         additions: 0,
         deletions: 4,
+        binary: false,
         diff: DISCOUNTS_TS,
     },
     {
@@ -99,7 +113,18 @@ const FILES: FixtureFile[] = [
         kind: 'untracked',
         additions: 6,
         deletions: 0,
+        binary: false,
         diff: COUPON_TS,
+    },
+    {
+        path: 'db/seed.sql',
+        origPath: null,
+        area: 'untracked',
+        kind: 'untracked',
+        additions: null,
+        deletions: null,
+        binary: false,
+        diff: SEED_SQL,
     },
     {
         path: 'src/utils/money.ts',
@@ -108,6 +133,7 @@ const FILES: FixtureFile[] = [
         kind: 'renamed',
         additions: 1,
         deletions: 1,
+        binary: false,
         diff: MONEY_TS,
     },
     {
@@ -117,6 +143,7 @@ const FILES: FixtureFile[] = [
         kind: 'added',
         additions: null,
         deletions: null,
+        binary: true,
         diff: LOGO_PNG,
     },
 ];
@@ -135,7 +162,7 @@ export function reviewSnapshot(clean: boolean): RepositorySnapshot {
         files,
         totals: clean
             ? { files: 0, additions: 0, deletions: 0 }
-            : { files: 5, additions: 10, deletions: 6 },
+            : { files: 6, additions: 10, deletions: 6 },
     };
 }
 

@@ -36,9 +36,10 @@ export interface ChangedFile {
     origPath: string | null;
     area: ChangeArea;
     kind: ChangeKind;
-    /** null for binary files or when the count is unknown. */
+    /** null for binary files and for files that were not counted. */
     additions: number | null;
     deletions: number | null;
+    binary: boolean;
 }
 
 /** Everything that differs from HEAD, staged or not, untracked files included. */

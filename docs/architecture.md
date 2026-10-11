@@ -70,7 +70,9 @@ When the selected file leaves the list, the selection falls back to the first fi
 
 1. `git status --porcelain=v2 -z --branch --untracked-files=all` — branch, ahead/behind, entries.
 2. `git diff --numstat -z` and `git diff --cached --numstat -z` — per-file counts per area.
-3. Untracked files are counted by reading them (binary when a NUL appears in the first 8 KiB).
+3. Untracked files are counted by reading them (binary when a NUL appears in the first 8 KiB),
+   within limits per snapshot: 4 MiB per file, 32 MiB and 2,000 files in all. A file past them is
+   not counted, which the frontend shows apart from binary (`binary` is a field of its own).
 4. Totals compare against HEAD (`git diff HEAD --numstat`), so a line staged and edited again
    counts once. Before the first commit the staged and unstaged counts are added instead.
 

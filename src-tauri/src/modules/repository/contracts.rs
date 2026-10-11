@@ -70,9 +70,10 @@ pub(crate) struct ChangedFile {
     pub(crate) orig_path: Option<String>,
     pub(crate) area: ChangeArea,
     pub(crate) kind: ChangeKind,
-    /// `None` for binary files or when the count is unknown.
+    /// `None` for binary files and for files that were not counted.
     pub(crate) additions: Option<u32>,
     pub(crate) deletions: Option<u32>,
+    pub(crate) binary: bool,
 }
 
 /// Everything that differs from HEAD, staged or not, untracked files included.
@@ -136,6 +137,7 @@ mod tests {
                 kind: ChangeKind::TypeChanged,
                 additions: None,
                 deletions: Some(2),
+                binary: false,
             }],
             totals: ChangeTotals {
                 files: 1,
@@ -161,7 +163,8 @@ mod tests {
                     "area": "staged",
                     "kind": "type-changed",
                     "additions": null,
-                    "deletions": 2
+                    "deletions": 2,
+                    "binary": false
                 }],
                 "totals": { "files": 1, "additions": 0, "deletions": 2 }
             })
