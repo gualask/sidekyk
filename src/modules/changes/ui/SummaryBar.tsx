@@ -44,18 +44,18 @@ export function SummaryBar({
                         <IconGitBranch size={14} />
                         {branchLabel(snapshot)}
                     </span>
-                    {snapshot.branch.ahead > 0 && (
+                    {snapshot.branch.ahead > 0 ? (
                         <span className="chip" title="Commits not pushed">
                             <IconArrowUp size={13} />
                             {snapshot.branch.ahead}
                         </span>
-                    )}
-                    {snapshot.branch.behind > 0 && (
+                    ) : null}
+                    {snapshot.branch.behind > 0 ? (
                         <span className="chip" title="Commits not pulled">
                             <IconArrowDown size={13} />
                             {snapshot.branch.behind}
                         </span>
-                    )}
+                    ) : null}
                 </div>
             ) : null}
 
