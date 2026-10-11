@@ -277,29 +277,63 @@ mod tests {
         assert_eq!(err.to_string(), "not_a_repository");
     }
 
-    /// Times the snapshot on a real repository:
-    /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release snapshot_timing -- --ignored --nocapture`
-    #[test]
-    #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
-    fn snapshot_timing() {
-        let repo = std::env::var("SIDEKYK_BENCH_REPO").expect("SIDEKYK_BENCH_REPO is set");
-        let backend = LocalRepositoryBackend::default();
-        let repo = resolve_repository(&backend, Path::new(&repo)).unwrap();
-        load_snapshot(&backend, &repo.info).unwrap();
-
-        let mut runs: Vec<_> = (0..20)
+    /// The median, min and max of `runs` calls to `work`, after one warm-up call.
+    fn time(runs: usize, mut work: impl FnMut()) -> String {
+        work();
+        let mut times: Vec<_> = (0..runs)
             .map(|_| {
                 let start = std::time::Instant::now();
-                load_snapshot(&backend, &repo.info).unwrap();
+                work();
                 start.elapsed()
             })
             .collect();
-        runs.sort();
+        times.sort();
+        format!(
+            "median {:?}, min {:?}, max {:?}",
+            times[runs / 2],
+            times[0],
+            times[runs - 1]
+        )
+    }
+
+    /// Times the snapshot and the diff of the largest changed file on a real repository:
+    /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
+    #[test]
+    #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
+    fn backend_timings() {
+        let repo = std::env::var("SIDEKYK_BENCH_REPO").expect("SIDEKYK_BENCH_REPO is set");
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, Path::new(&repo)).unwrap();
+
         println!(
-            "snapshot: median {:?}, min {:?}, max {:?}",
-            runs[runs.len() / 2],
-            runs[0],
-            runs[runs.len() - 1]
+            "snapshot: {}",
+            time(20, || {
+                load_snapshot(&backend, &repo.info).unwrap();
+            })
+        );
+
+        let snapshot = load_snapshot(&backend, &repo.info).unwrap();
+        let Some(largest) = snapshot
+            .files
+            .iter()
+            .max_by_key(|f| f.additions.unwrap_or(0) + f.deletions.unwrap_or(0))
+        else {
+            println!("diff: no changed file");
+            return;
+        };
+        let request: FileDiffRequest = serde_json::from_value(json!({
+            "path": largest.path,
+            "origPath": largest.orig_path,
+            "area": largest.area,
+        }))
+        .unwrap();
+        println!(
+            "diff of {} ({:?}): {}",
+            largest.path,
+            largest.area,
+            time(20, || {
+                load_file_diff(&backend, &repo.info, &request).unwrap();
+            })
         );
     }
 }

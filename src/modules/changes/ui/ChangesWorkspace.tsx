@@ -53,14 +53,14 @@ export function ChangesWorkspace({ repository }: { repository: RepositoryInfo })
                 </div>
             ) : null}
             <div className="flex min-h-0 flex-1">
-                <aside className="w-72 shrink-0 overflow-y-auto border-r border-ui-border bg-ui-surface">
+                <aside className="w-72 shrink-0 border-r border-ui-border bg-ui-surface">
                     <FileList
                         files={snapshot.data?.files ?? []}
                         selectedKey={selected ? fileKey(selected) : null}
                         onSelect={(file) => setSelectedKey(fileKey(file))}
                     />
                 </aside>
-                <main className="min-w-0 flex-1 overflow-auto bg-ui-surface-subtle">
+                <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {selected ? (
                         <DiffView key={fileKey(selected)} root={repository.root} file={selected} />
                     ) : snapshot.isSuccess ? (

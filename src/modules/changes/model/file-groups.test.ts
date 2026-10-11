@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileKey, groupFiles, orderedFiles, splitPath } from './file-groups';
+import { fileKey, fileListRows, groupFiles, orderedFiles, splitPath } from './file-groups';
 import type { ChangedFile } from './repository.types';
 
 function file(path: string, area: ChangedFile['area']): ChangedFile {
@@ -39,6 +39,24 @@ describe('file groups', () => {
             'unstaged:a.ts',
             'unstaged:b.ts',
             'untracked:new.md',
+            'staged:z.ts',
+        ]);
+    });
+
+    it('flattens the groups into headings followed by their files', () => {
+        expect(
+            fileListRows(files).map((row) =>
+                row.kind === 'group'
+                    ? `${row.label} (${row.count})${row.first ? ' first' : ''}`
+                    : fileKey(row.file),
+            ),
+        ).toEqual([
+            'Changes (2) first',
+            'unstaged:a.ts',
+            'unstaged:b.ts',
+            'New files (1)',
+            'untracked:new.md',
+            'Staged (1)',
             'staged:z.ts',
         ]);
     });

@@ -1,8 +1,9 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { RepositoryInfo } from '@/modules/changes';
+import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
 
-export const SCENARIOS = ['review', 'clean', 'no-repo'] as const;
+export const SCENARIOS = ['review', 'clean', 'no-repo', 'large'] as const;
 export type Scenario = (typeof SCENARIOS)[number];
 
 export function isScenario(value: string | null): value is Scenario {
@@ -20,8 +21,10 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 active = FIXTURE_REPOSITORY;
                 return active;
             },
-            getSnapshot: async () => reviewSnapshot(scenario === 'clean'),
-            getFileDiff: async (request) => reviewDiff(request),
+            getSnapshot: async () =>
+                scenario === 'large' ? largeSnapshot() : reviewSnapshot(scenario === 'clean'),
+            getFileDiff: async (request) =>
+                scenario === 'large' ? largeDiff(request) : reviewDiff(request),
             onRepositoryChanged: () => () => undefined,
         },
     };

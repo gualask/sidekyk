@@ -27,7 +27,9 @@ cannot see.
 - `src/modules/changes/` — the review workflow.
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
-  - `ui/` — summary bar, file list, diff view, hunk block, empty states.
+  - `ui/` — summary bar, file list, diff view, diff rows, empty states. The file list and the
+    diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
+    (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`) implementing the ports.
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, clipboard hook, error
   messages.
@@ -77,8 +79,8 @@ When the selected file leaves the list, the selection falls back to the first fi
    counts once. Before the first commit the staged and unstaged counts are added instead.
 
 The four git commands are independent and run in parallel, so a snapshot costs about as much as
-the slowest of them. `snapshot_timing` (an ignored test, see `AGENTS.md`) measures it on any
-repository.
+the slowest of them. `backend_timings` (an ignored test, see `AGENTS.md`) measures the snapshot
+and a diff on any repository.
 
 ### Diffs
 

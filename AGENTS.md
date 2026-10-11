@@ -29,14 +29,14 @@ Renderer code is in `src/`: composition root and shell in `src/app`, the review 
 - `pnpm lint`: Biome lint and format check. `pnpm format` fixes formatting.
 - `pnpm typecheck`, `pnpm knip`, `pnpm boundaries:check`: types, dead code, layer rules.
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests, including end-to-end tests against a real git in a scratch repository.
-- `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml snapshot_timing -- --ignored --nocapture`: snapshot timing on a real repository, to compare before and after a change on the hot path.
+- `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml backend_timings -- --ignored --nocapture`: snapshot and diff timings on a real repository, to compare before and after a change on the hot path.
 - `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
 
 Before handing off, run every check that covers the change and leave zero errors and zero warnings.
 
 ## UI Development Workflow
 
-Inspect UI changes in the browser on fixtures, not on live Tauri data. Run `pnpm dev`, then open `http://localhost:1420/?dev=app&scenario=review` (also `clean`, `no-repo`). The fixture ports and data live in `src/dev/`; add a scenario there when a state needs deterministic review. Check both light and dark (`prefers-color-scheme`).
+Inspect UI changes in the browser on fixtures, not on live Tauri data. Run `pnpm dev`, then open `http://localhost:1420/?dev=app&scenario=review` (also `clean`, `no-repo`, and `large` with 5,000 files and a 50,000-line diff for performance). The fixture ports and data live in `src/dev/`; add a scenario there when a state needs deterministic review. Check both light and dark (`prefers-color-scheme`).
 
 ## Coding Style & Boundaries
 
