@@ -1,0 +1,67 @@
+{
+    "$schema": "https://biomejs.dev/schema.json",
+    "vcs": {
+        "enabled": true,
+        "clientKind": "git",
+        "useIgnoreFile": true
+    },
+    "files": {
+        "includes": ["src/**", "*.json", "*.js", "*.ts", "*.html"]
+    },
+    "formatter": {
+        "indentStyle": "space",
+        "indentWidth": 4,
+        "lineWidth": 100
+    },
+    "css": {
+        "parser": {
+            "cssModules": true,
+            "tailwindDirectives": true
+        }
+    },
+    "javascript": {
+        "formatter": {
+            "semicolons": "always",
+            "quoteStyle": "single",
+            "trailingCommas": "all"
+        }
+    },
+    "linter": {
+        "enabled": true,
+        "domains": {
+            "react": "all",
+            "types": "all"
+        },
+        "rules": {
+            "preset": "recommended",
+            "a11y": {
+                "noStaticElementInteractions": "off",
+                "useKeyWithClickEvents": "off",
+                "noSvgWithoutTitle": "off"
+            },
+            "performance": {
+                "noJsxPropsBind": "off"
+            },
+            "suspicious": {
+                "noConsole": "error",
+                "noDebugger": "error",
+                "noUnnecessaryConditions": "off"
+            },
+            "style": {
+                "useImportType": "error",
+                "useSelfClosingElements": "error",
+                "useComponentExportOnlyModules": {
+                    "level": "warn",
+                    "options": {
+                        "allowConstantExport": true
+                    }
+                }
+            },
+            "nursery": {
+                "noFloatingPromises": "error",
+                "noMisusedPromises": "off",
+                "useAwaitThenable": "error"
+            }
+        }
+    }
+}

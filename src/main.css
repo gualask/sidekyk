@@ -1,0 +1,41 @@
+@import "tailwindcss";
+@import "./shared/ui/theme.css";
+@import "./shared/ui/primitives.css";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+    :where(*) {
+        scrollbar-width: thin;
+        scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+    }
+    :where(*)::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    :where(*)::-webkit-scrollbar-thumb {
+        background: var(--ui-scrollbar-thumb);
+        border-radius: 9999px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+    }
+    :where(*)::-webkit-scrollbar-thumb:hover {
+        background: var(--ui-scrollbar-thumb-hover);
+    }
+    :where(*)::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    html,
+    body,
+    #root {
+        height: 100%;
+    }
+}
+
+body {
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
+    font-variant-ligatures: none;
+    background-color: var(--ui-bg);
+    color: var(--ui-text);
+    overflow: hidden;
+}

@@ -1,0 +1,110 @@
+use serde::ser::SerializeStruct;
+use std::fmt;
+
+/// Top-level error type returned by Tauri commands.
+///
+/// The frontend receives a stable payload `{ code, message }` via the custom `Serialize`
+/// implementation below.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum AppError {
+    #[error(transparent)]
+    Anyhow(#[from] anyhow::Error),
+}
+
+/// Stable codes understood by the frontend's user-facing error formatter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum UserFacingErrorCode {
+    GitNotFound,
+    NotARepository,
+    NoRepositoryOpen,
+    PathOutsideRepository,
+}
+
+impl UserFacingErrorCode {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::GitNotFound => "git_not_found",
+            Self::NotARepository => "not_a_repository",
+            Self::NoRepositoryOpen => "no_repository_open",
+            Self::PathOutsideRepository => "path_outside_repository",
+        }
+    }
+}
+
+/// An error intended to be surfaced to the user (via a stable error `code`).
+///
+/// Wrap this inside `anyhow::Error` so it can carry context while still producing a
+/// frontend-friendly `{ code, message }` payload.
+#[derive(Debug)]
+pub(crate) struct UserFacingError {
+    pub(crate) code: UserFacingErrorCode,
+}
+
+impl UserFacingError {
+    pub(crate) fn new(code: UserFacingErrorCode) -> Self {
+        Self { code }
+    }
+}
+
+impl fmt::Display for UserFacingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.code.as_str())
+    }
+}
+
+impl std::error::Error for UserFacingError {}
+
+/// Shorthand for an `anyhow::Error` carrying a user-facing code.
+pub(crate) fn user_facing(code: UserFacingErrorCode) -> anyhow::Error {
+    anyhow::Error::new(UserFacingError::new(code))
+}
+
+impl serde::Serialize for AppError {
+    fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+        let AppError::Anyhow(err) = self;
+        let code = err
+            .downcast_ref::<UserFacingError>()
+            .map_or("unknown", |user| user.code.as_str());
+
+        let mut st = s.serialize_struct("AppError", 2)?;
+        st.serialize_field("code", code)?;
+        st.serialize_field("message", &format!("{err:#}"))?;
+        st.end()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serializes_user_facing_codes_and_unknown_errors() {
+        let known = AppError::from(user_facing(UserFacingErrorCode::NotARepository));
+        assert_eq!(
+            serde_json::to_value(known).unwrap(),
+            serde_json::json!({ "code": "not_a_repository", "message": "not_a_repository" })
+        );
+
+        let unknown = AppError::from(anyhow::anyhow!("git exploded"));
+        assert_eq!(
+            serde_json::to_value(unknown).unwrap(),
+            serde_json::json!({ "code": "unknown", "message": "git exploded" })
+        );
+    }
+
+    #[test]
+    fn user_facing_error_codes_keep_the_wire_contract() {
+        let cases = [
+            (UserFacingErrorCode::GitNotFound, "git_not_found"),
+            (UserFacingErrorCode::NotARepository, "not_a_repository"),
+            (UserFacingErrorCode::NoRepositoryOpen, "no_repository_open"),
+            (
+                UserFacingErrorCode::PathOutsideRepository,
+                "path_outside_repository",
+            ),
+        ];
+        for (code, wire) in cases {
+            assert_eq!(code.as_str(), wire);
+        }
+    }
+}

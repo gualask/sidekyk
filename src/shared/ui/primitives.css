@@ -1,0 +1,24 @@
+@layer components {
+    .btn-primary {
+        @apply flex min-h-10 items-center gap-2 rounded-lg px-5 py-2 text-sm font-semibold shadow-md transition-[colors,transform] active:scale-[0.97] motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-40 disabled:active:scale-100;
+        background-color: var(--ui-accent-solid);
+        color: var(--ui-accent-on-solid);
+    }
+    .btn-primary:hover:not(:disabled) {
+        background-color: var(--ui-accent-solid-hover);
+    }
+    .btn-ghost-sm {
+        @apply flex min-h-8 items-center gap-1.5 rounded-md bg-ui-surface-hover px-2.5 py-1 text-xs font-medium text-ui-text-secondary transition-[colors,transform] hover:bg-ui-accent-soft hover:text-ui-accent-on-soft active:scale-[0.97] motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-40 disabled:active:scale-100;
+    }
+    .btn-icon {
+        @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ui-text-muted transition-[colors,transform] hover:bg-ui-surface-hover hover:text-ui-text-secondary active:scale-[0.93] motion-reduce:transform-none motion-reduce:transition-none disabled:opacity-40;
+    }
+    .btn-primary,
+    .btn-ghost-sm,
+    .btn-icon {
+        @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-offset-2 focus-visible:ring-offset-ui-surface disabled:cursor-not-allowed;
+    }
+    .chip {
+        @apply inline-flex h-6 items-center gap-1 rounded-md bg-ui-surface-hover px-2 text-xs font-medium text-ui-text-secondary;
+    }
+}
