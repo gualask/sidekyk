@@ -13,7 +13,7 @@ Sidekyk must feel instant and stay invisible on system resources. This rule outr
 - Release builds are optimized for speed and size (LTO, one codegen unit, stripped).
 - Do not reinvent the wheel. When a battle-tested Rust crate or React library solves the problem well, use it instead of writing our own. Weigh it on maintenance, adoption, bundle size, startup time and memory, and compare it with the platform or a few lines of code.
 - Never add a dependency on your own: present the candidates with pros and cons to the maintainer and wait for a decision.
-- Zed (`github.com/zed-industries/zed`) is the reference for how a fast Rust app drives git and watches the filesystem (`crates/git`, `crates/worktree`, `crates/fs`). Read it for ideas, but its crates are GPL-3.0-or-later: never copy code from them. Only GPUI is Apache-2.0.
+- Zed (`github.com/zed-industries/zed`) is the reference for how a fast Rust app drives git and watches the filesystem (`crates/git`, `crates/worktree`, `crates/fs`). Read it for ideas, but its crates are GPL-3.0-or-later: never copy code from them. Only GPUI is Apache-2.0. A full clone with history lives in `.local/zed` (ignored by git; `git -C .local/zed pull` to update): read decisions with `git log -S`, `git log --grep` and the commit messages before guessing why Zed does something. If it is missing, clone it there again.
 
 ## Project Structure & Module Organization
 

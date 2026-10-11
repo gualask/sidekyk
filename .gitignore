@@ -34,3 +34,6 @@ dist-ssr
 .impeccable.md
 .impeccable/
 .agents
+
+# Local-only material, such as reference clones (see AGENTS.md)
+.local/

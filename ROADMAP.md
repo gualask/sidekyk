@@ -4,6 +4,12 @@ What Sidekyk does today and what is still missing, in priority order: first seei
 is doing, then giving it feedback. Items move to **Done** as they land; each one should keep the
 app read-only and follow the performance golden rule in `AGENTS.md`.
 
+## To do
+
+- [ ] Run the app (`pnpm tauri:dev`) after the performance work: the watcher filter, snapshot
+      coalescing and the rlib-only crate type are covered by tests and fixtures, but have not been
+      seen in the real app yet
+
 ## Done (MVP)
 
 - [x] Open a repository from a folder picker, the first CLI argument, or the last one used
