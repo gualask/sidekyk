@@ -58,6 +58,9 @@ rule in `AGENTS.md`.
 
 - [ ] Tray icon with the change count, and a menu to show the window or quit
 - [ ] Global shortcut to show and hide the window (configurable)
+- [ ] Follow the terminal (setting, off by default): when Sidekyk comes up, open the project of the
+      terminal tab used just before it; kitty first, other terminals when needed; any failure
+      leaves the current project (see docs/evolution.md)
 - [ ] Closing the window hides it instead of quitting; quit from the tray
 - [ ] Badge or tray hint when the agent changes files while the window is hidden
 - [ ] Compare against the default branch, for agents that commit as they go: diff the working

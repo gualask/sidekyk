@@ -60,10 +60,37 @@ locally in `.local/mocks/workspace.html` (not versioned). What it settles:
 - **Command palette** (`⌘K`): projects, panels, files of every project, notes.
 - **Notes** have "Copy for agent", like hunks.
 - **Still open**: tiles or tabs at level 1 (the mock has both, `T` switches).
-- **Not real yet**: the mock shows which agent is working ("Claude Code · 40s ago"). Sidekyk sees
-  file changes, not who made them; naming the agent needs a way to detect it (for example the
-  processes running in the repository), to be investigated. Without it, cards show only when
-  files last changed.
+- **Not taken**: the mock names the agent at work ("Claude Code · 40s ago"). Sidekyk sees file
+  changes, not who made them, and naming the agent is not wanted: cards show when files last
+  changed.
+
+## Follow the terminal
+
+The usual flow: in each terminal tab, `cd` into a repository and start the agent there (`claude`).
+Sidekyk is brought up from anywhere (global shortcut, launcher, Dock). With this feature on, it
+opens on the project of the terminal tab used just before, so moving to another tab and bringing
+Sidekyk up again shows the other project. No manual linking: the link is the directory the agent
+was started in.
+
+- **Which terminal**: Sidekyk remembers the last app that was frontmost before it. macOS reports
+  every app activation without any permission. Remembering it, instead of looking at the frontmost
+  app when Sidekyk appears, makes the launcher and the Dock work like the shortcut.
+- **Which tab**: Sidekyk asks that terminal for its active tab and the directory of its foreground
+  process, then resolves the git root and opens that project (adding it if new).
+- **Terminals**: one adapter each, since there is no generic way to know a terminal's active tab.
+  kitty first, through its remote control (`kitty @ ls`, which needs remote control turned on in
+  `kitty.conf`; socket-only, and used only to read). iTerm2, WezTerm and Terminal.app when needed
+  (AppleScript or their CLI; macOS asks once for automation permission).
+- **Opt-in, off by default**, in the settings. It depends on each terminal's API and
+  configuration, so it must never get in the way: if anything fails (unknown terminal, remote
+  control off, a tab outside any repository, the last app was not a terminal), Sidekyk silently
+  stays on the project it showed.
+- **Cost**: one call when Sidekyk is brought up, nothing while idle.
+- **To check when implementing**: whether `kitty @ ls` on kitty 0.49 marks the focused tab and
+  window, and how the socket is named when several kitty instances run.
+- **Rejected**: picking a window with a click, as macOS's screenshot tool does. It selects a
+  window, not a tab (two tabs of one kitty window are one window), and reading other apps' window
+  titles needs the screen recording permission.
 
 ## Ideas from tazly
 
@@ -173,7 +200,6 @@ When these land, `AGENTS.md` changes too:
 - Sync: conflict strategy, and whether to encrypt notes before upload.
 - Explorer: fuzzy matching in the frontend or the backend; `git grep` or ripgrep's crates.
 - Level 1 layout: tiles or tabs.
-- Naming the agent at work: how to detect it, or show only when files last changed.
 - Quick capture of a note through a global shortcut.
 - Free canvas: revisit after semantic zoom has been used for a while.
 
