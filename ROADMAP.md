@@ -29,7 +29,9 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 - [x] Release profile with LTO and one codegen unit
 - [x] Run git with `-c core.fsmonitor=false`, so a repository's config cannot run a command on
       every refresh
-- [ ] Timings for snapshot, diff and first paint, to measure every change against
+- [x] Snapshot and diff timings on any repository (`backend_timings`)
+- [ ] First paint and file switch timings as a repeatable script (today measured by hand on the
+      `large` fixture), and the same in the packaged app
 
 ## Next: see what the agent is doing
 
