@@ -3,6 +3,7 @@
 
 mod contracts;
 mod diff;
+mod ignored;
 mod numstat;
 mod open;
 mod ports;
@@ -14,6 +15,7 @@ pub(crate) use contracts::{
     REPOSITORY_CHANGED_EVENT,
 };
 pub(crate) use diff::load_file_diff;
+pub(crate) use ignored::IgnoredPaths;
 pub(crate) use open::resolve_repository;
 pub(crate) use ports::{GitOutput, RepositoryBackend};
 pub(crate) use snapshot::load_snapshot;

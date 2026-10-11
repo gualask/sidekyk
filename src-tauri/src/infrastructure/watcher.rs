@@ -10,24 +10,44 @@ use notify_debouncer_mini::{new_debouncer, DebounceEventResult, Debouncer};
 const QUIET_PERIOD: Duration = Duration::from_millis(250);
 
 /// The parts of the git dir that change what the app shows: the index (staging), HEAD and refs
-/// (branch, commits, ahead/behind). Objects and logs churn on every commit and say nothing new.
-const GIT_DIR_ENTRIES: [&str; 6] = [
+/// (branch, commits, ahead/behind), and `info/exclude` (which files are untracked). Objects and
+/// logs churn on every commit and say nothing new.
+const GIT_DIR_ENTRIES: [&str; 7] = [
     "index",
     "HEAD",
     "refs",
     "packed-refs",
     "FETCH_HEAD",
     "MERGE_HEAD",
+    "info",
 ];
 
-fn is_relevant(path: &Path, root: &Path, git_dir: &Path) -> bool {
-    if let Ok(inside_git_dir) = path.strip_prefix(git_dir) {
-        let is_lock = path.extension().is_some_and(|ext| ext == "lock");
-        let first = inside_git_dir.components().next();
-        return !is_lock
-            && matches!(first, Some(Component::Normal(name)) if GIT_DIR_ENTRIES.iter().any(|e| name == *e));
+/// What changed during one quiet period.
+#[derive(Debug, Default, PartialEq)]
+pub(crate) struct WatchedChanges {
+    /// The index, HEAD, refs or the exclude file changed.
+    pub(crate) git_dir: bool,
+    /// Changed paths in the working tree, absolute. Some of them may be ignored by git.
+    pub(crate) worktree: Vec<PathBuf>,
+}
+
+fn classify<'a>(
+    paths: impl Iterator<Item = &'a Path>,
+    root: &Path,
+    git_dir: &Path,
+) -> WatchedChanges {
+    let mut changes = WatchedChanges::default();
+    for path in paths {
+        if let Ok(inside_git_dir) = path.strip_prefix(git_dir) {
+            let is_lock = path.extension().is_some_and(|ext| ext == "lock");
+            let first = inside_git_dir.components().next();
+            changes.git_dir |= !is_lock
+                && matches!(first, Some(Component::Normal(name)) if GIT_DIR_ENTRIES.iter().any(|e| name == *e));
+        } else if path.starts_with(root) {
+            changes.worktree.push(path.to_path_buf());
+        }
     }
-    path.starts_with(root)
+    changes
 }
 
 /// Stops watching when dropped.
@@ -36,19 +56,22 @@ pub(crate) struct RepositoryWatcher {
 }
 
 impl RepositoryWatcher {
+    /// Calls `on_change` on the watcher's thread after each quiet period with relevant changes.
     pub(crate) fn start(
         root: PathBuf,
         git_dir: PathBuf,
-        on_change: impl Fn() + Send + 'static,
+        mut on_change: impl FnMut(WatchedChanges) + Send + 'static,
     ) -> anyhow::Result<Self> {
         let (watched_root, watched_git_dir) = (root.clone(), git_dir.clone());
         let mut debouncer = new_debouncer(QUIET_PERIOD, move |result: DebounceEventResult| {
             let Ok(events) = result else { return };
-            if events
-                .iter()
-                .any(|e| is_relevant(&e.path, &watched_root, &watched_git_dir))
-            {
-                on_change();
+            let changes = classify(
+                events.iter().map(|e| e.path.as_path()),
+                &watched_root,
+                &watched_git_dir,
+            );
+            if changes.git_dir || !changes.worktree.is_empty() {
+                on_change(changes);
             }
         })?;
         debouncer.watcher().watch(&root, RecursiveMode::Recursive)?;
@@ -67,35 +90,61 @@ impl RepositoryWatcher {
 mod tests {
     use super::*;
 
-    #[test]
-    fn worktree_files_and_index_or_refs_count_but_objects_and_locks_do_not() {
-        let root = Path::new("/r");
-        let git_dir = Path::new("/r/.git");
-        let relevant = |p: &str| is_relevant(Path::new(p), root, git_dir);
+    fn changes(paths: &[&str], root: &str, git_dir: &str) -> WatchedChanges {
+        classify(
+            paths.iter().map(Path::new),
+            Path::new(root),
+            Path::new(git_dir),
+        )
+    }
 
-        assert!(relevant("/r/src/a.ts"));
-        assert!(relevant("/r/.git/index"));
-        assert!(relevant("/r/.git/HEAD"));
-        assert!(relevant("/r/.git/refs/heads/main"));
-        assert!(!relevant("/r/.git/index.lock"));
-        assert!(!relevant("/r/.git/refs/heads/main.lock"));
-        assert!(!relevant("/r/.git/objects/ab/cdef"));
-        assert!(!relevant("/r/.git/logs/HEAD"));
-        assert!(!relevant("/r/.git"));
-        assert!(!relevant("/elsewhere/a.ts"));
+    #[test]
+    fn index_refs_and_excludes_count_but_objects_and_locks_do_not() {
+        let git_dir_counts = |p: &str| changes(&[p], "/r", "/r/.git").git_dir;
+
+        assert!(git_dir_counts("/r/.git/index"));
+        assert!(git_dir_counts("/r/.git/HEAD"));
+        assert!(git_dir_counts("/r/.git/refs/heads/main"));
+        assert!(git_dir_counts("/r/.git/info/exclude"));
+        assert!(!git_dir_counts("/r/.git/index.lock"));
+        assert!(!git_dir_counts("/r/.git/refs/heads/main.lock"));
+        assert!(!git_dir_counts("/r/.git/objects/ab/cdef"));
+        assert!(!git_dir_counts("/r/.git/logs/HEAD"));
+        assert!(!git_dir_counts("/r/.git"));
+    }
+
+    #[test]
+    fn worktree_paths_are_collected_and_the_git_dir_never_is() {
+        assert_eq!(
+            changes(
+                &[
+                    "/r/src/a.ts",
+                    "/r/.git/objects/ab",
+                    "/elsewhere/a.ts",
+                    "/r/target/x.o"
+                ],
+                "/r",
+                "/r/.git"
+            ),
+            WatchedChanges {
+                git_dir: false,
+                worktree: vec!["/r/src/a.ts".into(), "/r/target/x.o".into()],
+            }
+        );
     }
 
     #[test]
     fn a_git_dir_outside_the_root_is_still_filtered() {
-        let relevant = |p: &str| {
-            is_relevant(
-                Path::new(p),
-                Path::new("/wt"),
-                Path::new("/main/.git/worktrees/wt"),
-            )
-        };
-        assert!(relevant("/main/.git/worktrees/wt/index"));
-        assert!(!relevant("/main/.git/worktrees/wt/logs/HEAD"));
-        assert!(relevant("/wt/src/a.ts"));
+        let found = changes(
+            &[
+                "/main/.git/worktrees/wt/index",
+                "/main/.git/worktrees/wt/logs/HEAD",
+                "/wt/src/a.ts",
+            ],
+            "/wt",
+            "/main/.git/worktrees/wt",
+        );
+        assert!(found.git_dir);
+        assert_eq!(found.worktree, vec![PathBuf::from("/wt/src/a.ts")]);
     }
 }

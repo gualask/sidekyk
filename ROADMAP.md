@@ -19,7 +19,7 @@ app read-only and follow the performance golden rule in `AGENTS.md`.
 
 ## Now: performance and hardening
 
-- [ ] Ignore changes in gitignored paths (`git check-ignore --stdin`, cached per directory and
+- [x] Ignore changes in gitignored paths (`git check-ignore --stdin`, cached per directory and
       cleared when a `.gitignore` changes), so a build or a dependency install does not refresh
       the app over and over
 - [ ] Run the snapshot's git commands in parallel (`std::thread::scope`)

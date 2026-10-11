@@ -12,6 +12,9 @@ pub(crate) trait RepositoryBackend: Send + Sync {
     /// Runs `git` in `cwd` and returns its output whatever the exit code.
     fn git(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput>;
 
+    /// Like `git`, with `input` written to its standard input.
+    fn git_with_input(&self, cwd: &Path, args: &[&str], input: &[u8]) -> anyhow::Result<GitOutput>;
+
     /// Reads a working-tree file, or `None` when it is missing or larger than `limit` bytes.
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>>;
 }

@@ -8,6 +8,7 @@ workflow.
 
 ```text
 agent edits files ─▶ notify watcher (250 ms quiet period, filtered)
+                        └─▶ skip paths git ignores (check-ignore, cached per directory)
                         └─▶ event "repository-changed" { version: 1, root }
                               └─▶ frontend invalidates ['repository', …] queries
                                     ├─▶ get_repository_snapshot  (status + numstat ×3)
@@ -56,9 +57,9 @@ When the selected file leaves the list, the selection falls back to the first fi
   `get_repository_snapshot`, `get_file_diff`) and `state.rs`, the one place that switches the open
   repository and its watcher. Blocking git work runs on `spawn_blocking`.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
-  validation, wire contracts. No Tauri; the outside world is the `RepositoryBackend` port.
+  validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
-  `watcher.rs` (`notify-debouncer-mini` plus the relevance filter), `settings_store.rs` (last
+  `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes), `settings_store.rs` (last
   repository, through `tauri-plugin-store`).
 - `shared/error.rs` — `AppError`, serialized as `{ code, message }` with stable codes.
 

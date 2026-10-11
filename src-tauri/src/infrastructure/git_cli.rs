@@ -1,6 +1,7 @@
 //! The `git` CLI as the repository module's backend. No libgit2: every answer is what the user's
 //! own git would print.
 
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
@@ -27,12 +28,13 @@ pub(crate) struct LocalRepositoryBackend {
     git: OnceLock<Option<PathBuf>>,
 }
 
-impl RepositoryBackend for LocalRepositoryBackend {
-    fn git(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
+impl LocalRepositoryBackend {
+    fn command(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<Command> {
         let Some(bin) = self.git.get_or_init(find_git) else {
             return Err(user_facing(UserFacingErrorCode::GitNotFound));
         };
-        let out = Command::new(bin)
+        let mut command = Command::new(bin);
+        command
             .args(args)
             .current_dir(cwd)
             // Never take index.lock: a refresh must not fight the agent's own git commands, and
@@ -40,13 +42,40 @@ impl RepositoryBackend for LocalRepositoryBackend {
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("LC_ALL", "C")
-            .stdin(Stdio::null())
-            .output()?;
-        Ok(GitOutput {
-            code: out.status.code().unwrap_or(-1),
-            stdout: out.stdout,
-            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
-        })
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        Ok(command)
+    }
+}
+
+fn git_output(out: std::process::Output) -> GitOutput {
+    GitOutput {
+        code: out.status.code().unwrap_or(-1),
+        stdout: out.stdout,
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    }
+}
+
+impl RepositoryBackend for LocalRepositoryBackend {
+    fn git(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
+        let out = self.command(cwd, args)?.stdin(Stdio::null()).output()?;
+        Ok(git_output(out))
+    }
+
+    fn git_with_input(&self, cwd: &Path, args: &[&str], input: &[u8]) -> anyhow::Result<GitOutput> {
+        let mut child = self.command(cwd, args)?.stdin(Stdio::piped()).spawn()?;
+        let mut stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| anyhow::anyhow!("git stdin is not piped"))?;
+        // Written from another thread, so a large output cannot block git while we still write.
+        let out = std::thread::scope(|scope| {
+            let writer = scope.spawn(move || stdin.write_all(input));
+            let out = child.wait_with_output();
+            let _ = writer.join();
+            out
+        })?;
+        Ok(git_output(out))
     }
 
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {
@@ -64,7 +93,8 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_file_diff, load_snapshot, resolve_repository, FileDiffRequest, RepositorySnapshot,
+        load_file_diff, load_snapshot, resolve_repository, FileDiffRequest, IgnoredPaths,
+        RepositorySnapshot,
     };
     use serde_json::json;
 
@@ -170,6 +200,29 @@ mod tests {
         assert_eq!(staged.text, "");
 
         assert!(load_file_diff(&backend, &repo.info, &request("../x", "unstaged")).is_err());
+    }
+
+    #[test]
+    fn changes_git_ignores_do_not_count_unless_the_file_is_tracked() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, ".gitignore", "/target/\n*.log\nvendor/\n");
+        write(root, "vendor/kept.js", "x\n");
+        git(root, &["add", "-f", "vendor/kept.js"]);
+        write(root, "target/debug/a.o", "");
+        write(root, "src/debug.log", "");
+        write(root, "vendor/new.js", "");
+
+        let mut ignored = IgnoredPaths::new(root.to_path_buf());
+        let changed = |rels: &[&str]| rels.iter().map(|rel| root.join(rel)).collect::<Vec<_>>();
+        assert!(!ignored.any_visible(
+            &backend,
+            &changed(&["target/debug/a.o", "src/debug.log", "vendor/new.js"])
+        ));
+        assert!(ignored.any_visible(&backend, &changed(&["vendor/kept.js"])));
+        assert!(ignored.any_visible(&backend, &changed(&["target/a.o", "src/cart.ts"])));
     }
 
     #[test]

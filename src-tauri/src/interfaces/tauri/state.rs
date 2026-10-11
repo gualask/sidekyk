@@ -7,9 +7,10 @@ use tauri::{Emitter, Manager};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
-use crate::infrastructure::watcher::RepositoryWatcher;
+use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::repository::{
-    resolve_repository, RepositoryChangedEvent, RepositoryInfo, REPOSITORY_CHANGED_EVENT,
+    resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo,
+    REPOSITORY_CHANGED_EVENT,
 };
 
 struct ActiveRepository {
@@ -41,10 +42,18 @@ pub(crate) fn activate_repository(
 
     let emitter = app.clone();
     let root = info.root.clone();
-    let watcher =
-        RepositoryWatcher::start(info.root.clone().into(), resolved.git_dir, move || {
+    let mut ignored = IgnoredPaths::new(root.clone().into());
+    let on_change = move |changes: WatchedChanges| {
+        // The index may now track a file in an ignored directory, or the excludes changed.
+        if changes.git_dir {
+            ignored.forget();
+        }
+        let backend = emitter.state::<LocalRepositoryBackend>();
+        if changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree) {
             let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, RepositoryChangedEvent::new(&root));
-        })?;
+        }
+    };
+    let watcher = RepositoryWatcher::start(info.root.clone().into(), resolved.git_dir, on_change)?;
 
     let state = app.state::<RepositoryState>();
     *state.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(ActiveRepository {
