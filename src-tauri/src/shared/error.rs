@@ -59,6 +59,17 @@ pub(crate) fn user_facing(code: UserFacingErrorCode) -> anyhow::Error {
     anyhow::Error::new(UserFacingError::new(code))
 }
 
+/// An error shared by several callers (see `Coalesced`), back as an owned error that keeps its
+/// user-facing code.
+pub(crate) fn unshare(err: std::sync::Arc<anyhow::Error>) -> anyhow::Error {
+    std::sync::Arc::try_unwrap(err).unwrap_or_else(|shared| {
+        match shared.downcast_ref::<UserFacingError>() {
+            Some(user) => user_facing(user.code),
+            None => anyhow::anyhow!("{shared:#}"),
+        }
+    })
+}
+
 impl serde::Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let AppError::Anyhow(err) = self;
@@ -89,6 +100,23 @@ mod tests {
         assert_eq!(
             serde_json::to_value(unknown).unwrap(),
             serde_json::json!({ "code": "unknown", "message": "git exploded" })
+        );
+    }
+
+    #[test]
+    fn a_shared_error_keeps_its_code_and_message() {
+        let shared = std::sync::Arc::new(user_facing(UserFacingErrorCode::NoRepositoryOpen));
+        let _other_caller = shared.clone();
+        assert_eq!(
+            serde_json::to_value(AppError::from(unshare(shared))).unwrap(),
+            serde_json::json!({ "code": "no_repository_open", "message": "no_repository_open" })
+        );
+
+        let shared = std::sync::Arc::new(anyhow::anyhow!("git exploded").context("snapshot"));
+        let _other_caller = shared.clone();
+        assert_eq!(
+            serde_json::to_value(AppError::from(unshare(shared))).unwrap(),
+            serde_json::json!({ "code": "unknown", "message": "snapshot: git exploded" })
         );
     }
 

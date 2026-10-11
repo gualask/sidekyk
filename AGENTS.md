@@ -17,7 +17,7 @@ Sidekyk must feel instant and stay invisible on system resources. This rule outr
 
 ## Project Structure & Module Organization
 
-Renderer code is in `src/`: composition root and shell in `src/app`, the review workflow in `src/modules/changes` (`model/`, `application/`, `ui/`), native adapters in `src/infrastructure/platform`, stable primitives in `src/shared`, and browser fixtures in `src/dev`. The Rust backend is in `src-tauri/src`: `bootstrap/` (composition root), `interfaces/tauri/` (commands and managed state), `modules/repository/` (git parsing, snapshot, diff; no Tauri), `infrastructure/` (git CLI, watcher, settings store), `shared/` (error payload).
+Renderer code is in `src/`: composition root and shell in `src/app`, the review workflow in `src/modules/changes` (`model/`, `application/`, `ui/`), native adapters in `src/infrastructure/platform`, stable primitives in `src/shared`, and browser fixtures in `src/dev`. The Rust backend is in `src-tauri/src`: `bootstrap/` (composition root), `interfaces/tauri/` (commands and managed state), `modules/repository/` (git parsing, snapshot, diff; no Tauri), `infrastructure/` (git CLI, watcher, settings store), `shared/` (error payload, coalescing).
 
 ## Build, Test, and Development Commands
 

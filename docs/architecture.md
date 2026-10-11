@@ -55,13 +55,16 @@ When the selected file leaves the list, the selection falls back to the first fi
   repository from the first CLI argument, else the last one used.
 - `interfaces/tauri/` — commands (`get_active_repository`, `pick_repository`,
   `get_repository_snapshot`, `get_file_diff`) and `state.rs`, the one place that switches the open
-  repository and its watcher. Blocking git work runs on `spawn_blocking`.
+  repository and its watcher. Blocking git work runs on `spawn_blocking`. At most one snapshot
+  runs at a time: requests that arrive during it share the next one (`shared/coalesce.rs`), so a
+  burst of refreshes costs two snapshots, not one per request.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
   validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes), `settings_store.rs` (last
   repository, through `tauri-plugin-store`).
-- `shared/error.rs` — `AppError`, serialized as `{ code, message }` with stable codes.
+- `shared/` — `error.rs`: `AppError`, serialized as `{ code, message }` with stable codes;
+  `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting.
 
 ### Snapshot
 

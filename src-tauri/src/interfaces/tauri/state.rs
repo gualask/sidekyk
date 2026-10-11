@@ -1,7 +1,7 @@
 //! Managed Tauri state and the one place that switches the open repository.
 
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
 
@@ -9,18 +9,24 @@ use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::repository::{
-    resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo,
+    resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
     REPOSITORY_CHANGED_EVENT,
 };
+use crate::shared::coalesce::Coalesced;
 
 struct ActiveRepository {
     info: RepositoryInfo,
     _watcher: RepositoryWatcher,
 }
 
+/// A snapshot shared by every caller that waited for it.
+pub(crate) type SharedSnapshot = Result<RepositorySnapshot, Arc<anyhow::Error>>;
+
 #[derive(Default)]
 pub(crate) struct RepositoryState {
     active: Mutex<Option<ActiveRepository>>,
+    /// At most one snapshot in flight; requests during it share the next one.
+    pub(crate) snapshots: Coalesced<SharedSnapshot>,
 }
 
 impl RepositoryState {

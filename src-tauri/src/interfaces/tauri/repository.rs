@@ -1,5 +1,7 @@
 //! Tauri adapters for the repository under review.
 
+use std::sync::Arc;
+
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
@@ -8,7 +10,7 @@ use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::modules::repository::{
     self, FileDiff, FileDiffRequest, RepositoryInfo, RepositorySnapshot,
 };
-use crate::shared::error::{user_facing, AppError, UserFacingErrorCode};
+use crate::shared::error::{unshare, user_facing, AppError, UserFacingErrorCode};
 
 fn active_repository(app: &tauri::AppHandle) -> anyhow::Result<RepositoryInfo> {
     app.state::<RepositoryState>()
@@ -58,9 +60,16 @@ pub(crate) async fn get_repository_snapshot(
     app: tauri::AppHandle,
 ) -> Result<RepositorySnapshot, AppError> {
     blocking(app, |app| {
-        let info = active_repository(app)?;
-        let backend = app.state::<LocalRepositoryBackend>();
-        repository::load_snapshot(backend.inner(), &info)
+        let load = || {
+            let info = active_repository(app)?;
+            let backend = app.state::<LocalRepositoryBackend>();
+            repository::load_snapshot(backend.inner(), &info)
+        };
+        let state = app.state::<RepositoryState>();
+        state
+            .snapshots
+            .run(|| load().map_err(Arc::new))
+            .map_err(unshare)
     })
     .await
 }
