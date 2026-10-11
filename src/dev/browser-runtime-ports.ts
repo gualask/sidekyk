@@ -27,5 +27,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 scenario === 'large' ? largeDiff(request) : reviewDiff(request),
             onRepositoryChanged: () => () => undefined,
         },
+        // the browser console already shows them
+        reportError: () => undefined,
     };
 }

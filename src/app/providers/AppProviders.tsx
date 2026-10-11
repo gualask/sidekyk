@@ -4,6 +4,7 @@ import { type ReactNode, useState } from 'react';
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
 import { RepositoryProvider } from '@/modules/changes';
 import { createAppQueryClient } from './query-client';
+import { useReportUncaughtErrors } from './report-uncaught-errors';
 
 export function AppProviders({
     children,
@@ -13,6 +14,7 @@ export function AppProviders({
     runtime?: RuntimePorts;
 }) {
     const [queryClient] = useState(createAppQueryClient);
+    useReportUncaughtErrors(runtime.reportError);
 
     return (
         <QueryClientProvider client={queryClient}>

@@ -31,6 +31,7 @@ Renderer code is in `src/`: composition root and shell in `src/app`, the review 
 - `cargo test --manifest-path src-tauri/Cargo.toml`: Rust tests, including end-to-end tests against a real git in a scratch repository.
 - `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml backend_timings -- --ignored --nocapture`: snapshot and diff timings on a real repository, to compare before and after a change on the hot path.
 - `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` and `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`.
+- To see what the real app does (git commands, watcher batches, durations), read `~/Library/Logs/io.github.gualask.sidekyk/sidekyk-dev.log` while `pnpm tauri:dev` runs. New events on a hot path are `debug`, which release builds compile out; `info` and above are only for rare events and problems (`docs/architecture.md`, Logs).
 
 Before handing off, run every check that covers the change and leave zero errors and zero warnings.
 

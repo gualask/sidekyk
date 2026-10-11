@@ -28,6 +28,10 @@ serde_json = "1"
 anyhow = "1"
 thiserror = "2"
 notify-debouncer-mini = "0.7"
+# Release builds compile every event below `info` out (see `infrastructure/logging.rs`).
+tracing = { version = "0.1", default-features = false, features = ["std", "release_max_level_info"] }
+# Text output only: no ANSI colors, no `env-filter` (and its regex engine), no `log` bridge.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt"] }
 
 [dev-dependencies]
 tempfile = "3"

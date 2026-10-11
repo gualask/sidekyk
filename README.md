@@ -38,6 +38,18 @@ pnpm tauri:dev
 
 The app opens the folder given as its first argument, else the last repository it showed.
 
+## Logs
+
+Sidekyk writes a log to `~/Library/Logs/io.github.gualask.sidekyk/`, and keeps the previous
+session's next to it:
+
+- `sidekyk.log` (release builds): startup, the repository opened, failures and panics. Nothing
+  else is written, and nothing at all while the app is idle. Attach it when reporting a problem.
+- `sidekyk-dev.log` (development builds, also on stderr): every git command with its duration,
+  every watcher batch and whether it refreshed the app, every command's duration.
+
+`SIDEKYK_LOG=error|warn|info|debug|trace` changes the level; release builds stop at `info`.
+
 ## Check
 
 ```sh

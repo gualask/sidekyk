@@ -59,23 +59,24 @@ pub(crate) fn user_facing(code: UserFacingErrorCode) -> anyhow::Error {
     anyhow::Error::new(UserFacingError::new(code))
 }
 
+/// The user-facing code `err` carries, if any: `None` means an unexpected failure.
+pub(crate) fn user_facing_code(err: &anyhow::Error) -> Option<UserFacingErrorCode> {
+    err.downcast_ref::<UserFacingError>().map(|user| user.code)
+}
+
 /// An error shared by several callers (see `Coalesced`), back as an owned error that keeps its
 /// user-facing code.
 pub(crate) fn unshare(err: std::sync::Arc<anyhow::Error>) -> anyhow::Error {
-    std::sync::Arc::try_unwrap(err).unwrap_or_else(|shared| {
-        match shared.downcast_ref::<UserFacingError>() {
-            Some(user) => user_facing(user.code),
-            None => anyhow::anyhow!("{shared:#}"),
-        }
+    std::sync::Arc::try_unwrap(err).unwrap_or_else(|shared| match user_facing_code(&shared) {
+        Some(code) => user_facing(code),
+        None => anyhow::anyhow!("{shared:#}"),
     })
 }
 
 impl serde::Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let AppError::Anyhow(err) = self;
-        let code = err
-            .downcast_ref::<UserFacingError>()
-            .map_or("unknown", |user| user.code.as_str());
+        let code = user_facing_code(err).map_or("unknown", UserFacingErrorCode::as_str);
 
         let mut st = s.serialize_struct("AppError", 2)?;
         st.serialize_field("code", code)?;

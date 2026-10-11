@@ -64,7 +64,13 @@ impl RepositoryWatcher {
     ) -> anyhow::Result<Self> {
         let (watched_root, watched_git_dir) = (root.clone(), git_dir.clone());
         let mut debouncer = new_debouncer(QUIET_PERIOD, move |result: DebounceEventResult| {
-            let Ok(events) = result else { return };
+            let events = match result {
+                Ok(events) => events,
+                Err(error) => {
+                    tracing::warn!(%error, "watcher error");
+                    return;
+                }
+            };
             let changes = classify(
                 events.iter().map(|e| e.path.as_path()),
                 &watched_root,

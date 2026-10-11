@@ -55,6 +55,7 @@ impl<T: Clone> Coalesced<T> {
         loop {
             if let Some((run, value)) = &state.last {
                 if *run >= needed {
+                    tracing::debug!(run, "coalesced into a run in flight");
                     return value.clone();
                 }
             }

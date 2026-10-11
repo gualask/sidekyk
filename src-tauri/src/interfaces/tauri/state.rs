@@ -55,7 +55,14 @@ pub(crate) fn activate_repository(
             ignored.forget();
         }
         let backend = emitter.state::<LocalRepositoryBackend>();
-        if changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree) {
+        let visible = changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree);
+        tracing::debug!(
+            git_dir = changes.git_dir,
+            worktree_paths = changes.worktree.len(),
+            visible,
+            "watcher batch"
+        );
+        if visible {
             let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, RepositoryChangedEvent::new(&root));
         }
     };
@@ -67,7 +74,10 @@ pub(crate) fn activate_repository(
         _watcher: watcher,
     });
 
-    let _ = settings_store::save_last_repository(app, &info.root);
+    tracing::info!(root = %info.root, "repository opened");
+    if let Err(error) = settings_store::save_last_repository(app, &info.root) {
+        tracing::warn!(error = %format!("{error:#}"), "could not remember the repository");
+    }
     let _ = app.emit(
         REPOSITORY_CHANGED_EVENT,
         RepositoryChangedEvent::new(&info.root),

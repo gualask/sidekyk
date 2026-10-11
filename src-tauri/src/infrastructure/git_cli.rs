@@ -5,6 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
+use std::time::Instant;
 
 use crate::modules::repository::{GitOutput, RepositoryBackend};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
@@ -51,21 +52,33 @@ impl LocalRepositoryBackend {
     }
 }
 
-fn git_output(out: std::process::Output) -> GitOutput {
-    GitOutput {
+/// Converts a finished git process into the port's output, and logs the command (development
+/// builds only: `debug` is compiled out of release builds).
+fn git_output(args: &[&str], started: Instant, out: std::process::Output) -> GitOutput {
+    let output = GitOutput {
         code: out.status.code().unwrap_or(-1),
         stdout: out.stdout,
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
-    }
+    };
+    tracing::debug!(
+        args = %args.join(" "),
+        code = output.code,
+        ms = started.elapsed().as_millis() as u64,
+        stdout_bytes = output.stdout.len(),
+        "git"
+    );
+    output
 }
 
 impl RepositoryBackend for LocalRepositoryBackend {
     fn git(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
+        let started = Instant::now();
         let out = self.command(cwd, args)?.stdin(Stdio::null()).output()?;
-        Ok(git_output(out))
+        Ok(git_output(args, started, out))
     }
 
     fn git_with_input(&self, cwd: &Path, args: &[&str], input: &[u8]) -> anyhow::Result<GitOutput> {
+        let started = Instant::now();
         let mut child = self.command(cwd, args)?.stdin(Stdio::piped()).spawn()?;
         let mut stdin = child
             .stdin
@@ -78,7 +91,7 @@ impl RepositoryBackend for LocalRepositoryBackend {
             let _ = writer.join();
             out
         })?;
-        Ok(git_output(out))
+        Ok(git_output(args, started, out))
     }
 
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {

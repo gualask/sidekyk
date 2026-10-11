@@ -56,15 +56,15 @@ When the selected file leaves the list, the selection falls back to the first fi
 - `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Opens the
   repository from the first CLI argument, else the last one used.
 - `interfaces/tauri/` — commands (`get_active_repository`, `pick_repository`,
-  `get_repository_snapshot`, `get_file_diff`) and `state.rs`, the one place that switches the open
-  repository and its watcher. Blocking git work runs on `spawn_blocking`. At most one snapshot
+  `get_repository_snapshot`, `get_file_diff`, and `log_frontend_error` in `diagnostics.rs`) and
+  `state.rs`, the one place that switches the open repository and its watcher. Blocking git work runs on `spawn_blocking`. At most one snapshot
   runs at a time: requests that arrive during it share the next one (`shared/coalesce.rs`), so a
   burst of refreshes costs two snapshots, not one per request.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
   validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes), `settings_store.rs` (last
-  repository, through `tauri-plugin-store`).
+  repository, through `tauri-plugin-store`), `logging.rs` (see Logs).
 - `shared/` — `error.rs`: `AppError`, serialized as `{ code, message }` with stable codes;
   `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting.
 
@@ -88,3 +88,18 @@ and a diff on any repository.
 an untracked file uses `--no-index /dev/null <path>`. Output larger than 2 MiB is cut at a line
 boundary and flagged `truncated`. The frontend parses the text, so user settings such as
 `diff.noprefix` do not matter: parsing starts at the first `@@`.
+
+### Logs
+
+`tracing` events, written by `tracing-subscriber` as text lines with `key=value` fields to the
+app's log directory (one file per session, the previous one kept, a size cap per session).
+
+- **Development** (`debug` and below): every git command with its arguments, exit code, duration
+  and output size; every watcher batch with its path count and whether it refreshed the app;
+  every command's duration; snapshots that coalesced into one in flight. Also on stderr.
+- **Release**: `release_max_level_info` compiles `debug` and `trace` events out, so the hot
+  paths pay nothing. What is left is rare by design: startup, the repository opened, refused
+  and failed commands, watcher errors, panics, and uncaught frontend errors (`log_frontend_error`,
+  at most 50 per session, through the `reportError` runtime port).
+- A new event on a hot path is `debug`. `info` and above are for what happens a few times per
+  session or signals a problem.
