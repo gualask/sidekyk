@@ -55,17 +55,17 @@ what needs measuring before deciding waits in **Performance review**, at the end
 - [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full
       screen, with the Changes panel as today's view; breadcrumb and project rail as in the
       approved mock (docs/evolution.md)
-- [ ] Command palette (`⌘K`): projects, panels, files, notes
+- [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes
 - [ ] Keyboard model of the mock: `↵`/`Esc` zoom (progressive `Esc`), `1`-`3` panels, `[`/`]`
-      projects, `⌘`+scroll and pinch
+      projects, `⌘`/`Ctrl`+scroll and pinch
 
 ## Next: see what the agent is doing
 
 - [ ] Tray icon with the change count, and a menu to show the window or quit
 - [ ] Global shortcut to show and hide the window (configurable)
 - [ ] Follow the terminal (setting, off by default): when Sidekyk comes up, open the project of the
-      terminal tab used just before it; kitty first, other terminals when needed; any failure
-      leaves the current project (see docs/evolution.md)
+      terminal tab used just before it; kitty on macOS first, other terminals and systems when
+      needed; any failure leaves the current project (see docs/evolution.md)
 - [ ] Closing the window hides it instead of quitting; quit from the tray
 - [ ] No work while the window is hidden or minimized: the watcher only marks the project as
       changed, and the snapshot runs when the window comes back. Today every change refetches the
@@ -133,11 +133,14 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Release
 
-- [ ] CI running the same checks as `AGENTS.md`
+- [ ] CI running the same checks as `AGENTS.md`, with the Rust tests on macOS, Linux and Windows
+      (the end-to-end tests run a real git, so they catch path and process differences)
 - [ ] Signed release builds and self-update (as in Fyler); the update check runs at startup or on
       demand, never on a timer
-- [ ] Linux and Windows testing. On Linux, inotify needs one watch per directory: do not watch
-      ignored directories, and handle the `max_user_watches` limit
+- [ ] Linux and Windows testing of the packaged app. On Linux, inotify needs one watch per
+      directory: do not watch ignored directories, and handle the `max_user_watches` limit. On
+      Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
+      and the git-dir check, case included
 
 ## Performance review
 

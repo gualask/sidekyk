@@ -56,7 +56,8 @@ locally in `.local/mocks/workspace.html` (not versioned). What it settles:
 - **Level 0 cards**: branch, changed files with line counts, recent activity, the first note.
 - **Keyboard**: `↵` zooms in and `Esc` zooms out; `Esc` is progressive (it first leaves a field or
   clears a filter, then zooms out); `1`/`2`/`3` open Changes, Files, Notes; `[`/`]` switch
-  project; `⌘`+scroll and trackpad pinch zoom on the element under the pointer.
+  project; `⌘`+scroll and trackpad pinch zoom on the element under the pointer (`⌘` is `Ctrl`
+  on Linux and Windows, here and below).
 - **Command palette** (`⌘K`): projects, panels, files of every project, notes.
 - **Notes** have "Copy for agent", like hunks.
 - **Still open**: tiles or tabs at level 1 (the mock has both, `T` switches).
@@ -67,7 +68,7 @@ locally in `.local/mocks/workspace.html` (not versioned). What it settles:
 ## Follow the terminal
 
 The usual flow: in each terminal tab, `cd` into a repository and start the agent there (`claude`).
-Sidekyk is brought up from anywhere (global shortcut, launcher, Dock). With this feature on, it
+Sidekyk is brought up from anywhere (global shortcut, launcher, Dock or taskbar). With this feature on, it
 opens on the project of the terminal tab used just before, so moving to another tab and bringing
 Sidekyk up again shows the other project. No manual linking: the link is the directory the agent
 was started in.
@@ -88,6 +89,11 @@ was started in.
 - **Cost**: one call when Sidekyk is brought up, nothing while idle.
 - **To check when implementing**: whether `kitty @ ls` on kitty 0.49 marks the focused tab and
   window, and how the socket is named when several kitty instances run.
+- **Platforms**: designed on macOS first. kitty's remote control works the same on Linux; what
+  differs is knowing the last app that was in front. On Windows a foreground-window hook can tell
+  it; on X11 the window manager reports the active window; on Wayland an app generally cannot see
+  other apps' windows, so the feature may stay unavailable there. To check per platform when
+  implementing; where it cannot work, the setting is hidden.
 - **Rejected**: picking a window with a click, as macOS's screenshot tool does. It selects a
   window, not a tab (two tabs of one kitty window are one window), and reading other apps' window
   titles needs the screen recording permission.
@@ -124,8 +130,10 @@ enough).
 - The list of projects is app data, kept with the settings (see Notes for the location). It
   replaces the single "last repository" setting.
 - Only the active project runs full snapshots. Inactive projects keep a light watcher that only
-  marks "something changed" without running git (FSEvents on macOS costs close to nothing); level 0
-  shows the mark, and the snapshot runs when the project is opened.
+  marks "something changed" without running git; level 0 shows the mark, and the snapshot runs
+  when the project is opened. FSEvents (macOS) and Windows watch a whole tree with one handle and
+  cost close to nothing; inotify (Linux) needs one watch per directory, so several large projects
+  can reach the per-user limit: measure it there before watching every project.
 - Query caches of inactive projects expire (`gcTime`), so memory does not grow with the number of
   projects.
 
@@ -144,8 +152,9 @@ enough).
 ## Notes
 
 - **Kept at application level**, never inside repositories: in the app data directory, where
-  `settings.json` already lives (`~/Library/Application Support/io.github.gualask.sidekyk` on
-  macOS; Tauri's `app_data_dir`).
+  `settings.json` already lives (Tauri's `app_data_dir`: `~/Library/Application Support/` on
+  macOS, `~/.local/share/` on Linux, `%APPDATA%` on Windows, each followed by
+  `io.github.gualask.sidekyk`).
 - **Decided at implementation time**: the format (JSON, Markdown files, a small database) and
   whether notes are one file or one per note or per project. One file per note makes sync
   conflicts smaller; take it into account.
@@ -168,8 +177,10 @@ Facts checked on 2026-10-11 (sources below):
 - **Publishing status**: while the Google Cloud project is in "Testing", refresh tokens expire
   after 7 days. Real use needs the project in "Production". Tokens also stop working when the user
   revokes access, after six months without use, or beyond 100 live tokens per account and client.
-- **Where tokens live**: in the OS credential store (Keychain on macOS), never in the webview or
-  in a plain file.
+- **Where tokens live**: in the OS credential store (Keychain on macOS, Secret Service on Linux,
+  Credential Manager on Windows), never in the webview or in a plain file. On Linux a Secret
+  Service may be missing (a minimal desktop): then sync cannot be turned on, rather than keeping
+  tokens in a file.
 
 Design constraints for the implementation:
 

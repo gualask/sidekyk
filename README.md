@@ -25,8 +25,12 @@ growing into a project workspace (changes, files, notes, several projects): the 
 
 ## Requirements
 
-- macOS (Linux and Windows untested)
-- `git` on the PATH, or in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin`
+- macOS, Linux or Windows. Sidekyk is built for all three with Tauri; it is developed and tested
+  on macOS, and Linux and Windows are not tested yet
+- `git` on the PATH, or in `/opt/homebrew/bin`, `/usr/local/bin` or `/usr/bin` (macOS and Linux),
+  or in `C:\Program Files\Git\cmd` (Windows)
+- On Linux, the WebKitGTK and other system libraries listed in Tauri's
+  [prerequisites](https://v2.tauri.app/start/prerequisites/)
 - Rust toolchain and pnpm 11
 
 ## Run
@@ -40,8 +44,14 @@ The app opens the folder given as its first argument, else the last repository i
 
 ## Logs
 
-Sidekyk writes a log to `~/Library/Logs/io.github.gualask.sidekyk/`, and keeps the previous
-session's next to it:
+Sidekyk writes a log to the app's log directory, and keeps the previous session's next to it:
+
+| System | Log directory |
+|---|---|
+| macOS | `~/Library/Logs/io.github.gualask.sidekyk/` |
+| Linux | `~/.local/share/io.github.gualask.sidekyk/logs/` (or under `$XDG_DATA_HOME`) |
+| Windows | `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` |
+
 
 - `sidekyk.log` (release builds): startup, the repository opened, failures and panics. Nothing
   else is written, and nothing at all while the app is idle. Attach it when reporting a problem.

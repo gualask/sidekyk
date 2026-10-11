@@ -82,6 +82,12 @@ impl IgnoredPaths {
     }
 }
 
+/// A relative path as git writes it, with `/` on every platform. `None` when it is not UTF-8.
+fn git_path(path: &Path) -> Option<String> {
+    let parts: Option<Vec<&str>> = path.components().map(|c| c.as_os_str().to_str()).collect();
+    Some(parts?.join("/"))
+}
+
 /// The paths among `paths` (relative to `root`) that git ignores, or `None` when git fails.
 fn check_ignore(
     backend: &dyn RepositoryBackend,
@@ -90,7 +96,7 @@ fn check_ignore(
 ) -> Option<HashSet<PathBuf>> {
     let mut input = Vec::new();
     for path in paths {
-        input.extend_from_slice(path.to_str()?.as_bytes());
+        input.extend_from_slice(git_path(path)?.as_bytes());
         input.push(0);
     }
     let out = backend

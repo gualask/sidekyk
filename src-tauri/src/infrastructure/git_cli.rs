@@ -10,17 +10,27 @@ use std::time::Instant;
 use crate::modules::repository::{GitOutput, RepositoryBackend};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
-/// An app started from Finder gets a minimal PATH, so the usual install dirs are checked too.
-const FALLBACK_DIRS: [&str; 3] = ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
+/// An app started from Finder or a desktop launcher can get a minimal PATH, so the usual install
+/// dirs are checked too.
+#[cfg(unix)]
+const FALLBACK_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
+#[cfg(windows)]
+const FALLBACK_DIRS: &[&str] = &[r"C:\Program Files\Git\cmd"];
+
+/// Keeps git from opening a console window for every command, which a GUI app's child process
+/// does on Windows.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn find_git() -> Option<PathBuf> {
     let path_dirs = std::env::var_os("PATH")
         .map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
         .unwrap_or_default();
+    let file_name = format!("git{}", std::env::consts::EXE_SUFFIX);
     path_dirs
         .into_iter()
         .chain(FALLBACK_DIRS.iter().map(PathBuf::from))
-        .map(|dir| dir.join("git"))
+        .map(|dir| dir.join(&file_name))
         .find(|candidate| candidate.is_file())
 }
 
@@ -48,6 +58,8 @@ impl LocalRepositoryBackend {
             .env("LC_ALL", "C")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut command, CREATE_NO_WINDOW);
         Ok(command)
     }
 }
