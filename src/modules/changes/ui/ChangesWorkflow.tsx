@@ -6,7 +6,7 @@ import {
 import { ChangesWorkspace } from './ChangesWorkspace';
 import { NoRepository } from './NoRepository';
 
-/** The whole app for now: the open repository's changes, or the screen that opens one. */
+/** The Changes panel: the open repository's changes, or the screen that opens one. */
 export function ChangesWorkflow() {
     useRepositoryChangeSubscription();
     const active = useActiveRepository();

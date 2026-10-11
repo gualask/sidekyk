@@ -44,8 +44,12 @@ what needs measuring before deciding waits in **Performance review**, at the end
 
 ## Next: workspace foundation
 
-- [ ] Panel model: one module per panel with a common contract (id, title, icon, component,
-      summary for the overview); panels off screen run no queries and load lazily
+- [x] Panel model: one module per panel with a common contract (`PanelDefinition` in
+      `src/shared/panels`: id, title, icon, lazy component), composed in `src/app/panels.ts`;
+      panels off screen run no queries, and each loads as its own chunk, the startup panel's
+      fetched with the app instead of after the first render. Costs nothing hidden or shown
+- [ ] Panel summary for the overview and the tile headers (the Changes count), added to the
+      contract with level 0, once projects say where the data comes from
 - [ ] Projects as app data, replacing the single last repository: add, remove, switch. Only the
       active project runs snapshots; the others keep a light watcher that only marks changes
 - [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full

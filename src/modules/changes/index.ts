@@ -7,4 +7,4 @@ export {
     type RepositoryInfo,
     type RepositorySnapshot,
 } from './model/repository.types';
-export { ChangesWorkflow } from './ui/ChangesWorkflow';
+export { changesPanel } from './panel';

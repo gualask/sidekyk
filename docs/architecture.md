@@ -22,9 +22,9 @@ cannot see.
 
 ### Directory map
 
-- `src/app/` — composition root: providers (`QueryClient`, runtime ports), shell, system color
-  scheme. May depend on everything.
-- `src/modules/changes/` — the review workflow.
+- `src/app/` — composition root: providers (`QueryClient`, runtime ports), shell, the list of
+  panels (`panels.ts`), system color scheme. May depend on everything.
+- `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
   - `ui/` — summary bar, file list, diff view, diff rows, empty states. The file list and the
@@ -32,7 +32,7 @@ cannot see.
     (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`) implementing the ports.
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, clipboard hook, error
-  messages.
+  messages, and the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
 ### Dependency rules
@@ -44,6 +44,14 @@ cannot see.
 - Direct `@tauri-apps/*` imports live only under `src/infrastructure/`.
 
 `pnpm boundaries:check` enforces these rules.
+
+### Panels
+
+A panel is a module's `PanelDefinition` (`src/shared/panels/panel.ts`): id, title, icon and a
+component loaded with `import()`, one chunk per module. `src/app/panels.ts` lists them in shortcut
+order and starts loading the startup panel's chunk as soon as the app's code runs, so it does not
+wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
+its component, so a panel that is not on screen runs none.
 
 ### State
 
@@ -57,14 +65,16 @@ When the selected file leaves the list, the selection falls back to the first fi
   repository from the first CLI argument, else the last one used.
 - `interfaces/tauri/` — commands (`get_active_repository`, `pick_repository`,
   `get_repository_snapshot`, `get_file_diff`, and `log_frontend_error` in `diagnostics.rs`) and
-  `state.rs`, the one place that switches the open repository and its watcher. Blocking git work runs on `spawn_blocking`. At most one snapshot
-  runs at a time: requests that arrive during it share the next one (`shared/coalesce.rs`), so a
-  burst of refreshes costs two snapshots, not one per request.
+  `state.rs`, the one place that switches the open repository and its watcher. Blocking git work
+  runs on `spawn_blocking`. At most one snapshot runs at a time: requests that arrive during it
+  share the next one (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one
+  per request.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
-  validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside world is the `RepositoryBackend` port.
+  validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside
+  world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
-  `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes), `settings_store.rs` (last
-  repository, through `tauri-plugin-store`), `logging.rs` (see Logs).
+  `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes),
+  `settings_store.rs` (last repository, through `tauri-plugin-store`), `logging.rs` (see Logs).
 - `shared/` — `error.rs`: `AppError`, serialized as `{ code, message }` with stable codes;
   `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting.
 
