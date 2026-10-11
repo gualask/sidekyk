@@ -48,7 +48,11 @@ rule in `AGENTS.md`.
 - [ ] Projects as app data, replacing the single last repository: add, remove, switch. Only the
       active project runs snapshots; the others keep a light watcher that only marks changes
 - [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full
-      screen, with the Changes panel as today's view
+      screen, with the Changes panel as today's view; breadcrumb and project rail as in the
+      approved mock (docs/evolution.md)
+- [ ] Command palette (`⌘K`): projects, panels, files, notes
+- [ ] Keyboard model of the mock: `↵`/`Esc` zoom (progressive `Esc`), `1`-`3` panels, `[`/`]`
+      projects, `⌘`+scroll and pinch
 
 ## Next: see what the agent is doing
 

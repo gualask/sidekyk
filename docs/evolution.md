@@ -44,6 +44,46 @@ arises.
 **Revisit** after using semantic zoom: since panels are independent modules, a free canvas would
 be a different layout over the same panels, not a rewrite.
 
+## Approved mock
+
+A clickable mock of the three levels was approved on 2026-10-11. It is a single HTML file kept
+locally in `.local/mocks/workspace.html` (not versioned). What it settles:
+
+- **Where you are**: the breadcrumb (All projects / project / panel) is enough; no separate
+  zoom-level indicator.
+- **Project rail** on the left of a project: the "all projects" button first, then one avatar per
+  project with its change count, so switching does not need a trip to level 0.
+- **Level 0 cards**: branch, changed files with line counts, recent activity, the first note.
+- **Keyboard**: `↵` zooms in and `Esc` zooms out; `Esc` is progressive (it first leaves a field or
+  clears a filter, then zooms out); `1`/`2`/`3` open Changes, Files, Notes; `[`/`]` switch
+  project; `⌘`+scroll and trackpad pinch zoom on the element under the pointer.
+- **Command palette** (`⌘K`): projects, panels, files of every project, notes.
+- **Notes** have "Copy for agent", like hunks.
+- **Still open**: tiles or tabs at level 1 (the mock has both, `T` switches).
+- **Not real yet**: the mock shows which agent is working ("Claude Code · 40s ago"). Sidekyk sees
+  file changes, not who made them; naming the agent needs a way to detect it (for example the
+  processes running in the repository), to be investigated. Without it, cards show only when
+  files last changed.
+
+## Ideas from tazly
+
+tazly (`../tazly`, a Chrome new-tab board of projects, tasks and notes) tried a similar workspace.
+Worth taking:
+
+- the focus mode with a sidebar of the other projects (now the project rail);
+- a single command bar as the entry point for everything (now `⌘K`);
+- "`Esc` cancels, it does not navigate" (now the progressive `Esc`);
+- per-project notes with "copy all" (now "Copy for agent");
+- **quick capture**: a global shortcut that adds a note to the active project without opening the
+  window, as tazly's page widget did. To evaluate with the notes;
+- a `PRODUCT.md` with users, purpose and design principles, as tazly has;
+- `⌥` shortcuts matched on `e.code`, since on macOS `⌥`+letter types a special character in
+  `e.key`.
+
+Not to take: the visionOS-like glass (layered blur costs GPU, against the golden rule), and
+Lexical as the notes editor without weighing it first (a heavy dependency; plain Markdown may be
+enough).
+
 ## Panels
 
 - One module per panel under `src/modules/` (as `changes` is today), exposing a common contract:
@@ -132,6 +172,9 @@ When these land, `AGENTS.md` changes too:
 - Sync: `drive.appdata` (hidden backup) or `drive.file` (files visible in Drive).
 - Sync: conflict strategy, and whether to encrypt notes before upload.
 - Explorer: fuzzy matching in the frontend or the backend; `git grep` or ripgrep's crates.
+- Level 1 layout: tiles or tabs.
+- Naming the agent at work: how to detect it, or show only when files last changed.
+- Quick capture of a note through a global shortcut.
 - Free canvas: revisit after semantic zoom has been used for a while.
 
 ## Sources
