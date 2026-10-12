@@ -1,5 +1,15 @@
-import { KIND_BADGE } from '../model/file-groups';
 import type { ChangeKind } from '../model/repository.types';
+
+const LETTER: Record<ChangeKind, string> = {
+    added: 'A',
+    modified: 'M',
+    deleted: 'D',
+    renamed: 'R',
+    copied: 'C',
+    'type-changed': 'T',
+    untracked: 'U',
+    conflicted: '!',
+};
 
 const BADGE_TONE: Record<ChangeKind, string> = {
     added: 'bg-ui-success-soft text-ui-success-soft-text',
@@ -18,7 +28,7 @@ export function KindBadge({ kind }: { kind: ChangeKind }) {
         <span
             className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold ${BADGE_TONE[kind]}`}
         >
-            {KIND_BADGE[kind]}
+            {LETTER[kind]}
         </span>
     );
 }

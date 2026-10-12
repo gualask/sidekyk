@@ -15,11 +15,6 @@ export type ChangeKind =
     | 'untracked'
     | 'conflicted';
 
-export interface RepositoryInfo {
-    root: string;
-    name: string;
-}
-
 export interface BranchStatus {
     /** Branch name, or null when HEAD is detached. */
     head: string | null;
@@ -72,7 +67,6 @@ export interface RepositorySummary {
 
 /** Everything the Changes panel shows of a repository, and the summary of the same git output. */
 export interface RepositorySnapshot {
-    repository: RepositoryInfo;
     files: ChangedFile[];
     summary: RepositorySummary;
 }

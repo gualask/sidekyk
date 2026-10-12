@@ -1,7 +1,8 @@
-import type { ChangedFile, FileDiff, RepositoryInfo, RepositorySnapshot } from '@/modules/changes';
+import type { ChangedFile, FileDiff, RepositorySnapshot } from '@/modules/changes';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
 
-export const FIXTURE_REPOSITORY: RepositoryInfo = {
+export const FIXTURE_REPOSITORY: ProjectInfo = {
     root: '/Users/dev/Projects/shop',
     name: 'shop',
 };
@@ -149,7 +150,7 @@ const FILES: FixtureFile[] = [
     },
 ];
 
-export function reviewSnapshot(repository: RepositoryInfo, clean: boolean): RepositorySnapshot {
+export function reviewSnapshot(clean: boolean): RepositorySnapshot {
     const files = clean ? [] : FILES.map(({ diff: _diff, ...file }) => file);
     const branch = {
         head: 'feature/coupons',
@@ -158,7 +159,7 @@ export function reviewSnapshot(repository: RepositoryInfo, clean: boolean): Repo
         ahead: clean ? 0 : 2,
         behind: 0,
     };
-    return { repository, files, summary: fixtureSummary(branch, files) };
+    return { files, summary: fixtureSummary(branch, files) };
 }
 
 export function reviewDiff(file: Pick<ChangedFile, 'area' | 'path'>): FileDiff {

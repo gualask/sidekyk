@@ -1,7 +1,8 @@
 import { IconLayoutGrid } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useActivateProject } from '../application/projects.queries';
-import type { ProjectInfo, ProjectList } from '../model/project.types';
+import type { ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
 
 /** The projects on the left of a project: switching does not need a trip to all projects. */

@@ -43,22 +43,24 @@ cannot see.
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
-  - `ui/` — file list, diff view, diff rows, empty states; the summary's views: the project's
-    facts in the breadcrumb, the change count on the rail, the level 0 card's part (a chunk of its
-    own, loaded with level 0). The file list and the
-    diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
+  - `ui/` — the panel (`ChangesWorkspace`), file list, diff view and rows, the open file in the
+    panel's header; the summary's views: the project's facts in the breadcrumb, the change count
+    on the rail, the level 0 card's part (a chunk of its own, loaded with level 0). The file list
+    and the diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
     (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
   the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
   traffic lights overlay the top bar, which full screen turns off).
-- `src/shared/` — stable primitives: theme tokens, button/chip primitives, clipboard hook, error
-  messages, and the panel contract (`panels/panel.ts`).
+- `src/shared/` — stable primitives: theme tokens, button/chip primitives, the clipboard hook and
+  copy icon, error messages, the project type every layer shares (`projects/project-info.ts`), and
+  the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
 ### Dependency rules
 
 - `app` composes everything and owns no workflow state.
 - `modules` do not import `app`, `infrastructure`, `dev` or another module.
+- Outside a module, only its public API is imported: `@/modules/<name>`, its `index.ts`.
 - `infrastructure` implements ports owned by modules; it does not import `app`.
 - `shared` imports only `shared`.
 - Direct `@tauri-apps/*` imports live only under `src/infrastructure/`.

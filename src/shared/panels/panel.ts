@@ -1,16 +1,8 @@
 import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
-
-/**
- * The project a panel shows: a repository the user added, identified by its root. The same shape
- * as the projects module's `ProjectInfo`, repeated here because `shared` imports no module.
- */
-export interface PanelProject {
-    root: string;
-    name: string;
-}
+import type { ProjectInfo } from '@/shared/projects/project-info';
 
 export interface PanelProps {
-    project: PanelProject;
+    project: ProjectInfo;
     /**
      * Where the panel shows what is open in it and the actions on it, through a portal: the
      * tile's header, or full screen a header of its own, shown only while the panel puts something
@@ -21,7 +13,7 @@ export interface PanelProps {
 
 /** What a panel's summary gets: the project of the card it is on. */
 export interface PanelSummaryProps {
-    project: PanelProject;
+    project: ProjectInfo;
 }
 
 /**
@@ -35,7 +27,8 @@ export interface PanelDefinition {
     icon: ComponentType<{ size?: number; stroke?: number; className?: string }>;
     /**
      * The panel itself, loaded on its first show (one chunk per module). Its queries live inside
-     * it, so a panel that is not on screen runs none.
+     * it, so a panel that is not on screen runs none. It is mounted again for another project, so
+     * its state (a selection, a scroll position) always belongs to the project it shows.
      */
     Component: LazyExoticComponent<ComponentType<PanelProps>>;
     /** Starts loading the chunk ahead of the first show, for the panel the app opens on. */

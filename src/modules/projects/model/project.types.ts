@@ -3,11 +3,7 @@
  * Change both sides together.
  */
 
-/** A repository the user added. Its root identifies it. */
-export interface ProjectInfo {
-    root: string;
-    name: string;
-}
+import type { ProjectInfo } from '@/shared/projects/project-info';
 
 export interface ProjectList {
     /** In the order they were added. */

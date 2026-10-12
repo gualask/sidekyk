@@ -1,9 +1,9 @@
 import { IconCircleCheck } from '@tabler/icons-react';
 import { useEffect, useMemo, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { PanelProps } from '@/shared/panels/panel';
 import { useRepositorySnapshot } from '../application/repository.queries';
 import { fileKey, orderedFiles } from '../model/file-groups';
-import type { RepositoryInfo } from '../model/repository.types';
 import { DiffView } from './DiffView';
 import { FileList } from './FileList';
 
@@ -17,15 +17,9 @@ function isTyping(target: EventTarget | null): boolean {
     );
 }
 
-export function ChangesWorkspace({
-    repository,
-    header,
-}: {
-    repository: RepositoryInfo;
-    /** The panel's header, where the open file goes (see `PanelProps`). */
-    header: HTMLElement | null;
-}) {
-    const snapshot = useRepositorySnapshot(repository.root);
+/** The Changes panel: what changed in the project's working tree, file by file. */
+export function ChangesWorkspace({ project, header }: PanelProps) {
+    const snapshot = useRepositorySnapshot(project.root);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
     const files = useMemo(() => orderedFiles(snapshot.data?.files ?? []), [snapshot.data]);
@@ -65,7 +59,7 @@ export function ChangesWorkspace({
                     {selected ? (
                         <DiffView
                             key={fileKey(selected)}
-                            root={repository.root}
+                            root={project.root}
                             file={selected}
                             header={header}
                         />

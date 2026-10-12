@@ -1,5 +1,6 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
-import type { ProjectInfo, ProjectList } from '@/modules/projects';
+import type { ProjectList } from '@/modules/projects';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
 
@@ -38,9 +39,9 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
     const snapshot = (root: string) => {
-        const repository = project(root);
-        if (scenario === 'large' && scenarioData(root)) return largeSnapshot(repository);
-        return reviewSnapshot(repository, !scenarioData(root));
+        project(root);
+        if (scenario === 'large' && scenarioData(root)) return largeSnapshot();
+        return reviewSnapshot(!scenarioData(root));
     };
 
     return {

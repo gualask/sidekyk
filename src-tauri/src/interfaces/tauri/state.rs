@@ -12,22 +12,42 @@ use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
-    resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, REPOSITORY_CHANGED_EVENT,
+    self, resolve_repository, IgnoredPaths, RepositoryBackend, RepositoryChangedEvent,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, REPOSITORY_CHANGED_EVENT,
 };
 use crate::shared::coalesce::Coalesced;
+use crate::shared::error::unshare;
 use crate::shared::sync::lock;
 
-/// A snapshot shared by every caller that waited for it.
-pub(crate) type SharedSnapshot = Result<RepositorySnapshot, Arc<anyhow::Error>>;
-/// A summary shared by every caller that waited for it.
-pub(crate) type SharedSummary = Result<RepositorySummary, Arc<anyhow::Error>>;
+/// A result shared by every caller that waited for it.
+type Shared<T> = Result<T, Arc<anyhow::Error>>;
 
-/// One coalesced computation per project.
-type PerProject<T> = Mutex<HashMap<String, Arc<Coalesced<T>>>>;
+/// One computation per project at a time; requests that arrive during it share the next one.
+struct PerProject<T> {
+    runs: Mutex<HashMap<String, Arc<Coalesced<Shared<T>>>>>,
+}
 
-fn for_project<T>(map: &PerProject<T>, root: &str) -> Arc<Coalesced<T>> {
-    lock(map).entry(root.to_string()).or_default().clone()
+impl<T> Default for PerProject<T> {
+    fn default() -> Self {
+        Self {
+            runs: Mutex::default(),
+        }
+    }
+}
+
+impl<T: Clone> PerProject<T> {
+    fn run(&self, root: &str, work: impl FnOnce() -> anyhow::Result<T>) -> anyhow::Result<T> {
+        let coalesced = lock(&self.runs)
+            .entry(root.to_string())
+            .or_default()
+            .clone();
+        coalesced.run(|| work().map_err(Arc::new)).map_err(unshare)
+    }
+
+    /// Forgets the projects no longer in the list.
+    fn retain(&self, list: &ProjectList) {
+        lock(&self.runs).retain(|root, _| list.find(root).is_ok());
+    }
 }
 
 struct Watched {
@@ -42,10 +62,9 @@ pub(crate) struct ProjectsState {
     /// Only the project on screen is watched. Kept apart from `list`, since starting a watcher
     /// can take a while (on Linux it walks the tree) and must not hold up snapshots.
     watched: Mutex<Option<Watched>>,
-    /// At most one snapshot in flight per project; requests during it share the next one.
-    snapshots: PerProject<SharedSnapshot>,
-    /// The same for summaries, which every project on screen asks for at once.
-    summaries: PerProject<SharedSummary>,
+    snapshots: PerProject<RepositorySnapshot>,
+    /// Every project on screen asks for its summary at once.
+    summaries: PerProject<RepositorySummary>,
 }
 
 impl ProjectsState {
@@ -59,12 +78,26 @@ impl ProjectsState {
         lock(&self.list).find(root).cloned()
     }
 
-    pub(crate) fn snapshots(&self, root: &str) -> Arc<Coalesced<SharedSnapshot>> {
-        for_project(&self.snapshots, root)
+    /// A project's snapshot, sharing the one in flight.
+    pub(crate) fn snapshot(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+    ) -> anyhow::Result<RepositorySnapshot> {
+        let project = self.project(root)?;
+        self.snapshots
+            .run(root, || repository::load_snapshot(backend, &project))
     }
 
-    pub(crate) fn summaries(&self, root: &str) -> Arc<Coalesced<SharedSummary>> {
-        for_project(&self.summaries, root)
+    /// A project's summary, sharing the one in flight.
+    pub(crate) fn summary(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+    ) -> anyhow::Result<RepositorySummary> {
+        let project = self.project(root)?;
+        self.summaries
+            .run(root, || repository::load_summary(backend, &project))
     }
 
     /// Replaces the list at startup, before anything is watched.
@@ -87,8 +120,8 @@ impl ProjectsState {
             }
             list.clone()
         };
-        lock(&self.snapshots).retain(|root, _| list.find(root).is_ok());
-        lock(&self.summaries).retain(|root, _| list.find(root).is_ok());
+        self.snapshots.retain(&list);
+        self.summaries.retain(&list);
         watch_active(app);
         Ok(list)
     }

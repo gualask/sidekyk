@@ -1,5 +1,5 @@
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { avatarColor, avatarLetter } from '../model/avatar';
-import type { ProjectInfo } from '../model/project.types';
 
 export function ProjectAvatar({
     project,

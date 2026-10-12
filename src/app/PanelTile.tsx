@@ -1,7 +1,12 @@
 import { IconArrowsMaximize } from '@tabler/icons-react';
 import { Suspense, useState } from 'react';
-import type { PanelDefinition, PanelProject } from '@/shared/panels/panel';
+import type { PanelDefinition } from '@/shared/panels/panel';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { panelShortcut } from './panels';
+
+/** A panel's header row, in a tile or full screen. */
+const HEADER =
+    'flex h-[34px] shrink-0 items-center gap-2 border-b border-ui-border text-[13px] whitespace-nowrap';
 
 /**
  * A panel, in a tile (level 1) or full screen (level 2). Its header carries what the panel puts
@@ -15,7 +20,7 @@ export function PanelTile({
     onZoomIn,
 }: {
     panel: PanelDefinition;
-    project: PanelProject;
+    project: ProjectInfo;
     /** Shows the panel as a tile, whose header zooms into it; without it, the panel is full screen. */
     onZoomIn?: () => void;
 }) {
@@ -33,7 +38,7 @@ export function PanelTile({
             }`}
         >
             {onZoomIn ? (
-                <div className="flex h-[34px] shrink-0 items-center gap-2 border-b border-ui-border pr-2 pl-3 text-[13px] whitespace-nowrap">
+                <div className={`${HEADER} pr-2 pl-3`}>
                     <span className="font-bold" title={`${panel.title} (${shortcut})`}>
                         {panel.title}
                     </span>
@@ -51,14 +56,11 @@ export function PanelTile({
                     </button>
                 </div>
             ) : (
-                <div
-                    ref={setHeader}
-                    className="flex h-[34px] shrink-0 items-center gap-2 border-b border-ui-border px-3 text-[13px] whitespace-nowrap empty:hidden"
-                />
+                <div ref={setHeader} className={`${HEADER} px-3 empty:hidden`} />
             )}
             <div className="relative min-h-0 flex-1">
                 <Suspense fallback={null}>
-                    <panel.Component project={project} header={header} />
+                    <panel.Component key={project.root} project={project} header={header} />
                 </Suspense>
             </div>
         </section>

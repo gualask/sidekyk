@@ -1,7 +1,5 @@
 //! Tauri adapters for the repositories under review.
 
-use std::sync::Arc;
-
 use tauri::Manager;
 
 use super::blocking::blocking;
@@ -10,25 +8,18 @@ use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::modules::repository::{
     self, FileDiff, FileDiffRequest, RepositorySnapshot, RepositorySummary,
 };
-use crate::shared::error::{unshare, AppError};
+use crate::shared::error::AppError;
 
 #[tauri::command]
-/// Branch, changed files and totals of a project.
+/// A project's changed files, area by area, and its summary.
 pub(crate) async fn get_repository_snapshot(
     app: tauri::AppHandle,
     root: String,
 ) -> Result<RepositorySnapshot, AppError> {
     blocking("get_repository_snapshot", app, move |app| {
-        let state = app.state::<ProjectsState>();
-        let info = state.project(&root)?;
-        let load = || {
-            let backend = app.state::<LocalRepositoryBackend>();
-            repository::load_snapshot(backend.inner(), &info)
-        };
-        state
-            .snapshots(&root)
-            .run(|| load().map_err(Arc::new))
-            .map_err(unshare)
+        let backend = app.state::<LocalRepositoryBackend>();
+        app.state::<ProjectsState>()
+            .snapshot(backend.inner(), &root)
     })
     .await
 }
@@ -40,16 +31,8 @@ pub(crate) async fn get_repository_summary(
     root: String,
 ) -> Result<RepositorySummary, AppError> {
     blocking("get_repository_summary", app, move |app| {
-        let state = app.state::<ProjectsState>();
-        let info = state.project(&root)?;
-        let load = || {
-            let backend = app.state::<LocalRepositoryBackend>();
-            repository::load_summary(backend.inner(), &info)
-        };
-        state
-            .summaries(&root)
-            .run(|| load().map_err(Arc::new))
-            .map_err(unshare)
+        let backend = app.state::<LocalRepositoryBackend>();
+        app.state::<ProjectsState>().summary(backend.inner(), &root)
     })
     .await
 }

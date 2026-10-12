@@ -1,8 +1,7 @@
-import { IconGitBranch } from '@tabler/icons-react';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { useRepositorySummary } from '../application/repository.queries';
-import { branchLabel } from '../model/branch';
+import { BranchName } from './BranchName';
 import { KindBadge } from './KindBadge';
 import { LineCounts } from './LineCounts';
 
@@ -31,14 +30,8 @@ export function ChangesSummary({ project }: PanelSummaryProps) {
                 >
                     {totals.files > 0 ? `${totals.files} changed` : 'clean'}
                 </span>
-                <span
-                    className="chip font-mono"
-                    title={branch.upstream ? `Tracking ${branch.upstream}` : 'No upstream'}
-                >
-                    <IconGitBranch size={13} />
-                    <span className="max-w-40 truncate">{branchLabel(branch)}</span>
-                    {branch.ahead > 0 ? <span>↑{branch.ahead}</span> : null}
-                    {branch.behind > 0 ? <span>↓{branch.behind}</span> : null}
+                <span className="chip max-w-56">
+                    <BranchName branch={branch} />
                 </span>
                 {totals.additions + totals.deletions > 0 ? (
                     <span className="chip text-[11.5px]" title="Lines of tracked files">

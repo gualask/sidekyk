@@ -1,4 +1,4 @@
-import type { ChangedFile, FileDiff, RepositoryInfo, RepositorySnapshot } from '@/modules/changes';
+import type { ChangedFile, FileDiff, RepositorySnapshot } from '@/modules/changes';
 import { fixtureSummary } from './fixture-summary';
 
 /** Enough files and lines that rendering them all would be slow: checks the virtualized lists. */
@@ -36,8 +36,8 @@ const BRANCH = {
     behind: 0,
 };
 
-export function largeSnapshot(repository: RepositoryInfo): RepositorySnapshot {
-    return { repository, files: FILES, summary: fixtureSummary(BRANCH, FILES) };
+export function largeSnapshot(): RepositorySnapshot {
+    return { files: FILES, summary: fixtureSummary(BRANCH, FILES) };
 }
 
 let diffText: string | null = null;

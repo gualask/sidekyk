@@ -5,8 +5,8 @@ export const changesPanel = definePanel({
     id: 'changes',
     title: 'Changes',
     icon: IconGitCompare,
-    load: () => import('./ui/ChangesWorkflow'),
-    pick: (module) => module.ChangesWorkflow,
+    load: () => import('./ui/ChangesWorkspace'),
+    pick: (module) => module.ChangesWorkspace,
     summary: {
         load: () => import('./ui/ChangesSummary'),
         pick: (module) => module.ChangesSummary,

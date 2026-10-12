@@ -1,24 +1,17 @@
-import { IconCheck, IconCopy, IconCopyOff, IconFileOff } from '@tabler/icons-react';
+import { IconFileOff } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
-import type { CopyState } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useFileDiff } from '../application/repository.queries';
 import { formatFileForAgent, formatHunkForAgent } from '../model/agent-snippet';
 import { type DiffHunk, parseUnifiedDiff } from '../model/diff-parser';
 import { diffRows, widestLine } from '../model/diff-rows';
-import type { ChangeArea, ChangedFile } from '../model/repository.types';
+import type { ChangedFile } from '../model/repository.types';
 import { DiffLineRow, HunkHeaderRow } from './DiffRows';
 import { HUNK_ROW_HEIGHT, LINE_CHROME_WIDTH, LINE_ROW_HEIGHT } from './diff-layout';
-import { LineCounts } from './LineCounts';
-
-const AREA_LABEL: Record<ChangeArea, string> = {
-    unstaged: 'Not staged',
-    untracked: 'New file',
-    staged: 'Staged',
-};
+import { FileHeader } from './FileHeader';
 
 function Notice({ children }: { children: ReactNode }) {
     return (
@@ -83,67 +76,6 @@ function DiffLines({
                 );
             })}
         </div>
-    );
-}
-
-/**
- * The open file in the panel's header: its path, its area and counts, and the copy of the whole
- * file. Copy is an icon, as everywhere: its tooltip says what it copies, and it turns into a check
- * for a moment once done.
- */
-function FileHeader({
-    file,
-    copied,
-    onCopy,
-}: {
-    file: ChangedFile;
-    copied: CopyState;
-    /** null while there is nothing to copy (no hunks). */
-    onCopy: (() => void) | null;
-}) {
-    const path = file.origPath ? `${file.origPath} → ${file.path}` : file.path;
-    const copyTitle = copied
-        ? copied.ok
-            ? 'Copied'
-            : 'Copy failed'
-        : 'Copy the diff of this file, ready to paste to your agent';
-
-    return (
-        <>
-            <span className="flex min-w-0 flex-1 items-center gap-2 font-mono text-xs font-semibold text-ui-text-secondary">
-                <span className="min-w-0 truncate" title={path}>
-                    {path}
-                </span>
-                <span className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted">
-                    {AREA_LABEL[file.area]}
-                </span>
-                <span className="shrink-0 text-[11.5px] font-normal">
-                    <LineCounts
-                        additions={file.additions}
-                        deletions={file.deletions}
-                        binary={file.binary}
-                    />
-                </span>
-            </span>
-            <button
-                type="button"
-                className="btn-icon h-[26px] w-[26px]"
-                disabled={onCopy === null}
-                title={copyTitle}
-                aria-label={copyTitle}
-                onClick={onCopy ?? undefined}
-            >
-                {copied ? (
-                    copied.ok ? (
-                        <IconCheck size={14} />
-                    ) : (
-                        <IconCopyOff size={14} />
-                    )
-                ) : (
-                    <IconCopy size={14} />
-                )}
-            </button>
-        </>
     );
 }
 

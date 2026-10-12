@@ -6,7 +6,6 @@ export {
 } from './application/projects.queries';
 export {
     PROJECTS_CHANGED_EVENT,
-    type ProjectInfo,
     type ProjectList,
     type ProjectsChangedEvent,
 } from './model/project.types';

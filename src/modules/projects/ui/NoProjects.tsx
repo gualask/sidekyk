@@ -9,7 +9,7 @@ export function NoProjects({
     /** A repository was added: show it. */
     onOpen: () => void;
 }) {
-    const add = useAddProject();
+    const add = useAddProject(onOpen);
 
     return (
         <div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
@@ -27,13 +27,7 @@ export function NoProjects({
                 type="button"
                 className="btn-primary"
                 disabled={add.isPending}
-                onClick={() =>
-                    add.mutate(undefined, {
-                        onSuccess: (added) => {
-                            if (added) onOpen();
-                        },
-                    })
-                }
+                onClick={() => add.mutate()}
             >
                 <IconFolderOpen size={18} />
                 Add a repository

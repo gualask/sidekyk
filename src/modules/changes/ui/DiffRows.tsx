@@ -1,5 +1,5 @@
-import { IconCheck, IconCopy } from '@tabler/icons-react';
-import type { CopyState } from '@/shared/ui/hooks/use-copy-to-clipboard';
+import { CopyIcon } from '@/shared/ui/CopyIcon';
+import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 
 const ROW_TONE: Record<DiffLine['kind'], string> = {
@@ -47,12 +47,8 @@ export function HunkHeaderRow({
                         : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
                 }`}
             >
-                {copied?.ok === false ? null : copied ? (
-                    <IconCheck size={14} />
-                ) : (
-                    <IconCopy size={14} />
-                )}
-                {copied ? (copied.ok ? 'Copied' : 'Copy failed') : 'Copy hunk'}
+                <CopyIcon copied={copied} />
+                {copyLabel(copied, 'Copy hunk')}
             </span>
         </button>
     );

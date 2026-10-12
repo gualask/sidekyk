@@ -1,6 +1,6 @@
 import { ProjectFacts } from '@/modules/changes';
-import type { ProjectInfo } from '@/modules/projects';
 import type { PanelDefinition } from '@/shared/panels/panel';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useTitleBarOverlaid } from './providers';
 import type { ZoomLevel } from './workspace';
 

@@ -5,7 +5,6 @@ export {
     type FileDiff,
     REPOSITORY_CHANGED_EVENT,
     type RepositoryChangedEvent,
-    type RepositoryInfo,
     type RepositorySnapshot,
     type RepositorySummary,
 } from './model/repository.types';

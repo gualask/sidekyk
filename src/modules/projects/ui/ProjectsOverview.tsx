@@ -2,12 +2,13 @@ import { Menu } from '@base-ui/react/menu';
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import {
     useActivateProject,
     useAddProject,
     useRemoveProject,
 } from '../application/projects.queries';
-import type { ProjectInfo, ProjectList } from '../model/project.types';
+import type { ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
 
 /**
@@ -25,7 +26,7 @@ export function ProjectsOverview({
     /** What the panels tell about a project, below its name. */
     summary: (project: ProjectInfo) => ReactNode;
 }) {
-    const add = useAddProject();
+    const add = useAddProject(onOpen);
     const remove = useRemoveProject();
     const activate = useActivateProject();
     const failure = add.error ?? remove.error;
@@ -56,13 +57,7 @@ export function ProjectsOverview({
                     type="button"
                     disabled={add.isPending}
                     className="flex min-h-44 items-center justify-center gap-2 rounded-xl border border-dashed border-ui-border text-sm text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent disabled:opacity-40"
-                    onClick={() =>
-                        add.mutate(undefined, {
-                            onSuccess: (added) => {
-                                if (added) onOpen();
-                            },
-                        })
-                    }
+                    onClick={() => add.mutate()}
                 >
                     <IconPlus size={16} />
                     Add a repository

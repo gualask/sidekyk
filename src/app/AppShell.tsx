@@ -4,13 +4,13 @@ import {
     activeProject,
     loadProjectsOverview,
     NoProjects,
-    type ProjectInfo,
     type ProjectList,
     ProjectRail,
     useProjects,
     useProjectsChangeSubscription,
 } from '@/modules/projects';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { PanelTile } from './PanelTile';
 import { INITIAL_PANEL, SUMMARIES } from './panels';

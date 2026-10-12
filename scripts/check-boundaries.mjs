@@ -51,9 +51,17 @@ function moduleOwner(specifier) {
     return specifier.slice('@/modules/'.length).split('/')[0] ?? null;
 }
 
+/** Outside a module, only its public API (`@/modules/<name>`, its `index.ts`) may be imported. */
+function reachesIntoModule(fromFile, specifier) {
+    const owner = moduleOwner(specifier);
+    if (!owner || specifier === `@/modules/${owner}`) return false;
+    return moduleOwner(`@/${relativePath(fromFile).slice('src/'.length)}`) !== owner;
+}
+
 function isAllowedImport(fromLayer, fromFile, specifier) {
     const targetLayer = importedLayer(specifier);
     if (!targetLayer) return true;
+    if (reachesIntoModule(fromFile, specifier)) return false;
     if (targetLayer === 'dev' && fromLayer !== 'dev' && fromLayer !== 'app') return false;
 
     if (fromLayer === 'shared') {

@@ -1,4 +1,4 @@
-import type { ChangeArea, ChangedFile, ChangeKind } from './repository.types';
+import type { ChangeArea, ChangedFile } from './repository.types';
 
 export interface FileGroup {
     area: ChangeArea;
@@ -50,17 +50,6 @@ export function fileListRows(files: readonly ChangedFile[]): FileListRow[] {
 export function fileKey(file: Pick<ChangedFile, 'area' | 'path'>): string {
     return `${file.area}:${file.path}`;
 }
-
-export const KIND_BADGE: Record<ChangeKind, string> = {
-    added: 'A',
-    modified: 'M',
-    deleted: 'D',
-    renamed: 'R',
-    copied: 'C',
-    'type-changed': 'T',
-    untracked: 'U',
-    conflicted: '!',
-};
 
 export function splitPath(path: string): { name: string; dir: string } {
     const slash = path.lastIndexOf('/');

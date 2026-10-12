@@ -232,7 +232,6 @@ pub(crate) fn load_snapshot(
     };
 
     Ok(RepositorySnapshot {
-        repository: repository.clone(),
         files,
         summary: summarize(&status, &tracked),
     })

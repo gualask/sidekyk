@@ -1,6 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
-import type { ProjectInfo, ProjectList } from '../model/project.types';
+import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectList } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
 
 const projectsKey = ['projects'] as const;
@@ -44,14 +45,17 @@ export function activeProject(list: ProjectList): ProjectInfo | null {
     return list.projects.find((project) => project.root === list.active) ?? null;
 }
 
-export function useAddProject() {
+/** Asks for a folder and adds its repository; `onAdded` follows, unless the user cancelled. */
+export function useAddProject(onAdded: () => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
         ...projectsChange,
         mutationFn: () => port.addProject(),
         onSuccess: (list) => {
-            if (list && isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            if (!list) return;
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            onAdded();
         },
     });
 }

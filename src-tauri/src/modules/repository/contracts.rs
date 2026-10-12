@@ -114,7 +114,6 @@ pub(crate) struct RepositorySummary {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RepositorySnapshot {
-    pub(crate) repository: RepositoryInfo,
     pub(crate) files: Vec<ChangedFile>,
     pub(crate) summary: RepositorySummary,
 }
@@ -144,10 +143,6 @@ mod tests {
     #[test]
     fn snapshot_serializes_with_the_frontend_field_names() {
         let snapshot = RepositorySnapshot {
-            repository: RepositoryInfo {
-                root: "/r".into(),
-                name: "r".into(),
-            },
             files: vec![ChangedFile {
                 path: "b.ts".into(),
                 orig_path: Some("a.ts".into()),
@@ -183,7 +178,6 @@ mod tests {
         assert_eq!(
             serde_json::to_value(snapshot).unwrap(),
             serde_json::json!({
-                "repository": { "root": "/r", "name": "r" },
                 "files": [{
                     "path": "b.ts",
                     "origPath": "a.ts",
