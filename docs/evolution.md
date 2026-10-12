@@ -57,12 +57,13 @@ Tabler's. What it settles:
   zoom-level indicator.
 - **Project rail** on the left of a project: the "all projects" button first, then one avatar per
   project with its change count, so switching does not need a trip to level 0.
-- **Level 0 cards**: branch, changed files with line counts, when files last changed (pulsing
-  while an agent writes), and how many notes wait, with the newest. A card's ⋯ menu removes the
-  project from Sidekyk, as a note's removes the note; its repository is left as it is. "+ Add a
-  repository", the last card, adds one. Removing asks nothing and loses nothing while a project is
-  only its repository; once notes belong to projects, it must not delete them silently (undo, or
-  keep them until the project is added again).
+- **Level 0 cards**: branch, changed files with line counts (of tracked files, see Projects),
+  when files last changed (pulsing while an agent writes), and how many notes wait, with the
+  newest. A card's ⋯ menu removes the project from Sidekyk, as a note's removes the note; its
+  repository is left as it is. "+ Add a repository", the last card, adds one. Removing asks
+  nothing and loses nothing while a project is only its repository; once notes belong to
+  projects, it must not delete them silently (undo, or keep them until the project is added
+  again).
 - **Tiles or tabs** at level 1: both, chosen in the settings (tiles by default); no shortcut.
   Tiles put Changes on the left, Files above Notes on the right; the splitters drag, a double
   click resets them. Files and Notes minimize to a chip in the top bar, and the other takes the
@@ -262,11 +263,18 @@ still instant.
 
 - The list of projects is app data, kept with the settings (see Notes for the location). It
   replaces the single "last repository" setting.
-- Only the active project runs full snapshots. Inactive projects keep a light watcher that only
-  marks "something changed" without running git; level 0 shows the mark, and the snapshot runs
-  when the project is opened. FSEvents (macOS) and Windows watch a whole tree with one handle and
-  cost close to nothing; inotify (Linux) needs one watch per directory, so several large projects
-  can reach the per-user limit: measure it there before watching every project.
+- Only the active project runs full snapshots and is watched.
+- Decided on 2026-10-12: the other projects show a summary on the rail and on the level 0 cards
+  (branch, changed files, lines, the first files), from `git status` and one numstat against
+  HEAD, without reading new files. It loads once the first paint is done and again when the
+  window comes to the front, never while idle. The snapshot builds the same summary, so a project
+  shows the same numbers wherever it is; lines are those of tracked files, new files count as
+  files only. Counting new files' lines would mean reading them for every project on screen.
+- Still to come: a light watcher for the projects not on screen, marking "something changed"
+  without running git; the mark shows on the rail and the cards, and a marked project's summary
+  is fetched again while it is on screen. FSEvents (macOS) and Windows watch a whole tree with one
+  handle and cost close to nothing; inotify (Linux) needs one watch per directory, so several
+  large projects can reach the per-user limit: measure it there before watching every project.
 - Query caches of inactive projects expire (`gcTime`), so memory does not grow with the number of
   projects.
 

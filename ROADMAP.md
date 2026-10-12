@@ -45,9 +45,11 @@ what needs measuring before deciding waits in **Performance review**, at the end
 ## Next: workspace foundation
 
 - [x] Panel model: one module per panel with a common contract (`PanelDefinition` in
-      `src/shared/panels`: id, title, icon, lazy component), composed in `src/app/panels.ts`;
-      panels off screen run no queries, and each loads as its own chunk, the startup panel's
-      fetched with the app instead of after the first render. Costs nothing hidden or shown
+      `src/shared/panels`: id, title, icon, lazy component, and since then its header and its
+      level 0 summary), composed in `src/app/panels.ts`; panels off screen run no queries, and
+      each loads as its own chunk, the startup panel's fetched with the app instead of after the
+      first render. A panel is mounted again for another project, so its state belongs to one
+      project. Costs nothing hidden or shown
 - [x] Panel summary: a panel tells about a project on its level 0 card (`summary` in the
       contract, a chunk of its own loaded with level 0). Changes gives the card how many files
       changed, the branch, the lines and the first files; the same summary puts the change count
@@ -85,7 +87,8 @@ what needs measuring before deciding waits in **Performance review**, at the end
       project rail, level 0 cards with "+ Add a repository" and the ⋯ menu, level 1 tiles and
       level 2 full screen with Changes as their only panel. Level 0 and Base UI's menu are a
       chunk of their own, fetched once the window is idle after the first paint. Costs nothing
-      hidden; shown, one `isFullscreen` call per window resize on macOS. To check in the packaged
+      hidden; shown, on macOS, at most one `isFullscreen` call in flight while the window
+      resizes, and one more if it resized meanwhile. To check in the packaged
       app: the traffic lights' position (`trafficLightPosition` in `tauri.conf.json`)
 - [ ] Settings dialog (`⌘,`, a gear in the top bar): theme (dark by default, or light; replaces
       following the system) and project layout (tiles or tabs). The other settings of the mock
