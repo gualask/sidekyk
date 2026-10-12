@@ -12,10 +12,10 @@ mod status;
 
 pub(crate) use contracts::{
     FileDiff, FileDiffRequest, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
-    REPOSITORY_CHANGED_EVENT,
+    RepositorySummary, REPOSITORY_CHANGED_EVENT,
 };
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::IgnoredPaths;
 pub(crate) use open::{repository_name, resolve_repository};
 pub(crate) use ports::{GitOutput, RepositoryBackend};
-pub(crate) use snapshot::load_snapshot;
+pub(crate) use snapshot::{load_snapshot, load_summary};

@@ -29,20 +29,42 @@ export interface PanelDefinition {
     Component: LazyExoticComponent<ComponentType<PanelProps>>;
     /** Starts loading the chunk ahead of the first show, for the panel the app opens on. */
     preload: () => Promise<unknown>;
+    /**
+     * What the panel tells about a project on its card at all projects (level 0), if anything.
+     * A chunk of its own, loaded with level 0; it fetches only what the card shows.
+     */
+    summary?: {
+        Component: LazyExoticComponent<ComponentType<PanelProps>>;
+        preload: () => Promise<unknown>;
+    };
 }
 
-/** Builds a panel whose component comes from `load`, a dynamic `import()` of the module's UI. */
-export function definePanel<M>({
-    load,
-    pick,
-    ...panel
-}: Pick<PanelDefinition, 'id' | 'title' | 'icon'> & {
+/** A component of a module's UI, loaded by `load`, a dynamic `import()`. */
+interface LazyPart<M> {
     load: () => Promise<M>;
     pick: (module: M) => ComponentType<PanelProps>;
-}): PanelDefinition {
+}
+
+function lazyPart<M>({ load, pick }: LazyPart<M>) {
     return {
-        ...panel,
         Component: lazy(() => load().then((module) => ({ default: pick(module) }))),
         preload: load,
+    };
+}
+
+/** Builds a panel whose component, and summary if any, are loaded on their first show. */
+export function definePanel<M, S = never>({
+    load,
+    pick,
+    summary,
+    ...panel
+}: Pick<PanelDefinition, 'id' | 'title' | 'icon'> &
+    LazyPart<M> & {
+        summary?: LazyPart<S>;
+    }): PanelDefinition {
+    return {
+        ...panel,
+        ...lazyPart({ load, pick }),
+        summary: summary ? lazyPart(summary) : undefined,
     };
 }

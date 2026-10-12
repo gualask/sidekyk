@@ -10,14 +10,22 @@ workflow.
 agent edits files ─▶ notify watcher of the project on screen (250 ms quiet period, filtered)
                         └─▶ skip paths git ignores (check-ignore, cached per directory)
                         └─▶ event "repository-changed" { version: 1, root }
-                              └─▶ frontend invalidates ['repository', …] queries
-                                    ├─▶ get_repository_snapshot(root)  (status + numstat ×3)
+                              └─▶ frontend invalidates ['repository', root, …] queries
+                                    ├─▶ get_repository_snapshot(root)  (status + numstat ×3,
+                                    │                                   its summary included)
+                                    ├─▶ get_repository_summary(root)   (only when no snapshot
+                                    │                                   brings it: level 0)
                                     └─▶ get_file_diff(root, …)         (one file, one area)
 ```
 
 Projects are the repositories the user added (`get_projects`, `add_project`, `activate_project`,
 `remove_project`). Commands name a repository by its root, and the backend serves only roots in the
 project list. Only the project on screen is watched; the others cost nothing until shown.
+
+The other projects show their summary (`get_repository_summary`: status and one numstat against
+HEAD, new files not read) on the rail and on the level 0 cards. It is fetched once the first
+paint is done, and again when the window comes to the front: an agent may have worked on any
+project while the user was away. Nothing refreshes it while the window stays in front.
 
 The snapshot also refetches when the window regains focus, as a safety net for changes the watcher
 cannot see.
@@ -35,7 +43,9 @@ cannot see.
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
-  - `ui/` — summary bar, file list, diff view, diff rows, empty states. The file list and the
+  - `ui/` — file list, diff view, diff rows, empty states; the summary's views: the project's
+    facts in the breadcrumb, the change count on the rail, the level 0 card's part (a chunk of its
+    own, loaded with level 0). The file list and the
     diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
     (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
@@ -62,12 +72,15 @@ component loaded with `import()`, one chunk per module. The component receives t
 shows (`PanelProps`), so panels never ask which project is active. `src/app/panels.ts` lists them
 in shortcut order and starts loading the startup panel's chunk as soon as the app's code runs, so
 it does not wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
-its component, so a panel that is not on screen runs none.
+its component, so a panel that is not on screen runs none. A panel may also give a `summary`: its
+part of a project's card at level 0, a chunk of its own fetched with level 0.
 
 ### State
 
-There is no client store. Git is the state: the project list, the snapshot and the diffs are
-TanStack Query caches, the last two keyed by repository root. UI state is the zoom level
+There is no client store. Git is the state: the project list, the snapshots, the summaries and
+the diffs are TanStack Query caches, the last three keyed by repository root first, so a change on
+disk refetches only that repository. A snapshot stores its summary in the summary's cache, and the
+project in the Changes panel never fetches a summary of its own. UI state is the zoom level
 (`AppShell`) and the selected file (`ChangesWorkspace`). Switching project updates the cached list
 at once and the backend catches up; changes to the list run one at a time, in the user's order
 (one TanStack mutation scope), so quick switches end on the last project clicked; the list a change
@@ -81,7 +94,7 @@ When the selected file leaves the list, the selection falls back to the first fi
 - `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, and `log_frontend_error` in
   `diagnostics.rs`) and `state.rs`, the one place that changes the project list and watches the
   project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At most one snapshot
-  per project runs at a time: requests that arrive during it share the next one
+  and one summary per project run at a time: requests that arrive during one share the next
   (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
 - `modules/projects/` — the project list: adding, activating, removing, and a stored list made
   consistent. No Tauri.
@@ -104,12 +117,16 @@ When the selected file leaves the list, the selection falls back to the first fi
 3. Untracked files are counted by reading them (binary when a NUL appears in the first 8 KiB),
    within limits per snapshot: 4 MiB per file, 32 MiB and 2,000 files in all. A file past them is
    not counted, which the frontend shows apart from binary (`binary` is a field of its own).
-4. Totals compare against HEAD (`git diff HEAD --numstat`), so a line staged and edited again
-   counts once. Before the first commit the staged and unstaged counts are added instead.
+4. The summary compares against HEAD (`git diff HEAD --numstat`), so a line staged and edited
+   again counts once; before the first commit the staged and unstaged counts are added instead.
+   It has one entry per path (the first three, and how many there are), and its lines are those
+   of tracked files: new files count as files, their lines unread.
 
 The four git commands are independent and run in parallel, so a snapshot costs about as much as
-the slowest of them. `backend_timings` (an ignored test, see `AGENTS.md`) measures the snapshot
-and a diff on any repository.
+the slowest of them. A summary alone (`load_summary`) runs only steps 1 and 4, in parallel, and
+builds the same summary from them, so a project's numbers do not depend on whether it is the one
+in the Changes panel. `backend_timings` (an ignored test, see `AGENTS.md`) measures the snapshot,
+the summary and a diff on any repository.
 
 ### Diffs
 

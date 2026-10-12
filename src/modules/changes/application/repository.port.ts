@@ -4,6 +4,7 @@ import type {
     FileDiffRequest,
     RepositoryChangedEvent,
     RepositorySnapshot,
+    RepositorySummary,
 } from '../model/repository.types';
 
 /**
@@ -12,6 +13,8 @@ import type {
  */
 export interface RepositoryPort {
     getSnapshot(root: string): Promise<RepositorySnapshot>;
+    /** Branch, changed paths and line totals, cheap enough for every project on screen. */
+    getSummary(root: string): Promise<RepositorySummary>;
     getFileDiff(root: string, request: FileDiffRequest): Promise<FileDiff>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;

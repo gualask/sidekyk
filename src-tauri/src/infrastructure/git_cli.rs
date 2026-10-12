@@ -121,8 +121,8 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_file_diff, load_snapshot, resolve_repository, FileDiffRequest, IgnoredPaths,
-        RepositorySnapshot,
+        load_file_diff, load_snapshot, load_summary, resolve_repository, FileDiffRequest,
+        IgnoredPaths, RepositorySnapshot,
     };
     use serde_json::json;
 
@@ -162,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_reports_every_area_with_counts_and_totals_against_head() {
+    fn snapshot_reports_every_area_and_a_summary_against_head() {
         let dir = scratch_repo();
         let backend = LocalRepositoryBackend::default();
         let repo = resolve_repository(&backend, &dir.path().join("src")).unwrap();
@@ -177,7 +177,7 @@ mod tests {
         let snapshot = load_snapshot(&backend, &repo.info).unwrap();
         let value = snapshot_json(&snapshot);
 
-        assert_eq!(value["branch"]["head"], "main");
+        assert_eq!(value["summary"]["branch"]["head"], "main");
         assert_eq!(
             value["files"],
             json!([
@@ -187,10 +187,23 @@ mod tests {
                 { "path": "notes/todo.md", "origPath": null, "area": "untracked", "kind": "untracked", "additions": 3, "deletions": 0, "binary": false },
             ])
         );
-        // vs HEAD: cart +3 -1, README -1, todo +3
+        // vs HEAD: cart +3 -1, README -1; the new todo counts as a file, its lines unread
         assert_eq!(
-            value["totals"],
-            json!({ "files": 3, "additions": 6, "deletions": 2 })
+            value["summary"]["totals"],
+            json!({ "files": 3, "additions": 3, "deletions": 2 })
+        );
+        assert_eq!(
+            value["summary"]["files"],
+            json!([
+                { "path": "README.md", "kind": "deleted", "additions": 0, "deletions": 1, "binary": false },
+                { "path": "src/cart.ts", "kind": "modified", "additions": 3, "deletions": 1, "binary": false },
+                { "path": "notes/todo.md", "kind": "untracked", "additions": null, "deletions": null, "binary": false },
+            ])
+        );
+        assert_eq!(
+            load_summary(&backend, &repo.info).unwrap(),
+            snapshot.summary,
+            "a summary alone is the snapshot's"
         );
     }
 
@@ -206,12 +219,16 @@ mod tests {
 
         let backend = LocalRepositoryBackend::default();
         let repo = resolve_repository(&backend, root).unwrap();
-        let value = snapshot_json(&load_snapshot(&backend, &repo.info).unwrap());
+        let snapshot = load_snapshot(&backend, &repo.info).unwrap();
 
-        // a.ts: +1 staged and +1 unstaged; b.ts: +2 untracked
+        // a.ts: +1 staged and +1 unstaged; b.ts counts as a file, its lines unread
         assert_eq!(
-            value["totals"],
-            json!({ "files": 2, "additions": 4, "deletions": 0 })
+            snapshot_json(&snapshot)["summary"]["totals"],
+            json!({ "files": 2, "additions": 2, "deletions": 0 })
+        );
+        assert_eq!(
+            load_summary(&backend, &repo.info).unwrap(),
+            snapshot.summary
         );
     }
 
@@ -321,7 +338,8 @@ mod tests {
         )
     }
 
-    /// Times the snapshot and the diff of the largest changed file on a real repository:
+    /// Times the snapshot, the summary and the diff of the largest changed file on a real
+    /// repository:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
     #[test]
     #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
@@ -334,6 +352,12 @@ mod tests {
             "snapshot: {}",
             time(20, || {
                 load_snapshot(&backend, &repo.info).unwrap();
+            })
+        );
+        println!(
+            "summary: {}",
+            time(20, || {
+                load_summary(&backend, &repo.info).unwrap();
             })
         );
 

@@ -1,4 +1,5 @@
 import type { ChangedFile, FileDiff, RepositoryInfo, RepositorySnapshot } from '@/modules/changes';
+import { fixtureSummary } from './fixture-summary';
 
 /** Enough files and lines that rendering them all would be slow: checks the virtualized lists. */
 const FILE_COUNT = 5_000;
@@ -27,23 +28,16 @@ function largeDiffText(): string {
     return `${lines.join('\n')}\n`;
 }
 
+const BRANCH = {
+    head: 'agent/bulk-refactor',
+    commit: 'f00dbab',
+    upstream: null,
+    ahead: 0,
+    behind: 0,
+};
+
 export function largeSnapshot(repository: RepositoryInfo): RepositorySnapshot {
-    return {
-        repository,
-        branch: {
-            head: 'agent/bulk-refactor',
-            commit: 'f00dbab',
-            upstream: null,
-            ahead: 0,
-            behind: 0,
-        },
-        files: FILES,
-        totals: {
-            files: FILE_COUNT,
-            additions: FILES.reduce((sum, f) => sum + (f.additions ?? 0), 0),
-            deletions: FILES.reduce((sum, f) => sum + (f.deletions ?? 0), 0),
-        },
-    };
+    return { repository, files: FILES, summary: fixtureSummary(BRANCH, FILES) };
 }
 
 let diffText: string | null = null;

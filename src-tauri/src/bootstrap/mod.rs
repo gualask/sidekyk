@@ -81,6 +81,7 @@ pub(crate) fn run() {
             tauri_commands::projects::activate_project,
             tauri_commands::projects::remove_project,
             tauri_commands::repository::get_repository_snapshot,
+            tauri_commands::repository::get_repository_summary,
             tauri_commands::repository::get_file_diff,
             tauri_commands::diagnostics::log_frontend_error,
         ])

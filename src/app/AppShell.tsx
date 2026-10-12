@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
+import { ChangeCount, useRepositoryChangeSubscription } from '@/modules/changes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -12,7 +13,7 @@ import {
 import { errorMessage } from '@/shared/errors/app-error';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { PanelTile } from './PanelTile';
-import { INITIAL_PANEL } from './panels';
+import { INITIAL_PANEL, SUMMARIES } from './panels';
 import { TopBar } from './TopBar';
 import type { ZoomLevel } from './workspace';
 
@@ -23,13 +24,24 @@ const ProjectsOverview = lazy(() =>
 /** The window: the top bar, and below it the workspace at its zoom level. */
 export function AppShell() {
     useProjectsChangeSubscription();
+    useRepositoryChangeSubscription();
     const projects = useProjects();
     // the app opens on the project it showed last, with its panels
     const [level, setLevel] = useState<ZoomLevel>(1);
     const project = projects.data ? activeProject(projects.data) : null;
+    // what the first paint does not need waits until the window has nothing else to do
+    const [idle, setIdle] = useState(false);
 
     // all projects is a click away: its code is fetched while nothing else happens
-    useEffect(() => whenIdle(() => void loadProjectsOverview()), []);
+    useEffect(
+        () =>
+            whenIdle(() => {
+                setIdle(true);
+                void loadProjectsOverview();
+                for (const summary of SUMMARIES) void summary.preload();
+            }),
+        [],
+    );
 
     return (
         <div className="flex h-full flex-col">
@@ -45,6 +57,7 @@ export function AppShell() {
                         project={project}
                         level={level}
                         onZoom={setLevel}
+                        idle={idle}
                     />
                 ) : null}
             </main>
@@ -57,11 +70,14 @@ function Workspace({
     project,
     level,
     onZoom,
+    idle,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
     level: ZoomLevel;
     onZoom: (level: ZoomLevel) => void;
+    /** The first paint is done: the other projects' counts may load. */
+    idle: boolean;
 }) {
     // also reached from all projects, once the last project is removed there: the repository
     // added next opens, as from the "+ Add a repository" card
@@ -69,7 +85,17 @@ function Workspace({
     if (level === 0) {
         return (
             <Suspense fallback={null}>
-                <ProjectsOverview list={list} onOpen={() => onZoom(1)} />
+                <ProjectsOverview
+                    list={list}
+                    onOpen={() => onZoom(1)}
+                    summary={(card) =>
+                        SUMMARIES.map(({ id, Component }) => (
+                            <Suspense key={id} fallback={null}>
+                                <Component project={card} />
+                            </Suspense>
+                        ))
+                    }
+                />
             </Suspense>
         );
     }
@@ -82,7 +108,17 @@ function Workspace({
     }
     return (
         <div className="flex h-full">
-            <ProjectRail list={list} onShowAll={() => onZoom(0)} />
+            <ProjectRail
+                list={list}
+                onShowAll={() => onZoom(0)}
+                badge={(other) => {
+                    // the project on screen gets its count from the Changes panel's snapshot
+                    const shown = other.root === project.root;
+                    return shown || idle ? (
+                        <ChangeCount project={other} fromSnapshot={shown} />
+                    ) : null;
+                }}
+            />
             <div className="flex min-w-0 flex-1 p-2">
                 <PanelTile panel={INITIAL_PANEL} project={project} onZoomIn={() => onZoom(2)} />
             </div>

@@ -6,7 +6,6 @@ import { fileKey, orderedFiles } from '../model/file-groups';
 import type { RepositoryInfo } from '../model/repository.types';
 import { DiffView } from './DiffView';
 import { FileList } from './FileList';
-import { SummaryBar } from './SummaryBar';
 
 const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
@@ -42,11 +41,6 @@ export function ChangesWorkspace({ repository }: { repository: RepositoryInfo })
 
     return (
         <div className="flex h-full flex-col">
-            <SummaryBar
-                repository={repository}
-                snapshot={snapshot.data}
-                refreshing={snapshot.isFetching}
-            />
             {snapshot.isError ? (
                 <div className="border-b border-ui-border bg-ui-danger-soft px-4 py-2 text-sm text-ui-danger-soft-text">
                     {errorMessage(snapshot.error)}

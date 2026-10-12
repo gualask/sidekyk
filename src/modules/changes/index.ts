@@ -1,4 +1,5 @@
 export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
+export { useRepositoryChangeSubscription } from './application/repository.queries';
 export {
     type ChangedFile,
     type FileDiff,
@@ -6,5 +7,8 @@ export {
     type RepositoryChangedEvent,
     type RepositoryInfo,
     type RepositorySnapshot,
+    type RepositorySummary,
 } from './model/repository.types';
 export { changesPanel } from './panel';
+export { ChangeCount } from './ui/ChangeCount';
+export { ProjectFacts } from './ui/ProjectFacts';

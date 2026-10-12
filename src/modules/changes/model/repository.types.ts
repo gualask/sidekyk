@@ -20,7 +20,7 @@ export interface RepositoryInfo {
     name: string;
 }
 
-interface BranchStatus {
+export interface BranchStatus {
     /** Branch name, or null when HEAD is detached. */
     head: string | null;
     /** Abbreviated HEAD commit, or null before the first commit. */
@@ -42,18 +42,39 @@ export interface ChangedFile {
     binary: boolean;
 }
 
-/** Everything that differs from HEAD, staged or not, untracked files included. */
+/**
+ * Everything that differs from HEAD, staged or not. `files` counts every changed path, new files
+ * included; the lines are those of tracked files, since a summary does not read new files.
+ */
 interface ChangeTotals {
     files: number;
     additions: number;
     deletions: number;
 }
 
+/** One changed path against HEAD, whatever its areas. */
+interface SummaryFile {
+    path: string;
+    kind: ChangeKind;
+    /** null for binary files and for new files, which a summary does not read. */
+    additions: number | null;
+    deletions: number | null;
+    binary: boolean;
+}
+
+/** A repository at a glance: its card, its avatar in the rail, the breadcrumb. */
+export interface RepositorySummary {
+    branch: BranchStatus;
+    totals: ChangeTotals;
+    /** The first changed paths in git's order, at most three. */
+    files: SummaryFile[];
+}
+
+/** Everything the Changes panel shows of a repository, and the summary of the same git output. */
 export interface RepositorySnapshot {
     repository: RepositoryInfo;
-    branch: BranchStatus;
     files: ChangedFile[];
-    totals: ChangeTotals;
+    summary: RepositorySummary;
 }
 
 export interface FileDiffRequest {

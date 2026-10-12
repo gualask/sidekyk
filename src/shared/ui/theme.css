@@ -29,6 +29,7 @@
     --ui-warning: #d97706;
     --ui-warning-soft: #fffbeb;
     --ui-warning-soft-text: #92400e;
+    --ui-warning-on-solid: #1f1300;
     --ui-diff-add-bg: #ecfdf3;
     --ui-diff-add-gutter: #d1fadf;
     --ui-diff-add-mark: #047857;
@@ -74,6 +75,7 @@
     --ui-warning: #fbbf24;
     --ui-warning-soft: rgba(69, 26, 3, 0.6);
     --ui-warning-soft-text: #fde68a;
+    --ui-warning-on-solid: #1f1300;
     --ui-diff-add-bg: rgba(16, 185, 129, 0.11);
     --ui-diff-add-gutter: rgba(16, 185, 129, 0.2);
     --ui-diff-add-mark: #6ee7b7;
@@ -115,6 +117,7 @@
     --color-ui-warning: var(--ui-warning);
     --color-ui-warning-soft: var(--ui-warning-soft);
     --color-ui-warning-soft-text: var(--ui-warning-soft-text);
+    --color-ui-warning-on-solid: var(--ui-warning-on-solid);
     --color-ui-diff-add-bg: var(--ui-diff-add-bg);
     --color-ui-diff-add-gutter: var(--ui-diff-add-gutter);
     --color-ui-diff-add-mark: var(--ui-diff-add-mark);

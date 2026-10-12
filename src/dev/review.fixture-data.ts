@@ -1,4 +1,5 @@
 import type { ChangedFile, FileDiff, RepositoryInfo, RepositorySnapshot } from '@/modules/changes';
+import { fixtureSummary } from './fixture-summary';
 
 export const FIXTURE_REPOSITORY: RepositoryInfo = {
     root: '/Users/dev/Projects/shop',
@@ -150,20 +151,14 @@ const FILES: FixtureFile[] = [
 
 export function reviewSnapshot(repository: RepositoryInfo, clean: boolean): RepositorySnapshot {
     const files = clean ? [] : FILES.map(({ diff: _diff, ...file }) => file);
-    return {
-        repository,
-        branch: {
-            head: 'feature/coupons',
-            commit: 'a1b2c3d',
-            upstream: 'origin/feature/coupons',
-            ahead: clean ? 0 : 2,
-            behind: 0,
-        },
-        files,
-        totals: clean
-            ? { files: 0, additions: 0, deletions: 0 }
-            : { files: 6, additions: 10, deletions: 6 },
+    const branch = {
+        head: 'feature/coupons',
+        commit: 'a1b2c3d',
+        upstream: 'origin/feature/coupons',
+        ahead: clean ? 0 : 2,
+        behind: 0,
     };
+    return { repository, files, summary: fixtureSummary(branch, files) };
 }
 
 export function reviewDiff(file: Pick<ChangedFile, 'area' | 'path'>): FileDiff {

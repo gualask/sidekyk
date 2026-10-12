@@ -13,7 +13,7 @@ what needs measuring before deciding waits in **Performance review**, at the end
 
 - [x] Open a repository from a folder picker, the first CLI argument, or the last one used
 - [x] Summary bar: branch, ahead/behind, changed files, lines added/removed against HEAD,
-      uncommitted indicator
+      uncommitted indicator (now the project's facts in the breadcrumb)
 - [x] File list grouped as changes, new files and staged, with per-file line counts
 - [x] Unified diff per file, with line numbers, binary and truncation notices
 - [x] Automatic refresh on file and ref changes (filtered, debounced watcher) and on window focus
@@ -48,8 +48,16 @@ what needs measuring before deciding waits in **Performance review**, at the end
       `src/shared/panels`: id, title, icon, lazy component), composed in `src/app/panels.ts`;
       panels off screen run no queries, and each loads as its own chunk, the startup panel's
       fetched with the app instead of after the first render. Costs nothing hidden or shown
-- [ ] Panel summary for the overview and the tile headers (the Changes count), added to the
-      contract with level 0, once projects say where the data comes from
+- [x] Panel summary: a panel tells about a project on its level 0 card (`summary` in the
+      contract, a chunk of its own loaded with level 0). Changes gives the card how many files
+      changed, the branch, the lines and the first files; the same summary puts the change count
+      on the rail's avatars and the project's facts (branch, changes) in the breadcrumb, which
+      replace the summary bar. A summary is `git status` and one numstat against HEAD, new files
+      counted but not read (`get_repository_summary`, coalesced per project; 52 ms against 57 ms
+      for a snapshot on Zed's clone, both mostly `git status`); the project in the Changes panel
+      takes it from its snapshot, with no git of its own. Hidden, nothing; shown, one summary per
+      other project once the first paint is done and again when the window comes to the front,
+      none while idle
 - [x] Review the approved mock with the maintainer (`.local/mocks/workspace.html`): frozen for the
       MVP on 2026-10-12, described in docs/evolution.md (Approved mock), which the UI items below
       follow
@@ -68,8 +76,10 @@ what needs measuring before deciding waits in **Performance review**, at the end
       clicked (changes to the list run in order, front and back). A repository moved or deleted
       says so in its panels (`repository_missing`). Costs nothing for the projects not on screen
 - [ ] A light watcher for the projects not on screen, marking changes without running git, with
-      the mark on the rail and the level 0 cards (comes with the Changes count of the panel
-      summary; measure inotify's watch count on Linux first)
+      the mark on the rail and the level 0 cards, and when files last changed on the cards (the
+      mock's pulsing chip); a marked project's summary is fetched again while it is on screen,
+      instead of waiting for the window to come to the front. Measure inotify's watch count on
+      Linux first
 - [x] Shell of the approved mock, first part: top bar with the breadcrumb (overlay title bar on
       macOS, the traffic lights in it, room for them only when they show: not in full screen),
       project rail, level 0 cards with "+ Add a repository" and the ⋯ menu, level 1 tiles and
@@ -82,9 +92,8 @@ what needs measuring before deciding waits in **Performance review**, at the end
       (the diff's default view and scrollbar width, the notes' long lines and sync) join it with
       their features. Stored with the app data
 - [ ] Semantic zoom, the rest of the mock: tabs (with the layout setting), splitters and panels
-      minimized to the top bar (with Files and Notes), the project's facts in the breadcrumb and the
-      open file in the Changes tile's header (with the panel summary), the zoom transitions (View
-      Transitions, once WebKitGTK support is checked)
+      minimized to the top bar (with Files and Notes), the open file in the Changes tile's header,
+      the zoom transitions (View Transitions, once WebKitGTK support is checked)
 - [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
       them a project switch that failed (today the list just goes back to the backend's)
 - [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;

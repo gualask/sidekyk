@@ -1,3 +1,4 @@
+import { ProjectFacts } from '@/modules/changes';
 import type { ProjectInfo } from '@/modules/projects';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { useTitleBarOverlaid } from './providers';
@@ -70,6 +71,10 @@ export function TopBar({
                         </>
                     ) : null}
                 </nav>
+            ) : null}
+            {project && level >= 1 ? (
+                // a project's panels are on screen, Changes among them: its snapshot has the facts
+                <ProjectFacts project={project} fromSnapshot />
             ) : null}
         </header>
     );

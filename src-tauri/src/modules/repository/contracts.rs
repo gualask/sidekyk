@@ -76,7 +76,8 @@ pub(crate) struct ChangedFile {
     pub(crate) binary: bool,
 }
 
-/// Everything that differs from HEAD, staged or not, untracked files included.
+/// Everything that differs from HEAD, staged or not. `files` counts every changed path, new files
+/// included; the lines are those of tracked files, since a summary does not read new files.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ChangeTotals {
@@ -85,13 +86,37 @@ pub(crate) struct ChangeTotals {
     pub(crate) deletions: u32,
 }
 
+/// One changed path against HEAD, whatever its areas.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SummaryFile {
+    pub(crate) path: String,
+    pub(crate) kind: ChangeKind,
+    /// `None` for binary files and for new files, which a summary does not read.
+    pub(crate) additions: Option<u32>,
+    pub(crate) deletions: Option<u32>,
+    pub(crate) binary: bool,
+}
+
+/// A repository at a glance: its card, its avatar in the rail, the breadcrumb. Cheap enough to
+/// load for every project on screen (`git status` and one numstat against HEAD).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RepositorySummary {
+    pub(crate) branch: BranchStatus,
+    pub(crate) totals: ChangeTotals,
+    /// The first changed paths in git's order, at most `SUMMARY_FILES`.
+    pub(crate) files: Vec<SummaryFile>,
+}
+
+/// Everything the Changes panel shows of a repository. Its summary is the one
+/// `get_repository_summary` returns, built from the same git output.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RepositorySnapshot {
     pub(crate) repository: RepositoryInfo,
-    pub(crate) branch: BranchStatus,
     pub(crate) files: Vec<ChangedFile>,
-    pub(crate) totals: ChangeTotals,
+    pub(crate) summary: RepositorySummary,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -123,13 +148,6 @@ mod tests {
                 root: "/r".into(),
                 name: "r".into(),
             },
-            branch: BranchStatus {
-                head: Some("main".into()),
-                commit: Some("abc1234".into()),
-                upstream: Some("origin/main".into()),
-                ahead: 1,
-                behind: 0,
-            },
             files: vec![ChangedFile {
                 path: "b.ts".into(),
                 orig_path: Some("a.ts".into()),
@@ -139,10 +157,26 @@ mod tests {
                 deletions: Some(2),
                 binary: false,
             }],
-            totals: ChangeTotals {
-                files: 1,
-                additions: 0,
-                deletions: 2,
+            summary: RepositorySummary {
+                branch: BranchStatus {
+                    head: Some("main".into()),
+                    commit: Some("abc1234".into()),
+                    upstream: Some("origin/main".into()),
+                    ahead: 1,
+                    behind: 0,
+                },
+                totals: ChangeTotals {
+                    files: 1,
+                    additions: 0,
+                    deletions: 2,
+                },
+                files: vec![SummaryFile {
+                    path: "b.ts".into(),
+                    kind: ChangeKind::TypeChanged,
+                    additions: None,
+                    deletions: Some(2),
+                    binary: false,
+                }],
             },
         };
 
@@ -150,13 +184,6 @@ mod tests {
             serde_json::to_value(snapshot).unwrap(),
             serde_json::json!({
                 "repository": { "root": "/r", "name": "r" },
-                "branch": {
-                    "head": "main",
-                    "commit": "abc1234",
-                    "upstream": "origin/main",
-                    "ahead": 1,
-                    "behind": 0
-                },
                 "files": [{
                     "path": "b.ts",
                     "origPath": "a.ts",
@@ -166,7 +193,23 @@ mod tests {
                     "deletions": 2,
                     "binary": false
                 }],
-                "totals": { "files": 1, "additions": 0, "deletions": 2 }
+                "summary": {
+                    "branch": {
+                        "head": "main",
+                        "commit": "abc1234",
+                        "upstream": "origin/main",
+                        "ahead": 1,
+                        "behind": 0
+                    },
+                    "totals": { "files": 1, "additions": 0, "deletions": 2 },
+                    "files": [{
+                        "path": "b.ts",
+                        "kind": "type-changed",
+                        "additions": null,
+                        "deletions": 2,
+                        "binary": false
+                    }]
+                }
             })
         );
     }

@@ -1,19 +1,9 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useMemo, useRef } from 'react';
-import { fileKey, fileListRows, KIND_BADGE, splitPath } from '../model/file-groups';
-import type { ChangedFile, ChangeKind } from '../model/repository.types';
+import { fileKey, fileListRows, splitPath } from '../model/file-groups';
+import type { ChangedFile } from '../model/repository.types';
+import { KindBadge } from './KindBadge';
 import { LineCounts } from './LineCounts';
-
-const BADGE_TONE: Record<ChangeKind, string> = {
-    added: 'bg-ui-success-soft text-ui-success-soft-text',
-    untracked: 'bg-ui-success-soft text-ui-success-soft-text',
-    deleted: 'bg-ui-danger-soft text-ui-danger-soft-text',
-    conflicted: 'bg-ui-warning-soft text-ui-warning-soft-text',
-    modified: 'bg-ui-accent-soft text-ui-accent-on-soft',
-    renamed: 'bg-ui-accent-soft text-ui-accent-on-soft',
-    copied: 'bg-ui-accent-soft text-ui-accent-on-soft',
-    'type-changed': 'bg-ui-accent-soft text-ui-accent-on-soft',
-};
 
 /** Fixed heights, so the virtualized list knows every row's place without measuring it. */
 const FILE_ROW_HEIGHT = 32;
@@ -42,11 +32,7 @@ function FileRow({
                 selected ? 'bg-ui-accent-soft text-ui-accent-on-soft' : 'hover:bg-ui-surface-hover'
             }`}
         >
-            <span
-                className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded font-mono text-[10px] font-bold ${BADGE_TONE[file.kind]}`}
-            >
-                {KIND_BADGE[file.kind]}
-            </span>
+            <KindBadge kind={file.kind} />
             <span className="min-w-0 flex-1 truncate">
                 <span className="font-medium">{name}</span>
                 {dir ? <span className="ml-1.5 text-xs text-ui-text-muted">{dir}</span> : null}

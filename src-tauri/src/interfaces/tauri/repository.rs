@@ -7,7 +7,9 @@ use tauri::Manager;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
-use crate::modules::repository::{self, FileDiff, FileDiffRequest, RepositorySnapshot};
+use crate::modules::repository::{
+    self, FileDiff, FileDiffRequest, RepositorySnapshot, RepositorySummary,
+};
 use crate::shared::error::{unshare, AppError};
 
 #[tauri::command]
@@ -25,6 +27,27 @@ pub(crate) async fn get_repository_snapshot(
         };
         state
             .snapshots(&root)
+            .run(|| load().map_err(Arc::new))
+            .map_err(unshare)
+    })
+    .await
+}
+
+#[tauri::command]
+/// A project at a glance: branch, changed paths and line totals, without reading new files.
+pub(crate) async fn get_repository_summary(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<RepositorySummary, AppError> {
+    blocking("get_repository_summary", app, move |app| {
+        let state = app.state::<ProjectsState>();
+        let info = state.project(&root)?;
+        let load = || {
+            let backend = app.state::<LocalRepositoryBackend>();
+            repository::load_summary(backend.inner(), &info)
+        };
+        state
+            .summaries(&root)
             .run(|| load().map_err(Arc::new))
             .map_err(unshare)
     })

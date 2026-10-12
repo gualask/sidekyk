@@ -9,10 +9,11 @@ instant when you bring it up, close to idle when it sits in the background.
 
 ## Features
 
-- Several repositories as projects: add them, switch from the rail on the left, see them all as
-  cards and remove one from its ⋯ menu (its files are never touched).
-- Summary of the repository: branch, ahead/behind, changed files and total lines added and removed
-  against HEAD, and whether anything is uncommitted.
+- Several repositories as projects: add them, switch from the rail on the left (each avatar shows
+  how many files changed), see them all as cards with their branch, changes and first files, and
+  remove one from its ⋯ menu (its files are never touched).
+- The project's facts next to its name: branch, ahead/behind, changed files and the lines added
+  and removed in tracked files against HEAD, or "clean".
 - Changed files grouped as changes, new files and staged, with per-file line counts.
 - Unified diff per file, refreshed automatically when files or refs change on disk.
 - Copy on click: a hunk (or the whole file) goes to the clipboard as `path:lines` plus a `diff`

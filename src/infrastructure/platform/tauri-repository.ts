@@ -10,6 +10,7 @@ import { onTauriEvent } from './events';
 /** Native repository adapter: commands in `src-tauri/src/interfaces/tauri/repository.rs`. */
 export const tauriRepository: RepositoryPort = {
     getSnapshot: (root) => invoke('get_repository_snapshot', { root }),
+    getSummary: (root) => invoke('get_repository_summary', { root }),
     getFileDiff: (root, request) => invoke('get_file_diff', { root, request }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),

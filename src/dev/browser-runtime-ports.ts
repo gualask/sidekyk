@@ -37,6 +37,11 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
+    const snapshot = (root: string) => {
+        const repository = project(root);
+        if (scenario === 'large' && scenarioData(root)) return largeSnapshot(repository);
+        return reviewSnapshot(repository, !scenarioData(root));
+    };
 
     return {
         projects: {
@@ -65,11 +70,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             onProjectsChanged: () => () => undefined,
         },
         repository: {
-            getSnapshot: async (root) => {
-                const repository = project(root);
-                if (scenario === 'large' && scenarioData(root)) return largeSnapshot(repository);
-                return reviewSnapshot(repository, !scenarioData(root));
-            },
+            getSnapshot: async (root) => snapshot(root),
+            getSummary: async (root) => snapshot(root).summary,
             getFileDiff: async (root, request) =>
                 scenario === 'large' && scenarioData(root)
                     ? largeDiff(request)

@@ -8,6 +8,11 @@ const PANELS: readonly PanelDefinition[] = [changesPanel];
 export const INITIAL_PANEL = PANELS[0];
 void INITIAL_PANEL.preload();
 
+/** The panels that say something about a project on its card at all projects. */
+export const SUMMARIES = PANELS.flatMap((panel) =>
+    panel.summary ? [{ id: panel.id, ...panel.summary }] : [],
+);
+
 /** The key that opens a panel, named in its tooltips. */
 export function panelShortcut(panel: PanelDefinition): string {
     return String(PANELS.indexOf(panel) + 1);

@@ -13,13 +13,22 @@ use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
     resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
-    REPOSITORY_CHANGED_EVENT,
+    RepositorySummary, REPOSITORY_CHANGED_EVENT,
 };
 use crate::shared::coalesce::Coalesced;
 use crate::shared::sync::lock;
 
 /// A snapshot shared by every caller that waited for it.
 pub(crate) type SharedSnapshot = Result<RepositorySnapshot, Arc<anyhow::Error>>;
+/// A summary shared by every caller that waited for it.
+pub(crate) type SharedSummary = Result<RepositorySummary, Arc<anyhow::Error>>;
+
+/// One coalesced computation per project.
+type PerProject<T> = Mutex<HashMap<String, Arc<Coalesced<T>>>>;
+
+fn for_project<T>(map: &PerProject<T>, root: &str) -> Arc<Coalesced<T>> {
+    lock(map).entry(root.to_string()).or_default().clone()
+}
 
 struct Watched {
     root: String,
@@ -34,7 +43,9 @@ pub(crate) struct ProjectsState {
     /// can take a while (on Linux it walks the tree) and must not hold up snapshots.
     watched: Mutex<Option<Watched>>,
     /// At most one snapshot in flight per project; requests during it share the next one.
-    snapshots: Mutex<HashMap<String, Arc<Coalesced<SharedSnapshot>>>>,
+    snapshots: PerProject<SharedSnapshot>,
+    /// The same for summaries, which every project on screen asks for at once.
+    summaries: PerProject<SharedSummary>,
 }
 
 impl ProjectsState {
@@ -49,10 +60,11 @@ impl ProjectsState {
     }
 
     pub(crate) fn snapshots(&self, root: &str) -> Arc<Coalesced<SharedSnapshot>> {
-        lock(&self.snapshots)
-            .entry(root.to_string())
-            .or_default()
-            .clone()
+        for_project(&self.snapshots, root)
+    }
+
+    pub(crate) fn summaries(&self, root: &str) -> Arc<Coalesced<SharedSummary>> {
+        for_project(&self.summaries, root)
     }
 
     /// Replaces the list at startup, before anything is watched.
@@ -76,6 +88,7 @@ impl ProjectsState {
             list.clone()
         };
         lock(&self.snapshots).retain(|root, _| list.find(root).is_ok());
+        lock(&self.summaries).retain(|root, _| list.find(root).is_ok());
         watch_active(app);
         Ok(list)
     }

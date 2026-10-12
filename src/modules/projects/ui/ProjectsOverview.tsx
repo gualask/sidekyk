@@ -1,5 +1,6 @@
 import { Menu } from '@base-ui/react/menu';
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
+import type { ReactNode } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import {
     useActivateProject,
@@ -16,10 +17,13 @@ import { ProjectAvatar } from './ProjectAvatar';
 export function ProjectsOverview({
     list,
     onOpen,
+    summary,
 }: {
     list: ProjectList;
     /** A project was picked or added: show it. */
     onOpen: () => void;
+    /** What the panels tell about a project, below its name. */
+    summary: (project: ProjectInfo) => ReactNode;
 }) {
     const add = useAddProject();
     const remove = useRemoveProject();
@@ -44,12 +48,14 @@ export function ProjectsOverview({
                             onOpen();
                         }}
                         onRemove={() => remove.mutate(project.root)}
-                    />
+                    >
+                        {summary(project)}
+                    </ProjectCard>
                 ))}
                 <button
                     type="button"
                     disabled={add.isPending}
-                    className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-dashed border-ui-border text-sm text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent disabled:opacity-40"
+                    className="flex min-h-44 items-center justify-center gap-2 rounded-xl border border-dashed border-ui-border text-sm text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent disabled:opacity-40"
                     onClick={() =>
                         add.mutate(undefined, {
                             onSuccess: (added) => {
@@ -71,15 +77,17 @@ function ProjectCard({
     selected,
     onOpen,
     onRemove,
+    children,
 }: {
     project: ProjectInfo;
     selected: boolean;
     onOpen: () => void;
     onRemove: () => void;
+    children: ReactNode;
 }) {
     return (
         <article
-            className={`relative flex min-h-24 flex-col gap-3 rounded-xl border bg-ui-surface p-4 shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-colors ${
+            className={`relative flex min-h-44 flex-col gap-3 rounded-xl border bg-ui-surface p-4 shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-colors ${
                 selected
                     ? 'border-ui-accent shadow-[0_0_0_3px_var(--ui-accent-soft),0_8px_24px_var(--ui-shadow-soft)]'
                     : 'border-ui-border hover:border-ui-border-hover'
@@ -104,6 +112,7 @@ function ProjectCard({
                     </div>
                 </div>
             </div>
+            {children}
             <Menu.Root>
                 <Menu.Trigger
                     className="btn-icon absolute top-2 right-2 h-7 w-7 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
