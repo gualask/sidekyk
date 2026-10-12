@@ -6,6 +6,7 @@ import { RepositoryProvider } from '@/modules/changes';
 import { ProjectsProvider } from '@/modules/projects';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
+import { TitleBarProvider } from './title-bar';
 
 export function AppProviders({
     children,
@@ -19,9 +20,11 @@ export function AppProviders({
 
     return (
         <QueryClientProvider client={queryClient}>
-            <ProjectsProvider value={runtime.projects}>
-                <RepositoryProvider value={runtime.repository}>{children}</RepositoryProvider>
-            </ProjectsProvider>
+            <TitleBarProvider value={runtime.titleBar}>
+                <ProjectsProvider value={runtime.projects}>
+                    <RepositoryProvider value={runtime.repository}>{children}</RepositoryProvider>
+                </ProjectsProvider>
+            </TitleBarProvider>
         </QueryClientProvider>
     );
 }

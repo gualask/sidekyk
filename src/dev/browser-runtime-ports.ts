@@ -76,6 +76,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     : reviewDiff(request),
             onRepositoryChanged: () => () => undefined,
         },
+        // a browser tab draws no window controls over the page
+        titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },
         // the browser console already shows them
         reportError: () => undefined,
     };

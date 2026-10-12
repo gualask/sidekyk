@@ -4,7 +4,7 @@ import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
  * The project a panel shows: a repository the user added, identified by its root. The same shape
  * as the projects module's `ProjectInfo`, repeated here because `shared` imports no module.
  */
-interface PanelProject {
+export interface PanelProject {
     root: string;
     name: string;
 }

@@ -7,13 +7,17 @@ workflow.
 ## Data flow
 
 ```text
-agent edits files ─▶ notify watcher (250 ms quiet period, filtered)
+agent edits files ─▶ notify watcher of the project on screen (250 ms quiet period, filtered)
                         └─▶ skip paths git ignores (check-ignore, cached per directory)
                         └─▶ event "repository-changed" { version: 1, root }
                               └─▶ frontend invalidates ['repository', …] queries
-                                    ├─▶ get_repository_snapshot  (status + numstat ×3)
-                                    └─▶ get_file_diff            (one file, one area)
+                                    ├─▶ get_repository_snapshot(root)  (status + numstat ×3)
+                                    └─▶ get_file_diff(root, …)         (one file, one area)
 ```
+
+Projects are the repositories the user added (`get_projects`, `add_project`, `activate_project`,
+`remove_project`). Commands name a repository by its root, and the backend serves only roots in the
+project list. Only the project on screen is watched; the others cost nothing until shown.
 
 The snapshot also refetches when the window regains focus, as a safety net for changes the watcher
 cannot see.
@@ -22,15 +26,21 @@ cannot see.
 
 ### Directory map
 
-- `src/app/` — composition root: providers (`QueryClient`, runtime ports), shell, the list of
-  panels (`panels.ts`), system color scheme. May depend on everything.
+- `src/app/` — composition root: providers (`QueryClient`, runtime ports), the shell (top bar
+  with the breadcrumb, the zoom levels, panel tiles), the list of panels (`panels.ts`), system
+  color scheme. May depend on everything.
+- `src/modules/projects/` — the project list: port and queries, the project rail, level 0's
+  cards (`ProjectsOverview`, a chunk of its own with Base UI's menu, fetched once the window is
+  idle after the first paint), the screen shown before the first project.
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
   - `ui/` — summary bar, file list, diff view, diff rows, empty states. The file list and the
     diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
     (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
-- `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`) implementing the ports.
+- `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
+  the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
+  traffic lights overlay the top bar, which full screen turns off).
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, clipboard hook, error
   messages, and the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
@@ -48,35 +58,43 @@ cannot see.
 ### Panels
 
 A panel is a module's `PanelDefinition` (`src/shared/panels/panel.ts`): id, title, icon and a
-component loaded with `import()`, one chunk per module. `src/app/panels.ts` lists them in shortcut
-order and starts loading the startup panel's chunk as soon as the app's code runs, so it does not
-wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
+component loaded with `import()`, one chunk per module. The component receives the project it
+shows (`PanelProps`), so panels never ask which project is active. `src/app/panels.ts` lists them
+in shortcut order and starts loading the startup panel's chunk as soon as the app's code runs, so
+it does not wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
 its component, so a panel that is not on screen runs none.
 
 ### State
 
-There is no client store. Git is the state: the snapshot and the diffs are TanStack Query caches
-keyed by repository root, and the only UI state is the selected file, held in `ChangesWorkspace`.
+There is no client store. Git is the state: the project list, the snapshot and the diffs are
+TanStack Query caches, the last two keyed by repository root. UI state is the zoom level
+(`AppShell`) and the selected file (`ChangesWorkspace`). Switching project updates the cached list
+at once and the backend catches up; changes to the list run one at a time, in the user's order
+(one TanStack mutation scope), so quick switches end on the last project clicked.
 When the selected file leaves the list, the selection falls back to the first file.
 
 ## Backend
 
-- `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Opens the
-  repository from the first CLI argument, else the last one used.
-- `interfaces/tauri/` — commands (`get_active_repository`, `pick_repository`,
-  `get_repository_snapshot`, `get_file_diff`, and `log_frontend_error` in `diagnostics.rs`) and
-  `state.rs`, the one place that switches the open repository and its watcher. Blocking git work
-  runs on `spawn_blocking`. At most one snapshot runs at a time: requests that arrive during it
-  share the next one (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one
-  per request.
+- `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Restores
+  the projects, and adds and shows the repository of the first CLI argument, if any.
+- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, and `log_frontend_error` in
+  `diagnostics.rs`) and `state.rs`, the one place that changes the project list and watches the
+  project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At most one snapshot
+  per project runs at a time: requests that arrive during it share the next one
+  (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
+- `modules/projects/` — the project list: adding, activating, removing, and a stored list made
+  consistent. No Tauri.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
-  validation, the ignored-paths filter for watcher events, wire contracts. No Tauri; the outside
-  world is the `RepositoryBackend` port.
+  validation, the ignored-paths filter for watcher events, wire contracts. A repository moved or
+  deleted after it was added fails its snapshot and diffs with `repository_missing`, before git
+  runs. No Tauri; the outside world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes),
-  `settings_store.rs` (last repository, through `tauri-plugin-store`), `logging.rs` (see Logs).
+  `settings_store.rs` (the projects, through `tauri-plugin-store`; an older version's last
+  repository becomes the first project), `logging.rs` (see Logs).
 - `shared/` — `error.rs`: `AppError`, serialized as `{ code, message }` with stable codes;
-  `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting.
+  `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting;
+  `sync.rs`: locking a mutex past a panic.
 
 ### Snapshot
 

@@ -11,3 +11,7 @@ export {
     type ProjectsChangedEvent,
 } from './model/project.types';
 export { NoProjects } from './ui/NoProjects';
+export { ProjectRail } from './ui/ProjectRail';
+
+/** Level 0, loaded on its first show: it brings the menu component along. */
+export const loadProjectsOverview = () => import('./ui/ProjectsOverview');

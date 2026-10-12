@@ -9,6 +9,8 @@ instant when you bring it up, close to idle when it sits in the background.
 
 ## Features
 
+- Several repositories as projects: add them, switch from the rail on the left, see them all as
+  cards and remove one from its ⋯ menu (its files are never touched).
 - Summary of the repository: branch, ahead/behind, changed files and total lines added and removed
   against HEAD, and whether anything is uncommitted.
 - Changed files grouped as changes, new files and staged, with per-file line counts.
@@ -40,7 +42,8 @@ pnpm install
 pnpm tauri:dev
 ```
 
-The app opens the folder given as its first argument, else the last repository it showed.
+The app adds and opens the repository of the folder given as its first argument, else it opens the
+project it showed last.
 
 ## Logs
 

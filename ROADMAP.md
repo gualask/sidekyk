@@ -56,20 +56,37 @@ what needs measuring before deciding waits in **Performance review**, at the end
 - [ ] Icons of the mock from Tabler (`@tabler/icons-react`, already the app's set, imported one
       file per icon by `vite.config.ts`): the mock's glyphs and SVGs (chevron, minimize, zoom,
       settings, overview, close, more, trash, folder, compare, open in editor) are placeholders.
-      Copy is `IconCopy`, then `IconCheck` for a moment, as `DiffRows.tsx` already does
-- [ ] Decide on Base UI for palette, menus, selects and tooltips (compared with Radix, Headless
-      UI, Ariakit, Ark UI and React Aria in docs/evolution.md, UI components). Whatever is chosen
-      loads after the first paint
-- [ ] Projects as app data, replacing the single last repository: add, remove, switch. Only the
-      active project runs snapshots; the others keep a light watcher that only marks changes
+      Copy is `IconCopy`, then `IconCheck` for a moment, as `DiffRows.tsx` already does. The
+      shell's are in (overview, zoom, more, trash, add); the rest come with their features
+- [x] Base UI for palette, menus, selects and tooltips (decided on 2026-10-12, see
+      docs/evolution.md, UI components), loaded with the code that first needs it, never in the
+      first paint
+- [x] Projects as app data, replacing the single last repository (migrated on first start): add,
+      remove from the card's ⋯ menu, switch from the rail. Commands name a project by its root
+      and serve only the projects in the list; only the project on screen is watched and
+      refreshed. Switching shows the project at once, and quick switches end on the last one
+      clicked (changes to the list run in order, front and back). A repository moved or deleted
+      says so in its panels (`repository_missing`). Costs nothing for the projects not on screen
+- [ ] A light watcher for the projects not on screen, marking changes without running git, with
+      the mark on the rail and the level 0 cards (comes with the Changes count of the panel
+      summary; measure inotify's watch count on Linux first)
+- [x] Shell of the approved mock, first part: top bar with the breadcrumb (overlay title bar on
+      macOS, the traffic lights in it, room for them only when they show: not in full screen),
+      project rail, level 0 cards with "+ Add a repository" and the ⋯ menu, level 1 tiles and
+      level 2 full screen with Changes as their only panel. Level 0 and Base UI's menu are a
+      chunk of their own, fetched once the window is idle after the first paint. Costs nothing
+      hidden; shown, one `isFullscreen` call per window resize on macOS. To check in the packaged
+      app: the traffic lights' position (`trafficLightPosition` in `tauri.conf.json`)
 - [ ] Settings dialog (`⌘,`, a gear in the top bar): theme (dark by default, or light; replaces
       following the system) and project layout (tiles or tabs). The other settings of the mock
       (the diff's default view and scrollbar width, the notes' long lines and sync) join it with
       their features. Stored with the app data
-- [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full
-      screen, with the Changes panel as today's view; breadcrumb, project rail, splitters and
-      panels minimized to the top bar as in the approved mock (docs/evolution.md)
-- [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix
+- [ ] Semantic zoom, the rest of the mock: tabs (with the layout setting), splitters and panels
+      minimized to the top bar (with Files and Notes), the project's facts in the breadcrumb and the
+      open file in the Changes tile's header (with the panel summary), the zoom transitions (View
+      Transitions, once WebKitGTK support is checked)
+- [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
+      them a project switch that failed (today the list just goes back to the backend's)
 - [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;
       results virtualized (thousands of files), code loaded after the first paint
 - [ ] Keyboard model of the mock: `↵`/`Esc` zoom (progressive `Esc`), `1`-`3` panels, `[`/`]`

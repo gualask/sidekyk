@@ -40,6 +40,13 @@
     --ui-scrollbar-thumb: color-mix(in srgb, var(--ui-border-hover) 82%, transparent);
     --ui-scrollbar-thumb-hover: color-mix(in srgb, var(--ui-border-hover) 98%, transparent);
     --ui-shadow-soft: rgba(15, 23, 42, 0.12);
+    /* project avatars, the same in both themes */
+    --ui-avatar-1: #6366f1;
+    --ui-avatar-2: #0ea5e9;
+    --ui-avatar-3: #10b981;
+    --ui-avatar-4: #f59e0b;
+    --ui-avatar-5: #ec4899;
+    --ui-avatar-6: #8b5cf6;
 }
 
 .dark {
@@ -98,6 +105,7 @@
     --color-ui-accent-soft: var(--ui-accent-soft);
     --color-ui-accent-soft-hover: var(--ui-accent-soft-hover);
     --color-ui-accent-on-soft: var(--ui-accent-on-soft);
+    --color-ui-accent-on-solid: var(--ui-accent-on-solid);
     --color-ui-danger: var(--ui-danger);
     --color-ui-danger-soft: var(--ui-danger-soft);
     --color-ui-danger-soft-text: var(--ui-danger-soft-text);

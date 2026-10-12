@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { ProjectInfo, ProjectList } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
 
@@ -43,5 +43,43 @@ export function useAddProject() {
         onSuccess: (list) => {
             if (list) queryClient.setQueryData(projectsKey, list);
         },
+    });
+}
+
+/**
+ * Shows a project at once; the backend catches up (it starts watching the repository). Showing
+ * the project already on screen does nothing. A failure puts the list back as the backend has it
+ * (the toasts will say why: the switch has already left the screen that asked for it).
+ */
+export function useActivateProject() {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    const { mutate } = useMutation({
+        mutationFn: (root: string) => port.activateProject(root),
+        scope: projectsScope,
+        onMutate: async (root) => {
+            await queryClient.cancelQueries({ queryKey: projectsKey });
+            queryClient.setQueryData<ProjectList>(projectsKey, (list) =>
+                list ? { ...list, active: root } : list,
+            );
+        },
+        onSuccess: (list) => queryClient.setQueryData(projectsKey, list),
+        onError: () => queryClient.invalidateQueries({ queryKey: projectsKey }),
+    });
+    return useCallback(
+        (root: string) => {
+            if (queryClient.getQueryData<ProjectList>(projectsKey)?.active !== root) mutate(root);
+        },
+        [queryClient, mutate],
+    );
+}
+
+export function useRemoveProject() {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (root: string) => port.removeProject(root),
+        scope: projectsScope,
+        onSuccess: (list) => queryClient.setQueryData(projectsKey, list),
     });
 }

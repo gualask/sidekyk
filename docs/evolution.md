@@ -58,7 +58,11 @@ Tabler's. What it settles:
 - **Project rail** on the left of a project: the "all projects" button first, then one avatar per
   project with its change count, so switching does not need a trip to level 0.
 - **Level 0 cards**: branch, changed files with line counts, when files last changed (pulsing
-  while an agent writes), and how many notes wait, with the newest.
+  while an agent writes), and how many notes wait, with the newest. A card's ⋯ menu removes the
+  project from Sidekyk, as a note's removes the note; its repository is left as it is. "+ Add a
+  repository", the last card, adds one. Removing asks nothing and loses nothing while a project is
+  only its repository; once notes belong to projects, it must not delete them silently (undo, or
+  keep them until the project is added again).
 - **Tiles or tabs** at level 1: both, chosen in the settings (tiles by default); no shortcut.
   Tiles put Changes on the left, Files above Notes on the right; the splitters drag, a double
   click resets them. Files and Notes minimize to a chip in the top bar, and the other takes the
@@ -248,10 +252,11 @@ Evaluated on 2026-10-11.
   native `title` is placed by the system but cannot be styled. CSS anchor positioning would
   replace the engine, but WebKitGTK support is not confirmed (Safari has it since 26).
 
-Recommendation: Base UI for the palette, menus, selects and tooltips; tabs by hand (a few dozen
-lines with roving `tabindex`). None of it is in the first paint's chunk: the overlays load once
-the window is idle after the first paint, so `⌘K` and the first hover are still instant. Decision
-pending, see Open decisions.
+Decided on 2026-10-12: Base UI (`@base-ui/react`, pinned to 1.8.0) for the palette, menus, selects
+and tooltips; tabs by hand (a few dozen lines with roving `tabindex`). None of it is in the first
+paint's chunk: each overlay comes with the code that first needs it (the project cards' menu with
+level 0), or loads once the window is idle after the first paint, so `⌘K` and the first hover are
+still instant.
 
 ## Projects
 
@@ -345,7 +350,6 @@ When these land, `AGENTS.md` changes too:
 
 ## Open decisions
 
-- UI components: Base UI for palette, menus, selects and tooltips (see UI components).
 - Notes: format and granularity (one file per note is the natural unit, see Notes).
 - Sync: `drive.appdata` (hidden backup) or `drive.file` (files visible in Drive).
 - Sync: conflict strategy, and whether to encrypt notes before upload.
