@@ -1,9 +1,10 @@
 import { IconFolderOpen, IconGitCommit } from '@tabler/icons-react';
 import { errorMessage } from '@/shared/errors/app-error';
-import { usePickRepository } from '../application/repository.queries';
+import { useAddProject } from '../application/projects.queries';
 
-export function NoRepository() {
-    const pick = usePickRepository();
+/** What the app shows before the first repository is added. */
+export function NoProjects() {
+    const add = useAddProject();
 
     return (
         <div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
@@ -11,7 +12,7 @@ export function NoRepository() {
                 <IconGitCommit size={28} stroke={1.75} />
             </div>
             <div className="max-w-sm space-y-1.5">
-                <h1 className="text-lg font-semibold">Open a repository to review</h1>
+                <h1 className="text-lg font-semibold">Add a repository to review</h1>
                 <p className="text-sm text-ui-text-muted">
                     Sidekyk watches the working tree and shows what changed since the last commit,
                     while your agent keeps working.
@@ -20,15 +21,15 @@ export function NoRepository() {
             <button
                 type="button"
                 className="btn-primary"
-                disabled={pick.isPending}
-                onClick={() => pick.mutate()}
+                disabled={add.isPending}
+                onClick={() => add.mutate()}
             >
                 <IconFolderOpen size={18} />
-                Open repository
+                Add a repository
             </button>
-            {pick.isError ? (
+            {add.isError ? (
                 <p className="text-sm text-ui-danger" role="alert">
-                    {errorMessage(pick.error)}
+                    {errorMessage(add.error)}
                 </p>
             ) : null}
         </div>

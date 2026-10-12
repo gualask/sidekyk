@@ -5,12 +5,13 @@
 
 use std::path::{Path, PathBuf};
 
-use ::tauri::Manager;
+use ::tauri::{Emitter, Manager};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
-use crate::interfaces::tauri::state::{activate_repository, RepositoryState};
+use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
+use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -28,14 +29,17 @@ fn show_main_window(app: &::tauri::AppHandle) {
     }
 }
 
-/// Opens a repository named at launch; a failure leaves the app as it was.
+/// Adds and shows a repository named at launch; a failure leaves the app as it was.
 fn open_or_log(app: &::tauri::AppHandle, folder: &Path) {
-    if let Err(error) = activate_repository(app, folder) {
-        tracing::warn!(
+    match open_folder(app, folder) {
+        Ok(_) => {
+            let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::new());
+        }
+        Err(error) => tracing::warn!(
             folder = %folder.display(),
             error = %format!("{error:#}"),
             "could not open the repository"
-        );
+        ),
     }
 }
 
@@ -55,23 +59,26 @@ pub(crate) fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(LocalRepositoryBackend::default())
-        .manage(RepositoryState::default())
+        .manage(ProjectsState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
+            app.state::<ProjectsState>()
+                .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
-            let candidate = folder_argument(&args)
-                .or_else(|| settings_store::load_last_repository(app.handle()));
-            if let Some(folder) = candidate {
-                // a moved or deleted repository just leaves the app on its empty state
-                open_or_log(app.handle(), &folder);
+            match folder_argument(&args) {
+                Some(folder) => open_or_log(app.handle(), &folder),
+                // a moved or deleted repository shows its error in the project's panels
+                None => watch_active(app.handle()),
             }
             Ok(())
         })
         .invoke_handler(::tauri::generate_handler![
-            tauri_commands::repository::get_active_repository,
-            tauri_commands::repository::pick_repository,
+            tauri_commands::projects::get_projects,
+            tauri_commands::projects::add_project,
+            tauri_commands::projects::activate_project,
+            tauri_commands::projects::remove_project,
             tauri_commands::repository::get_repository_snapshot,
             tauri_commands::repository::get_file_diff,
             tauri_commands::diagnostics::log_frontend_error,

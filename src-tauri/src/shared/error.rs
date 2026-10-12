@@ -16,8 +16,9 @@ pub(crate) enum AppError {
 pub(crate) enum UserFacingErrorCode {
     GitNotFound,
     NotARepository,
-    NoRepositoryOpen,
     PathOutsideRepository,
+    ProjectNotFound,
+    RepositoryMissing,
 }
 
 impl UserFacingErrorCode {
@@ -25,8 +26,9 @@ impl UserFacingErrorCode {
         match self {
             Self::GitNotFound => "git_not_found",
             Self::NotARepository => "not_a_repository",
-            Self::NoRepositoryOpen => "no_repository_open",
             Self::PathOutsideRepository => "path_outside_repository",
+            Self::ProjectNotFound => "project_not_found",
+            Self::RepositoryMissing => "repository_missing",
         }
     }
 }
@@ -106,11 +108,11 @@ mod tests {
 
     #[test]
     fn a_shared_error_keeps_its_code_and_message() {
-        let shared = std::sync::Arc::new(user_facing(UserFacingErrorCode::NoRepositoryOpen));
+        let shared = std::sync::Arc::new(user_facing(UserFacingErrorCode::ProjectNotFound));
         let _other_caller = shared.clone();
         assert_eq!(
             serde_json::to_value(AppError::from(unshare(shared))).unwrap(),
-            serde_json::json!({ "code": "no_repository_open", "message": "no_repository_open" })
+            serde_json::json!({ "code": "project_not_found", "message": "project_not_found" })
         );
 
         let shared = std::sync::Arc::new(anyhow::anyhow!("git exploded").context("snapshot"));
@@ -126,11 +128,12 @@ mod tests {
         let cases = [
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::NotARepository, "not_a_repository"),
-            (UserFacingErrorCode::NoRepositoryOpen, "no_repository_open"),
             (
                 UserFacingErrorCode::PathOutsideRepository,
                 "path_outside_repository",
             ),
+            (UserFacingErrorCode::ProjectNotFound, "project_not_found"),
+            (UserFacingErrorCode::RepositoryMissing, "repository_missing"),
         ];
         for (code, wire) in cases {
             assert_eq!(code.as_str(), wire);

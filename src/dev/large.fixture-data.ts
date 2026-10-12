@@ -1,5 +1,4 @@
-import type { ChangedFile, FileDiff, RepositorySnapshot } from '@/modules/changes';
-import { FIXTURE_REPOSITORY } from './review.fixture-data';
+import type { ChangedFile, FileDiff, RepositoryInfo, RepositorySnapshot } from '@/modules/changes';
 
 /** Enough files and lines that rendering them all would be slow: checks the virtualized lists. */
 const FILE_COUNT = 5_000;
@@ -28,9 +27,9 @@ function largeDiffText(): string {
     return `${lines.join('\n')}\n`;
 }
 
-export function largeSnapshot(): RepositorySnapshot {
+export function largeSnapshot(repository: RepositoryInfo): RepositorySnapshot {
     return {
-        repository: FIXTURE_REPOSITORY,
+        repository,
         branch: {
             head: 'agent/bulk-refactor',
             commit: 'f00dbab',

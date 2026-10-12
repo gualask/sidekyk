@@ -1,6 +1,7 @@
 use std::path::{Component, Path};
 
 use super::contracts::{ChangeArea, FileDiff, FileDiffRequest, RepositoryInfo};
+use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
@@ -38,6 +39,7 @@ pub(crate) fn load_file_diff(
     repository: &RepositoryInfo,
     request: &FileDiffRequest,
 ) -> anyhow::Result<FileDiff> {
+    let root = existing_root(repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
     let base = ["--no-color", "--no-ext-diff", "-U3"];
@@ -66,7 +68,7 @@ pub(crate) fn load_file_diff(
         }
     }
 
-    let stdout = git_checked(backend, Path::new(&repository.root), &args, &ok_codes)?;
+    let stdout = git_checked(backend, root, &args, &ok_codes)?;
     let (bytes, truncated) = truncate_at_line(stdout, MAX_DIFF_BYTES);
 
     Ok(FileDiff {

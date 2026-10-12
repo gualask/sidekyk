@@ -5,6 +5,7 @@ use super::contracts::{
     ChangeArea, ChangeKind, ChangeTotals, ChangedFile, RepositoryInfo, RepositorySnapshot,
 };
 use super::numstat::{count_text_lines, parse_numstat_z, Counts, LineCounts};
+use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend};
 use super::status::{parse_porcelain_v2, StatusEntry};
 
@@ -90,7 +91,7 @@ pub(crate) fn load_snapshot(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RepositorySnapshot> {
-    let root = Path::new(&repository.root);
+    let root = existing_root(repository)?;
     // The four commands are independent, so they run together and the snapshot costs about as
     // much as the slowest one. The diff against HEAD fails before the first commit; its result
     // is only used when status reports a commit.

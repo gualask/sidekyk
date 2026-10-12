@@ -2,6 +2,8 @@
 
 use std::sync::{Condvar, Mutex, MutexGuard};
 
+use super::sync::lock;
+
 /// A caller arriving while a run is in flight waits for it, then shares the next run, which starts
 /// after the caller arrived and so sees everything that changed before. However many callers pile
 /// up during a run, exactly one more run follows it.
@@ -44,7 +46,7 @@ impl<T> Drop for RunGuard<'_, T> {
 
 impl<T> Coalesced<T> {
     fn lock(&self) -> MutexGuard<'_, State<T>> {
-        self.state.lock().unwrap_or_else(|e| e.into_inner())
+        lock(&self.state)
     }
 }
 

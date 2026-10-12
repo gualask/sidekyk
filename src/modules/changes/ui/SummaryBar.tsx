@@ -1,11 +1,5 @@
-import {
-    IconArrowDown,
-    IconArrowUp,
-    IconFolderOpen,
-    IconGitBranch,
-    IconRefresh,
-} from '@tabler/icons-react';
-import { usePickRepository, useRefreshRepository } from '../application/repository.queries';
+import { IconArrowDown, IconArrowUp, IconGitBranch, IconRefresh } from '@tabler/icons-react';
+import { useRefreshRepository } from '../application/repository.queries';
 import type { RepositoryInfo, RepositorySnapshot } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
 
@@ -24,7 +18,6 @@ export function SummaryBar({
     snapshot: RepositorySnapshot | undefined;
     refreshing: boolean;
 }) {
-    const pick = usePickRepository();
     const refresh = useRefreshRepository();
     const totals = snapshot?.totals;
     const dirty = (totals?.files ?? 0) > 0;
@@ -91,16 +84,6 @@ export function SummaryBar({
                         size={17}
                         className={refreshing ? 'animate-spin motion-reduce:animate-none' : ''}
                     />
-                </button>
-                <button
-                    type="button"
-                    className="btn-icon"
-                    aria-label="Open another repository"
-                    title="Open another repository"
-                    disabled={pick.isPending}
-                    onClick={() => pick.mutate()}
-                >
-                    <IconFolderOpen size={17} />
                 </button>
             </div>
         </header>

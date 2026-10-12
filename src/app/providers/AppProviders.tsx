@@ -3,6 +3,7 @@ import { type ReactNode, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
 import { RepositoryProvider } from '@/modules/changes';
+import { ProjectsProvider } from '@/modules/projects';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
 
@@ -18,7 +19,9 @@ export function AppProviders({
 
     return (
         <QueryClientProvider client={queryClient}>
-            <RepositoryProvider value={runtime.repository}>{children}</RepositoryProvider>
+            <ProjectsProvider value={runtime.projects}>
+                <RepositoryProvider value={runtime.repository}>{children}</RepositoryProvider>
+            </ProjectsProvider>
         </QueryClientProvider>
     );
 }

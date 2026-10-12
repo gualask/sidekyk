@@ -16,6 +16,6 @@ pub(crate) use contracts::{
 };
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::IgnoredPaths;
-pub(crate) use open::resolve_repository;
+pub(crate) use open::{repository_name, resolve_repository};
 pub(crate) use ports::{GitOutput, RepositoryBackend};
 pub(crate) use snapshot::load_snapshot;

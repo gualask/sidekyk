@@ -148,10 +148,10 @@ const FILES: FixtureFile[] = [
     },
 ];
 
-export function reviewSnapshot(clean: boolean): RepositorySnapshot {
+export function reviewSnapshot(repository: RepositoryInfo, clean: boolean): RepositorySnapshot {
     const files = clean ? [] : FILES.map(({ diff: _diff, ...file }) => file);
     return {
-        repository: FIXTURE_REPOSITORY,
+        repository,
         branch: {
             head: 'feature/coupons',
             commit: 'a1b2c3d',

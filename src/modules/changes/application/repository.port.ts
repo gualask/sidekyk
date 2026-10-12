@@ -3,17 +3,16 @@ import type {
     FileDiff,
     FileDiffRequest,
     RepositoryChangedEvent,
-    RepositoryInfo,
     RepositorySnapshot,
 } from '../model/repository.types';
 
-/** The repository's runtime boundary: the native backend, or a fixture in browser dev mode. */
+/**
+ * The repositories' runtime boundary: the native backend, or a fixture in browser dev mode. A
+ * repository is named by its root, which must be a project the user added.
+ */
 export interface RepositoryPort {
-    getActiveRepository(): Promise<RepositoryInfo | null>;
-    /** Asks for a folder and opens its repository. null when the user cancels. */
-    pickRepository(): Promise<RepositoryInfo | null>;
-    getSnapshot(): Promise<RepositorySnapshot>;
-    getFileDiff(request: FileDiffRequest): Promise<FileDiff>;
+    getSnapshot(root: string): Promise<RepositorySnapshot>;
+    getFileDiff(root: string, request: FileDiffRequest): Promise<FileDiff>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
 }

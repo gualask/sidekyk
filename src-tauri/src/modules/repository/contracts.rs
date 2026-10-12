@@ -4,15 +4,15 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) const REPOSITORY_CHANGED_EVENT: &str = "repository-changed";
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RepositoryInfo {
     pub(crate) root: String,
     pub(crate) name: String,
 }
 
-/// Emitted when the open repository changes: another repository was opened, or files or refs
-/// changed on disk. The frontend refetches everything it shows.
+/// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
+/// what it shows of that repository.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RepositoryChangedEvent {

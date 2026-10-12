@@ -1,6 +1,19 @@
 import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
 
 /**
+ * The project a panel shows: a repository the user added, identified by its root. The same shape
+ * as the projects module's `ProjectInfo`, repeated here because `shared` imports no module.
+ */
+interface PanelProject {
+    root: string;
+    name: string;
+}
+
+export interface PanelProps {
+    project: PanelProject;
+}
+
+/**
  * What a module gives the app to show it as a panel. The app lays panels out and switches between
  * them; a panel knows nothing of the others or of where it sits.
  */
@@ -13,7 +26,7 @@ export interface PanelDefinition {
      * The panel itself, loaded on its first show (one chunk per module). Its queries live inside
      * it, so a panel that is not on screen runs none.
      */
-    Component: LazyExoticComponent<ComponentType>;
+    Component: LazyExoticComponent<ComponentType<PanelProps>>;
     /** Starts loading the chunk ahead of the first show, for the panel the app opens on. */
     preload: () => Promise<unknown>;
 }
@@ -25,7 +38,7 @@ export function definePanel<M>({
     ...panel
 }: Pick<PanelDefinition, 'id' | 'title' | 'icon'> & {
     load: () => Promise<M>;
-    pick: (module: M) => ComponentType;
+    pick: (module: M) => ComponentType<PanelProps>;
 }): PanelDefinition {
     return {
         ...panel,
