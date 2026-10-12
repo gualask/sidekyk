@@ -1,6 +1,6 @@
 import { IconGitBranch } from '@tabler/icons-react';
 import { errorMessage } from '@/shared/errors/app-error';
-import type { PanelProps } from '@/shared/panels/panel';
+import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { useRepositorySummary } from '../application/repository.queries';
 import { branchLabel } from '../model/branch';
 import { KindBadge } from './KindBadge';
@@ -10,7 +10,7 @@ import { LineCounts } from './LineCounts';
  * What Changes tells about a project on its card at all projects: how many files changed, the
  * branch, the lines, and the first files. Loaded with level 0.
  */
-export function ChangesSummary({ project }: PanelProps) {
+export function ChangesSummary({ project }: PanelSummaryProps) {
     const summary = useRepositorySummary(project.root);
     if (summary.isError) {
         return <p className="text-xs text-ui-danger">{errorMessage(summary.error)}</p>;

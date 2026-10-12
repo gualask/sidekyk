@@ -92,8 +92,9 @@ what needs measuring before deciding waits in **Performance review**, at the end
       (the diff's default view and scrollbar width, the notes' long lines and sync) join it with
       their features. Stored with the app data
 - [ ] Semantic zoom, the rest of the mock: tabs (with the layout setting), splitters and panels
-      minimized to the top bar (with Files and Notes), the open file in the Changes tile's header,
-      the zoom transitions (View Transitions, once WebKitGTK support is checked)
+      minimized to the top bar (with Files and Notes), the zoom transitions (View Transitions,
+      once WebKitGTK support is checked). The open file is in the Changes tile's header already
+      (`header` in the panel contract), with the copy of the whole file as an icon
 - [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
       them a project switch that failed (today the list just goes back to the backend's)
 - [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;

@@ -72,8 +72,11 @@ component loaded with `import()`, one chunk per module. The component receives t
 shows (`PanelProps`), so panels never ask which project is active. `src/app/panels.ts` lists them
 in shortcut order and starts loading the startup panel's chunk as soon as the app's code runs, so
 it does not wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
-its component, so a panel that is not on screen runs none. A panel may also give a `summary`: its
-part of a project's card at level 0, a chunk of its own fetched with level 0.
+its component, so a panel that is not on screen runs none. The panel gets its header too
+(`PanelProps.header`), an element it fills through a portal with what is open in it and its
+actions: in a tile, after the panel's title; full screen, a header shown only while the panel
+puts something in it. A panel may also give a `summary`: its part of a project's card at level 0,
+a chunk of its own fetched with level 0.
 
 ### State
 

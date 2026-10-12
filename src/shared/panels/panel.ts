@@ -11,6 +11,17 @@ export interface PanelProject {
 
 export interface PanelProps {
     project: PanelProject;
+    /**
+     * Where the panel shows what is open in it and the actions on it, through a portal: the
+     * tile's header, or full screen a header of its own, shown only while the panel puts something
+     * in it. Laid out as a row; null until it is mounted.
+     */
+    header: HTMLElement | null;
+}
+
+/** What a panel's summary gets: the project of the card it is on. */
+export interface PanelSummaryProps {
+    project: PanelProject;
 }
 
 /**
@@ -34,18 +45,18 @@ export interface PanelDefinition {
      * A chunk of its own, loaded with level 0; it fetches only what the card shows.
      */
     summary?: {
-        Component: LazyExoticComponent<ComponentType<PanelProps>>;
+        Component: LazyExoticComponent<ComponentType<PanelSummaryProps>>;
         preload: () => Promise<unknown>;
     };
 }
 
 /** A component of a module's UI, loaded by `load`, a dynamic `import()`. */
-interface LazyPart<M> {
+interface LazyPart<M, P> {
     load: () => Promise<M>;
-    pick: (module: M) => ComponentType<PanelProps>;
+    pick: (module: M) => ComponentType<P>;
 }
 
-function lazyPart<M>({ load, pick }: LazyPart<M>) {
+function lazyPart<M, P>({ load, pick }: LazyPart<M, P>) {
     return {
         Component: lazy(() => load().then((module) => ({ default: pick(module) }))),
         preload: load,
@@ -59,8 +70,8 @@ export function definePanel<M, S = never>({
     summary,
     ...panel
 }: Pick<PanelDefinition, 'id' | 'title' | 'icon'> &
-    LazyPart<M> & {
-        summary?: LazyPart<S>;
+    LazyPart<M, PanelProps> & {
+        summary?: LazyPart<S, PanelSummaryProps>;
     }): PanelDefinition {
     return {
         ...panel,

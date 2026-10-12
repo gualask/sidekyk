@@ -1,7 +1,9 @@
-import { IconCheck, IconCopy, IconFileOff } from '@tabler/icons-react';
+import { IconCheck, IconCopy, IconCopyOff, IconFileOff } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { CopyState } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useFileDiff } from '../application/repository.queries';
 import { formatFileForAgent, formatHunkForAgent } from '../model/agent-snippet';
@@ -84,7 +86,77 @@ function DiffLines({
     );
 }
 
-export function DiffView({ root, file }: { root: string; file: ChangedFile }) {
+/**
+ * The open file in the panel's header: its path, its area and counts, and the copy of the whole
+ * file. Copy is an icon, as everywhere: its tooltip says what it copies, and it turns into a check
+ * for a moment once done.
+ */
+function FileHeader({
+    file,
+    copied,
+    onCopy,
+}: {
+    file: ChangedFile;
+    copied: CopyState;
+    /** null while there is nothing to copy (no hunks). */
+    onCopy: (() => void) | null;
+}) {
+    const path = file.origPath ? `${file.origPath} → ${file.path}` : file.path;
+    const copyTitle = copied
+        ? copied.ok
+            ? 'Copied'
+            : 'Copy failed'
+        : 'Copy the diff of this file, ready to paste to your agent';
+
+    return (
+        <>
+            <span className="flex min-w-0 flex-1 items-center gap-2 font-mono text-xs font-semibold text-ui-text-secondary">
+                <span className="min-w-0 truncate" title={path}>
+                    {path}
+                </span>
+                <span className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted">
+                    {AREA_LABEL[file.area]}
+                </span>
+                <span className="shrink-0 text-[11.5px] font-normal">
+                    <LineCounts
+                        additions={file.additions}
+                        deletions={file.deletions}
+                        binary={file.binary}
+                    />
+                </span>
+            </span>
+            <button
+                type="button"
+                className="btn-icon h-[26px] w-[26px]"
+                disabled={onCopy === null}
+                title={copyTitle}
+                aria-label={copyTitle}
+                onClick={onCopy ?? undefined}
+            >
+                {copied ? (
+                    copied.ok ? (
+                        <IconCheck size={14} />
+                    ) : (
+                        <IconCopyOff size={14} />
+                    )
+                ) : (
+                    <IconCopy size={14} />
+                )}
+            </button>
+        </>
+    );
+}
+
+export function DiffView({
+    root,
+    file,
+    header,
+}: {
+    root: string;
+    file: ChangedFile;
+    /** The panel's header, where the open file goes (see `PanelProps`). */
+    header: HTMLElement | null;
+}) {
     const diff = useFileDiff(root, {
         path: file.path,
         origPath: file.origPath,
@@ -101,33 +173,20 @@ export function DiffView({ root, file }: { root: string; file: ChangedFile }) {
 
     return (
         <div className="flex h-full flex-col">
-            <div className="flex shrink-0 items-center gap-3 border-b border-ui-border bg-ui-surface px-4 py-2.5">
-                <div className="min-w-0 truncate font-mono text-[13px]">
-                    {file.origPath ? (
-                        <span className="text-ui-text-muted">{file.origPath} → </span>
-                    ) : null}
-                    <span className="font-semibold">{file.path}</span>
-                </div>
-                <span className="chip shrink-0">{AREA_LABEL[file.area]}</span>
-                <span className="shrink-0 text-xs">
-                    <LineCounts
-                        additions={file.additions}
-                        deletions={file.deletions}
-                        binary={file.binary}
-                    />
-                </span>
-                <button
-                    type="button"
-                    className="btn-ghost-sm ml-auto shrink-0"
-                    disabled={hunks.length === 0}
-                    title="Copy every hunk of this file, ready to paste to your agent"
-                    onClick={() => void copy('file', formatFileForAgent(file.path, hunks))}
-                >
-                    {fileCopied?.ok ? <IconCheck size={14} /> : <IconCopy size={14} />}
-                    {fileCopied ? (fileCopied.ok ? 'Copied' : 'Copy failed') : 'Copy file'}
-                </button>
-            </div>
-
+            {header
+                ? createPortal(
+                      <FileHeader
+                          file={file}
+                          copied={fileCopied}
+                          onCopy={
+                              hunks.length > 0
+                                  ? () => void copy('file', formatFileForAgent(file.path, hunks))
+                                  : null
+                          }
+                      />,
+                      header,
+                  )
+                : null}
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
                 {hunks.length > 0 ? (
                     <DiffLines path={file.path} hunks={hunks} scrollRef={scrollRef} />

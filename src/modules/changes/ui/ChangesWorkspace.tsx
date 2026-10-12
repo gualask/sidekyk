@@ -17,7 +17,14 @@ function isTyping(target: EventTarget | null): boolean {
     );
 }
 
-export function ChangesWorkspace({ repository }: { repository: RepositoryInfo }) {
+export function ChangesWorkspace({
+    repository,
+    header,
+}: {
+    repository: RepositoryInfo;
+    /** The panel's header, where the open file goes (see `PanelProps`). */
+    header: HTMLElement | null;
+}) {
     const snapshot = useRepositorySnapshot(repository.root);
     const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
@@ -56,7 +63,12 @@ export function ChangesWorkspace({ repository }: { repository: RepositoryInfo })
                 </aside>
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {selected ? (
-                        <DiffView key={fileKey(selected)} root={repository.root} file={selected} />
+                        <DiffView
+                            key={fileKey(selected)}
+                            root={repository.root}
+                            file={selected}
+                            header={header}
+                        />
                     ) : snapshot.isSuccess ? (
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-ui-text-muted">
                             <IconCircleCheck size={32} stroke={1.5} />
