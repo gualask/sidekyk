@@ -67,11 +67,12 @@ pub(crate) fn run() {
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
-            match folder_argument(&args) {
-                Some(folder) => open_or_log(app.handle(), &folder),
-                // a moved or deleted repository shows its error in the project's panels
-                None => watch_active(app.handle()),
+            if let Some(folder) = folder_argument(&args) {
+                open_or_log(app.handle(), &folder);
             }
+            // the project on screen is watched even when the folder argument could not be opened;
+            // a moved or deleted repository shows its error in the project's panels
+            watch_active(app.handle());
             Ok(())
         })
         .invoke_handler(::tauri::generate_handler![

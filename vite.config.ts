@@ -5,19 +5,26 @@ import { defineConfig } from 'vite';
 
 const host = process.env.TAURI_DEV_HOST;
 
-function vendorChunkName(moduleId: string): string | null {
-    const id = moduleId.replaceAll('\\', '/');
-    if (!id.includes('/node_modules/')) return null;
-    if (id.includes('/node_modules/@tabler/')) return 'icons-vendor';
-    if (
-        id.includes('/node_modules/react/') ||
-        id.includes('/node_modules/react-dom/') ||
-        id.includes('/node_modules/scheduler/')
-    ) {
-        return 'react-vendor';
-    }
-    return 'vendor';
-}
+/**
+ * Vendor chunks. A group also takes the dependencies of what it captures, so the groups whose
+ * modules others depend on come first: React before the libraries built on it.
+ */
+const VENDOR_CHUNKS = [
+    {
+        name: 'react-vendor',
+        test: /[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/,
+        priority: 4,
+    },
+    { name: 'icons-vendor', test: /[\\/]node_modules[\\/]@tabler[\\/]/, priority: 3 },
+    // Base UI and what only it uses, fetched with the first code that needs an overlay: in
+    // `vendor` they would be preloaded with the first paint
+    {
+        name: 'base-ui-vendor',
+        test: /[\\/]node_modules[\\/](@base-ui|@floating-ui|@babel[\\/]runtime|reselect|use-sync-external-store)[\\/]/,
+        priority: 2,
+    },
+    { name: 'vendor', test: /[\\/]node_modules[\\/]/, priority: 1 },
+];
 
 // https://vite.dev/config/
 export default defineConfig(async () => ({
@@ -43,12 +50,7 @@ export default defineConfig(async () => ({
         rolldownOptions: {
             output: {
                 codeSplitting: {
-                    groups: [
-                        {
-                            name: vendorChunkName,
-                            test: 'node_modules',
-                        },
-                    ],
+                    groups: VENDOR_CHUNKS,
                 },
             },
         },

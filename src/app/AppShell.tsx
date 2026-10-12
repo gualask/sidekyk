@@ -63,7 +63,9 @@ function Workspace({
     level: ZoomLevel;
     onZoom: (level: ZoomLevel) => void;
 }) {
-    if (!project) return <NoProjects />;
+    // also reached from all projects, once the last project is removed there: the repository
+    // added next opens, as from the "+ Add a repository" card
+    if (!project) return <NoProjects onOpen={() => onZoom(1)} />;
     if (level === 0) {
         return (
             <Suspense fallback={null}>

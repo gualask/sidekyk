@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import type { ProjectInfo, ProjectList } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
@@ -9,7 +9,17 @@ const projectsKey = ['projects'] as const;
  * Changes to the list run one at a time, in the order the user made them: two quick switches end
  * on the second project, in the backend and on screen.
  */
-const projectsScope = { id: 'projects' };
+const projectsChange = { mutationKey: projectsKey, scope: { id: 'projects' } };
+
+/**
+ * Whether no later change waits behind the one ending now. The list a change returns is shown
+ * only then: in quick switches the screen stays on the last project clicked, instead of going
+ * back to each earlier one as the backend catches up.
+ */
+function isLastChange(queryClient: QueryClient): boolean {
+    // the change ending now still counts, as its callbacks run before it settles
+    return queryClient.isMutating({ mutationKey: projectsKey }) <= 1;
+}
 
 export function useProjects() {
     const port = useProjectsPort();
@@ -38,10 +48,10 @@ export function useAddProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
+        ...projectsChange,
         mutationFn: () => port.addProject(),
-        scope: projectsScope,
         onSuccess: (list) => {
-            if (list) queryClient.setQueryData(projectsKey, list);
+            if (list && isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
     });
 }
@@ -55,16 +65,22 @@ export function useActivateProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const { mutate } = useMutation({
+        ...projectsChange,
         mutationFn: (root: string) => port.activateProject(root),
-        scope: projectsScope,
         onMutate: async (root) => {
             await queryClient.cancelQueries({ queryKey: projectsKey });
             queryClient.setQueryData<ProjectList>(projectsKey, (list) =>
                 list ? { ...list, active: root } : list,
             );
         },
-        onSuccess: (list) => queryClient.setQueryData(projectsKey, list),
-        onError: () => queryClient.invalidateQueries({ queryKey: projectsKey }),
+        onSuccess: (list) => {
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+        },
+        onError: () => {
+            if (isLastChange(queryClient)) {
+                void queryClient.invalidateQueries({ queryKey: projectsKey });
+            }
+        },
     });
     return useCallback(
         (root: string) => {
@@ -78,8 +94,10 @@ export function useRemoveProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
+        ...projectsChange,
         mutationFn: (root: string) => port.removeProject(root),
-        scope: projectsScope,
-        onSuccess: (list) => queryClient.setQueryData(projectsKey, list),
+        onSuccess: (list) => {
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+        },
     });
 }

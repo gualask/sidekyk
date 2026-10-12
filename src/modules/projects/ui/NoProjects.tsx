@@ -3,7 +3,12 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useAddProject } from '../application/projects.queries';
 
 /** What the app shows before the first repository is added. */
-export function NoProjects() {
+export function NoProjects({
+    onOpen,
+}: {
+    /** A repository was added: show it. */
+    onOpen: () => void;
+}) {
     const add = useAddProject();
 
     return (
@@ -22,7 +27,13 @@ export function NoProjects() {
                 type="button"
                 className="btn-primary"
                 disabled={add.isPending}
-                onClick={() => add.mutate()}
+                onClick={() =>
+                    add.mutate(undefined, {
+                        onSuccess: (added) => {
+                            if (added) onOpen();
+                        },
+                    })
+                }
             >
                 <IconFolderOpen size={18} />
                 Add a repository

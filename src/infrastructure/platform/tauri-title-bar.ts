@@ -15,11 +15,14 @@ export const tauriTitleBar: TitleBarPort = {
         const window = getCurrentWindow();
         let overlaid: boolean = OVERLAY_TITLE_BAR;
         let checking = false;
+        let resizedSince = false;
+        let disposed = false;
         // entering and leaving full screen resize the window; a drag resizes it many times, so
-        // one check at a time is enough
-        return onTauriEvent(TauriEvent.WINDOW_RESIZED, () => {
-            if (checking) return;
+        // one check at a time is enough, and one more if the window resized during it: the last
+        // resize of a transition is never left unchecked
+        const check = () => {
             checking = true;
+            resizedSince = false;
             window
                 .isFullscreen()
                 .then((fullscreen) => {
@@ -30,7 +33,16 @@ export const tauriTitleBar: TitleBarPort = {
                 .catch(() => undefined)
                 .finally(() => {
                     checking = false;
+                    if (resizedSince && !disposed) check();
                 });
+        };
+        const stop = onTauriEvent(TauriEvent.WINDOW_RESIZED, () => {
+            if (checking) resizedSince = true;
+            else check();
         });
+        return () => {
+            disposed = true;
+            stop();
+        };
     },
 };

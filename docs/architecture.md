@@ -70,7 +70,8 @@ There is no client store. Git is the state: the project list, the snapshot and t
 TanStack Query caches, the last two keyed by repository root. UI state is the zoom level
 (`AppShell`) and the selected file (`ChangesWorkspace`). Switching project updates the cached list
 at once and the backend catches up; changes to the list run one at a time, in the user's order
-(one TanStack mutation scope), so quick switches end on the last project clicked.
+(one TanStack mutation scope), so quick switches end on the last project clicked; the list a change
+returns is shown only when no later change waits, so the screen never steps back through them.
 When the selected file leaves the list, the selection falls back to the first file.
 
 ## Backend
