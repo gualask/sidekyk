@@ -46,32 +46,119 @@ be a different layout over the same panels, not a rewrite.
 
 ## Approved mock
 
-A clickable mock of the three levels was approved on 2026-10-11. It is a single HTML file kept
-locally in `.local/mocks/workspace.html` (not versioned). What it settles:
+A clickable mock of the three levels was approved on 2026-10-11, refined with the maintainer and
+frozen for the MVP on 2026-10-12. It is a single HTML file kept locally in
+`.local/mocks/workspace.html` (not versioned); its glyphs and SVG icons are placeholders for
+Tabler's. What it settles:
+
+### Workspace
 
 - **Where you are**: the breadcrumb (All projects / project / panel) is enough; no separate
   zoom-level indicator.
 - **Project rail** on the left of a project: the "all projects" button first, then one avatar per
   project with its change count, so switching does not need a trip to level 0.
-- **Level 0 cards**: branch, changed files with line counts, recent activity, the first note.
-- **Keyboard**: `↵` zooms in and `Esc` zooms out; `Esc` is progressive (it first leaves a field or
-  clears a filter, then zooms out); `1`/`2`/`3` open Changes, Files, Notes; `[`/`]` switch
-  project; `⌘`+scroll and trackpad pinch zoom on the element under the pointer (`⌘` is `Ctrl`
-  on Linux and Windows, here and below).
-- **Command palette** (`⌘K`): projects, panels, files of every project, notes.
-- **Notes** have "Copy for agent", like hunks.
-- **Still open**: tiles or tabs at level 1 (the mock has both, `T` switches).
-- **Not taken**: the mock names the agent at work ("Claude Code · 40s ago"). Sidekyk sees file
-  changes, not who made them, and naming the agent is not wanted: cards show when files last
-  changed.
+- **Level 0 cards**: branch, changed files with line counts, when files last changed (pulsing
+  while an agent writes), and how many notes wait, with the newest.
+- **Tiles or tabs** at level 1: both, chosen in the settings (tiles by default); no shortcut.
+  Tiles put Changes on the left, Files above Notes on the right; the splitters drag, a double
+  click resets them. Files and Notes minimize to a chip in the top bar, and the other takes the
+  room. Each project keeps its own tiles.
+- **Panel headers** stay light: the panel's title, what is open in it, and icons; minimize and
+  zoom always shown. The panel's key is in the tooltips, not a badge. Full screen, a panel with
+  nothing to show in its header has none.
+- **Copy** is one icon everywhere (hunk, file, path, note), with no label: its tooltip says what it
+  copies, and it turns into a check for a moment once done.
+- **Keyboard**: `↵` zooms in and `Esc` zooms out; `Esc` is progressive (it first leaves a field,
+  closes a menu or leaves a mode, then zooms out); `1`/`2`/`3` open Changes, Files, Notes; `[`/`]`
+  switch project; `⌘`+scroll and trackpad pinch zoom on the element under the pointer (`⌘` is
+  `Ctrl` on Linux and Windows, here and below).
+- **Command palette** (`⌘K`): projects, panels, files of every project, notes, note lists. It is
+  the only search: panels have no filter of their own. Inside a project its files come first.
+- **Toasts** for passing events, bottom center, at most three; information leaves by itself, an
+  error stays until closed or acted on. **Problems that last** (sync stopped) are not toasts: a
+  warning in the top bar lists them, each with its fix.
+- **Theme**: dark by default, light chosen in the settings. The app no longer follows the system.
+- **Settings**: a small modal dialog, opened from a gear in the top bar and with `⌘,`; changes
+  apply at once, `Esc` or a click outside closes it. Sections: Appearance (theme), Workspace
+  (project layout), Diff (the view a diff opens in, the scrollbar's width, context lines later),
+  Notes (long lines, Google Drive sync), and the settings still to come (global shortcut, follow
+  the terminal) as they land. Same dialog component as the palette.
+
+### Changes
+
+- **The diff** shows only the changed lines, or the whole file with the changes marked ("Full
+  file", which opens on the current or first change); the header switches it, and the settings
+  choose the default. In the whole file a hunk is outlined on hover, its copy at its top right.
+- **The scrollbar is a map of the changes**: one mark per hunk at its place (added, removed or
+  both), under a translucent thumb; a click on a mark goes to that change, elsewhere jumps there,
+  the thumb drags. Narrow or wide, in the settings.
+- **`n`/`p`** go to the next or previous change, on to the next or previous file at either end;
+  `↑`/`↓` and `j`/`k` move between files.
+
+### Files
+
+- **A tree**, folders first, as in VS Code: `→` opens a folder or goes into it, `←` closes it or
+  goes up, `↑`/`↓` move, `↵` opens (full screen; `j`/`k` in a tile too). A folder holding only one
+  folder shares its row with it ("modules/changes"). Open folders and the selection are kept per
+  project.
+- **Changes color the name**, as in VS Code, with no letter or mark: modified in amber, new in
+  green; a folder takes the color of the strongest change inside it, and the tooltip says it in
+  words.
+- **The tree's width** is dragged, and kept. A double click on its edge widens it to fit every
+  open row, for a look at a deep tree, and a second one brings it back. Never a horizontal
+  scrollbar: a row that does not fit ends in "…", its full path in the tooltip; the file view
+  keeps at least 240 px.
+- **A file opened from `⌘K`** is shown in the tree: the folders above it open and it is selected.
+- **A changed file** shows the whole file with its changes marked, on the viewer of Changes (the
+  same rows, scrollbar marks and hunk copy), starting at its first change; other files show their
+  text. One viewer, not two.
+- **Changes and Files are not kept in sync**: moving through changes would drag the tree away from
+  where it was, and with tiles the same file would show twice. Each header links to the other
+  instead, at the same change: "Show in Changes" in Files, "Show in Files" in Changes (the file
+  revealed in the tree). An opt-in setting to follow the selection can come later, if missed.
+
+### Notes
+
+- **Cards, not documents**: plain text, one card each, in the order the user gives them (a new
+  card goes on top). They hold things to try and what the agent said, to paste back later; both
+  are used once and then done, so a card is marked done, whatever it holds.
+- **What a card does is on the card**, never inside its text: a circle on the left for done; copy
+  and a ⋯ menu always shown in the top right corner, ⋯ in the corner itself. The menu moves the
+  card to the top, reorders the list, moves the card to another list (to its top) or deletes it;
+  moving and deleting can be undone. Done cards fold into "Done (n)" at the bottom.
+- **Editing** happens in place: a card shows four lines (and its line count when longer), all of
+  it once clicked; `Esc`, `⌘↵` or a click outside closes it, and a card left empty goes. Long
+  lines wrap or scroll sideways, as in VS Code: a setting, switched with `⌥Z`.
+- **A field on top** of the cards adds one to the open list: `↵` adds what was typed (`⇧↵` for a
+  new line), and pasting into the empty field adds a card at once. `⌘N` focuses it.
+- **Lists** keep a project's notes apart by topic (General, Architecture, Observability…); a card
+  is in one list. Full screen, the lists are on the left; in a tile, the header's list name opens
+  them as a menu. "New list" comes first in both, so it is never a scroll away; a double click
+  renames a list; deleting one takes its notes, with undo. Each list has its own "Done". A
+  project opens on the list last open in it, not the one edited last: things are found where
+  they were left.
+- **Order without drag and drop**: "Move to top" covers the usual case in one click. "Reorder…"
+  enters a mode where the list shows one line per card, each with ↑, its position and ↓ (as in
+  fyler): a click on the position takes a number typed in, for long jumps; `⌥↑`/`⌥↓` move the
+  selected card, `↑`/`↓` select; `Esc`, `↵` or "Done" leave the mode. Only open cards are
+  ordered; done ones stay by when they were done.
+- **`⌘K`** finds notes by their text too, and lists by name.
+
+### Not taken
+
+- Naming the agent at work ("Claude Code · 40s ago", in the first version). Sidekyk sees file
+  changes, not who made them: cards show when files last changed.
+- Long structured notes (a document with headings). They fit in a card for now; revisit if the
+  need shows up in use.
+- A filter in the Files panel, and a flat list of results in it: `⌘K` is the search.
 
 ## Follow the terminal
 
 The usual flow: in each terminal tab, `cd` into a repository and start the agent there (`claude`).
-Sidekyk is brought up from anywhere (global shortcut, launcher, Dock or taskbar). With this feature on, it
-opens on the project of the terminal tab used just before, so moving to another tab and bringing
-Sidekyk up again shows the other project. No manual linking: the link is the directory the agent
-was started in.
+Sidekyk is brought up from anywhere (global shortcut, launcher, Dock or taskbar). With this feature
+on, it opens on the project of the terminal tab used just before, so moving to another tab and
+bringing Sidekyk up again shows the other project. No manual linking: the link is the directory
+the agent was started in.
 
 - **Which terminal**: Sidekyk remembers the last app that was frontmost before it. macOS reports
   every app activation without any permission. Remembering it, instead of looking at the frontmost
@@ -106,16 +193,15 @@ Worth taking:
 - the focus mode with a sidebar of the other projects (now the project rail);
 - a single command bar as the entry point for everything (now `⌘K`);
 - "`Esc` cancels, it does not navigate" (now the progressive `Esc`);
-- per-project notes with "copy all" (now "Copy for agent");
+- per-project notes with "copy all" (now a note's copy icon);
 - **quick capture**: a global shortcut that adds a note to the active project without opening the
   window, as tazly's page widget did. To evaluate with the notes;
 - a `PRODUCT.md` with users, purpose and design principles, as tazly has;
 - `⌥` shortcuts matched on `e.code`, since on macOS `⌥`+letter types a special character in
   `e.key`.
 
-Not to take: the visionOS-like glass (layered blur costs GPU, against the golden rule), and
-Lexical as the notes editor without weighing it first (a heavy dependency; plain Markdown may be
-enough).
+Not to take: the visionOS-like glass (layered blur costs GPU, against the golden rule), and a
+rich-text editor such as Lexical: notes are plain-text cards.
 
 ## Panels
 
@@ -124,6 +210,48 @@ enough).
   import each other, and `pnpm boundaries:check` keeps enforcing it.
 - A panel that is not on screen does no work: its queries are disabled (`enabled`) and its code
   is loaded lazily, one chunk per panel module.
+
+## UI components
+
+The mock needs widgets that are costly to get right by hand: a command palette (a combobox in a
+dialog, with keyboard navigation, focus trap and screen reader support), menus (a note's ⋯, the
+note lists in a tile), tooltips, and later the settings' controls (switch, select, number field).
+Evaluated on 2026-10-11.
+
+**Libraries compared**, on realistic components, minified, React excluded, each measured alone
+(kB gzip; the app's JS is 95 kB gzip today):
+
+| Library | Palette | Tabs | Tooltip |
+|---|---|---|---|
+| Base UI 1.8 | 42.0 | 14.5 | 33.8 |
+| Radix (one package each) + cmdk | 19.5 (cmdk) | 10.1 | 21.0 |
+| Headless UI 2.2 | 53.6 | 12.1 | none |
+| Ariakit 0.4 | 38.1 | 22.7 | 34.5 |
+| Ark UI 5.39 | 48.1 | 14.6 | 25.3 |
+| React Aria Components 1.22 | 56.0 | 34.6 | 21.7 |
+
+- **Positioning is the cost**: a tooltip, menu or select must stay attached to its trigger, flip
+  at the window's edges and follow scrolling. Every library does it with a positioning engine
+  (mostly floating-ui) of 20-35 kB, paid once. Base UI's palette (Autocomplete `inline` in a
+  Dialog, centered) does not use it.
+- **Marginal cost in Base UI**: a tooltip adds 20.7 kB to the palette alone, but 4.2 kB to a menu
+  and 4.4 kB to palette + menu + select (75.0 → 79.4 kB), since they share the engine.
+- **Radix + cmdk** is the lightest, but Radix's development has slowed (its authors build Base
+  UI) and cmdk does not virtualize (with thousands of files, show only the top matches).
+  Headless UI has no tooltip and a heavier palette; Ariakit is 0.x with one main maintainer; Ark
+  UI and React Aria are heavier.
+- **Base UI**: actively maintained, 1.x, MIT, headless (takes the `--ui-*` tokens and Tailwind),
+  one import path per component; Autocomplete supports virtualization with
+  `@tanstack/react-virtual`, already a dependency; used in `../irc-news`. It targets Baseline
+  Widely Available features, which WKWebView, WebKitGTK and WebView2 have; to confirm on Linux.
+- **Native**: a CSS-only tooltip cannot flip or stay on screen, so it is not an option. The
+  native `title` is placed by the system but cannot be styled. CSS anchor positioning would
+  replace the engine, but WebKitGTK support is not confirmed (Safari has it since 26).
+
+Recommendation: Base UI for the palette, menus, selects and tooltips; tabs by hand (a few dozen
+lines with roving `tabindex`). None of it is in the first paint's chunk: the overlays load once
+the window is idle after the first paint, so `⌘K` and the first hover are still instant. Decision
+pending, see Open decisions.
 
 ## Projects
 
@@ -140,12 +268,21 @@ enough).
 ## Explorer
 
 - **Tree**: `git ls-files` plus untracked files (`--others --exclude-standard`), so `.gitignore`
-  applies and large repositories list in milliseconds. The tree is virtualized.
+  applies and large repositories list in milliseconds; read again only when files are created or
+  deleted. A tracked file deleted from disk is still in the index until staged: the tree leaves it
+  out, as VS Code does, and the Changes panel lists it.
+- **Tree view**: the frontend builds the tree from the paths and renders only the rows of open
+  folders, virtualized (`@tanstack/react-virtual`, already a dependency), with `tree`/`treeitem`
+  roles and their level, since rows off screen are not in the DOM. Behaviour as in the approved
+  mock. A read-only tree is little code on the virtualizer; tree libraries mostly add drag and
+  drop.
 - **File view**: read through the backend with a size limit, rendered with the virtualized rows of
-  the diff view. Syntax highlighting comes with the item already on the roadmap (loaded lazily).
-- **Search by name**: fuzzy matching over the path list, in the frontend or with a backend crate.
-- **Search in contents**: in the backend, with `git grep` or ripgrep's crates, streaming results
-  and cancellable when the query changes.
+  the diff view; a changed file uses the diff view itself, whole file with changes marked. Syntax
+  highlighting comes with the item already on the roadmap (loaded lazily).
+- **Search by name**: in `⌘K`, fuzzy matching over the path list, in the frontend or with a
+  backend crate. The Files panel has no filter of its own.
+- **Search in contents**: in `⌘K` too, as a mode of the palette; in the backend, with `git grep`
+  or ripgrep's crates, streaming results and cancellable when the query changes.
 - Each library is chosen at implementation time with pros and cons, per the dependency rule in
   `AGENTS.md`.
 
@@ -155,9 +292,11 @@ enough).
   `settings.json` already lives (Tauri's `app_data_dir`: `~/Library/Application Support/` on
   macOS, `~/.local/share/` on Linux, `%APPDATA%` on Windows, each followed by
   `io.github.gualask.sidekyk`).
+- **What is stored**: per project, its lists (name, order, the one last open) and its notes (text,
+  list, position, when edited, when done).
 - **Decided at implementation time**: the format (JSON, Markdown files, a small database) and
-  whether notes are one file or one per note or per project. One file per note makes sync
-  conflicts smaller; take it into account.
+  whether notes are one file or one per note or per project. A note is a card (Approved mock), so
+  one file per note is the natural unit, and it keeps sync conflicts small.
 
 ### Optional sync with Google Drive
 
@@ -206,11 +345,13 @@ When these land, `AGENTS.md` changes too:
 
 ## Open decisions
 
-- Notes: format and granularity (one file, one per note, one per project).
+- UI components: Base UI for palette, menus, selects and tooltips (see UI components).
+- Notes: format and granularity (one file per note is the natural unit, see Notes).
 - Sync: `drive.appdata` (hidden backup) or `drive.file` (files visible in Drive).
 - Sync: conflict strategy, and whether to encrypt notes before upload.
-- Explorer: fuzzy matching in the frontend or the backend; `git grep` or ripgrep's crates.
-- Level 1 layout: tiles or tabs.
+- Explorer: fuzzy matching in the frontend or the backend; `git grep` or ripgrep's crates. The
+  scoring must favour consecutive letters and word starts (as VS Code does): letters scattered
+  over a long note title match almost any query.
 - Quick capture of a note through a global shortcut.
 - Free canvas: revisit after semantic zoom has been used for a while.
 

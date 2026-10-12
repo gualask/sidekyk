@@ -50,12 +50,28 @@ what needs measuring before deciding waits in **Performance review**, at the end
       fetched with the app instead of after the first render. Costs nothing hidden or shown
 - [ ] Panel summary for the overview and the tile headers (the Changes count), added to the
       contract with level 0, once projects say where the data comes from
+- [x] Review the approved mock with the maintainer (`.local/mocks/workspace.html`): frozen for the
+      MVP on 2026-10-12, described in docs/evolution.md (Approved mock), which the UI items below
+      follow
+- [ ] Icons of the mock from Tabler (`@tabler/icons-react`, already the app's set, imported one
+      file per icon by `vite.config.ts`): the mock's glyphs and SVGs (chevron, minimize, zoom,
+      settings, overview, close, more, trash, folder, compare, open in editor) are placeholders.
+      Copy is `IconCopy`, then `IconCheck` for a moment, as `DiffRows.tsx` already does
+- [ ] Decide on Base UI for palette, menus, selects and tooltips (compared with Radix, Headless
+      UI, Ariakit, Ark UI and React Aria in docs/evolution.md, UI components). Whatever is chosen
+      loads after the first paint
 - [ ] Projects as app data, replacing the single last repository: add, remove, switch. Only the
       active project runs snapshots; the others keep a light watcher that only marks changes
+- [ ] Settings dialog (`⌘,`, a gear in the top bar): theme (dark by default, or light; replaces
+      following the system) and project layout (tiles or tabs). The other settings of the mock
+      (the diff's default view and scrollbar width, the notes' long lines and sync) join it with
+      their features. Stored with the app data
 - [ ] Semantic zoom levels 1 and 2: a project's panels as tiles or tabs, and one panel full
-      screen, with the Changes panel as today's view; breadcrumb and project rail as in the
-      approved mock (docs/evolution.md)
-- [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes
+      screen, with the Changes panel as today's view; breadcrumb, project rail, splitters and
+      panels minimized to the top bar as in the approved mock (docs/evolution.md)
+- [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix
+- [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;
+      results virtualized (thousands of files), code loaded after the first paint
 - [ ] Keyboard model of the mock: `↵`/`Esc` zoom (progressive `Esc`), `1`-`3` panels, `[`/`]`
       projects, `⌘`/`Ctrl`+scroll and pinch
 
@@ -90,17 +106,23 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Then: explore the repository
 
+- [ ] Whole-file view in Changes ("Full file"): the file with its changes marked, opening on the
+      current change; the default view in the settings. The Files panel shows changed files on it
 - [ ] Files panel: tree from `git ls-files` plus untracked files, virtualized, with a bounded
-      payload
-- [ ] File view through the backend, size-limited, on the virtualized rows of the diff view
-- [ ] Search by name (fuzzy)
-- [ ] Search in contents in the backend (`git grep` or ripgrep's crates), streaming and
-      cancellable
+      payload; keyboard, compact folders, change colors and adjustable width as in the approved
+      mock
+- [ ] File view through the backend, size-limited, on the virtualized rows of the diff view; a
+      changed file shows the diff view's whole file with its changes, and links to Changes
+- [ ] Search by name (fuzzy) in `⌘K`, the active project's files first; opening one shows it
+      in the tree. No filter in the panel
+- [ ] Search in contents in `⌘K`, as a mode, in the backend (`git grep` or ripgrep's crates),
+      streaming and cancellable
 
 ## Then: notes
 
-- [ ] Notes panel, stored at application level in the app data directory (format and granularity
-      decided at implementation)
+- [ ] Notes panel as cards in lists (plain text, done, copy, move between lists, the user's order;
+      docs/evolution.md, Approved mock), stored at application level in the app data directory
+      (format and granularity decided at implementation)
 - [ ] Optional sync and backup with Google Drive: OAuth 2.0 for desktop apps (loopback, PKCE),
       tokens in the OS credential store, sync in the backend, local first, conflicts kept as both
       versions (see docs/evolution.md for the checked facts and the open decisions). Nothing of
@@ -118,6 +140,9 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Review
 
+- [ ] The scrollbar as a map of the changes: one mark per hunk, click to go there; narrow or wide
+      in the settings
+- [ ] `n`/`p`: next or previous change, on to the next or previous file at either end
 - [ ] Syntax highlighting, loaded lazily, only for the rows on screen, and skipped above a size
       limit
 - [ ] Side-by-side view
@@ -126,7 +151,7 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## App
 
-- [ ] Settings: theme override, shortcut, diff context lines
+- [ ] Diff context lines, in the settings dialog
 - [ ] Italian and English UI (as in Fyler)
 - [ ] Real app icon
 - [ ] Copy or reveal the log from the app, for bug reports
