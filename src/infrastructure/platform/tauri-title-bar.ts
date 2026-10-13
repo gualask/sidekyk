@@ -1,11 +1,12 @@
 import { TauriEvent } from '@tauri-apps/api/event';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
+import { MACOS } from '@/shared/platform/macos';
 import type { TitleBarPort } from '@/shared/platform/title-bar';
 import { onTauriEvent } from './events';
 
 /** `tauri.conf.json` asks for an overlay title bar, which only macOS has. */
-const OVERLAY_TITLE_BAR = navigator.userAgent.includes('Mac');
+const OVERLAY_TITLE_BAR = MACOS;
 
 /** Native title bar: the traffic lights overlay the page, except in full screen. */
 export const tauriTitleBar: TitleBarPort = {

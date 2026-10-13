@@ -9,7 +9,9 @@ import {
     useProjects,
     useProjectsChangeSubscription,
 } from '@/modules/projects';
+import { loadSettingsDialog } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
+import { hasShortcutModifier } from '@/shared/platform/shortcut';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { PanelTile } from './PanelTile';
@@ -19,6 +21,9 @@ import type { ZoomLevel } from './workspace';
 
 const ProjectsOverview = lazy(() =>
     loadProjectsOverview().then((module) => ({ default: module.ProjectsOverview })),
+);
+const SettingsDialog = lazy(() =>
+    loadSettingsDialog().then((module) => ({ default: module.SettingsDialog })),
 );
 
 /** The window: the top bar, and below it the workspace at its zoom level. */
@@ -31,21 +36,41 @@ export function AppShell() {
     const project = projects.data ? activeProject(projects.data) : null;
     // what the first paint does not need waits until the window has nothing else to do
     const [idle, setIdle] = useState(false);
+    // null until first opened; then the dialog stays mounted, to give the focus back as it closes
+    const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
 
-    // all projects is a click away: its code is fetched while nothing else happens
+    // all projects and the settings are a click away: their code is fetched while nothing else
+    // happens
     useEffect(
         () =>
             whenIdle(() => {
                 setIdle(true);
                 void loadProjectsOverview();
+                void loadSettingsDialog();
                 for (const summary of SUMMARIES) void summary.preload();
             }),
         [],
     );
 
+    useEffect(() => {
+        function onKeyDown(event: KeyboardEvent) {
+            if (!hasShortcutModifier(event) || event.altKey || event.key !== ',') return;
+            event.preventDefault();
+            setSettingsOpen((open) => !open);
+        }
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, []);
+
     return (
         <div className="flex h-full flex-col">
-            <TopBar level={level} project={project} panel={INITIAL_PANEL} onZoom={setLevel} />
+            <TopBar
+                level={level}
+                project={project}
+                panel={INITIAL_PANEL}
+                onZoom={setLevel}
+                onOpenSettings={() => setSettingsOpen(true)}
+            />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
                     <div className="flex h-full items-center justify-center p-8 text-sm text-ui-danger">
@@ -61,6 +86,11 @@ export function AppShell() {
                     />
                 ) : null}
             </main>
+            {settingsOpen === null ? null : (
+                <Suspense fallback={null}>
+                    <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+                </Suspense>
+            )}
         </div>
     );
 }

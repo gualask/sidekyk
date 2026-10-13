@@ -50,43 +50,46 @@
     --ui-avatar-6: #8b5cf6;
 }
 
-.dark {
-    --ui-bg: #232530;
-    --ui-surface: #2c2f3a;
-    --ui-surface-subtle: #30333f;
-    --ui-surface-hover: #383c49;
-    --ui-border: rgba(255, 255, 255, 0.1);
-    --ui-border-hover: rgba(255, 255, 255, 0.2);
-    --ui-text: #f4f6fb;
-    --ui-text-secondary: #dde3ee;
-    --ui-text-dim: #b1bacb;
-    --ui-text-muted: #9aa4b6;
-    --ui-accent-text: #a5b4fc;
-    --ui-accent-muted: #a5b4fc;
-    --ui-accent-soft: rgba(99, 102, 241, 0.15);
-    --ui-accent-soft-hover: rgba(99, 102, 241, 0.25);
-    --ui-accent-on-soft: #c7d2fe;
-    --ui-danger: #f87171;
-    --ui-danger-soft: rgba(127, 29, 29, 0.6);
-    --ui-danger-soft-text: #fecaca;
-    --ui-success: #34d399;
-    --ui-success-soft: rgba(2, 44, 34, 0.6);
-    --ui-success-soft-text: #a7f3d0;
-    --ui-warning: #fbbf24;
-    --ui-warning-soft: rgba(69, 26, 3, 0.6);
-    --ui-warning-soft-text: #fde68a;
-    --ui-warning-on-solid: #1f1300;
-    --ui-diff-add-bg: rgba(16, 185, 129, 0.11);
-    --ui-diff-add-gutter: rgba(16, 185, 129, 0.2);
-    --ui-diff-add-mark: #6ee7b7;
-    --ui-diff-del-bg: rgba(244, 63, 94, 0.11);
-    --ui-diff-del-gutter: rgba(244, 63, 94, 0.2);
-    --ui-diff-del-mark: #fda4af;
-    --ui-diff-hunk-bg: rgba(99, 102, 241, 0.12);
-    --ui-diff-hunk-text: #b4bdf5;
-    --ui-scrollbar-thumb: color-mix(in srgb, var(--ui-border-hover) 78%, transparent);
-    --ui-scrollbar-thumb-hover: color-mix(in srgb, var(--ui-border-hover) 96%, transparent);
-    --ui-shadow-soft: rgba(2, 6, 23, 0.34);
+/* The window's theme, which the backend sets from the settings: the page follows it. */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ui-bg: #232530;
+        --ui-surface: #2c2f3a;
+        --ui-surface-subtle: #30333f;
+        --ui-surface-hover: #383c49;
+        --ui-border: rgba(255, 255, 255, 0.1);
+        --ui-border-hover: rgba(255, 255, 255, 0.2);
+        --ui-text: #f4f6fb;
+        --ui-text-secondary: #dde3ee;
+        --ui-text-dim: #b1bacb;
+        --ui-text-muted: #9aa4b6;
+        --ui-accent-text: #a5b4fc;
+        --ui-accent-muted: #a5b4fc;
+        --ui-accent-soft: rgba(99, 102, 241, 0.15);
+        --ui-accent-soft-hover: rgba(99, 102, 241, 0.25);
+        --ui-accent-on-soft: #c7d2fe;
+        --ui-danger: #f87171;
+        --ui-danger-soft: rgba(127, 29, 29, 0.6);
+        --ui-danger-soft-text: #fecaca;
+        --ui-success: #34d399;
+        --ui-success-soft: rgba(2, 44, 34, 0.6);
+        --ui-success-soft-text: #a7f3d0;
+        --ui-warning: #fbbf24;
+        --ui-warning-soft: rgba(69, 26, 3, 0.6);
+        --ui-warning-soft-text: #fde68a;
+        --ui-warning-on-solid: #1f1300;
+        --ui-diff-add-bg: rgba(16, 185, 129, 0.11);
+        --ui-diff-add-gutter: rgba(16, 185, 129, 0.2);
+        --ui-diff-add-mark: #6ee7b7;
+        --ui-diff-del-bg: rgba(244, 63, 94, 0.11);
+        --ui-diff-del-gutter: rgba(244, 63, 94, 0.2);
+        --ui-diff-del-mark: #fda4af;
+        --ui-diff-hunk-bg: rgba(99, 102, 241, 0.12);
+        --ui-diff-hunk-text: #b4bdf5;
+        --ui-scrollbar-thumb: color-mix(in srgb, var(--ui-border-hover) 78%, transparent);
+        --ui-scrollbar-thumb-hover: color-mix(in srgb, var(--ui-border-hover) 96%, transparent);
+        --ui-shadow-soft: rgba(2, 6, 23, 0.34);
+    }
 }
 
 @theme inline {

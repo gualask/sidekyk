@@ -10,10 +10,13 @@ import { FileList } from './FileList';
 const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
 
-function isTyping(target: EventTarget | null): boolean {
+/** Whether a key belongs to what has the focus: a field, or a dialog over the panel. */
+function isTaken(target: EventTarget | null): boolean {
     return (
         target instanceof HTMLElement &&
-        (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+        (target.isContentEditable ||
+            ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) ||
+            target.closest('[role="dialog"]') !== null)
     );
 }
 
@@ -29,7 +32,7 @@ export function ChangesWorkspace({ project, header }: PanelProps) {
 
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.metaKey || event.ctrlKey || event.altKey || isTyping(event.target)) return;
+            if (event.metaKey || event.ctrlKey || event.altKey || isTaken(event.target)) return;
             const step = NEXT_KEYS.has(event.key) ? 1 : PREVIOUS_KEYS.has(event.key) ? -1 : 0;
             const next = files[selectedIndex + step];
             if (step === 0 || !next) return;

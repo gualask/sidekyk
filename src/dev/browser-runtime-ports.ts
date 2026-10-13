@@ -1,5 +1,6 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { ProjectList } from '@/modules/projects';
+import type { Settings } from '@/modules/settings';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
@@ -36,6 +37,9 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         list = next;
         return list;
     };
+    // a browser tab follows the system's theme, or the one the devtools emulate: the setting is
+    // only kept
+    let settings: Settings = { theme: 'dark' };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
     const snapshot = (root: string) => {
@@ -78,6 +82,13 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     ? largeDiff(request)
                     : reviewDiff(request),
             onRepositoryChanged: () => () => undefined,
+        },
+        settings: {
+            getSettings: async () => settings,
+            setSettings: async (next) => {
+                settings = next;
+                return settings;
+            },
         },
         // a browser tab draws no window controls over the page
         titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },

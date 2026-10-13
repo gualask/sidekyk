@@ -90,11 +90,15 @@ what needs measuring before deciding waits in **Performance review**, at the end
       hidden; shown, on macOS, at most one `isFullscreen` call in flight while the window
       resizes, and one more if it resized meanwhile. To check in the packaged
       app: the traffic lights' position (`trafficLightPosition` in `tauri.conf.json`)
-- [ ] Settings dialog (`⌘,`, a gear in the top bar): theme (dark by default, or light; replaces
-      following the system) and project layout (tiles or tabs). The other settings of the mock
-      (the diff's default view and scrollbar width, the notes' long lines and sync) join it with
-      their features. Stored with the app data
-- [ ] Semantic zoom, the rest of the mock: tabs (with the layout setting), splitters and panels
+- [x] Settings dialog (`⌘,`, `Ctrl+,` on Linux and Windows, a gear in the top bar): theme, dark
+      by default or light, which replaces following the system. Stored with the projects
+      (`settings.json`), applied at once. The backend creates the window in the stored theme
+      and the page follows the window's (`prefers-color-scheme`), so the first paint is right
+      without asking the backend. The dialog is a chunk of its own with Base UI's, fetched once
+      the window is idle. The other settings of the mock (project layout, the diff's default
+      view and scrollbar width, the notes' long lines and sync) join it with their features.
+      Costs nothing hidden or shown; opening it reads the settings once per session
+- [ ] Semantic zoom, the rest of the mock: tabs (with the project layout setting), splitters and panels
       minimized to the top bar (with Files and Notes), the zoom transitions (View Transitions,
       once WebKitGTK support is checked). The open file is in the Changes tile's header already
       (`header` in the panel contract), with the copy of the whole file as an icon
@@ -195,7 +199,9 @@ Before the explorer adds more git reads, so they all share the same limits.
 - [ ] Linux and Windows testing of the packaged app. On Linux, inotify needs one watch per
       directory: do not watch ignored directories, and handle the `max_user_watches` limit. On
       Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
-      and the git-dir check, case included
+      and the git-dir check, case included. On both, check that the page's `prefers-color-scheme`
+      follows the window's theme, at startup and when the setting changes (WebKitGTK reads GTK's
+      `gtk-application-prefer-dark-theme`, WebView2 its preferred color scheme)
 
 ## Performance review
 

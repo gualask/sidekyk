@@ -5,11 +5,12 @@
 
 use std::path::{Path, PathBuf};
 
-use ::tauri::{Emitter, Manager};
+use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
+use crate::interfaces::tauri::settings::window_theme;
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 
@@ -19,6 +20,18 @@ fn folder_argument(args: &[String]) -> Option<PathBuf> {
         .skip(1)
         .find(|a| !a.starts_with('-'))
         .map(PathBuf::from)
+}
+
+/// Creates the windows `tauri.conf.json` leaves to the app (`create: false`), already in the theme
+/// of the settings: their first paint has the right colors, with no flash of the system's theme.
+fn create_windows(app: &::tauri::AppHandle) -> ::tauri::Result<()> {
+    let theme = settings_store::load_settings(app).theme;
+    for config in app.config().app.windows.iter().filter(|w| !w.create) {
+        WebviewWindowBuilder::from_config(app, config)?
+            .theme(Some(window_theme(theme)))
+            .build()?;
+    }
+    Ok(())
 }
 
 fn show_main_window(app: &::tauri::AppHandle) {
@@ -64,6 +77,7 @@ pub(crate) fn run() {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
+            create_windows(app.handle())?;
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
@@ -83,6 +97,8 @@ pub(crate) fn run() {
             tauri_commands::repository::get_repository_snapshot,
             tauri_commands::repository::get_repository_summary,
             tauri_commands::repository::get_file_diff,
+            tauri_commands::settings::get_settings,
+            tauri_commands::settings::set_settings,
             tauri_commands::diagnostics::log_frontend_error,
         ])
         .run(::tauri::generate_context!())

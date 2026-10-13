@@ -1,5 +1,7 @@
+import { IconSettings } from '@tabler/icons-react';
 import { ProjectFacts } from '@/modules/changes';
 import type { PanelDefinition } from '@/shared/panels/panel';
+import { shortcutLabel } from '@/shared/platform/shortcut';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useTitleBarOverlaid } from './providers';
 import type { ZoomLevel } from './workspace';
@@ -25,20 +27,22 @@ function Crumb({ onClick, children }: { onClick?: () => void; children: string }
 }
 
 /**
- * The window's top bar: where you are (all projects, a project, a panel), and the way back. On
- * macOS it is also the title bar: the traffic lights sit in its first 78 pixels, and its empty
- * parts drag the window.
+ * The window's top bar: where you are (all projects, a project, a panel), the way back, and the
+ * settings. On macOS it is also the title bar: the traffic lights sit in its first 78 pixels, and
+ * its empty parts drag the window.
  */
 export function TopBar({
     level,
     project,
     panel,
     onZoom,
+    onOpenSettings,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
     panel: PanelDefinition;
     onZoom: (level: ZoomLevel) => void;
+    onOpenSettings: () => void;
 }) {
     const overlaid = useTitleBarOverlaid();
     const separator = <span className="font-normal text-ui-text-muted">/</span>;
@@ -76,6 +80,15 @@ export function TopBar({
                 // a project's panels are on screen, Changes among them: its snapshot has the facts
                 <ProjectFacts project={project} fromSnapshot />
             ) : null}
+            <button
+                type="button"
+                className="btn-icon ml-auto h-7 w-7"
+                title={`Settings (${shortcutLabel(',')})`}
+                aria-label="Settings"
+                onClick={onOpenSettings}
+            >
+                <IconSettings size={16} />
+            </button>
         </header>
     );
 }

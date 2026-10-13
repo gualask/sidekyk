@@ -35,11 +35,13 @@ cannot see.
 ### Directory map
 
 - `src/app/` — composition root: providers (`QueryClient`, runtime ports), the shell (top bar
-  with the breadcrumb, the zoom levels, panel tiles), the list of panels (`panels.ts`), system
-  color scheme. May depend on everything.
+  with the breadcrumb and the settings' gear, the zoom levels, panel tiles, `⌘,`), the list of
+  panels (`panels.ts`). May depend on everything.
 - `src/modules/projects/` — the project list: port and queries, the project rail, level 0's
   cards (`ProjectsOverview`, a chunk of its own with Base UI's menu, fetched once the window is
   idle after the first paint), the screen shown before the first project.
+- `src/modules/settings/` — the settings: port and queries, and the dialog (a chunk of its own
+  with Base UI's dialog and radio group, fetched once the window is idle after the first paint).
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
@@ -52,7 +54,8 @@ cannot see.
   the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
   traffic lights overlay the top bar, which full screen turns off).
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, the clipboard hook and
-  copy icon, error messages, the project type every layer shares (`projects/project-info.ts`), and
+  copy icon, error messages, shortcut labels and modifiers (`⌘` or `Ctrl`, `platform/shortcut.ts`, from
+  `platform/macos.ts`), the project type every layer shares (`projects/project-info.ts`), and
   the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
@@ -92,25 +95,34 @@ at once and the backend catches up; changes to the list run one at a time, in th
 returns is shown only when no later change waits, so the screen never steps back through them.
 When the selected file leaves the list, the selection falls back to the first file.
 
+The settings are a TanStack Query cache as well, read when the dialog first opens. The theme is
+not React state: the backend gives the window the theme of the settings (when it creates it, and
+on `set_settings`), the page's `prefers-color-scheme` follows the window's theme, and the dark
+tokens apply under that media query (`theme.css`), with no script. The first paint has the right
+colors without waiting for the backend. In the browser fixtures the page follows the system's
+theme, or the devtools' emulation, and the setting is only kept.
+
 ## Backend
 
-- `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Restores
-  the projects, and adds and shows the repository of the first CLI argument, if any.
-- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, and `log_frontend_error` in
-  `diagnostics.rs`) and `state.rs`, the one place that changes the project list and watches the
+- `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Creates
+  the window (`create: false` in `tauri.conf.json`) in the theme of the settings, restores the
+  projects, and adds and shows the repository of the first CLI argument, if any.
+- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `settings.rs`, and
+  `log_frontend_error` in `diagnostics.rs`) and `state.rs`, the one place that changes the project list and watches the
   project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At most one snapshot
   and one summary per project run at a time: requests that arrive during one share the next
   (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
 - `modules/projects/` — the project list: adding, activating, removing, and a stored list made
   consistent. No Tauri.
+- `modules/settings/` — the settings and their defaults (`Settings`, `Theme`). No Tauri.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
   validation, the ignored-paths filter for watcher events, wire contracts. A repository moved or
   deleted after it was added fails its snapshot and diffs with `repository_missing`, before git
   runs. No Tauri; the outside world is the `RepositoryBackend` port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes),
-  `settings_store.rs` (the projects, through `tauri-plugin-store`; an older version's last
-  repository becomes the first project), `logging.rs` (see Logs).
+  `settings_store.rs` (the settings and the projects, through `tauri-plugin-store`; an older
+  version's last repository becomes the first project), `logging.rs` (see Logs).
 - `shared/` — `error.rs`: `AppError`, serialized as `{ code, message }` with stable codes;
   `coalesce.rs`: one computation in flight at a time, its result shared by the callers waiting;
   `sync.rs`: locking a mutex past a panic.

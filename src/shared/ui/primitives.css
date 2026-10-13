@@ -21,6 +21,16 @@
     .chip {
         @apply inline-flex h-6 items-center gap-1 rounded-md bg-ui-surface-hover px-2 text-xs font-medium text-ui-text-secondary;
     }
+    .kbd {
+        @apply rounded border border-ui-border bg-ui-surface-subtle px-[5px] py-px font-mono text-[11px] text-ui-text-muted;
+    }
+    /* one choice among a few, side by side (Base UI's RadioGroup, a Radio per segment) */
+    .seg {
+        @apply flex shrink-0 overflow-hidden rounded-lg border border-ui-border;
+    }
+    .seg-item {
+        @apply cursor-default px-2.5 py-1 text-xs text-ui-text-muted outline-none select-none hover:text-ui-text-secondary focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset data-checked:bg-ui-accent-soft data-checked:font-semibold data-checked:text-ui-accent-on-soft;
+    }
     /* a menu's popup and its items (Base UI's Menu) */
     .menu-popup {
         @apply min-w-44 rounded-[10px] border border-ui-border-hover bg-ui-surface p-1 shadow-[0_12px_32px_var(--ui-shadow-soft)] outline-none;
