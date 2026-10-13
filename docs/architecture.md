@@ -50,15 +50,15 @@ cannot see.
   - `ui/` — the panel (`ChangesWorkspace`), file list, diff view and rows, the open file in the
     panel's header; the summary's views: the project's facts in the breadcrumb, the change count
     on the rail, the level 0 card's part (a chunk of its own, loaded with level 0). The file list
-    and the diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height rows
-    (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
+    and the diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height
+    rows (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
   the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
   traffic lights overlay the top bar, which full screen turns off).
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, the clipboard hook and
-  copy icon, error messages, shortcut labels and modifiers (`⌘` or `Ctrl`, `platform/shortcut.ts`, from
-  `platform/macos.ts`), the project type every layer shares (`projects/project-info.ts`), and
-  the panel contract (`panels/panel.ts`).
+  copy icon, error messages, shortcut labels and modifiers (`⌘` or `Ctrl`,
+  `platform/shortcut.ts`, from `platform/macos.ts`), the project type every layer shares
+  (`projects/project-info.ts`), and the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
 ### Dependency rules
@@ -75,15 +75,15 @@ cannot see.
 ### Panels
 
 A panel is a module's `PanelDefinition` (`src/shared/panels/panel.ts`): id, title, icon and a
-component loaded with `import()`, one chunk per module. The component receives the project it
-shows (`PanelProps`), so panels never ask which project is active. `src/app/panels.ts` lists them
-in shortcut order and starts loading the startup panel's chunk as soon as the app's code runs, so
-it does not wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries live in
-its component, so a panel that is not on screen runs none. The panel gets its header too
-(`PanelProps.header`), an element it fills through a portal with what is open in it and its
-actions: in a tile, after the panel's title; full screen, a header shown only while the panel
-puts something in it. A panel may also give a `summary`: its part of a project's card at level 0,
-a chunk of its own fetched with level 0.
+component loaded with `import()`, one chunk per module. The component receives the project it shows
+(`PanelProps`), so panels never ask which project is active. `src/app/panels.ts` lists them in
+shortcut order and starts loading the startup panel's chunk as soon as the app's code runs, so it
+does not wait for the first render. The shell renders a panel inside `Suspense`; a panel's queries
+live in its component, so a panel that is not on screen runs none. The panel gets its header too
+(`PanelProps.header`), an element it fills through a portal with what is open in it and its actions:
+in a tile, after the panel's title; full screen, a header shown only while the panel puts something
+in it. A panel may also give a `summary`: its part of a project's card at level 0, a chunk of its
+own fetched with level 0.
 
 ### State
 
@@ -110,10 +110,10 @@ theme, or the devtools' emulation, and the setting is only kept.
   the window (`create: false` in `tauri.conf.json`) in the theme of the settings, restores the
   projects, and adds and shows the repository of the first CLI argument, if any.
 - `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `settings.rs`, and
-  `log_frontend_error` in `diagnostics.rs`) and `state.rs`, the one place that changes the project list and watches the
-  project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At most one snapshot
-  and one summary per project run at a time: requests that arrive during one share the next
-  (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
+  `log_frontend_error` in `diagnostics.rs`) and `state.rs`, the one place that changes the project
+  list and watches the project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At
+  most one snapshot and one summary per project run at a time: requests that arrive during one share
+  the next (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
 - `modules/projects/` — the project list: adding, activating, removing, and a stored list made
   consistent. No Tauri.
 - `modules/settings/` — the settings and their defaults (`Settings`, `Theme`). No Tauri.

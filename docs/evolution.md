@@ -27,7 +27,7 @@ Three fixed levels, with animated transitions that give the feeling of zooming:
 | Level | Shows |
 |---|---|
 | 0, all projects | One card per project: changes in progress, a glimpse of the notes. It doubles as the project switcher |
-| 1, a project | Its panels (Changes, Files, Notes, …) as tiles or tabs |
+| 1, a project | Its panels (Changes, Files, Notes, …) as tiles |
 | 2, one panel | A single panel full screen, as the app is today |
 
 Navigation is by keyboard and shortcuts, and a new panel finds its place without a layout to
@@ -64,7 +64,7 @@ Tabler's. What it settles:
   nothing and loses nothing while a project is only its repository; once notes belong to
   projects, it must not delete them silently (undo, or keep them until the project is added
   again).
-- **Tiles or tabs** at level 1: both, chosen in the settings (tiles by default); no shortcut.
+- **Tiles** at level 1, the only layout (tabs were dropped on 2026-10-13, see Not taken).
   Tiles put Changes on the left, Files above Notes on the right; the splitters drag, a double
   click resets them. Files and Notes minimize to a chip in the top bar, and the other takes the
   room. Each project keeps its own tiles.
@@ -84,10 +84,10 @@ Tabler's. What it settles:
   warning in the top bar lists them, each with its fix.
 - **Theme**: dark by default, light chosen in the settings. The app no longer follows the system.
 - **Settings**: a small modal dialog, opened from a gear in the top bar and with `⌘,`; changes
-  apply at once, `Esc` or a click outside closes it. Sections: Appearance (theme), Workspace
-  (project layout), Diff (the view a diff opens in, the scrollbar's width, context lines later),
-  Notes (long lines, Google Drive sync), and the settings still to come (global shortcut, follow
-  the terminal) as they land. Same dialog component as the palette.
+  apply at once, `Esc` or a click outside closes it. Sections: Appearance (theme), Diff (the view
+  a diff opens in, the scrollbar's width, context lines later), Notes (long lines, Google Drive
+  sync), and the settings still to come (global shortcut, follow the terminal) as they land.
+  Same dialog component as the palette.
 
 ### Changes
 
@@ -156,6 +156,9 @@ Tabler's. What it settles:
 - When files last changed on the cards ("40s ago", pulsing while an agent writes). Without a
   watcher on every project (see Projects) it has no source for the projects not on screen, and
   it is not worth one.
+- Tabs at level 1, as a layout to choose instead of the tiles in the settings. Dropped on
+  2026-10-13: the tiles are enough, and one layout keeps the code, the settings and the
+  keyboard model simpler.
 - Long structured notes (a document with headings). They fit in a card for now; revisit if the
   need shows up in use.
 - A filter in the Files panel, and a flat list of results in it: `⌘K` is the search.
@@ -229,14 +232,14 @@ Evaluated on 2026-10-11.
 **Libraries compared**, on realistic components, minified, React excluded, each measured alone
 (kB gzip; the app's JS is 95 kB gzip today):
 
-| Library | Palette | Tabs | Tooltip |
-|---|---|---|---|
-| Base UI 1.8 | 42.0 | 14.5 | 33.8 |
-| Radix (one package each) + cmdk | 19.5 (cmdk) | 10.1 | 21.0 |
-| Headless UI 2.2 | 53.6 | 12.1 | none |
-| Ariakit 0.4 | 38.1 | 22.7 | 34.5 |
-| Ark UI 5.39 | 48.1 | 14.6 | 25.3 |
-| React Aria Components 1.22 | 56.0 | 34.6 | 21.7 |
+| Library | Palette | Tooltip |
+|---|---|---|
+| Base UI 1.8 | 42.0 | 33.8 |
+| Radix (one package each) + cmdk | 19.5 (cmdk) | 21.0 |
+| Headless UI 2.2 | 53.6 | none |
+| Ariakit 0.4 | 38.1 | 34.5 |
+| Ark UI 5.39 | 48.1 | 25.3 |
+| React Aria Components 1.22 | 56.0 | 21.7 |
 
 - **Positioning is the cost**: a tooltip, menu or select must stay attached to its trigger, flip
   at the window's edges and follow scrolling. Every library does it with a positioning engine
@@ -257,10 +260,9 @@ Evaluated on 2026-10-11.
   replace the engine, but WebKitGTK support is not confirmed (Safari has it since 26).
 
 Decided on 2026-10-12: Base UI (`@base-ui/react`, pinned to 1.8.0) for the palette, menus, selects
-and tooltips; tabs by hand (a few dozen lines with roving `tabindex`). None of it is in the first
-paint's chunk: each overlay comes with the code that first needs it (the project cards' menu with
-level 0), or loads once the window is idle after the first paint, so `⌘K` and the first hover are
-still instant.
+and tooltips. None of it is in the first paint's chunk: each overlay comes with the code that first
+needs it (the project cards' menu with level 0), or loads once the window is idle after the first
+paint, so `⌘K` and the first hover are still instant.
 
 ## Projects
 

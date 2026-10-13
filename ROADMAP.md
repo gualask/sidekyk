@@ -95,13 +95,14 @@ what needs measuring before deciding waits in **Performance review**, at the end
       (`settings.json`), applied at once. The backend creates the window in the stored theme
       and the page follows the window's (`prefers-color-scheme`), so the first paint is right
       without asking the backend. The dialog is a chunk of its own with Base UI's, fetched once
-      the window is idle. The other settings of the mock (project layout, the diff's default
-      view and scrollbar width, the notes' long lines and sync) join it with their features.
+      the window is idle. The other settings of the mock (the diff's default view and scrollbar
+      width, the notes' long lines and sync) join it with their features.
       Costs nothing hidden or shown; opening it reads the settings once per session
-- [ ] Semantic zoom, the rest of the mock: tabs (with the project layout setting), splitters and panels
-      minimized to the top bar (with Files and Notes), the zoom transitions (View Transitions,
-      once WebKitGTK support is checked). The open file is in the Changes tile's header already
-      (`header` in the panel contract), with the copy of the whole file as an icon
+- [ ] Semantic zoom, the rest of the mock: splitters and panels minimized to the top bar (with
+      Files and Notes), the zoom transitions (View Transitions, once WebKitGTK support is
+      checked). Level 1 has tiles only: no tabs (decided on 2026-10-13). The open file is in the
+      Changes tile's header already (`header` in the panel contract), with the copy of the whole
+      file as an icon
 - [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
       them a project switch that failed (today the list just goes back to the backend's)
 - [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;
