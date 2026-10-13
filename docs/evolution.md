@@ -307,8 +307,9 @@ paint, so `⌘K` and the first hover are still instant.
 - **File view**: read through the backend with a size limit, rendered with the virtualized rows of
   the diff view; a changed file uses the diff view itself, whole file with changes marked. Syntax
   highlighting comes with the item already on the roadmap (loaded lazily).
-- **Search by name**: in `⌘K`, fuzzy matching over the path list, in the frontend or with a
-  backend crate. The Files panel has no filter of its own.
+- **Search by name**: in `⌘K`, fuzzy matching over the path list in the backend, with
+  `nucleo-matcher` (decided on 2026-10-13, see Fuzzy matching). The Files panel has no filter of
+  its own.
 - **Search in contents**: in `⌘K` too, as a mode of the palette; in the backend, with `git grep`
   or ripgrep's crates, streaming results and cancellable when the query changes.
 - Each library is chosen at implementation time with pros and cons, per the dependency rule in
@@ -363,6 +364,28 @@ Design constraints for the implementation:
 - **Libraries** (OAuth, HTTP, credential store) are chosen at implementation time with pros and
   cons.
 
+## Fuzzy matching
+
+Decided on 2026-10-13: the palette's matching runs in the backend, with `nucleo-matcher` (Helix's
+matcher, MPL-2.0). The scoring must favour consecutive letters and word starts: letters scattered
+over a long path or note title match almost any query.
+
+- **`nucleo-matcher` 0.3**: fzf's scoring, a mode for paths (bonuses after `/` and at the start
+  of a file name), Unicode normalization, only `memchr` as dependency. Zed moved its file finder
+  and command palette to it in April 2026; nushell and Rerun use it too. Releases stopped in 2024,
+  the API is stable. MPL-2.0 is a per-file copyleft: fine in an MIT app as long as its files are
+  not modified; its notice goes with the binary.
+- **`frizbee` 0.13** (MIT): SIMD Smith-Waterman, about 4 times faster than nucleo in its own
+  benchmarks (1.4M Chromium paths: 22 ms against 90 ms), optional typo tolerance; television,
+  skim, fff and atuin moved to it. A breaking release a month in 2026 and one main maintainer;
+  no mode for paths.
+- **`fuzzy-matcher`** (skim's, MIT): the most downloaded, unmaintained since 2020. `fff-search`
+  is a whole file finder with its own index, in nightly releases.
+- Speed does not decide: a project has from hundreds to tens of thousands of paths, a few
+  milliseconds per key with nucleo (0.34 ms for 4,366 paths of Zed's clone). The ranking of paths
+  and a stable API do. The matcher sits behind `modules/search/rank.rs`, so changing it touches
+  one file.
+
 ## What changes in the rules
 
 When these land, `AGENTS.md` changes too:
@@ -376,9 +399,7 @@ When these land, `AGENTS.md` changes too:
 - Notes: format and granularity (one file per note is the natural unit, see Notes).
 - Sync: `drive.appdata` (hidden backup) or `drive.file` (files visible in Drive).
 - Sync: conflict strategy, and whether to encrypt notes before upload.
-- Explorer: fuzzy matching in the frontend or the backend; `git grep` or ripgrep's crates. The
-  scoring must favour consecutive letters and word starts (as VS Code does): letters scattered
-  over a long note title match almost any query.
+- Explorer: `git grep` or ripgrep's crates for the search in contents.
 - Quick capture of a note through a global shortcut.
 - Free canvas: revisit after semantic zoom has been used for a while.
 

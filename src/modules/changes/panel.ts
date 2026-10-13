@@ -1,5 +1,7 @@
 import { IconGitCompare } from '@tabler/icons-react';
-import { definePanel } from '@/shared/panels/panel';
+import { definePanel, type PanelTarget } from '@/shared/panels/panel';
+import { fileKey } from './model/file-groups';
+import type { ChangeArea } from './model/repository.types';
 
 export const changesPanel = definePanel({
     id: 'changes',
@@ -12,3 +14,8 @@ export const changesPanel = definePanel({
         pick: (module) => module.ChangesSummary,
     },
 });
+
+/** Asks the Changes panel to show a changed file, in one area. */
+export function changesTarget(file: { path: string; area: ChangeArea }): PanelTarget {
+    return { key: fileKey(file) };
+}

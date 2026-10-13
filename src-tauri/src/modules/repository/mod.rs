@@ -10,9 +10,11 @@ mod ports;
 mod snapshot;
 mod status;
 
+#[cfg(test)]
+pub(crate) use contracts::ChangeKind;
 pub(crate) use contracts::{
-    FileDiff, FileDiffRequest, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, REPOSITORY_CHANGED_EVENT,
+    ChangeArea, ChangedFile, FileDiff, FileDiffRequest, RepositoryChangedEvent, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary, REPOSITORY_CHANGED_EVENT,
 };
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::IgnoredPaths;

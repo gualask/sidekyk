@@ -31,6 +31,17 @@
     .seg-item {
         @apply cursor-default px-2.5 py-1 text-xs text-ui-text-muted outline-none select-none hover:text-ui-text-secondary focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset data-checked:bg-ui-accent-soft data-checked:font-semibold data-checked:text-ui-accent-on-soft;
     }
+    /* a modal dialog over the page (Base UI's Dialog): the settings, the command palette */
+    .dialog-backdrop {
+        @apply fixed inset-0 z-20 bg-[color-mix(in_srgb,var(--ui-bg)_55%,transparent)];
+    }
+    .dialog-popup {
+        @apply fixed left-1/2 z-20 max-h-[76vh] -translate-x-1/2 rounded-[14px] border border-ui-border-hover bg-ui-surface text-sm shadow-[0_24px_60px_var(--ui-shadow-soft)] outline-none;
+    }
+    /* the keys a dialog takes, along its bottom edge */
+    .dialog-foot {
+        @apply flex gap-3.5 border-t border-ui-border px-4 py-2.5 text-[11.5px] text-ui-text-muted;
+    }
     /* a menu's popup and its items (Base UI's Menu) */
     .menu-popup {
         @apply min-w-44 rounded-[10px] border border-ui-border-hover bg-ui-surface p-1 shadow-[0_12px_32px_var(--ui-shadow-soft)] outline-none;

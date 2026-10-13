@@ -12,9 +12,10 @@ use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
-    self, resolve_repository, IgnoredPaths, RepositoryBackend, RepositoryChangedEvent,
+    self, resolve_repository, ChangedFile, IgnoredPaths, RepositoryBackend, RepositoryChangedEvent,
     RepositoryInfo, RepositorySnapshot, RepositorySummary, REPOSITORY_CHANGED_EVENT,
 };
+use crate::modules::search::{self, SearchRequest, SearchResults};
 use crate::shared::coalesce::Coalesced;
 use crate::shared::error::unshare;
 use crate::shared::sync::lock;
@@ -65,6 +66,9 @@ pub(crate) struct ProjectsState {
     snapshots: PerProject<RepositorySnapshot>,
     /// Every project on screen asks for its summary at once.
     summaries: PerProject<RepositorySummary>,
+    /// The changed files of each project's last snapshot, which the palette searches without
+    /// running git. Only the project on screen has snapshots.
+    changed: Mutex<HashMap<String, Arc<[ChangedFile]>>>,
 }
 
 impl ProjectsState {
@@ -85,8 +89,31 @@ impl ProjectsState {
         root: &str,
     ) -> anyhow::Result<RepositorySnapshot> {
         let project = self.project(root)?;
-        self.snapshots
-            .run(root, || repository::load_snapshot(backend, &project))
+        self.snapshots.run(root, || {
+            let snapshot = repository::load_snapshot(backend, &project);
+            let mut changed = lock(&self.changed);
+            match &snapshot {
+                Ok(snapshot) => {
+                    changed.insert(root.to_string(), snapshot.files.as_slice().into());
+                }
+                // a repository moved away has nothing left to search
+                Err(_) => {
+                    changed.remove(root);
+                }
+            }
+            snapshot
+        })
+    }
+
+    /// The palette's matches: the projects, the panels the frontend names, and the changed
+    /// files of the project on screen as its last snapshot found them.
+    pub(crate) fn search(&self, request: &SearchRequest) -> SearchResults {
+        let list = self.list();
+        let files = list
+            .active()
+            .and_then(|active| lock(&self.changed).get(&active.root).cloned())
+            .unwrap_or_else(|| Arc::from([]));
+        search::search(request, &list.projects, &files)
     }
 
     /// A project's summary, sharing the one in flight.
@@ -122,6 +149,7 @@ impl ProjectsState {
         };
         self.snapshots.retain(&list);
         self.summaries.retain(&list);
+        lock(&self.changed).retain(|root, _| list.find(root).is_ok());
         watch_active(app);
         Ok(list)
     }

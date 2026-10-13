@@ -1,6 +1,6 @@
 import { IconArrowsMaximize } from '@tabler/icons-react';
 import { Suspense, useState } from 'react';
-import type { PanelDefinition } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -18,10 +18,13 @@ const HEADER =
 export function PanelTile({
     panel,
     project,
+    target = null,
     onZoomIn,
 }: {
     panel: PanelDefinition;
     project: ProjectInfo;
+    /** What the panel is asked to show, if anything. */
+    target?: PanelTarget | null;
     /** Shows the panel as a tile, whose header zooms into it; without it, the panel is full screen. */
     onZoomIn?: () => void;
 }) {
@@ -65,7 +68,12 @@ export function PanelTile({
             )}
             <div className="relative min-h-0 flex-1">
                 <Suspense fallback={null}>
-                    <panel.Component key={project.root} project={project} header={header} />
+                    <panel.Component
+                        key={project.root}
+                        project={project}
+                        header={header}
+                        target={target}
+                    />
                 </Suspense>
             </div>
         </section>

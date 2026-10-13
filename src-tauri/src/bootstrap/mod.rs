@@ -97,6 +97,7 @@ pub(crate) fn run() {
             tauri_commands::repository::get_repository_snapshot,
             tauri_commands::repository::get_repository_summary,
             tauri_commands::repository::get_file_diff,
+            tauri_commands::search::search,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
             tauri_commands::diagnostics::log_frontend_error,

@@ -3,6 +3,7 @@ export {
     useActivateProject,
     useProjects,
     useProjectsChangeSubscription,
+    useRemoveProject,
 } from './application/projects.queries';
 export {
     PROJECTS_CHANGED_EVENT,

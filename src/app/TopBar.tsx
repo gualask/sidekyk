@@ -1,10 +1,17 @@
-import { IconSettings } from '@tabler/icons-react';
+import { IconSearch, IconSettings } from '@tabler/icons-react';
+import { lazy, Suspense } from 'react';
 import { ProjectFacts } from '@/modules/changes';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { Problem } from './problems';
 import { useTitleBarOverlaid } from './providers';
 import type { ZoomLevel } from './workspace';
+
+/** Loaded with the first problem: most sessions have none. */
+const ProblemsButton = lazy(() =>
+    import('./ProblemsButton').then((module) => ({ default: module.ProblemsButton })),
+);
 
 /** A step of the breadcrumb: where you are, or a button back to it. */
 function Crumb({ onClick, children }: { onClick?: () => void; children: string }) {
@@ -27,22 +34,26 @@ function Crumb({ onClick, children }: { onClick?: () => void; children: string }
 }
 
 /**
- * The window's top bar: where you are (all projects, a project, a panel), the way back, and the
- * settings. On macOS it is also the title bar: the traffic lights sit in its first 78 pixels, and
- * its empty parts drag the window.
+ * The window's top bar: where you are (all projects, a project, a panel), the way back, the
+ * command palette, the problems that last, if any, and the settings. On macOS it is also the
+ * title bar: the traffic lights sit in its first 78 pixels, and its empty parts drag the window.
  */
 export function TopBar({
     level,
     project,
     panel,
+    problems,
     onZoom,
     onOpenSettings,
+    onOpenPalette,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
     panel: PanelDefinition;
+    problems: Problem[];
     onZoom: (level: ZoomLevel) => void;
     onOpenSettings: () => void;
+    onOpenPalette: () => void;
 }) {
     const overlaid = useTitleBarOverlaid();
     const separator = <span className="font-normal text-ui-text-muted">/</span>;
@@ -80,15 +91,32 @@ export function TopBar({
                 // a project's panels are on screen, Changes among them: its snapshot has the facts
                 <ProjectFacts project={project} fromSnapshot />
             ) : null}
-            <button
-                type="button"
-                className="btn-icon ml-auto h-7 w-7"
-                title={`Settings (${shortcutLabel(',')})`}
-                aria-label="Settings"
-                onClick={onOpenSettings}
-            >
-                <IconSettings size={16} />
-            </button>
+            <div className="ml-auto flex items-center gap-1.5">
+                <button
+                    type="button"
+                    className="flex h-[26px] items-center gap-1.5 rounded-[7px] border border-ui-border pr-1.5 pl-2 text-xs text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
+                    title="Go to a project, a panel or a changed file"
+                    aria-label="Go to"
+                    onClick={onOpenPalette}
+                >
+                    <IconSearch size={13} />
+                    <kbd className="kbd">{shortcutLabel('K')}</kbd>
+                </button>
+                {problems.length > 0 ? (
+                    <Suspense fallback={null}>
+                        <ProblemsButton problems={problems} />
+                    </Suspense>
+                ) : null}
+                <button
+                    type="button"
+                    className="btn-icon h-7 w-7"
+                    title={`Settings (${shortcutLabel(',')})`}
+                    aria-label="Settings"
+                    onClick={onOpenSettings}
+                >
+                    <IconSettings size={16} />
+                </button>
+            </div>
         </header>
     );
 }

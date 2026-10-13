@@ -1,11 +1,13 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { type QueryCache, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { hasErrorCode } from '@/shared/errors/app-error';
 import type { FileDiffRequest } from '../model/repository.types';
 import { useRepositoryPort } from './repository.port';
 
 /** Every query of a repository starts with its root, so a change on disk refetches only its own. */
 const repositoryKeys = {
-    of: (root: string) => ['repository', root] as const,
+    all: ['repository'] as const,
+    of: (root: string) => [...repositoryKeys.all, root] as const,
     snapshot: (root: string) => [...repositoryKeys.of(root), 'snapshot'] as const,
     summary: (root: string) => [...repositoryKeys.of(root), 'summary'] as const,
     diff: (root: string, request: FileDiffRequest) =>
@@ -62,6 +64,33 @@ export function useFileDiff(root: string, request: FileDiffRequest | null) {
         queryFn: () => (request ? port.getFileDiff(root, request) : null),
         enabled: request !== null,
     });
+}
+
+/** The roots whose last read failed as moved or deleted, joined by NUL (no path has one). */
+function missingRoots(cache: QueryCache): string {
+    const roots = new Set<string>();
+    for (const query of cache.findAll({ queryKey: repositoryKeys.all, type: 'all' })) {
+        if (
+            query.state.status === 'error' &&
+            hasErrorCode(query.state.error, 'repository_missing')
+        ) {
+            roots.add(query.queryKey[1] as string);
+        }
+    }
+    return [...roots].sort().join('\0');
+}
+
+/**
+ * The repositories found moved or deleted, from what was already read of them: nothing is
+ * fetched to know it. One reads well again, and it leaves the list.
+ */
+export function useMissingRepositories(): readonly string[] {
+    const cache = useQueryClient().getQueryCache();
+    const roots = useSyncExternalStore(
+        (onChange) => cache.subscribe(onChange),
+        () => missingRoots(cache),
+    );
+    return useMemo(() => (roots ? roots.split('\0') : []), [roots]);
 }
 
 /**

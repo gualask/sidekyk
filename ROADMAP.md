@@ -108,10 +108,28 @@ what needs measuring before deciding waits in **Performance review**, at the end
       Files and Notes). Level 1 has tiles only: no tabs (decided on 2026-10-13). The open file is
       in the Changes tile's header already (`header` in the panel contract), with the copy of the
       whole file as an icon
-- [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
-      them a project switch that failed (today the list just goes back to the backend's)
-- [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;
-      results virtualized (thousands of files), code loaded after the first paint
+- [x] Toasts for passing events and a top-bar list of lasting problems, each with its fix.
+      Toasts (Base UI's, bottom center, at most three) say what failed when nothing on screen
+      waits for it: adding, opening (a project switch) or removing a project. Information leaves
+      after 4 s, an error stays until closed, and the same message again refreshes the toast on
+      screen instead of stacking a copy. The problems come from what the app already read, with
+      no git of their own: today a repository moved or deleted, seen from any project and fixed by
+      removing it. The toaster is a chunk of its own fetched with the first toast, the problems'
+      popover with the first problem; the settings dialog keeps its errors inside it. Costs
+      nothing hidden, nothing shown while nothing fails; +2.2 kB on the first paint's chunk
+      (0.65 kB gzip), +25 kB in Base UI's chunk (fetched once the window is idle)
+- [x] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows, or the search button in the top
+      bar): projects, the panels of the project on screen, and its changed files, which open in
+      Changes full screen (`PanelProps.target`, the way Files and Notes will open what is picked).
+      Every key typed is ranked in the backend with `nucleo-matcher` (decided on 2026-10-13, see
+      docs/evolution.md, Fuzzy matching) over the changed paths of the last snapshot, with no git:
+      0.34 ms for the 4,366 paths of Zed's clone. At most 500 files come back, the rest counted;
+      the list is virtualized and the matched letters are bold. `Esc` empties the field, then
+      closes. The palette is a chunk of its own with Base UI's dialog and autocomplete, fetched
+      once the window is idle. Every project's files and the notes join with their features.
+      Costs nothing hidden, nothing shown until opened; +2.4 kB on the first paint's chunk
+      (0.75 kB gzip), +32 kB in Base UI's chunk (fetched once the window is idle), +199 KiB on
+      the release binary (the matcher with its Unicode case folding and normalization tables)
 - [x] Keyboard model of the mock: `↵`/`Esc` zoom (`Esc` leaves a field first; dialogs and menus
       keep their own keys), `1`-`9` open a panel full screen, `[`/`]` switch project (also typed
       with `⌥` or `AltGr`, as on Italian keyboards), the arrows move among the cards at level 0,
@@ -161,7 +179,8 @@ Before the explorer adds more git reads, so they all share the same limits.
 - [ ] File view through the backend, size-limited, on the virtualized rows of the diff view; a
       changed file shows the diff view's whole file with its changes, and links to Changes
 - [ ] Search by name (fuzzy) in `⌘K`, the active project's files first; opening one shows it
-      in the tree. No filter in the panel
+      in the tree. No filter in the panel. The ranking is there already (`modules/search`): it
+      needs the path list of every project, kept by the backend
 - [ ] Search in contents in `⌘K`, as a mode, in the backend (`git grep` or ripgrep's crates),
       streaming and cancellable
 

@@ -8,5 +8,6 @@ mod blocking;
 pub(crate) mod diagnostics;
 pub(crate) mod projects;
 pub(crate) mod repository;
+pub(crate) mod search;
 pub(crate) mod settings;
 pub(crate) mod state;

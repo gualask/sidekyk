@@ -1,23 +1,31 @@
 import { Suspense, useEffect, useState } from 'react';
-import { ChangeCount, useRepositoryChangeSubscription } from '@/modules/changes';
+import {
+    ChangeCount,
+    changesPanel,
+    changesTarget,
+    useRepositoryChangeSubscription,
+} from '@/modules/changes';
 import {
     activeProject,
     loadProjectsOverview,
     NoProjects,
     type ProjectList,
     ProjectRail,
+    useActivateProject,
     useProjects,
     useProjectsChangeSubscription,
 } from '@/modules/projects';
+import { loadCommandPalette, type PaletteActions } from '@/modules/search';
 import { loadSettingsDialog } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
-import type { PanelDefinition } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
 import { PanelTile } from './PanelTile';
-import { INITIAL_PANEL, SUMMARIES } from './panels';
+import { INITIAL_PANEL, PALETTE_PANELS, panelById, SUMMARIES } from './panels';
+import { useProblems } from './problems';
 import { TopBar } from './TopBar';
 import type { ZoomLevel } from './workspace';
 import { useWorkspaceKeys } from './workspace-keys';
@@ -25,6 +33,10 @@ import { useZoomGestures } from './zoom-gestures';
 
 const ProjectsOverview = preloadable(loadProjectsOverview, (module) => module.ProjectsOverview);
 const SettingsDialog = preloadable(loadSettingsDialog, (module) => module.SettingsDialog);
+const CommandPalette = preloadable(loadCommandPalette, (module) => module.CommandPalette);
+
+/** Without a project, the palette offers no panel. */
+const NO_PANELS: typeof PALETTE_PANELS = [];
 
 /** A project and its panels, at level 1 or full screen: the zoom carries it to and from its card. */
 const PROJECT_ZOOM = { viewTransitionName: ZOOM_NAMES.project };
@@ -38,19 +50,54 @@ export function AppShell() {
     const [level, setLevel] = useState<ZoomLevel>(1);
     // the panel full screen at level 2
     const [panel, setPanel] = useState(INITIAL_PANEL);
+    // what that panel was asked to show, such as a file picked in the palette
+    const [target, setTarget] = useState<PanelTarget | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
+    const problems = useProblems(projects.data);
     // what the first paint does not need waits until the window has nothing else to do
     const [idle, setIdle] = useState(false);
-    // null until first opened; then the dialog stays mounted, to give the focus back as it closes
+    // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
+    const [paletteOpen, setPaletteOpen] = useState<boolean | null>(null);
+    const activate = useActivateProject();
 
-    /** Every change of level goes through here, so it animates the same way everywhere. */
-    const zoom = (next: ZoomLevel, nextPanel = panel) => {
-        if (next === level && nextPanel === panel) return;
+    /**
+     * Every change of level goes through here, so it animates the same way everywhere. A target
+     * asks the panel full screen to show something; any other move leaves the panels as they are.
+     */
+    const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
+        if (next === level && nextPanel === panel) {
+            if (nextTarget) setTarget(nextTarget);
+            return;
+        }
         zoomTransition(() => {
             setLevel(next);
             setPanel(nextPanel);
+            setTarget(nextTarget);
         });
+    };
+
+    // one dialog at a time: the palette and the settings close each other
+    const togglePalette = () => {
+        setSettingsOpen((open) => (open ? false : open));
+        setPaletteOpen((open) => !open);
+    };
+    const toggleSettings = () => {
+        setPaletteOpen((open) => (open ? false : open));
+        setSettingsOpen((open) => !open);
+    };
+
+    const paletteActions: PaletteActions = {
+        // the project's panels, or the panel already full screen
+        openProject: (root) => {
+            activate(root);
+            if (level === 0) zoom(1);
+        },
+        openPanel: (id) => {
+            const next = panelById(id);
+            if (next) zoom(2, next);
+        },
+        openFile: (file) => zoom(2, changesPanel, changesTarget(file)),
     };
 
     const zoomIn = () => {
@@ -68,7 +115,8 @@ export function AppShell() {
         openPanel: (next) => {
             if (level > 0) zoom(2, next);
         },
-        toggleSettings: () => setSettingsOpen((open) => !open),
+        toggleSettings,
+        togglePalette,
     });
     useZoomGestures({
         // what is under the pointer zooms in as its own control would, so the zoom grows from it
@@ -88,6 +136,7 @@ export function AppShell() {
                 setIdle(true);
                 void ProjectsOverview.preload();
                 void SettingsDialog.preload();
+                void CommandPalette.preload();
                 for (const summary of SUMMARIES) void summary.preload();
             }),
         [],
@@ -99,8 +148,10 @@ export function AppShell() {
                 level={level}
                 project={project}
                 panel={panel}
+                problems={problems}
                 onZoom={zoom}
-                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenSettings={toggleSettings}
+                onOpenPalette={togglePalette}
             />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
@@ -113,6 +164,7 @@ export function AppShell() {
                         project={project}
                         level={level}
                         panel={panel}
+                        target={target}
                         zoom={zoom}
                         idle={idle}
                     />
@@ -121,6 +173,17 @@ export function AppShell() {
             {settingsOpen === null ? null : (
                 <Suspense fallback={null}>
                     <SettingsDialog.Component open={settingsOpen} onOpenChange={setSettingsOpen} />
+                </Suspense>
+            )}
+            {paletteOpen === null ? null : (
+                <Suspense fallback={null}>
+                    <CommandPalette.Component
+                        open={paletteOpen}
+                        onOpenChange={setPaletteOpen}
+                        projectName={project?.name ?? null}
+                        panels={project ? PALETTE_PANELS : NO_PANELS}
+                        actions={paletteActions}
+                    />
                 </Suspense>
             )}
         </div>
@@ -132,6 +195,7 @@ function Workspace({
     project,
     level,
     panel,
+    target,
     zoom,
     idle,
 }: {
@@ -139,6 +203,7 @@ function Workspace({
     project: ProjectInfo | null;
     level: ZoomLevel;
     panel: PanelDefinition;
+    target: PanelTarget | null;
     zoom: (level: ZoomLevel, panel?: PanelDefinition) => void;
     /** The first paint is done: the other projects' counts may load. */
     idle: boolean;
@@ -166,7 +231,7 @@ function Workspace({
     if (level === 2) {
         return (
             <div className="flex h-full" style={PROJECT_ZOOM}>
-                <PanelTile panel={panel} project={project} />
+                <PanelTile panel={panel} project={project} target={target} />
             </div>
         );
     }

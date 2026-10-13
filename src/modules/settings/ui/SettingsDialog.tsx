@@ -31,10 +31,10 @@ export function SettingsDialog({
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
-                <Dialog.Backdrop className="fixed inset-0 z-20 bg-[color-mix(in_srgb,var(--ui-bg)_55%,transparent)]" />
+                <Dialog.Backdrop className="dialog-backdrop" />
                 <Dialog.Popup
                     initialFocus={current}
-                    className="fixed top-[12vh] left-1/2 z-20 max-h-[76vh] w-[min(520px,calc(100vw-32px))] -translate-x-1/2 overflow-auto rounded-[14px] border border-ui-border-hover bg-ui-surface text-sm shadow-[0_24px_60px_var(--ui-shadow-soft)] outline-none"
+                    className="dialog-popup top-[12vh] w-[min(520px,calc(100vw-32px))] overflow-auto"
                 >
                     <div className="flex items-center gap-2 border-b border-ui-border py-3 pr-3 pl-4">
                         <Dialog.Title className="flex-1 text-[15px] font-bold">
@@ -66,7 +66,7 @@ export function SettingsDialog({
                             )}
                         </Setting>
                     </Section>
-                    <div className="flex gap-3.5 border-t border-ui-border px-4 py-2.5 text-[11.5px] text-ui-text-muted">
+                    <div className="dialog-foot">
                         <span>Changes apply at once</span>
                         <span>
                             <kbd className="kbd">Esc</kbd> close

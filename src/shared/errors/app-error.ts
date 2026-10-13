@@ -22,6 +22,11 @@ function isAppErrorPayload(error: unknown): error is AppErrorPayload {
     );
 }
 
+/** Whether a native command failed with this code. */
+export function hasErrorCode(error: unknown, code: string): boolean {
+    return isAppErrorPayload(error) && error.code === code;
+}
+
 export function errorMessage(error: unknown): string {
     if (isAppErrorPayload(error)) return USER_MESSAGES[error.code] ?? error.message;
     if (error instanceof Error) return error.message;

@@ -3,7 +3,9 @@
  * Change both sides together.
  */
 
-export type ChangeArea = 'staged' | 'unstaged' | 'untracked';
+import type { ChangeArea } from '@/shared/git/change-area';
+
+export type { ChangeArea };
 
 export type ChangeKind =
     | 'added'

@@ -2,7 +2,6 @@ import { Menu } from '@base-ui/react/menu';
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { errorMessage } from '@/shared/errors/app-error';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import {
@@ -56,7 +55,6 @@ export function ProjectsOverview({
     const add = useAddProject(onOpen);
     const remove = useRemoveProject();
     const activate = useActivateProject();
-    const failure = add.error ?? remove.error;
     // the card the zoom grows from: the one being opened, else the project on screen
     const [opening, setOpening] = useState<string | null>(null);
     const zoomed = opening ?? list.active;
@@ -68,11 +66,6 @@ export function ProjectsOverview({
 
     return (
         <section aria-label="All projects" className="h-full overflow-auto p-4">
-            {failure ? (
-                <p role="alert" className="mb-3 text-sm text-ui-danger">
-                    {errorMessage(failure)}
-                </p>
-            ) : null}
             <div
                 ref={grid}
                 className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4"

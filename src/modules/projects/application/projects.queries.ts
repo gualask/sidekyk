@@ -1,5 +1,6 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
+import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { ProjectList } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
 
@@ -21,6 +22,12 @@ function isLastChange(queryClient: QueryClient): boolean {
     return queryClient.isMutating({ mutationKey: projectsKey }) <= 1;
 }
 
+/** A project's name as the list on screen has it, for a message about a change to it. */
+function projectName(queryClient: QueryClient, root: string): string {
+    const list = queryClient.getQueryData<ProjectList>(projectsKey);
+    return list?.projects.find((project) => project.root === root)?.name ?? root;
+}
+
 export function useProjects() {
     const port = useProjectsPort();
     return useQuery({ queryKey: projectsKey, queryFn: () => port.getProjects() });
@@ -39,10 +46,14 @@ export function useProjectsChangeSubscription() {
     );
 }
 
-/** Asks for a folder and adds its repository; `onAdded` follows, unless the user cancelled. */
+/**
+ * Asks for a folder and adds its repository; `onAdded` follows, unless the user cancelled. A
+ * failure is a toast: the folder picker has closed, nothing on screen waits for it.
+ */
 export function useAddProject(onAdded: () => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
+    const showToast = useShowToast();
     return useMutation({
         ...projectsChange,
         mutationFn: () => port.addProject(),
@@ -51,17 +62,21 @@ export function useAddProject(onAdded: () => void) {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
             onAdded();
         },
+        onError: (error) => {
+            showToast(errorToast('Could not add the repository', error));
+        },
     });
 }
 
 /**
  * Shows a project at once; the backend catches up (it starts watching the repository). Showing
- * the project already on screen does nothing. A failure puts the list back as the backend has it
- * (the toasts will say why: the switch has already left the screen that asked for it).
+ * the project already on screen does nothing. A failure puts the list back as the backend has it,
+ * and a toast says why: the switch has already left the screen that asked for it.
  */
 export function useActivateProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
+    const showToast = useShowToast();
     const { mutate } = useMutation({
         ...projectsChange,
         mutationFn: (root: string) => port.activateProject(root),
@@ -74,7 +89,8 @@ export function useActivateProject() {
         onSuccess: (list) => {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
-        onError: () => {
+        onError: (error, root) => {
+            showToast(errorToast(`Could not open ${projectName(queryClient, root)}`, error));
             if (isLastChange(queryClient)) {
                 void queryClient.invalidateQueries({ queryKey: projectsKey });
             }
@@ -88,14 +104,19 @@ export function useActivateProject() {
     );
 }
 
+/** Forgets a project; its repository is left as it is. A failure is a toast. */
 export function useRemoveProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
+    const showToast = useShowToast();
     return useMutation({
         ...projectsChange,
         mutationFn: (root: string) => port.removeProject(root),
         onSuccess: (list) => {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+        },
+        onError: (error, root) => {
+            showToast(errorToast(`Could not remove ${projectName(queryClient, root)}`, error));
         },
     });
 }

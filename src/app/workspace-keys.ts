@@ -20,7 +20,8 @@ function isPlain(event: KeyboardEvent): boolean {
 /**
  * The workspace's keyboard: `↵` zooms in and `Esc` out (after leaving a field: `Esc` is
  * progressive), `1`-`9` open a panel full screen, `[` and `]` switch project, `⌘,` (`Ctrl+,`)
- * opens the settings. Keys a field, a dialog or a menu takes are left to it.
+ * opens the settings and `⌘K` (`Ctrl+K`) the command palette. Keys a field, a dialog or a menu
+ * takes are left to it.
  */
 export function useWorkspaceKeys({
     list,
@@ -28,12 +29,14 @@ export function useWorkspaceKeys({
     zoomOut,
     openPanel,
     toggleSettings,
+    togglePalette,
 }: {
     list: ProjectList | undefined;
     zoomIn: () => void;
     zoomOut: () => void;
     openPanel: (panel: PanelDefinition) => void;
     toggleSettings: () => void;
+    togglePalette: () => void;
 }) {
     const activate = useActivateProject();
 
@@ -42,6 +45,11 @@ export function useWorkspaceKeys({
         if (hasShortcutModifier(event) && !event.altKey && event.key === ',') {
             event.preventDefault();
             toggleSettings();
+            return;
+        }
+        if (hasShortcutModifier(event) && !event.altKey && event.key.toLowerCase() === 'k') {
+            event.preventDefault();
+            togglePalette();
             return;
         }
         if (event.key === 'Escape' && isField(event.target)) {

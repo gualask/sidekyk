@@ -36,15 +36,19 @@ cannot see.
 
 ### Directory map
 
-- `src/app/` — composition root: providers (`QueryClient`, runtime ports), the shell (top bar
-  with the breadcrumb and the settings' gear, the zoom levels, panel tiles), the keyboard and
-  the zoom gestures (see Zoom and keyboard), the list of panels (`panels.ts`). May depend on
-  everything.
+- `src/app/` — composition root: providers (`QueryClient`, runtime ports, the toasts), the shell
+  (top bar with the breadcrumb, the problems and the settings' gear, the zoom levels, panel
+  tiles), the keyboard and the zoom gestures (see Zoom and keyboard), the list of panels
+  (`panels.ts`). May depend on everything.
 - `src/modules/projects/` — the project list: port and queries, the project rail, level 0's
   cards (`ProjectsOverview`, a chunk of its own with Base UI's menu, fetched once the window is
   idle after the first paint), the screen shown before the first project.
 - `src/modules/settings/` — the settings: port and queries, and the dialog (a chunk of its own
   with Base UI's dialog and radio group, fetched once the window is idle after the first paint).
+- `src/modules/search/` — the command palette: port and query (the ranking is the backend's),
+  the rows it shows (`model/palette-rows.ts`), and the palette (a chunk of its own with Base UI's
+  dialog and autocomplete, fetched once the window is idle after the first paint). What it opens,
+  the app decides (`PaletteActions`).
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
   - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
@@ -59,8 +63,10 @@ cannot see.
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, the clipboard hook and
   copy icon, error messages, shortcut labels and modifiers (`⌘` or `Ctrl`,
   `platform/shortcut.ts`, from `platform/macos.ts`), which keys a field or an overlay takes
-  (`ui/keys.ts`), the zoom transition and preloadable lazy parts (`ui/`), the project type every
-  layer shares (`projects/project-info.ts`), and the panel contract (`panels/panel.ts`).
+  (`ui/keys.ts`), the toasts' port (`ui/toasts.ts`), the zoom transition and preloadable lazy
+  parts (`ui/`), the project type every layer shares (`projects/project-info.ts`), the change
+  areas and their labels (`git/change-area.ts`, for Changes and the palette), and the panel
+  contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
 ### Dependency rules
@@ -85,7 +91,10 @@ live in its component, so a panel that is not on screen runs none. The panel get
 (`PanelProps.header`), an element it fills through a portal with what is open in it and its actions:
 in a tile, after the panel's title; full screen, a header shown only while the panel puts something
 in it. A panel may also give a `summary`: its part of a project's card at level 0, a chunk of its
-own fetched with level 0.
+own fetched with level 0. The app can ask a panel to show something (`PanelProps.target`, a key in
+the panel's own terms that its module builds, such as `changesTarget` for a changed file): the
+command palette opens a file this way. Each request is a new object; without one, the panel stays
+as the user left it.
 
 ### Zoom and keyboard
 
@@ -101,6 +110,19 @@ projects, `⌘,` settings. A key that a field, a dialog or a menu takes is left 
 (`shared/ui/keys.ts`, which the Changes panel's `j`/`k` use too). `⌘`/`Ctrl`+scroll and the pinch
 are `app/zoom-gestures.ts`: the wheel listener exists only while the modifier is held, since a
 wheel listener that may cancel makes every scroll wait for the main thread.
+
+### Toasts and problems
+
+A passing event is a toast: a module calls `useShowToast()` (`shared/ui/toasts.ts`), today when a
+change to the project list fails, since the screen that asked for it may be gone. The app renders
+them (`app/providers/toasts.tsx`) with Base UI's toasts, a chunk loaded with the first one; the
+toasts that come while it loads wait in a queue (`toast-queue.ts`). A dialog that is open shows its
+own errors inside it, as the settings do.
+
+What stays wrong until fixed is a problem, in the top bar with its fix (`app/problems.ts`). The
+problems are read from the caches, never fetched: a repository whose last read failed with
+`repository_missing` (`useMissingRepositories` in the changes module, over the query cache), fixed
+by removing its project. The warning and its popover are a chunk loaded with the first problem.
 
 ### State
 
@@ -126,7 +148,7 @@ theme, or the devtools' emulation, and the setting is only kept.
 - `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Creates
   the window (`create: false` in `tauri.conf.json`) in the theme of the settings, restores the
   projects, and adds and shows the repository of the first CLI argument, if any.
-- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `settings.rs`, and
+- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `search.rs`, `settings.rs`, and
   `log_frontend_error` in `diagnostics.rs`) and `state.rs`, the one place that changes the project
   list and watches the project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At
   most one snapshot and one summary per project run at a time: requests that arrive during one share
@@ -134,6 +156,8 @@ theme, or the devtools' emulation, and the setting is only kept.
 - `modules/projects/` — the project list: adding, activating, removing, and a stored list made
   consistent. No Tauri.
 - `modules/settings/` — the settings and their defaults (`Settings`, `Theme`). No Tauri.
+- `modules/search/` — the command palette's ranking (`rank.rs`, over `nucleo-matcher`) and its
+  wire contracts. Pure: it gets what to search. No Tauri.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
   validation, the ignored-paths filter for watcher events, wire contracts. A repository moved or
   deleted after it was added fails its snapshot and diffs with `repository_missing`, before git
@@ -163,6 +187,17 @@ the slowest of them. A summary alone (`load_summary`) runs only steps 1 and 4, i
 builds the same summary from them, so a project's numbers do not depend on whether it is the one
 in the Changes panel. `backend_timings` (an ignored test, see `AGENTS.md`) measures the snapshot,
 the summary and a diff on any repository.
+
+### Search
+
+The palette calls `search` at every key typed, with the query and the panels' titles (the
+frontend defines the panels). The backend ranks, in groups, the projects' names, the panels'
+titles and the changed paths of the project on screen, which `state.rs` keeps from its last
+snapshot: no git runs for a search, and a snapshot that fails leaves nothing to search. With
+nothing typed, every project and panel come back in their order and no file. Each word of the
+query matches on its own, in any order, case ignored; the matched letters come back as UTF-16
+offsets, which the frontend draws in bold. At most 500 files are sent; the rest are counted.
+`backend_timings` measures a search over every tracked path of a repository.
 
 ### Diffs
 

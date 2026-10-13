@@ -12,9 +12,14 @@ const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
 
 /** The Changes panel: what changed in the project's working tree, file by file. */
-export function ChangesWorkspace({ project, header }: PanelProps) {
+export function ChangesWorkspace({ project, header, target }: PanelProps) {
     const snapshot = useRepositorySnapshot(project.root);
-    const [selectedKey, setSelectedKey] = useState<string | null>(null);
+    const [selectedKey, setSelectedKey] = useState<string | null>(target?.key ?? null);
+
+    // a file asked for from outside, such as the command palette (`changesTarget`)
+    useEffect(() => {
+        if (target) setSelectedKey(target.key);
+    }, [target]);
 
     const files = useMemo(() => orderedFiles(snapshot.data?.files ?? []), [snapshot.data]);
     // a file that left the list (committed, reverted) hands the selection to the first one

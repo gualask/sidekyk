@@ -15,7 +15,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 ## Commands
 
 - `pnpm tauri:dev`: the desktop app; its log is `sidekyk-dev.log` in the app's log directory (macOS: `~/Library/Logs/io.github.gualask.sidekyk/`).
-- `pnpm dev`: the frontend on fixtures, `http://localhost:1420/?dev=app&scenario=review|clean|no-repo|large` (`src/dev/`). Check UI changes there, in light and dark.
+- `pnpm dev`: the frontend on fixtures, `http://localhost:1420/?dev=app&scenario=review|clean|no-repo|large|problems` (`src/dev/`). Check UI changes there, in light and dark.
 - Checks: `pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm boundaries:check`; `cargo test`, `cargo fmt -- --check`, `cargo clippy --all-targets -- -D warnings`, all with `--manifest-path src-tauri/Cargo.toml`.
 - Backend timings: `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml backend_timings -- --ignored --nocapture`.
 - Before handing off, run every check that covers the change: zero errors, zero warnings.

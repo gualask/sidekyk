@@ -4,10 +4,12 @@ import { type ReactNode, useState } from 'react';
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
 import { RepositoryProvider } from '@/modules/changes';
 import { ProjectsProvider } from '@/modules/projects';
+import { SearchProvider } from '@/modules/search';
 import { SettingsProvider } from '@/modules/settings';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
 import { TitleBarProvider } from './title-bar';
+import { ToastsHost } from './toasts';
 
 export function AppProviders({
     children,
@@ -25,7 +27,9 @@ export function AppProviders({
                 <SettingsProvider value={runtime.settings}>
                     <ProjectsProvider value={runtime.projects}>
                         <RepositoryProvider value={runtime.repository}>
-                            {children}
+                            <SearchProvider value={runtime.search}>
+                                <ToastsHost>{children}</ToastsHost>
+                            </SearchProvider>
                         </RepositoryProvider>
                     </ProjectsProvider>
                 </SettingsProvider>

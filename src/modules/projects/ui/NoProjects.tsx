@@ -1,5 +1,4 @@
 import { IconFolderOpen, IconGitCommit } from '@tabler/icons-react';
-import { errorMessage } from '@/shared/errors/app-error';
 import { useAddProject } from '../application/projects.queries';
 
 /** What the app shows before the first repository is added. */
@@ -32,11 +31,6 @@ export function NoProjects({
                 <IconFolderOpen size={18} />
                 Add a repository
             </button>
-            {add.isError ? (
-                <p className="text-sm text-ui-danger" role="alert">
-                    {errorMessage(add.error)}
-                </p>
-            ) : null}
         </div>
     );
 }

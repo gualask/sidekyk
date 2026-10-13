@@ -1,13 +1,8 @@
+import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import type { ChangeArea, ChangedFile } from '../model/repository.types';
+import type { ChangedFile } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
-
-const AREA_LABEL: Record<ChangeArea, string> = {
-    unstaged: 'Not staged',
-    untracked: 'New file',
-    staged: 'Staged',
-};
 
 /**
  * The open file in the panel's header: its path, its area and counts, and the copy of the whole
@@ -34,7 +29,7 @@ export function FileHeader({
                     {path}
                 </span>
                 <span className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted">
-                    {AREA_LABEL[file.area]}
+                    {CHANGE_AREA_LABEL[file.area]}
                 </span>
                 <span className="shrink-0 text-[11.5px] font-normal">
                     <LineCounts

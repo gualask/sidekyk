@@ -121,9 +121,10 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_file_diff, load_snapshot, load_summary, resolve_repository, FileDiffRequest,
-        IgnoredPaths, RepositorySnapshot,
+        load_file_diff, load_snapshot, load_summary, resolve_repository, ChangeArea, ChangeKind,
+        ChangedFile, FileDiffRequest, IgnoredPaths, RepositorySnapshot,
     };
+    use crate::modules::search::{search, SearchRequest};
     use serde_json::json;
 
     fn git(root: &Path, args: &[&str]) {
@@ -338,8 +339,8 @@ mod tests {
         )
     }
 
-    /// Times the snapshot, the summary and the diff of the largest changed file on a real
-    /// repository:
+    /// Times the snapshot, the summary, the palette's search over every tracked path and the diff
+    /// of the largest changed file on a real repository:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
     #[test]
     #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
@@ -358,6 +359,34 @@ mod tests {
             "summary: {}",
             time(20, || {
                 load_summary(&backend, &repo.info).unwrap();
+            })
+        );
+
+        // the palette over every tracked path, as many as it will search once the explorer
+        // lists them all
+        let listed = backend
+            .git(Path::new(&repo.info.root), &["ls-files", "-z"])
+            .unwrap();
+        let tracked: Vec<ChangedFile> = String::from_utf8_lossy(&listed.stdout)
+            .split('\0')
+            .filter(|path| !path.is_empty())
+            .map(|path| ChangedFile {
+                path: path.to_string(),
+                orig_path: None,
+                area: ChangeArea::Unstaged,
+                kind: ChangeKind::Modified,
+                additions: None,
+                deletions: None,
+                binary: false,
+            })
+            .collect();
+        let palette: SearchRequest =
+            serde_json::from_value(json!({ "query": "srcmod", "panels": ["Changes"] })).unwrap();
+        println!(
+            "search over {} paths: {}",
+            tracked.len(),
+            time(20, || {
+                search(&palette, std::slice::from_ref(&repo.info), &tracked);
             })
         );
 

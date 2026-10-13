@@ -32,6 +32,9 @@ notify-debouncer-mini = "0.7"
 tracing = { version = "0.1", default-features = false, features = ["std", "release_max_level_info"] }
 # Text output only: no ANSI colors, no `env-filter` (and its regex engine), no `log` bridge.
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt"] }
+# The palette's fuzzy matching (fzf's scoring). Without `unicode-segmentation`, a match's indices
+# count code points, which `modules/search` turns into the frontend's UTF-16 offsets.
+nucleo-matcher = { version = "0.3", default-features = false, features = ["unicode-normalization", "unicode-casefold"] }
 
 [dev-dependencies]
 tempfile = "3"

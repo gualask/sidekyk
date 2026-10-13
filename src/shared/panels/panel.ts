@@ -2,6 +2,15 @@ import type { ComponentType } from 'react';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
 
+/**
+ * Something the app asks a panel to show, such as a file picked in the command palette. Each
+ * request is a new object, so asking twice for the same thing shows it twice.
+ */
+export interface PanelTarget {
+    /** What to show, in the panel's own terms (the panel's module builds it). */
+    key: string;
+}
+
 export interface PanelProps {
     project: ProjectInfo;
     /**
@@ -10,6 +19,8 @@ export interface PanelProps {
      * in it. Laid out as a row; null until it is mounted.
      */
     header: HTMLElement | null;
+    /** What to show, when the app asks for something; null leaves the panel as the user left it. */
+    target: PanelTarget | null;
 }
 
 /** What a panel's summary gets: the project of the card it is on. */
