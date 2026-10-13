@@ -26,7 +26,7 @@ export function ProjectRail({
             <button
                 type="button"
                 className="btn-icon h-[34px] w-[34px]"
-                title="All projects"
+                title="All projects (Esc)"
                 aria-label="All projects"
                 onClick={onShowAll}
             >

@@ -98,17 +98,29 @@ what needs measuring before deciding waits in **Performance review**, at the end
       the window is idle. The other settings of the mock (the diff's default view and scrollbar
       width, the notes' long lines and sync) join it with their features.
       Costs nothing hidden or shown; opening it reads the settings once per session
+- [x] Zoom transitions (View Transitions): a project grows from its card into its panels and
+      back, a panel from its tile to full screen; every change of level goes through one function
+      (`zoomTransition`). Without the API (older WebKitGTK) or with reduced motion, the level just
+      changes. Lazy parts render at once when their chunk is already loaded (`preloadable`), so a
+      transition never captures an empty frame. Costs nothing hidden or idle; shown, 320 ms of
+      compositing per zoom
 - [ ] Semantic zoom, the rest of the mock: splitters and panels minimized to the top bar (with
-      Files and Notes), the zoom transitions (View Transitions, once WebKitGTK support is
-      checked). Level 1 has tiles only: no tabs (decided on 2026-10-13). The open file is in the
-      Changes tile's header already (`header` in the panel contract), with the copy of the whole
-      file as an icon
+      Files and Notes). Level 1 has tiles only: no tabs (decided on 2026-10-13). The open file is
+      in the Changes tile's header already (`header` in the panel contract), with the copy of the
+      whole file as an icon
 - [ ] Toasts for passing events and a top-bar list of lasting problems, each with its fix; among
       them a project switch that failed (today the list just goes back to the backend's)
 - [ ] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows): projects, panels, files, notes;
       results virtualized (thousands of files), code loaded after the first paint
-- [ ] Keyboard model of the mock: `↵`/`Esc` zoom (progressive `Esc`), `1`-`3` panels, `[`/`]`
-      projects, `⌘`/`Ctrl`+scroll and pinch
+- [x] Keyboard model of the mock: `↵`/`Esc` zoom (`Esc` leaves a field first; dialogs and menus
+      keep their own keys), `1`-`9` open a panel full screen, `[`/`]` switch project (also typed
+      with `⌥` or `AltGr`, as on Italian keyboards), the arrows move among the cards at level 0,
+      which opens on the project on screen. `⌘`/`Ctrl`+scroll zooms on what is under the
+      pointer, with the wheel listened to only while the modifier is held, so scrolling never
+      waits for it. A trackpad pinch zooms through WebKit's gesture events on macOS; on Linux and
+      Windows it would need a wheel listener on every scroll, so it does not zoom there. To check
+      in the packaged app: the pinch in WKWebView. The arrows among tiles at level 1 come with
+      Files and Notes. +2.6 kB on the first paint's chunk (1 kB gzip)
 
 ## Next: see what the agent is doing
 
@@ -206,7 +218,9 @@ Before the explorer adds more git reads, so they all share the same limits.
       Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
       and the git-dir check, case included. On both, check that the page's `prefers-color-scheme`
       follows the window's theme, at startup and when the setting changes (WebKitGTK reads GTK's
-      `gtk-application-prefer-dark-theme`, WebView2 its preferred color scheme)
+      `gtk-application-prefer-dark-theme`, WebView2 its preferred color scheme). On Linux, which
+      WebKitGTK versions run the zoom transitions (WebKit enabled View Transitions by default in
+      February 2024)
 
 ## Performance review
 

@@ -1,6 +1,6 @@
 export { type ProjectsPort, ProjectsProvider } from './application/projects.port';
 export {
-    activeProject,
+    useActivateProject,
     useProjects,
     useProjectsChangeSubscription,
 } from './application/projects.queries';
@@ -9,6 +9,7 @@ export {
     type ProjectList,
     type ProjectsChangedEvent,
 } from './model/project.types';
+export { activeProject, neighbourProject } from './model/project-list';
 export { NoProjects } from './ui/NoProjects';
 export { ProjectRail } from './ui/ProjectRail';
 

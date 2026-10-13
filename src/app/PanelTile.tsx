@@ -2,6 +2,7 @@ import { IconArrowsMaximize } from '@tabler/icons-react';
 import { Suspense, useState } from 'react';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
 
 /** A panel's header row, in a tile or full screen. */
@@ -31,6 +32,9 @@ export function PanelTile({
         <section
             aria-label={panel.title}
             data-panel={panel.id}
+            // a tile zooms in on itself under the pointer (⌘+scroll), and grows to full screen
+            data-zoom={onZoomIn ? '' : undefined}
+            style={{ viewTransitionName: ZOOM_NAMES.panel(panel.id) }}
             className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-ui-surface ${
                 onZoomIn
                     ? 'rounded-xl border border-ui-border shadow-[0_1px_2px_var(--ui-shadow-soft)]'
@@ -47,6 +51,7 @@ export function PanelTile({
                     <div ref={setHeader} className="contents" />
                     <button
                         type="button"
+                        data-zoom-in
                         className="btn-icon ml-auto h-[26px] w-[26px]"
                         title={`Zoom into ${panel.title} (${shortcut})`}
                         aria-label={`Zoom into ${panel.title}`}

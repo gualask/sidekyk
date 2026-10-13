@@ -1,6 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
-import type { ProjectInfo } from '@/shared/projects/project-info';
 import type { ProjectList } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
 
@@ -38,11 +37,6 @@ export function useProjectsChangeSubscription() {
             }),
         [port, queryClient],
     );
-}
-
-/** The project on screen, from a list the backend keeps consistent. */
-export function activeProject(list: ProjectList): ProjectInfo | null {
-    return list.projects.find((project) => project.root === list.active) ?? null;
 }
 
 /** Asks for a folder and adds its repository; `onAdded` follows, unless the user cancelled. */

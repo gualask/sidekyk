@@ -37,3 +37,14 @@ body {
     color: var(--ui-text);
     overflow: hidden;
 }
+
+/* Zoom transitions (View Transitions, see `shared/ui/zoom-transition.ts`): a project grows from
+   its card and a panel from its tile; the rest fades. */
+::view-transition-group(*) {
+    animation-duration: 320ms;
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+    animation-duration: 200ms;
+}

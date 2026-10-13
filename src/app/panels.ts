@@ -13,6 +13,11 @@ export const SUMMARIES = PANELS.flatMap((panel) =>
     panel.summary ? [{ id: panel.id, ...panel.summary }] : [],
 );
 
+/** The panel a key opens full screen (`1`, `2`, …), if any. */
+export function panelForKey(key: string): PanelDefinition | undefined {
+    return /^[1-9]$/.test(key) ? PANELS[Number(key) - 1] : undefined;
+}
+
 /** The key that opens a panel, named in its tooltips. */
 export function panelShortcut(panel: PanelDefinition): string {
     return String(PANELS.indexOf(panel) + 1);

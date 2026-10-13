@@ -1,5 +1,6 @@
-import { type ComponentType, type LazyExoticComponent, lazy } from 'react';
+import type { ComponentType } from 'react';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { preloadable } from '@/shared/ui/preloadable';
 
 export interface PanelProps {
     project: ProjectInfo;
@@ -30,7 +31,7 @@ export interface PanelDefinition {
      * it, so a panel that is not on screen runs none. It is mounted again for another project, so
      * its state (a selection, a scroll position) always belongs to the project it shows.
      */
-    Component: LazyExoticComponent<ComponentType<PanelProps>>;
+    Component: ComponentType<PanelProps>;
     /** Starts loading the chunk ahead of the first show, for the panel the app opens on. */
     preload: () => Promise<unknown>;
     /**
@@ -38,7 +39,7 @@ export interface PanelDefinition {
      * A chunk of its own, loaded with level 0; it fetches only what the card shows.
      */
     summary?: {
-        Component: LazyExoticComponent<ComponentType<PanelSummaryProps>>;
+        Component: ComponentType<PanelSummaryProps>;
         preload: () => Promise<unknown>;
     };
 }
@@ -47,13 +48,6 @@ export interface PanelDefinition {
 interface LazyPart<M, P> {
     load: () => Promise<M>;
     pick: (module: M) => ComponentType<P>;
-}
-
-function lazyPart<M, P>({ load, pick }: LazyPart<M, P>) {
-    return {
-        Component: lazy(() => load().then((module) => ({ default: pick(module) }))),
-        preload: load,
-    };
 }
 
 /** Builds a panel whose component, and summary if any, are loaded on their first show. */
@@ -68,7 +62,7 @@ export function definePanel<M, S = never>({
     }): PanelDefinition {
     return {
         ...panel,
-        ...lazyPart({ load, pick }),
-        summary: summary ? lazyPart(summary) : undefined,
+        ...preloadable(load, pick),
+        summary: summary ? preloadable(summary.load, summary.pick) : undefined,
     };
 }

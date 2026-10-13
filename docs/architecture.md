@@ -37,8 +37,9 @@ cannot see.
 ### Directory map
 
 - `src/app/` — composition root: providers (`QueryClient`, runtime ports), the shell (top bar
-  with the breadcrumb and the settings' gear, the zoom levels, panel tiles, `⌘,`), the list of
-  panels (`panels.ts`). May depend on everything.
+  with the breadcrumb and the settings' gear, the zoom levels, panel tiles), the keyboard and
+  the zoom gestures (see Zoom and keyboard), the list of panels (`panels.ts`). May depend on
+  everything.
 - `src/modules/projects/` — the project list: port and queries, the project rail, level 0's
   cards (`ProjectsOverview`, a chunk of its own with Base UI's menu, fetched once the window is
   idle after the first paint), the screen shown before the first project.
@@ -57,8 +58,9 @@ cannot see.
   traffic lights overlay the top bar, which full screen turns off).
 - `src/shared/` — stable primitives: theme tokens, button/chip primitives, the clipboard hook and
   copy icon, error messages, shortcut labels and modifiers (`⌘` or `Ctrl`,
-  `platform/shortcut.ts`, from `platform/macos.ts`), the project type every layer shares
-  (`projects/project-info.ts`), and the panel contract (`panels/panel.ts`).
+  `platform/shortcut.ts`, from `platform/macos.ts`), which keys a field or an overlay takes
+  (`ui/keys.ts`), the zoom transition and preloadable lazy parts (`ui/`), the project type every
+  layer shares (`projects/project-info.ts`), and the panel contract (`panels/panel.ts`).
 - `src/dev/` — browser fixtures (`?dev=app&scenario=…`), loaded lazily and only in dev builds.
 
 ### Dependency rules
@@ -84,6 +86,21 @@ live in its component, so a panel that is not on screen runs none. The panel get
 in a tile, after the panel's title; full screen, a header shown only while the panel puts something
 in it. A panel may also give a `summary`: its part of a project's card at level 0, a chunk of its
 own fetched with level 0.
+
+### Zoom and keyboard
+
+`AppShell` owns the zoom level and the panel full screen; every change of level goes through its
+`zoom`, which runs it inside a view transition (`shared/ui/zoom-transition.ts`): the project and
+its card share one `view-transition-name`, a panel's tile and its full screen another, so the zoom
+grows one into the other. Level 0, the settings dialog and the panels are `preloadable` parts
+(`shared/ui/preloadable.ts`): once their chunk is loaded they render at once, where `lazy` would
+suspend for a frame and the transition would capture an empty screen.
+
+The keys are one listener (`app/workspace-keys.ts`): `↵`/`Esc` zoom, `1`-`9` panels, `[`/`]`
+projects, `⌘,` settings. A key that a field, a dialog or a menu takes is left to it
+(`shared/ui/keys.ts`, which the Changes panel's `j`/`k` use too). `⌘`/`Ctrl`+scroll and the pinch
+are `app/zoom-gestures.ts`: the wheel listener exists only while the modifier is held, since a
+wheel listener that may cancel makes every scroll wait for the main thread.
 
 ### State
 
