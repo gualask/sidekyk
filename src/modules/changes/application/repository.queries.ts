@@ -31,17 +31,24 @@ export function useRepositorySnapshot(root: string) {
 /**
  * A repository at a glance, for every project on screen. `fromSnapshot` says the Changes panel
  * shows it: its snapshot then brings the summary, and the summary is never fetched on its own.
+ * `freshOnShow` reads it again each time the component shows, as the cards of all projects do.
  *
- * A summary is kept until something says it changed: the watcher, for the project on screen, or
- * the window coming back to the front, when an agent may have worked on any project meanwhile.
+ * A summary is kept until something says it changed: the watcher, for the project on screen; the
+ * window coming back to the front, when an agent may have worked on any project meanwhile; or the
+ * cards of all projects showing. The other projects are not watched: nothing runs for them while
+ * nobody looks.
  */
-export function useRepositorySummary(root: string, { fromSnapshot = false } = {}) {
+export function useRepositorySummary(
+    root: string,
+    { fromSnapshot = false, freshOnShow = false } = {},
+) {
     const port = useRepositoryPort();
     return useQuery({
         queryKey: repositoryKeys.summary(root),
         queryFn: () => port.getSummary(root),
         enabled: !fromSnapshot,
         staleTime: Number.POSITIVE_INFINITY,
+        refetchOnMount: freshOnShow ? 'always' : true,
         refetchOnWindowFocus: 'always',
     });
 }

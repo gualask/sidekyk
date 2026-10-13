@@ -24,8 +24,10 @@ project list. Only the project on screen is watched; the others cost nothing unt
 
 The other projects show their summary (`get_repository_summary`: status and one numstat against
 HEAD, new files not read) on the rail and on the level 0 cards. It is fetched once the first
-paint is done, and again when the window comes to the front: an agent may have worked on any
-project while the user was away. Nothing refreshes it while the window stays in front.
+paint is done, again when the window comes to the front (an agent may have worked on any
+project while the user was away), and again each time level 0 shows, for its cards and with
+them the rail. The projects not on screen are not watched: nothing refreshes them while the
+window stays in front on another view.
 
 The snapshot also refetches when the window regains focus, as a safety net for changes the watcher
 cannot see.

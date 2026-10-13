@@ -26,7 +26,7 @@ Three fixed levels, with animated transitions that give the feeling of zooming:
 
 | Level | Shows |
 |---|---|
-| 0, all projects | One card per project: changes in progress, last activity, a glimpse of the notes. It doubles as the project switcher |
+| 0, all projects | One card per project: changes in progress, a glimpse of the notes. It doubles as the project switcher |
 | 1, a project | Its panels (Changes, Files, Notes, …) as tiles or tabs |
 | 2, one panel | A single panel full screen, as the app is today |
 
@@ -58,7 +58,7 @@ Tabler's. What it settles:
 - **Project rail** on the left of a project: the "all projects" button first, then one avatar per
   project with its change count, so switching does not need a trip to level 0.
 - **Level 0 cards**: branch, changed files with line counts (of tracked files, see Projects),
-  when files last changed (pulsing while an agent writes), and how many notes wait, with the
+  and how many notes wait, with the
   newest. A card's ⋯ menu removes the project from Sidekyk, as a note's removes the note; its
   repository is left as it is. "+ Add a repository", the last card, adds one. Removing asks
   nothing and loses nothing while a project is only its repository; once notes belong to
@@ -152,7 +152,10 @@ Tabler's. What it settles:
 ### Not taken
 
 - Naming the agent at work ("Claude Code · 40s ago", in the first version). Sidekyk sees file
-  changes, not who made them: cards show when files last changed.
+  changes, not who made them.
+- When files last changed on the cards ("40s ago", pulsing while an agent writes). Without a
+  watcher on every project (see Projects) it has no source for the projects not on screen, and
+  it is not worth one.
 - Long structured notes (a document with headings). They fit in a card for now; revisit if the
   need shows up in use.
 - A filter in the Files panel, and a flat list of results in it: `⌘K` is the search.
@@ -270,11 +273,21 @@ still instant.
   window comes to the front, never while idle. The snapshot builds the same summary, so a project
   shows the same numbers wherever it is; lines are those of tracked files, new files count as
   files only. Counting new files' lines would mean reading them for every project on screen.
-- Still to come: a light watcher for the projects not on screen, marking "something changed"
-  without running git; the mark shows on the rail and the cards, and a marked project's summary
-  is fetched again while it is on screen. FSEvents (macOS) and Windows watch a whole tree with one
-  handle and cost close to nothing; inotify (Linux) needs one watch per directory, so several
-  large projects can reach the per-user limit: measure it there before watching every project.
+- Decided on 2026-10-13: the projects not on screen are not watched. Level 0 is where one
+  chooses a project knowingly, or sees which ones have changes; nobody watches it for changes in
+  real time. So the cards read their summaries again each time level 0 shows (measured on the
+  ten repositories in `~/Dev`: about 65 ms in parallel, 0.4 s of CPU), which also refreshes the
+  counts on the rail, and nothing runs for those projects otherwise.
+- Why not a watcher on every project: FSEvents (macOS) and Windows watch a whole tree with one
+  handle and cost close to nothing, but inotify (Linux) needs one watch per directory, and
+  `notify`'s recursive mode watches them all, ignored ones included: about 33,000 directories
+  for those ten repositories (47,000 following links), against about 670 that git does not
+  ignore. The limit is per user and shared with the editors, and was 8,192 before Linux 5.11.
+  Watching only the directories not ignored would make it light, but it is Linux-only code to
+  write and test for numbers that change while nobody looks. Knowing only that "something
+  changed" needs the same watches, so it is not cheaper. Revisit if real-time cards are missed
+  in use; the Linux watcher of the project on screen needs the same work anyway (`ROADMAP.md`,
+  Release).
 - Query caches of inactive projects expire (`gcTime`), so memory does not grow with the number of
   projects.
 

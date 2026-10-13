@@ -77,11 +77,11 @@ what needs measuring before deciding waits in **Performance review**, at the end
       refreshed. Switching shows the project at once, and quick switches end on the last one
       clicked (changes to the list run in order, front and back). A repository moved or deleted
       says so in its panels (`repository_missing`). Costs nothing for the projects not on screen
-- [ ] A light watcher for the projects not on screen, marking changes without running git, with
-      the mark on the rail and the level 0 cards, and when files last changed on the cards (the
-      mock's pulsing chip); a marked project's summary is fetched again while it is on screen,
-      instead of waiting for the window to come to the front. Measure inotify's watch count on
-      Linux first
+- [x] All projects up to date when looked at: the level 0 cards read their summaries again each
+      time level 0 shows (about 65 ms for ten projects in parallel, 0.4 s of CPU), which also
+      refreshes the counts on the rail. Decided on 2026-10-13 instead of a light watcher for every
+      project (docs/evolution.md, Projects): level 0 is for choosing a project, not for watching
+      them all. Costs nothing hidden, nothing while idle
 - [x] Shell of the approved mock, first part: top bar with the breadcrumb (overlay title bar on
       macOS, the traffic lights in it, room for them only when they show: not in full screen),
       project rail, level 0 cards with "+ Add a repository" and the ⋯ menu, level 1 tiles and
@@ -164,8 +164,8 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Then: all projects at a glance
 
-- [ ] Semantic zoom level 0: one card per project (changes in progress, last activity, notes),
-      doubling as the project switcher
+- [ ] Semantic zoom level 0: one card per project (changes in progress, notes), doubling as the
+      project switcher
 
 ## Then: feedback to the agent
 
@@ -197,7 +197,11 @@ Before the explorer adds more git reads, so they all share the same limits.
 - [ ] Signed release builds and self-update (as in Fyler); the update check runs at startup or on
       demand, never on a timer
 - [ ] Linux and Windows testing of the packaged app. On Linux, inotify needs one watch per
-      directory: do not watch ignored directories, and handle the `max_user_watches` limit. On
+      directory, and `notify`'s recursive mode watches them all, ignored ones and links
+      included: one watch per directory not ignored instead, added as directories appear (about
+      670 for the ten repositories in `~/Dev` against 33,000 to 47,000; `clean-flow` alone has
+      8,222, past the 8,192 of older kernels). Handle the `max_user_watches` limit, shared with
+      the user's editors: a watch that fails must not fail the whole project. On
       Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
       and the git-dir check, case included. On both, check that the page's `prefers-color-scheme`
       follows the window's theme, at startup and when the setting changes (WebKitGTK reads GTK's

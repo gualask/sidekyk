@@ -7,10 +7,11 @@ import { LineCounts } from './LineCounts';
 
 /**
  * What Changes tells about a project on its card at all projects: how many files changed, the
- * branch, the lines, and the first files. Loaded with level 0.
+ * branch, the lines, and the first files. Loaded with level 0, and read again each time it shows,
+ * since all projects is where one looks for the projects with changes.
  */
 export function ChangesSummary({ project }: PanelSummaryProps) {
-    const summary = useRepositorySummary(project.root);
+    const summary = useRepositorySummary(project.root, { freshOnShow: true });
     if (summary.isError) {
         return <p className="text-xs text-ui-danger">{errorMessage(summary.error)}</p>;
     }
