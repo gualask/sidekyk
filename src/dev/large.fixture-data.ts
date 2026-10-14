@@ -37,7 +37,8 @@ const BRANCH = {
 };
 
 export function largeSnapshot(): RepositorySnapshot {
-    return { files: FILES, summary: fixtureSummary(BRANCH, FILES) };
+    // as if git listed more changes than the backend reads: shows the notice and the `+` counts
+    return { files: FILES, summary: { ...fixtureSummary(BRANCH, FILES), truncated: true } };
 }
 
 let diffText: string | null = null;

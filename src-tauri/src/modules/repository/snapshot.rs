@@ -17,6 +17,16 @@ const MAX_UNTRACKED_FILE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_UNTRACKED_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNTRACKED_FILES_READ: usize = 2_000;
 
+/// At most this many changed paths are listed, as VS Code's `git.statusLimit`: past it, an
+/// unignored `node_modules` or build folder would fill the list and the payload for nothing.
+const MAX_CHANGED_PATHS: usize = 10_000;
+
+/// Output read from `git status` and from a numstat, well past what `MAX_CHANGED_PATHS` paths
+/// take (about 150 bytes each in `git status`), so that git is killed rather than read to the
+/// end when the paths are many more.
+const MAX_STATUS_BYTES: usize = 8 * 1024 * 1024;
+const MAX_NUMSTAT_BYTES: usize = 4 * 1024 * 1024;
+
 /// How many changed paths a summary lists: a card shows them, then how many more there are.
 const SUMMARY_FILES: usize = 3;
 
@@ -27,16 +37,20 @@ fn by_path(counts: Vec<LineCounts>) -> CountsByPath {
 }
 
 /// The counts of two areas of the same paths, added up path by path.
-fn added_up(mut first: CountsByPath, second: CountsByPath) -> CountsByPath {
-    for (path, counts) in second {
-        let sum = first.entry(path).or_default();
+fn added_up(first: Numstat, second: Numstat) -> Numstat {
+    let mut counts = first.counts;
+    for (path, more) in second.counts {
+        let sum = counts.entry(path).or_default();
         *sum = Counts {
-            additions: add_options(sum.additions, counts.additions),
-            deletions: add_options(sum.deletions, counts.deletions),
-            binary: sum.binary || counts.binary,
+            additions: add_options(sum.additions, more.additions),
+            deletions: add_options(sum.deletions, more.deletions),
+            binary: sum.binary || more.binary,
         };
     }
-    first
+    Numstat {
+        counts,
+        truncated: first.truncated || second.truncated,
+    }
 }
 
 fn add_options(a: Option<u32>, b: Option<u32>) -> Option<u32> {
@@ -46,8 +60,9 @@ fn add_options(a: Option<u32>, b: Option<u32>) -> Option<u32> {
     }
 }
 
-fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Vec<u8>> {
-    git_checked(
+/// `git status`, with at most `MAX_CHANGED_PATHS` entries.
+fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<StatusReport> {
+    let out = git_checked(
         backend,
         root,
         &[
@@ -58,7 +73,16 @@ fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Vec<u8
             "--untracked-files=all",
         ],
         &[0],
-    )
+        MAX_STATUS_BYTES,
+    )?;
+    let mut report = parse_porcelain_v2(&out.stdout);
+    if out.truncated {
+        // the output was cut anywhere, maybe in the last entry
+        report.entries.pop();
+    }
+    report.truncated = out.truncated || report.entries.len() > MAX_CHANGED_PATHS;
+    report.entries.truncate(MAX_CHANGED_PATHS);
+    Ok(report)
 }
 
 fn join<T>(handle: std::thread::ScopedJoinHandle<'_, anyhow::Result<T>>) -> anyhow::Result<T> {
@@ -67,14 +91,30 @@ fn join<T>(handle: std::thread::ScopedJoinHandle<'_, anyhow::Result<T>>) -> anyh
         .unwrap_or_else(|_| Err(anyhow::anyhow!("git thread panicked")))
 }
 
+/// The line counts of one numstat, by path.
+struct Numstat {
+    counts: CountsByPath,
+    /// The output was cut: some paths have no counts.
+    truncated: bool,
+}
+
 fn numstat(
     backend: &dyn RepositoryBackend,
     root: &Path,
     extra: &[&str],
-) -> anyhow::Result<Vec<LineCounts>> {
+) -> anyhow::Result<Numstat> {
     let mut args = vec!["diff", "--numstat", "-z", "--no-ext-diff"];
     args.extend_from_slice(extra);
-    Ok(parse_numstat_z(&git_checked(backend, root, &args, &[0])?))
+    let out = git_checked(backend, root, &args, &[0], MAX_NUMSTAT_BYTES)?;
+    let mut counts = parse_numstat_z(&out.stdout);
+    if out.truncated {
+        // the output was cut anywhere, maybe in the last record
+        counts.pop();
+    }
+    Ok(Numstat {
+        counts: by_path(counts),
+        truncated: out.truncated,
+    })
 }
 
 /// What is left of the untracked reading limits during one snapshot.
@@ -145,8 +185,8 @@ fn kind_against_head(entry: &StatusEntry) -> ChangeKind {
 
 /// The summary of `status`, where `tracked` holds the line counts of tracked paths against HEAD.
 /// New files are listed and counted as files, their lines unread.
-fn summarize(status: &StatusReport, tracked: &CountsByPath) -> RepositorySummary {
-    let (additions, deletions) = sum(tracked.values().copied());
+fn summarize(status: &StatusReport, tracked: &Numstat) -> RepositorySummary {
+    let (additions, deletions) = sum(tracked.counts.values().copied());
     let paths: HashSet<&str> = status.entries.iter().map(|e| e.path.as_str()).collect();
     let files = status
         .entries
@@ -156,7 +196,7 @@ fn summarize(status: &StatusReport, tracked: &CountsByPath) -> RepositorySummary
             let counts = if entry.unstaged == Some(ChangeKind::Untracked) {
                 Counts::default()
             } else {
-                tracked.get(&entry.path).copied().unwrap_or_default()
+                tracked.counts.get(&entry.path).copied().unwrap_or_default()
             };
             SummaryFile {
                 path: entry.path.clone(),
@@ -175,6 +215,7 @@ fn summarize(status: &StatusReport, tracked: &CountsByPath) -> RepositorySummary
             deletions,
         },
         files,
+        truncated: status.truncated || tracked.truncated,
     }
 }
 
@@ -194,15 +235,15 @@ pub(crate) fn load_snapshot(
         let status = status(backend, root);
         (status, join(unstaged), join(staged), join(against_head))
     });
-    let status = parse_porcelain_v2(&status?);
-    let unstaged = by_path(unstaged?);
-    let staged = by_path(staged?);
+    let status = status?;
+    let unstaged = unstaged?;
+    let staged = staged?;
 
     let mut files = Vec::new();
     let mut budget = UntrackedBudget::new();
     for entry in &status.entries {
         if let Some(kind) = entry.staged {
-            let counts = staged.get(&entry.path).copied().unwrap_or_default();
+            let counts = staged.counts.get(&entry.path).copied().unwrap_or_default();
             files.push(changed_file(entry, ChangeArea::Staged, kind, counts));
         }
         match entry.unstaged {
@@ -216,7 +257,11 @@ pub(crate) fn load_snapshot(
                 ));
             }
             Some(kind) => {
-                let counts = unstaged.get(&entry.path).copied().unwrap_or_default();
+                let counts = unstaged
+                    .counts
+                    .get(&entry.path)
+                    .copied()
+                    .unwrap_or_default();
                 files.push(changed_file(entry, ChangeArea::Unstaged, kind, counts));
             }
             None => {}
@@ -226,7 +271,7 @@ pub(crate) fn load_snapshot(
     // Against HEAD a line edited, staged, then edited again counts once. Before the first commit
     // there is no HEAD, and the staged and unstaged counts are added up instead.
     let tracked = if status.branch.commit.is_some() {
-        by_path(against_head?)
+        against_head?
     } else {
         added_up(staged, unstaged)
     };
@@ -248,14 +293,14 @@ pub(crate) fn load_summary(
         let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
         (status(backend, root), join(against_head))
     });
-    let status = parse_porcelain_v2(&status?);
+    let status = status?;
     let tracked = if status.branch.commit.is_some() {
-        by_path(against_head?)
+        against_head?
     } else {
         // before the first commit (rare): what is staged plus what is not, one after the other
         added_up(
-            by_path(numstat(backend, root, &["--cached"])?),
-            by_path(numstat(backend, root, &[])?),
+            numstat(backend, root, &["--cached"])?,
+            numstat(backend, root, &[])?,
         )
     };
     Ok(summarize(&status, &tracked))
@@ -272,7 +317,7 @@ mod tests {
     }
 
     impl RepositoryBackend for FakeFiles {
-        fn git(&self, _cwd: &Path, _args: &[&str]) -> anyhow::Result<GitOutput> {
+        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
 
@@ -281,6 +326,7 @@ mod tests {
             _cwd: &Path,
             _args: &[&str],
             _input: &[u8],
+            _max: usize,
         ) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
@@ -322,18 +368,102 @@ mod tests {
         );
     }
 
+    /// `git status` printing `stdout`, cut by the transport when `truncated`.
+    struct FakeStatus {
+        stdout: Vec<u8>,
+        truncated: bool,
+    }
+
+    impl RepositoryBackend for FakeStatus {
+        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
+            Ok(GitOutput {
+                code: if self.truncated { -1 } else { 0 },
+                stdout: self.stdout.clone(),
+                stderr: String::new(),
+                truncated: self.truncated,
+            })
+        }
+
+        fn git_with_input(
+            &self,
+            _cwd: &Path,
+            _args: &[&str],
+            _input: &[u8],
+            _max: usize,
+        ) -> anyhow::Result<GitOutput> {
+            unreachable!()
+        }
+
+        fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
+            unreachable!()
+        }
+    }
+
+    fn untracked(count: usize) -> Vec<u8> {
+        let mut stdout = b"# branch.head main\0".to_vec();
+        for i in 0..count {
+            stdout.extend_from_slice(format!("? node_modules/{i}.js\0").as_bytes());
+        }
+        stdout
+    }
+
+    #[test]
+    fn status_lists_at_most_the_limit_of_changed_paths() {
+        let within = FakeStatus {
+            stdout: untracked(MAX_CHANGED_PATHS),
+            truncated: false,
+        };
+        let report = status(&within, Path::new(".")).unwrap();
+        assert_eq!(report.entries.len(), MAX_CHANGED_PATHS);
+        assert!(!report.truncated);
+
+        let past = FakeStatus {
+            stdout: untracked(MAX_CHANGED_PATHS + 1),
+            truncated: false,
+        };
+        let report = status(&past, Path::new(".")).unwrap();
+        assert_eq!(report.entries.len(), MAX_CHANGED_PATHS);
+        assert!(report.truncated);
+        assert_eq!(report.branch.head.as_deref(), Some("main"));
+    }
+
+    #[test]
+    fn status_cut_by_the_transport_drops_its_last_entry() {
+        let mut stdout = untracked(2);
+        stdout.extend_from_slice(b"? node_modules/cut-in-the-mi");
+        let report = status(
+            &FakeStatus {
+                stdout,
+                truncated: true,
+            },
+            Path::new("."),
+        )
+        .unwrap();
+        let paths: Vec<&str> = report.entries.iter().map(|e| e.path.as_str()).collect();
+        assert_eq!(paths, ["node_modules/0.js", "node_modules/1.js"]);
+        assert!(report.truncated);
+    }
+
     #[test]
     fn counts_of_two_areas_add_up_path_by_path() {
-        let map = |entries: &[(&str, Counts)]| -> CountsByPath {
-            entries.iter().map(|(p, c)| (p.to_string(), *c)).collect()
+        let numstat = |entries: &[(&str, Counts)], truncated| Numstat {
+            counts: entries.iter().map(|(p, c)| (p.to_string(), *c)).collect(),
+            truncated,
         };
         let sum = added_up(
-            map(&[("a.ts", Counts::lines(1, 2)), ("logo.png", Counts::BINARY)]),
-            map(&[("a.ts", Counts::lines(3, 0)), ("b.ts", Counts::lines(0, 1))]),
+            numstat(
+                &[("a.ts", Counts::lines(1, 2)), ("logo.png", Counts::BINARY)],
+                false,
+            ),
+            numstat(
+                &[("a.ts", Counts::lines(3, 0)), ("b.ts", Counts::lines(0, 1))],
+                true,
+            ),
         );
-        assert_eq!(sum["a.ts"], Counts::lines(4, 2));
-        assert_eq!(sum["b.ts"], Counts::lines(0, 1));
-        assert_eq!(sum["logo.png"], Counts::BINARY);
+        assert_eq!(sum.counts["a.ts"], Counts::lines(4, 2));
+        assert_eq!(sum.counts["b.ts"], Counts::lines(0, 1));
+        assert_eq!(sum.counts["logo.png"], Counts::BINARY);
+        assert!(sum.truncated);
     }
 
     #[test]

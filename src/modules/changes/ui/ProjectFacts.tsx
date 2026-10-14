@@ -1,5 +1,6 @@
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useRepositorySummary } from '../application/repository.queries';
+import { changedCount } from '../model/summary';
 import { BranchName } from './BranchName';
 import { LineCounts } from './LineCounts';
 
@@ -21,7 +22,7 @@ export function ProjectFacts({
             <BranchName branch={branch} className="text-[11.5px]" />
             {totals.files > 0 ? (
                 <span className="inline-flex items-center gap-2">
-                    {totals.files} changed
+                    {changedCount(summary.data)} changed
                     {totals.additions + totals.deletions > 0 ? (
                         <span title="Lines of tracked files">
                             <LineCounts additions={totals.additions} deletions={totals.deletions} />

@@ -45,5 +45,6 @@ export function fixtureSummary(branch: Branch, files: readonly ChangedFile[]): R
                 binary: areas.some((file) => file.binary),
             };
         }),
+        truncated: false,
     };
 }

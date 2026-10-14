@@ -165,6 +165,9 @@ Tabler's. What it settles:
 - A dot on the tray's icon when the project on screen changes while the window is hidden. Dropped
   on 2026-10-14: while an agent works it is always on, so it tells nothing, and it cannot say
   which project changed.
+- Comparing against the default branch (the merge base with `main`), to keep an agent's commits
+  in view. Dropped on 2026-10-14: Changes compares against HEAD, as VS Code and Zed do, and what
+  was committed is looked at in the recent commits instead.
 
 ## Follow the terminal
 

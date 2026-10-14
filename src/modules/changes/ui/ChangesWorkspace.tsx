@@ -46,6 +46,12 @@ export function ChangesWorkspace({ project, header, target }: PanelProps) {
                     {errorMessage(snapshot.error)}
                 </div>
             ) : null}
+            {snapshot.data?.summary.truncated ? (
+                <div className="border-b border-ui-border bg-ui-warning-soft px-4 py-2 text-sm text-ui-warning-soft-text">
+                    Too many changes: only the first {snapshot.data.summary.totals.files} changed
+                    files are listed. A folder such as node_modules may be missing from .gitignore.
+                </div>
+            ) : null}
             <div className="flex min-h-0 flex-1">
                 <aside className="w-72 shrink-0 border-r border-ui-border bg-ui-surface">
                     <FileList

@@ -5,7 +5,8 @@ use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
-/// Larger diffs are cut at the last whole line before this size.
+/// Larger diffs are cut at the last whole line before this size, and git is killed instead of
+/// read to the end.
 const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
 
 /// Only a plain relative path may reach git: no `..`, no absolute path, nothing that names a
@@ -22,16 +23,12 @@ fn checked_path(path: &str) -> anyhow::Result<&str> {
     }
 }
 
-fn truncate_at_line(mut bytes: Vec<u8>, max: usize) -> (Vec<u8>, bool) {
-    if bytes.len() <= max {
-        return (bytes, false);
+/// Output cut anywhere, back to its last whole line, if it has one.
+fn cut_at_line(mut bytes: Vec<u8>) -> Vec<u8> {
+    if let Some(end) = bytes.iter().rposition(|&b| b == b'\n') {
+        bytes.truncate(end + 1);
     }
-    let cut = bytes[..max]
-        .iter()
-        .rposition(|&b| b == b'\n')
-        .map_or(max, |i| i + 1);
-    bytes.truncate(cut);
-    (bytes, true)
+    bytes
 }
 
 pub(crate) fn load_file_diff(
@@ -68,14 +65,18 @@ pub(crate) fn load_file_diff(
         }
     }
 
-    let stdout = git_checked(backend, root, &args, &ok_codes)?;
-    let (bytes, truncated) = truncate_at_line(stdout, MAX_DIFF_BYTES);
+    let out = git_checked(backend, root, &args, &ok_codes, MAX_DIFF_BYTES)?;
+    let bytes = if out.truncated {
+        cut_at_line(out.stdout)
+    } else {
+        out.stdout
+    };
 
     Ok(FileDiff {
         path: request.path.clone(),
         area: request.area,
         text: String::from_utf8_lossy(&bytes).into_owned(),
-        truncated,
+        truncated: out.truncated,
     })
 }
 
@@ -93,18 +94,9 @@ mod tests {
     }
 
     #[test]
-    fn truncation_keeps_whole_lines() {
-        assert_eq!(
-            truncate_at_line(b"ab\ncd\n".to_vec(), 10),
-            (b"ab\ncd\n".to_vec(), false)
-        );
-        assert_eq!(
-            truncate_at_line(b"ab\ncd\nef".to_vec(), 7),
-            (b"ab\ncd\n".to_vec(), true)
-        );
-        assert_eq!(
-            truncate_at_line(b"abcdef".to_vec(), 3),
-            (b"abc".to_vec(), true)
-        );
+    fn a_cut_diff_keeps_whole_lines() {
+        assert_eq!(cut_at_line(b"ab\ncd\n".to_vec()), b"ab\ncd\n");
+        assert_eq!(cut_at_line(b"ab\ncd\nef".to_vec()), b"ab\ncd\n");
+        assert_eq!(cut_at_line(b"abcdef".to_vec()), b"abcdef");
     }
 }

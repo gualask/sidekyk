@@ -15,6 +15,7 @@ pub(crate) enum AppError {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UserFacingErrorCode {
     GitNotFound,
+    GitTimedOut,
     NotARepository,
     PathOutsideRepository,
     ProjectNotFound,
@@ -25,6 +26,7 @@ impl UserFacingErrorCode {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::GitNotFound => "git_not_found",
+            Self::GitTimedOut => "git_timed_out",
             Self::NotARepository => "not_a_repository",
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
@@ -127,6 +129,7 @@ mod tests {
     fn user_facing_error_codes_keep_the_wire_contract() {
         let cases = [
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
+            (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::NotARepository, "not_a_repository"),
             (
                 UserFacingErrorCode::PathOutsideRepository,

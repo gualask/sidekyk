@@ -1,14 +1,24 @@
 //! The `git` CLI as the repository module's backend. No libgit2: every answer is what the user's
 //! own git would print.
 
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
-use std::sync::OnceLock;
-use std::time::Instant;
+use std::process::{Child, Command, Stdio};
+use std::sync::{mpsc, OnceLock};
+use std::time::{Duration, Instant};
+
+use anyhow::Context;
 
 use crate::modules::repository::{GitOutput, RepositoryBackend};
-use crate::shared::error::{user_facing, UserFacingErrorCode};
+use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
+
+/// No git call takes longer: past it git is killed and the call fails with `git_timed_out`, so a
+/// hung command (a network drive, a huge repository) cannot hold a snapshot forever. Its message
+/// in `app-error.ts` names it.
+const GIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// What git writes to stderr past this is read and dropped: its start says what went wrong.
+const MAX_STDERR_BYTES: usize = 64 * 1024;
 
 /// An app started from Finder or a desktop launcher can get a minimal PATH, so the usual install
 /// dirs are checked too.
@@ -62,48 +72,172 @@ impl LocalRepositoryBackend {
         std::os::windows::process::CommandExt::creation_flags(&mut command, CREATE_NO_WINDOW);
         Ok(command)
     }
+
+    /// Runs git within the limits, and logs the command (development builds only: `debug` is
+    /// compiled out of release builds); a git that timed out, in every build.
+    fn run_git(
+        &self,
+        cwd: &Path,
+        args: &[&str],
+        input: Option<&[u8]>,
+        max_stdout: usize,
+    ) -> anyhow::Result<GitOutput> {
+        let started = Instant::now();
+        let output = run(
+            &mut self.command(cwd, args)?,
+            input,
+            max_stdout,
+            GIT_TIMEOUT,
+        );
+        match &output {
+            Ok(output) => tracing::debug!(
+                args = %args.join(" "),
+                code = output.code,
+                ms = started.elapsed().as_millis() as u64,
+                stdout_bytes = output.stdout.len(),
+                truncated = output.truncated,
+                "git"
+            ),
+            Err(error) if user_facing_code(error) == Some(UserFacingErrorCode::GitTimedOut) => {
+                tracing::warn!(args = %args.join(" "), "git timed out and was killed");
+            }
+            Err(error) => tracing::debug!(
+                args = %args.join(" "),
+                error = %format!("{error:#}"),
+                "git could not run"
+            ),
+        }
+        output
+    }
 }
 
-/// Converts a finished git process into the port's output, and logs the command (development
-/// builds only: `debug` is compiled out of release builds).
-fn git_output(args: &[&str], started: Instant, out: std::process::Output) -> GitOutput {
-    let output = GitOutput {
-        code: out.status.code().unwrap_or(-1),
-        stdout: out.stdout,
-        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+/// A pipe of the child, read to its end on a thread of its own.
+enum Pipe {
+    Stdout(std::io::Result<Stdout>),
+    Stderr(Vec<u8>),
+}
+
+struct Stdout {
+    bytes: Vec<u8>,
+    /// There was more: the reading stopped at the limit.
+    truncated: bool,
+}
+
+/// Reads at most `max` bytes, and one more to know whether there was more.
+fn read_stdout(pipe: impl Read, max: usize) -> std::io::Result<Stdout> {
+    let mut bytes = Vec::new();
+    pipe.take((max as u64).saturating_add(1))
+        .read_to_end(&mut bytes)?;
+    let truncated = bytes.len() > max;
+    bytes.truncate(max);
+    Ok(Stdout { bytes, truncated })
+}
+
+/// Keeps the start of stderr and drains the rest, so that git never blocks writing to it.
+fn read_stderr(mut pipe: impl Read) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    let _ = (&mut pipe)
+        .take(MAX_STDERR_BYTES as u64)
+        .read_to_end(&mut bytes);
+    let _ = std::io::copy(&mut pipe, &mut std::io::sink());
+    bytes
+}
+
+fn kill(child: &mut Child) {
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Runs `command`, writing `input` to it, and reads its output within `max_stdout` bytes and
+/// `timeout`. Each pipe is read on a thread of its own, so the caller can give up on both: a
+/// reader left behind ends when the pipe closes. Past `max_stdout` the child is killed and its
+/// output comes back cut; past `timeout` it is killed and the call fails.
+fn run(
+    command: &mut Command,
+    input: Option<&[u8]>,
+    max_stdout: usize,
+    timeout: Duration,
+) -> anyhow::Result<GitOutput> {
+    let deadline = Instant::now() + timeout;
+    let mut child = command
+        .stdin(if input.is_some() {
+            Stdio::piped()
+        } else {
+            Stdio::null()
+        })
+        .spawn()?;
+    if let (Some(input), Some(mut stdin)) = (input, child.stdin.take()) {
+        // written apart, so a large output cannot block git while we still write; closed once
+        // written, which ends git's input
+        let input = input.to_vec();
+        std::thread::spawn(move || stdin.write_all(&input));
+    }
+    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
+        kill(&mut child);
+        anyhow::bail!("git's output is not piped");
     };
-    tracing::debug!(
-        args = %args.join(" "),
-        code = output.code,
-        ms = started.elapsed().as_millis() as u64,
-        stdout_bytes = output.stdout.len(),
-        "git"
-    );
-    output
+    let (sender, pipes) = mpsc::channel();
+    let to_stdout = sender.clone();
+    std::thread::spawn(move || to_stdout.send(Pipe::Stdout(read_stdout(stdout, max_stdout))));
+    std::thread::spawn(move || sender.send(Pipe::Stderr(read_stderr(stderr))));
+
+    let mut stdout = None;
+    let mut stderr = Vec::new();
+    let mut stderr_done = false;
+    while stdout.is_none() || !stderr_done {
+        match pipes.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
+            Ok(Pipe::Stdout(read)) => {
+                let read = read.inspect_err(|_| kill(&mut child))?;
+                let truncated = read.truncated;
+                stdout = Some(read);
+                // nobody reads the rest: git stops here, and so does the wait for stderr
+                if truncated {
+                    kill(&mut child);
+                    break;
+                }
+            }
+            Ok(Pipe::Stderr(read)) => {
+                stderr = read;
+                stderr_done = true;
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                kill(&mut child);
+                return Err(user_facing(UserFacingErrorCode::GitTimedOut));
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => {
+                kill(&mut child);
+                anyhow::bail!("git's output could not be read");
+            }
+        }
+    }
+    let stdout = stdout.context("git's output was not read")?;
+    let code = if stdout.truncated {
+        -1
+    } else {
+        // both pipes closed: git has ended, or is ending, so this wait is short
+        child.wait()?.code().unwrap_or(-1)
+    };
+    Ok(GitOutput {
+        code,
+        stdout: stdout.bytes,
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        truncated: stdout.truncated,
+    })
 }
 
 impl RepositoryBackend for LocalRepositoryBackend {
-    fn git(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
-        let started = Instant::now();
-        let out = self.command(cwd, args)?.stdin(Stdio::null()).output()?;
-        Ok(git_output(args, started, out))
+    fn git(&self, cwd: &Path, args: &[&str], max_stdout: usize) -> anyhow::Result<GitOutput> {
+        self.run_git(cwd, args, None, max_stdout)
     }
 
-    fn git_with_input(&self, cwd: &Path, args: &[&str], input: &[u8]) -> anyhow::Result<GitOutput> {
-        let started = Instant::now();
-        let mut child = self.command(cwd, args)?.stdin(Stdio::piped()).spawn()?;
-        let mut stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| anyhow::anyhow!("git stdin is not piped"))?;
-        // Written from another thread, so a large output cannot block git while we still write.
-        let out = std::thread::scope(|scope| {
-            let writer = scope.spawn(move || stdin.write_all(input));
-            let out = child.wait_with_output();
-            let _ = writer.join();
-            out
-        })?;
-        Ok(git_output(args, started, out))
+    fn git_with_input(
+        &self,
+        cwd: &Path,
+        args: &[&str],
+        input: &[u8],
+        max_stdout: usize,
+    ) -> anyhow::Result<GitOutput> {
+        self.run_git(cwd, args, Some(input), max_stdout)
     }
 
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {
@@ -129,7 +263,7 @@ mod tests {
 
     fn git(root: &Path, args: &[&str]) {
         let backend = LocalRepositoryBackend::default();
-        let out = backend.git(root, args).unwrap();
+        let out = backend.git(root, args, usize::MAX).unwrap();
         assert_eq!(out.code, 0, "git {args:?}: {}", out.stderr);
     }
 
@@ -292,6 +426,8 @@ mod tests {
         assert!(ignored.any_visible(&backend, &changed(&["target/a.o", "src/cart.ts"])));
     }
 
+    // the hook is a shell script, made executable
+    #[cfg(unix)]
     #[test]
     fn a_repository_cannot_run_an_fsmonitor_command() {
         let dir = scratch_repo();
@@ -309,6 +445,68 @@ mod tests {
         let repo = resolve_repository(&backend, dir.path()).unwrap();
         load_snapshot(&backend, &repo.info).unwrap();
         assert!(!marker.exists(), "the repository's fsmonitor command ran");
+    }
+
+    #[cfg(unix)]
+    fn shell(script: &str) -> Command {
+        let mut command = Command::new("sh");
+        command
+            .args(["-c", script])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        command
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn output_past_the_limit_is_cut_and_the_process_killed() {
+        let started = Instant::now();
+        // writes forever: only killing it ends the call
+        let out = run(&mut shell("yes"), None, 1000, Duration::from_secs(10)).unwrap();
+        assert!(out.truncated);
+        assert_eq!(out.code, -1);
+        assert_eq!(out.stdout, b"y\n".repeat(500));
+        assert!(started.elapsed() < Duration::from_secs(5));
+
+        let out = run(&mut shell("printf abc"), None, 3, Duration::from_secs(10)).unwrap();
+        assert_eq!(
+            (out.stdout.as_slice(), out.truncated, out.code),
+            (&b"abc"[..], false, 0)
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_process_past_the_timeout_is_killed() {
+        let started = Instant::now();
+        let error = run(
+            &mut shell("sleep 10"),
+            None,
+            1000,
+            Duration::from_millis(200),
+        )
+        .err()
+        .unwrap();
+        assert_eq!(
+            user_facing_code(&error),
+            Some(UserFacingErrorCode::GitTimedOut)
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn input_is_written_and_stderr_kept() {
+        let out = run(
+            &mut shell("cat; echo oops >&2; exit 3"),
+            Some(b"in"),
+            1000,
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert_eq!(out.stdout, b"in");
+        assert_eq!(out.stderr, "oops\n");
+        assert_eq!(out.code, 3);
     }
 
     #[test]
@@ -365,7 +563,7 @@ mod tests {
         // the palette over every tracked path, as many as it will search once the explorer
         // lists them all
         let listed = backend
-            .git(Path::new(&repo.info.root), &["ls-files", "-z"])
+            .git(Path::new(&repo.info.root), &["ls-files", "-z"], usize::MAX)
             .unwrap();
         let tracked: Vec<ChangedFile> = String::from_utf8_lossy(&listed.stdout)
             .split('\0')

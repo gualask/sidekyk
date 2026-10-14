@@ -114,11 +114,17 @@ fn check_ignore(
         input.extend_from_slice(git_path(path)?.as_bytes());
         input.push(0);
     }
+    // git answers with some of the paths it was given, so never more than them
     let out = backend
-        .git_with_input(root, &["check-ignore", "-z", "--stdin"], &input)
+        .git_with_input(
+            root,
+            &["check-ignore", "-z", "--stdin"],
+            &input,
+            input.len(),
+        )
         .ok()?;
     // 0: some paths are ignored, 1: none are.
-    if out.code != 0 && out.code != 1 {
+    if out.truncated || (out.code != 0 && out.code != 1) {
         return None;
     }
     Some(
@@ -145,7 +151,7 @@ mod tests {
     }
 
     impl RepositoryBackend for FakeGit {
-        fn git(&self, _cwd: &Path, _args: &[&str]) -> anyhow::Result<GitOutput> {
+        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
 
@@ -154,6 +160,7 @@ mod tests {
             _cwd: &Path,
             _args: &[&str],
             input: &[u8],
+            _max: usize,
         ) -> anyhow::Result<GitOutput> {
             let paths: Vec<String> = input
                 .split(|&b| b == 0)
@@ -170,6 +177,7 @@ mod tests {
                 code: if self.fail { 128 } else { 0 },
                 stdout: ignored,
                 stderr: String::new(),
+                truncated: false,
             })
         }
 

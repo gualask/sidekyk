@@ -6,6 +6,8 @@ use super::contracts::{BranchStatus, ChangeKind};
 pub(super) struct StatusReport {
     pub(super) branch: BranchStatus,
     pub(super) entries: Vec<StatusEntry>,
+    /// git listed more entries than were read.
+    pub(super) truncated: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]

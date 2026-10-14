@@ -4,6 +4,9 @@ use super::contracts::RepositoryInfo;
 use super::ports::RepositoryBackend;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
+/// Two paths, one per line.
+const MAX_REV_PARSE_BYTES: usize = 64 * 1024;
+
 pub(crate) struct ResolvedRepository {
     pub(crate) info: RepositoryInfo,
     /// Usually `<root>/.git`; elsewhere for linked worktrees and submodules.
@@ -39,6 +42,7 @@ pub(crate) fn resolve_repository(
     let out = backend.git(
         candidate,
         &["rev-parse", "--show-toplevel", "--absolute-git-dir"],
+        MAX_REV_PARSE_BYTES,
     )?;
     if out.code != 0 {
         return Err(user_facing(UserFacingErrorCode::NotARepository));

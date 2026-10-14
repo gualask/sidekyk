@@ -107,6 +107,9 @@ pub(crate) struct RepositorySummary {
     pub(crate) totals: ChangeTotals,
     /// The first changed paths in git's order, at most `SUMMARY_FILES`.
     pub(crate) files: Vec<SummaryFile>,
+    /// git listed more changes than are read (`MAX_CHANGED_PATHS`, as VS Code): the list and the
+    /// count of files stop there.
+    pub(crate) truncated: bool,
 }
 
 /// Everything the Changes panel shows of a repository. Its summary is the one
@@ -172,6 +175,7 @@ mod tests {
                     deletions: Some(2),
                     binary: false,
                 }],
+                truncated: false,
             },
         };
 
@@ -202,7 +206,8 @@ mod tests {
                         "additions": null,
                         "deletions": 2,
                         "binary": false
-                    }]
+                    }],
+                    "truncated": false
                 }
             })
         );

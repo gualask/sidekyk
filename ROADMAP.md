@@ -186,20 +186,26 @@ what needs measuring before deciding waits in **Performance review**, at the end
       blank frame at startup, light and dark; on Linux and Windows, that a page in a window never
       shown loads and calls back (WebKitGTK, WebView2). Costs nothing hidden or shown; at startup,
       one thread asleep for 3 s
-- [ ] Compare against the default branch, for agents that commit as they go: diff the working
-      tree against the merge base (`git diff --merge-base <default>`), so commits and uncommitted
-      edits show together and an edit that undoes a commit shows as unchanged. The default branch
-      comes from `upstream/HEAD`, `origin/HEAD` or `init.defaultBranch`; without one, stay on HEAD
+- [ ] Recent commits, as in VS Code's source control: the last commits of the branch on screen
+      (a bounded `git log`), and a click on one shows the files it changed and their diffs, read
+      only. Changes keeps comparing against HEAD, as VS Code and Zed do. Read when the list is
+      opened, never in the background. A section at the bottom of the Changes panel, as in VS
+      Code (decided on 2026-10-14)
 
 ## Next: bounded git
 
 Before the explorer adds more git reads, so they all share the same limits.
 
-- [ ] A timeout on every git call that kills git, so a hung command (network drive, huge
-      repository) cannot hold the coalesced snapshot forever; the frontend shows the state
-- [ ] Bound reads while reading, not after: stop reading a diff at 2 MiB and kill git instead of
-      buffering the whole output and cutting it; cap the entries read from `git status`, with a
-      "too many changes" state (an unignored `node_modules`)
+- [x] A timeout on every git call that kills git, so a hung command (network drive, huge
+      repository) cannot hold the coalesced snapshot forever: 30 s, then `git_timed_out`, which
+      the panels show like any error and the log keeps as a warning
+- [x] Bound reads while reading, not after: each git call names the most output it reads
+      (`git status` 8 MiB, a numstat 4 MiB, a diff 2 MiB, `check-ignore` its input's size), and
+      git is killed past it instead of read to the end. At most 10,000 changed paths, as VS
+      Code's `git.statusLimit`: past them Changes says "too many changes" above the list, which
+      stops there, and the counts read `10000+` (breadcrumb, card, tray). Each pipe is read on a
+      thread of its own; measured: a snapshot of Zed's clone takes 57 ms before and after.
+      Costs nothing hidden or idle
 
 ## Then: explore the repository
 

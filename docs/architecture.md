@@ -182,7 +182,8 @@ the page never calls it (a script that failed to load), the backend shows the wi
   validation, the ignored-paths filter for watcher events, wire contracts. A repository moved or
   deleted after it was added fails its snapshot and diffs with `repository_missing`, before git
   runs. No Tauri; the outside world is the `RepositoryBackend` port.
-- `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs),
+- `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs,
+  every call bounded: see Git limits),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes),
   `settings_store.rs` (the settings and the projects, through `tauri-plugin-store`; an older
   version's last repository becomes the first project), `logging.rs` (see Logs).
@@ -207,6 +208,24 @@ the slowest of them. A summary alone (`load_summary`) runs only steps 1 and 4, i
 builds the same summary from them, so a project's numbers do not depend on whether it is the one
 in the Changes panel. `backend_timings` (an ignored test, see `AGENTS.md`) measures the snapshot,
 the summary and a diff on any repository.
+
+A snapshot lists at most 10,000 changed paths, as VS Code's `git.statusLimit`: past them (an
+unignored `node_modules`), the list and the count of files stop there and the summary says
+`truncated`. Changes then says so above the list, and the counts read `10000+`, in the
+breadcrumb, on the card and in the tray.
+
+### Git limits
+
+Every git call names the most output it reads (`max_stdout`, part of the `RepositoryBackend`
+port): `git status` 8 MiB, a numstat 4 MiB, a diff 2 MiB, `check-ignore` the size of its input.
+Each pipe is read on a thread of its own while git writes, so past the limit git is killed
+instead of read to the end, and what was read comes back `truncated`: the last record of a cut
+status or numstat is dropped, a cut diff ends at its last whole line. stderr keeps its first
+64 KiB and drains the rest, so git never blocks on it. No call takes more than 30 s: past it git
+is killed and the call fails with `git_timed_out`, which the panels show like any error, so a
+hung command (a network drive) cannot hold a coalesced snapshot forever. A reader thread left
+behind (a filter git started still holding the pipe) ends when the pipe closes. The threads
+cost nothing measurable: a snapshot of Zed's clone takes 57 ms before and after.
 
 ### Search
 
@@ -239,7 +258,7 @@ the window quits.
 
 `git diff [--cached] --no-color --no-ext-diff -U3 -- <path>`; a staged rename passes both paths;
 an untracked file uses `--no-index /dev/null <path>`. Output larger than 2 MiB is cut at a line
-boundary and flagged `truncated`. The frontend parses the text, so user settings such as
+boundary and flagged `truncated` (see Git limits). The frontend parses the text, so user settings such as
 `diff.noprefix` do not matter: parsing starts at the first `@@`.
 
 ### Logs

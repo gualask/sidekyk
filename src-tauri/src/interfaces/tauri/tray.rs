@@ -30,6 +30,8 @@ struct Tray {
 struct Shown {
     name: String,
     files: u32,
+    /// There are more changed files than were read.
+    more: bool,
 }
 
 /// Puts the icon in the tray. On Linux, Tauri loads libayatana-appindicator3 (or
@@ -110,6 +112,7 @@ pub(crate) fn show_read(app: &AppHandle, root: &str, summary: Option<&Repository
             summary.map(|summary| Shown {
                 name: active.name,
                 files: summary.totals.files,
+                more: summary.truncated,
             }),
         );
     }
@@ -153,16 +156,17 @@ fn show(app: &AppHandle, next: Option<Shown>) {
 
 /// The text next to the icon, none without changes, and the tooltip.
 fn label(shown: Option<&Shown>) -> (Option<String>, String) {
-    let Some(Shown { name, files }) = shown else {
+    let Some(Shown { name, files, more }) = shown else {
         return (None, "Sidekyk".to_string());
     };
-    let changes = match files {
-        0 => "no changes".to_string(),
-        1 => "1 changed file".to_string(),
-        n => format!("{n} changed files"),
+    let count = format!("{files}{}", if *more { "+" } else { "" });
+    let changes = match (files, more) {
+        (0, _) => "no changes".to_string(),
+        (1, false) => "1 changed file".to_string(),
+        _ => format!("{count} changed files"),
     };
     (
-        (*files > 0).then(|| files.to_string()),
+        (*files > 0).then_some(count),
         format!("Sidekyk · {name}: {changes}"),
     )
 }
@@ -175,6 +179,7 @@ mod tests {
         Some(Shown {
             name: "shop".to_string(),
             files,
+            more: false,
         })
     }
 
@@ -197,6 +202,17 @@ mod tests {
             (
                 Some("12".to_string()),
                 "Sidekyk · shop: 12 changed files".to_string()
+            )
+        );
+        let more = Shown {
+            more: true,
+            ..shown(10_000).unwrap()
+        };
+        assert_eq!(
+            label(Some(&more)),
+            (
+                Some("10000+".to_string()),
+                "Sidekyk · shop: 10000+ changed files".to_string()
             )
         );
     }

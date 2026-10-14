@@ -65,6 +65,8 @@ export interface RepositorySummary {
     totals: ChangeTotals;
     /** The first changed paths in git's order, at most three. */
     files: SummaryFile[];
+    /** git listed more changes than are read (10,000, as VS Code): the list and the file count stop there. */
+    truncated: boolean;
 }
 
 /** Everything the Changes panel shows of a repository, and the summary of the same git output. */

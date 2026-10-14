@@ -1,6 +1,7 @@
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { useRepositorySummary } from '../application/repository.queries';
+import { changedCount } from '../model/summary';
 import { BranchName } from './BranchName';
 import { KindBadge } from './KindBadge';
 import { LineCounts } from './LineCounts';
@@ -29,7 +30,7 @@ export function ChangesSummary({ project }: PanelSummaryProps) {
                             : 'bg-ui-success-soft text-ui-success-soft-text'
                     }`}
                 >
-                    {totals.files > 0 ? `${totals.files} changed` : 'clean'}
+                    {totals.files > 0 ? `${changedCount(summary.data)} changed` : 'clean'}
                 </span>
                 <span className="chip max-w-56">
                     <BranchName branch={branch} />
