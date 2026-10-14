@@ -36,22 +36,9 @@ impl IgnoredPaths {
         backend: &dyn RepositoryBackend,
         changed: &[PathBuf],
     ) -> bool {
-        let mut candidates = Vec::new();
-        for path in changed {
-            let Ok(rel) = path.strip_prefix(&self.root) else {
-                return true;
-            };
-            if rel.as_os_str().is_empty() {
-                return true;
-            }
-            if rel.file_name().is_some_and(|name| name == ".gitignore") {
-                self.forget();
-                return true;
-            }
-            if !self.is_in_ignored_dir(rel) {
-                candidates.push(rel);
-            }
-        }
+        let Some(candidates) = self.unsettled(changed) else {
+            return true;
+        };
         if candidates.is_empty() {
             return false;
         }
@@ -75,6 +62,34 @@ impl IgnoredPaths {
             }
         }
         candidates.iter().any(|rel| !ignored.contains(*rel))
+    }
+
+    /// Whether any of these changed paths may be one git does not ignore, from what was already
+    /// learned: no git runs, so a path never asked about counts.
+    pub(crate) fn any_maybe_visible(&mut self, changed: &[PathBuf]) -> bool {
+        self.unsettled(changed)
+            .is_none_or(|candidates| !candidates.is_empty())
+    }
+
+    /// The changed paths, relative to the root, that are not inside a directory known to be
+    /// ignored; `None` when one of them is visible for sure (outside the root, the root itself,
+    /// a `.gitignore`).
+    fn unsettled<'a>(&mut self, changed: &'a [PathBuf]) -> Option<Vec<&'a Path>> {
+        let mut candidates = Vec::new();
+        for path in changed {
+            let rel = path.strip_prefix(&self.root).ok()?;
+            if rel.as_os_str().is_empty() {
+                return None;
+            }
+            if rel.file_name().is_some_and(|name| name == ".gitignore") {
+                self.forget();
+                return None;
+            }
+            if !self.is_in_ignored_dir(rel) {
+                candidates.push(rel);
+            }
+        }
+        Some(candidates)
     }
 
     fn is_in_ignored_dir(&self, rel: &Path) -> bool {
@@ -200,6 +215,23 @@ mod tests {
         assert!(ignored.any_visible(&git, &paths(&["sub/.gitignore"])));
         assert!(!ignored.any_visible(&git, &paths(&["target/a.o"])));
         assert_eq!(git.asked.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn without_git_only_directories_already_learned_are_settled() {
+        let git = FakeGit::default();
+        let mut ignored = IgnoredPaths::new("/r".into());
+        assert!(ignored.any_maybe_visible(&paths(&["target/a.o"])));
+
+        assert!(!ignored.any_visible(&git, &paths(&["target/a.o"])));
+        assert!(!ignored.any_maybe_visible(&paths(&["target/debug/b.o"])));
+        assert!(ignored.any_maybe_visible(&paths(&["target/c.o", "dist/app.js"])));
+        assert!(ignored.any_maybe_visible(&paths(&[".gitignore"])));
+        assert!(
+            ignored.any_maybe_visible(&paths(&["target/a.o"])),
+            "forgotten"
+        );
+        assert_eq!(git.asked.lock().unwrap().len(), 1);
     }
 
     #[test]

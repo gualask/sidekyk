@@ -156,15 +156,20 @@ what needs measuring before deciding waits in **Performance review**, at the end
       window's occlusion). Seen in the real app: writes while hidden cost the watcher's batch
       only, and showing the window runs one snapshot and one diff. Costs nothing hidden; shown,
       one `git diff` more each time the window comes back
-- [ ] Read again on show only what may have changed (decided on 2026-10-14, see
+- [x] Read again on show only what may have changed (decided on 2026-10-14, see
       docs/evolution.md, Projects): the project on screen when the watcher saw something while
-      the window was hidden (a mark it keeps as it drops its batches), the other projects'
-      summaries when they are older than 30 s, at level 0 too. The project on screen is also read
-      again past 30 s, the safety net for changes the watcher cannot see. Today every return to
-      the window reads everything: with the terminal covering Sidekyk, each `⌘Tab` costs a
-      snapshot, the open diff and every project's summary (0.4 s of CPU for ten projects)
-- [ ] Badge or tray hint when the agent changes files while the window is hidden, from a mark the
-      watcher keeps while it drops its batches (no git while hidden)
+      the window was hidden, the other projects' summaries when they are older than 30 s, at
+      level 0 too. The project on screen is also read again past 30 s, the safety net for changes
+      the watcher cannot see. While hidden, the watcher marks a batch from what it already knows
+      of the ignored directories, with no git: a build in `dist/` leaves no mark once `dist/` was
+      seen ignored, a path never asked about does. `set_window_visible` answers with the marked
+      project. Seen in the real app: shown again within 30 s with nothing changed, no git; after a
+      write, one snapshot and one diff; past 30 s, everything on screen. Before, each `⌘Tab` back
+      from a terminal covering Sidekyk cost a snapshot, the open diff and every project's summary
+      (0.4 s of CPU for ten projects). Costs nothing hidden; shown, at most one read of what is on
+      screen every 30 s, plus one for each change the agent made while hidden
+- [ ] Badge or tray hint when the agent changes files while the window is hidden, from the mark
+      the watcher keeps while it drops its batches (no git while hidden)
 - [ ] Create the window hidden and show it after the first paint: no blank frame at startup
 - [ ] Compare against the default branch, for agents that commit as they go: diff the working
       tree against the merge base (`git diff --merge-base <default>`), so commits and uncommitted

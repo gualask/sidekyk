@@ -1,9 +1,8 @@
-//! Managed Tauri state: the projects, the watcher of the one on screen, and the one place that
-//! changes them.
+//! Managed Tauri state: the projects, the watcher of the one on screen, whether the window shows,
+//! and the one place that changes them.
 
 use std::collections::HashMap;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -52,6 +51,15 @@ impl<T: Clone> PerProject<T> {
     }
 }
 
+/// While the window is minimized, hidden or covered, as its page tells, the watcher keeps
+/// watching but reports nothing, and only marks what it saw.
+#[derive(Default)]
+struct WindowState {
+    hidden: bool,
+    /// The project on screen, when its watcher saw a change that may show while hidden.
+    missed: Option<String>,
+}
+
 struct Watched {
     root: String,
     /// `None` when the watcher could not start, such as a repository moved away.
@@ -64,9 +72,9 @@ pub(crate) struct ProjectsState {
     /// Only the project on screen is watched. Kept apart from `list`, since starting a watcher
     /// can take a while (on Linux it walks the tree) and must not hold up snapshots.
     watched: Mutex<Option<Watched>>,
-    /// The window is minimized, hidden or covered, as its page tells. Its watcher keeps watching
-    /// but reports nothing: the frontend reads what it shows again when the window comes back.
-    window_hidden: AtomicBool,
+    /// Kept apart from `watched`, which is held while a watcher starts: the page reports its
+    /// visibility on the main thread, which must not wait for that.
+    window: Mutex<WindowState>,
     snapshots: PerProject<RepositorySnapshot>,
     /// Every project on screen asks for its summary at once.
     summaries: PerProject<RepositorySummary>,
@@ -131,13 +139,14 @@ impl ProjectsState {
             .run(root, || repository::load_summary(backend, &project))
     }
 
-    pub(crate) fn set_window_visible(&self, visible: bool) {
-        self.window_hidden.store(!visible, Ordering::Relaxed);
-        tracing::debug!(visible, "window visibility");
-    }
-
-    fn window_hidden(&self) -> bool {
-        self.window_hidden.load(Ordering::Relaxed)
+    /// Records whether the window shows. Showing again returns the project on screen if its
+    /// watcher saw a change meanwhile, for the frontend to read again.
+    pub(crate) fn set_window_visible(&self, visible: bool) -> Option<String> {
+        let mut window = lock(&self.window);
+        window.hidden = !visible;
+        let missed = if visible { window.missed.take() } else { None };
+        tracing::debug!(visible, missed = missed.is_some(), "window visibility");
+        missed
     }
 
     /// Replaces the list at startup, before anything is watched.
@@ -182,6 +191,8 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     }
     // the previous watcher stops before the next one walks its tree
     *watched = None;
+    // a project put on screen is read in full anyway
+    lock(&state.window).missed = None;
     let watcher = match start_watcher(app, &active.root) {
         Ok(watcher) => {
             tracing::info!(root = %active.root, "project opened");
@@ -215,11 +226,24 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
         if changes.git_dir {
             ignored.forget();
         }
-        // nobody looks: no `check-ignore`, no refresh
-        if emitter.state::<ProjectsState>().window_hidden() {
-            tracing::debug!(git_dir = changes.git_dir, "watcher batch while hidden");
+        let state = emitter.state::<ProjectsState>();
+        // held until the batch is settled, so the window cannot show in between and miss it
+        let mut window = lock(&state.window);
+        // nobody looks: no `check-ignore`, no refresh, only a mark for when the window shows
+        if window.hidden {
+            let marked = changes.git_dir || ignored.any_maybe_visible(&changes.worktree);
+            if marked {
+                window.missed = Some(event.root.clone());
+            }
+            tracing::debug!(
+                git_dir = changes.git_dir,
+                worktree_paths = changes.worktree.len(),
+                marked,
+                "watcher batch while hidden"
+            );
             return;
         }
+        drop(window);
         let backend = emitter.state::<LocalRepositoryBackend>();
         let visible = changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree);
         tracing::debug!(

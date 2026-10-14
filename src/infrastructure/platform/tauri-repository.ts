@@ -17,7 +17,6 @@ export const tauriRepository: RepositoryPort = {
     getFileDiff: (root, request) => invoke('get_file_diff', { root, request }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),
-    setWindowVisible: (visible) => {
-        invoke('set_window_visible', { visible }).catch(() => undefined);
-    },
+    setWindowVisible: (visible) =>
+        invoke<string | null>('set_window_visible', { visible }).catch(() => null),
 };

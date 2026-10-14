@@ -1,4 +1,4 @@
-import { type QueryCache, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryCache, type QueryState, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import type { FileDiffRequest } from '../model/repository.types';
@@ -14,6 +14,18 @@ const repositoryKeys = {
         [...repositoryKeys.of(root), 'diff', request.area, request.path, request.origPath] as const,
 };
 
+/**
+ * How old a read may be when the window or level 0 shows again, before it is read once more
+ * (decided with its cases in docs/evolution.md, Projects). The project on screen is read at once
+ * when its watcher saw a change while the window was hidden.
+ */
+const READ_AGAIN_AFTER_MS = 30_000;
+
+function isOld({ state }: { state: QueryState<unknown> }): boolean {
+    const readAt = Math.max(state.dataUpdatedAt, state.errorUpdatedAt);
+    return Date.now() - readAt > READ_AGAIN_AFTER_MS;
+}
+
 export function useRepositorySnapshot(root: string) {
     const port = useRepositoryPort();
     const queryClient = useQueryClient();
@@ -25,20 +37,18 @@ export function useRepositorySnapshot(root: string) {
             queryClient.setQueryData(repositoryKeys.summary(root), snapshot.summary);
             return snapshot;
         },
-        // a safety net for changes the watcher cannot see, such as a repository on a network drive
-        refetchOnWindowFocus: true,
     });
 }
 
 /**
  * A repository at a glance, for every project on screen. `fromSnapshot` says the Changes panel
  * shows it: its snapshot then brings the summary, and the summary is never fetched on its own.
- * `freshOnShow` reads it again each time the component shows, as the cards of all projects do.
+ * `freshOnShow` reads it again each time the component shows, as the cards of all projects do,
+ * unless it was read in the last 30 s.
  *
  * A summary is kept until something says it changed: the watcher, for the project on screen; the
- * window coming back to the front, when an agent may have worked on any project meanwhile; or the
- * cards of all projects showing. The other projects are not watched: nothing runs for them while
- * nobody looks.
+ * window coming back, when an agent may have worked on any project meanwhile; or the cards of all
+ * projects showing. The other projects are not watched: nothing runs for them while nobody looks.
  */
 export function useRepositorySummary(
     root: string,
@@ -50,8 +60,7 @@ export function useRepositorySummary(
         queryFn: () => port.getSummary(root),
         enabled: !fromSnapshot,
         staleTime: Number.POSITIVE_INFINITY,
-        refetchOnMount: freshOnShow ? 'always' : true,
-        refetchOnWindowFocus: 'always',
+        refetchOnMount: freshOnShow ? (query) => (isOld(query) ? 'always' : false) : true,
     });
 }
 
@@ -63,8 +72,6 @@ export function useFileDiff(root: string, request: FileDiffRequest | null) {
             : [...repositoryKeys.of(root), 'none'],
         queryFn: () => (request ? port.getFileDiff(root, request) : null),
         enabled: request !== null,
-        // changes made while the window was hidden were not reported
-        refetchOnWindowFocus: true,
     });
 }
 
@@ -100,8 +107,10 @@ export function useMissingRepositories(): readonly string[] {
  * summary that comes with the snapshot is not fetched: its snapshot refetches and brings it.
  *
  * While the window is minimized, hidden or covered, the backend reports nothing and no git runs.
- * When it shows again, what is on screen refetches as it does whenever the page becomes visible
- * (`refetchOnWindowFocus`, which TanStack Query ties to the page's visibility).
+ * When it shows again, what is on screen is read again if the watcher saw its project change
+ * meanwhile, or if it is older than 30 s: the other projects are not watched, and the watcher
+ * cannot see everything (a repository on a network drive). Shown again within 30 s with nothing
+ * changed, as when switching back and forth with the agent's terminal, nothing runs.
  */
 export function useRepositoryChangeSubscription() {
     const port = useRepositoryPort();
@@ -114,10 +123,29 @@ export function useRepositoryChangeSubscription() {
         [port, queryClient],
     );
     useEffect(() => {
-        const report = () => port.setWindowVisible(!document.hidden);
+        const report = async () => {
+            const visible = !document.hidden;
+            const missed = await port.setWindowVisible(visible);
+            if (!visible) return;
+            void queryClient.refetchQueries(
+                {
+                    queryKey: repositoryKeys.all,
+                    type: 'active',
+                    predicate: (query) => query.queryKey[1] === missed || isOld(query),
+                },
+                // a read already under way started after the window showed
+                { cancelRefetch: false },
+            );
+        };
+        // One report at a time, each with the visibility of its moment: when the window flickers,
+        // the backend still ends on the last one, never hidden while the window shows.
+        let reports = Promise.resolve();
+        const onChange = () => {
+            reports = reports.then(report);
+        };
         // the backend starts with the window visible
-        if (document.hidden) report();
-        document.addEventListener('visibilitychange', report);
-        return () => document.removeEventListener('visibilitychange', report);
-    }, [port]);
+        if (document.hidden) onChange();
+        document.addEventListener('visibilitychange', onChange);
+        return () => document.removeEventListener('visibilitychange', onChange);
+    }, [port, queryClient]);
 }

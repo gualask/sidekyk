@@ -25,20 +25,21 @@ project list. Only the project on screen is watched; the others cost nothing unt
 
 The other projects show their summary (`get_repository_summary`: status and one numstat against
 HEAD, new files not read) on the rail and on the level 0 cards. It is fetched once the first
-paint is done, again when the window comes to the front (an agent may have worked on any
+paint is done, again when the window shows after being hidden (an agent may have worked on any
 project while the user was away), and again each time level 0 shows, for its cards and with
-them the rail. The projects not on screen are not watched: nothing refreshes them while the
-window stays in front on another view.
-
-The snapshot also refetches when the window shows again, as a safety net for changes the watcher
-cannot see. "Shows again" is the page becoming visible (`visibilitychange`), which is what
-TanStack Query's `refetchOnWindowFocus` follows: not a mere change of focus.
+them the rail; in both cases only when the summary is older than 30 s. The projects not on
+screen are not watched: nothing refreshes them while the window stays in front on another view.
 
 While the window is hidden, minimized or covered by other windows (WKWebView follows the
-window's occlusion on macOS), nothing runs git. The page tells the backend
-(`set_window_visible`, in `window.rs`), and the watcher keeps watching but drops its batches
-before `check-ignore`. When the window shows again, the snapshot and the open diff refetch,
-whatever happened meanwhile.
+window's occlusion on macOS), nothing runs git. The page tells the backend when it becomes hidden
+or visible (`visibilitychange`, through `set_window_visible` in `window.rs`). The watcher keeps
+watching but drops its batches before `check-ignore`, and only marks the project when a batch may
+show: a path outside the ignored directories it already knows, or the git dir. When the window
+shows again, `set_window_visible` answers with the marked project, if any, and the frontend reads
+again what is on screen of it, and anything on screen read more than 30 s ago: the summaries of
+the projects not watched, and the project on screen too, as a safety net for changes the watcher
+cannot see (a repository on a network drive). Shown again within 30 s with nothing changed, as
+when switching back and forth with the agent's terminal, nothing runs.
 
 ## Frontend
 

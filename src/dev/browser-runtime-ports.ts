@@ -109,7 +109,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     : reviewDiff(request);
             },
             onRepositoryChanged: () => () => undefined,
-            setWindowVisible: () => undefined,
+            setWindowVisible: async () => null,
         },
         search: {
             search: async (request) => {
