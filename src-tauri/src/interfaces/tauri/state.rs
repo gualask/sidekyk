@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -63,6 +64,9 @@ pub(crate) struct ProjectsState {
     /// Only the project on screen is watched. Kept apart from `list`, since starting a watcher
     /// can take a while (on Linux it walks the tree) and must not hold up snapshots.
     watched: Mutex<Option<Watched>>,
+    /// The window is minimized, hidden or covered, as its page tells. Its watcher keeps watching
+    /// but reports nothing: the frontend reads what it shows again when the window comes back.
+    window_hidden: AtomicBool,
     snapshots: PerProject<RepositorySnapshot>,
     /// Every project on screen asks for its summary at once.
     summaries: PerProject<RepositorySummary>,
@@ -125,6 +129,15 @@ impl ProjectsState {
         let project = self.project(root)?;
         self.summaries
             .run(root, || repository::load_summary(backend, &project))
+    }
+
+    pub(crate) fn set_window_visible(&self, visible: bool) {
+        self.window_hidden.store(!visible, Ordering::Relaxed);
+        tracing::debug!(visible, "window visibility");
+    }
+
+    fn window_hidden(&self) -> bool {
+        self.window_hidden.load(Ordering::Relaxed)
     }
 
     /// Replaces the list at startup, before anything is watched.
@@ -201,6 +214,11 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
         // The index may now track a file in an ignored directory, or the excludes changed.
         if changes.git_dir {
             ignored.forget();
+        }
+        // nobody looks: no `check-ignore`, no refresh
+        if emitter.state::<ProjectsState>().window_hidden() {
+            tracing::debug!(git_dir = changes.git_dir, "watcher batch while hidden");
+            return;
         }
         let backend = emitter.state::<LocalRepositoryBackend>();
         let visible = changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree);

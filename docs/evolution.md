@@ -280,6 +280,27 @@ paint, so `⌘K` and the first hover are still instant.
   real time. So the cards read their summaries again each time level 0 shows (measured on the
   ten repositories in `~/Dev`: about 65 ms in parallel, 0.4 s of CPU), which also refreshes the
   counts on the rail, and nothing runs for those projects otherwise.
+- Decided on 2026-10-14: when the window shows again, or level 0 does, only what may have
+  changed is read again. The project on screen is read when its watcher saw something while the
+  window was hidden; the projects not watched, when their summary is older than 30 s; the project
+  on screen also past 30 s, as the safety net for what the watcher cannot see. No debounce: it
+  would delay the one refresh the user is waiting for. The cases 30 s was chosen on:
+  - Flicker: a window dragged over Sidekyk, Mission Control, a swipe between Spaces hide and
+    show it within a second or two. Any limit handles them.
+  - The review loop, the app's main use: `⌘Tab` between the agent's terminal and Sidekyk every
+    5 to 30 s. Read every time, with ten projects at one return every 10 s, it costs about
+    140 s of CPU an hour (0.4 s per return); SWR's 5 s (its `focusThrottleInterval`) would not
+    reduce it at all. With 30 s it is at most two reads a minute, about 50 s an hour, and
+    nothing for the project on screen while the agent writes nothing.
+  - Level 0 and back (`Esc`, `↵`) in a few seconds, to look at the cards: read once.
+  - Another agent at work on another project: its count on the rail is at most 30 s old when
+    the window comes back, less than one turn of an agent, which takes tens of seconds to
+    minutes. While the window stays in front, those counts are not read anyway (see above), and
+    opening the project reads it at once.
+  - Back after a break: always read.
+
+  60 s would halve the cost of the loop again, but the rail could then miss a whole turn of
+  another agent.
 - Why not a watcher on every project: FSEvents (macOS) and Windows watch a whole tree with one
   handle and cost close to nothing, but inotify (Linux) needs one watch per directory, and
   `notify`'s recursive mode watches them all, ignored ones included: about 33,000 directories

@@ -8,6 +8,7 @@ workflow.
 
 ```text
 agent edits files ─▶ notify watcher of the project on screen (250 ms quiet period, filtered)
+                        └─▶ dropped while the window is hidden, minimized or covered
                         └─▶ skip paths git ignores (check-ignore, cached per directory)
                         └─▶ event "repository-changed" { version: 1, root }
                               └─▶ frontend invalidates ['repository', root, …] queries
@@ -29,8 +30,15 @@ project while the user was away), and again each time level 0 shows, for its car
 them the rail. The projects not on screen are not watched: nothing refreshes them while the
 window stays in front on another view.
 
-The snapshot also refetches when the window regains focus, as a safety net for changes the watcher
-cannot see.
+The snapshot also refetches when the window shows again, as a safety net for changes the watcher
+cannot see. "Shows again" is the page becoming visible (`visibilitychange`), which is what
+TanStack Query's `refetchOnWindowFocus` follows: not a mere change of focus.
+
+While the window is hidden, minimized or covered by other windows (WKWebView follows the
+window's occlusion on macOS), nothing runs git. The page tells the backend
+(`set_window_visible`, in `window.rs`), and the watcher keeps watching but drops its batches
+before `check-ignore`. When the window shows again, the snapshot and the open diff refetch,
+whatever happened meanwhile.
 
 ## Frontend
 
@@ -148,8 +156,9 @@ theme, or the devtools' emulation, and the setting is only kept.
 - `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Creates
   the window (`create: false` in `tauri.conf.json`) in the theme of the settings, restores the
   projects, and adds and shows the repository of the first CLI argument, if any.
-- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `search.rs`, `settings.rs`, and
-  `log_frontend_error` in `diagnostics.rs`) and `state.rs`, the one place that changes the project
+- `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `search.rs`, `settings.rs`,
+  the window's visibility in `window.rs`, and `log_frontend_error` in `diagnostics.rs`) and
+  `state.rs`, the one place that changes the project
   list and watches the project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At
   most one snapshot and one summary per project run at a time: requests that arrive during one share
   the next (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.

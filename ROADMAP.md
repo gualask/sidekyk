@@ -148,11 +148,23 @@ what needs measuring before deciding waits in **Performance review**, at the end
       terminal tab used just before it; kitty on macOS first, other terminals and systems when
       needed; any failure leaves the current project (see docs/evolution.md)
 - [ ] Closing the window hides it instead of quitting; quit from the tray
-- [ ] No work while the window is hidden or minimized: the watcher only marks the project as
-      changed, and the snapshot runs when the window comes back. Today every change refetches the
-      snapshot and the open diff even when nobody looks
-- [ ] Badge or tray hint when the agent changes files while the window is hidden, from the
-      watcher's mark alone (no git while hidden)
+- [x] No work while the window is hidden, minimized or covered: the page's visibility
+      (`visibilitychange`, which TanStack Query's focus refetch already follows) reaches the
+      backend (`set_window_visible`), and the watcher drops its batches meanwhile: no
+      `check-ignore`, no snapshot, no diff. When the window shows again, the snapshot and the open
+      diff refetch. On macOS a window covered by others counts as hidden (WKWebView follows the
+      window's occlusion). Seen in the real app: writes while hidden cost the watcher's batch
+      only, and showing the window runs one snapshot and one diff. Costs nothing hidden; shown,
+      one `git diff` more each time the window comes back
+- [ ] Read again on show only what may have changed (decided on 2026-10-14, see
+      docs/evolution.md, Projects): the project on screen when the watcher saw something while
+      the window was hidden (a mark it keeps as it drops its batches), the other projects'
+      summaries when they are older than 30 s, at level 0 too. The project on screen is also read
+      again past 30 s, the safety net for changes the watcher cannot see. Today every return to
+      the window reads everything: with the terminal covering Sidekyk, each `⌘Tab` costs a
+      snapshot, the open diff and every project's summary (0.4 s of CPU for ten projects)
+- [ ] Badge or tray hint when the agent changes files while the window is hidden, from a mark the
+      watcher keeps while it drops its batches (no git while hidden)
 - [ ] Create the window hidden and show it after the first paint: no blank frame at startup
 - [ ] Compare against the default branch, for agents that commit as they go: diff the working
       tree against the merge base (`git diff --merge-base <default>`), so commits and uncommitted
@@ -235,7 +247,9 @@ Before the explorer adds more git reads, so they all share the same limits.
       8,222, past the 8,192 of older kernels). Handle the `max_user_watches` limit, shared with
       the user's editors: a watch that fails must not fail the whole project. On
       Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
-      and the git-dir check, case included. On both, check that the page's `prefers-color-scheme`
+      and the git-dir check, case included. On both, check that the page becomes hidden
+      (`visibilitychange`) when the window is minimized, so the watcher stops refreshing (WebView2
+      may need its controller told). On both, check that the page's `prefers-color-scheme`
       follows the window's theme, at startup and when the setting changes (WebKitGTK reads GTK's
       `gtk-application-prefer-dark-theme`, WebView2 its preferred color scheme). On Linux, which
       WebKitGTK versions run the zoom transitions (WebKit enabled View Transitions by default in
@@ -267,8 +281,6 @@ numbers the others are judged on.
       200 writes in 3 s gave 14 of each). Decide whether snapshots need a minimum interval, and
       whether paths git tracks can skip `check-ignore` (today only ignored directories are
       remembered)
-- [ ] Focus refetch: skip it when the watcher reported nothing since a recent snapshot, or keep
-      it unconditional as the safety net
 - [ ] Prefetch the diffs next to the selected file, if file switching shows a visible wait
 - [ ] Syntax highlighting and fuzzy search off the main thread, if they show up in the timings
 - [ ] Files panel refreshed only when paths are added or removed, not on every edit (the

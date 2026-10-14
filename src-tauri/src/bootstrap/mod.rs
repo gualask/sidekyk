@@ -100,6 +100,7 @@ pub(crate) fn run() {
             tauri_commands::search::search,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
+            tauri_commands::window::set_window_visible,
             tauri_commands::diagnostics::log_frontend_error,
         ])
         .run(::tauri::generate_context!())

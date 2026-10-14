@@ -18,6 +18,8 @@ export interface RepositoryPort {
     getFileDiff(root: string, request: FileDiffRequest): Promise<FileDiff>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
+    /** While the window is hidden, changes on disk are not reported. Never fails. */
+    setWindowVisible(visible: boolean): void;
 }
 
 const RepositoryPortContext = createContext<RepositoryPort | null>(null);

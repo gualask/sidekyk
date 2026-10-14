@@ -63,6 +63,8 @@ export function useFileDiff(root: string, request: FileDiffRequest | null) {
             : [...repositoryKeys.of(root), 'none'],
         queryFn: () => (request ? port.getFileDiff(root, request) : null),
         enabled: request !== null,
+        // changes made while the window was hidden were not reported
+        refetchOnWindowFocus: true,
     });
 }
 
@@ -96,6 +98,10 @@ export function useMissingRepositories(): readonly string[] {
 /**
  * Refetches what is shown of a repository whenever the backend reports a change on disk in it. A
  * summary that comes with the snapshot is not fetched: its snapshot refetches and brings it.
+ *
+ * While the window is minimized, hidden or covered, the backend reports nothing and no git runs.
+ * When it shows again, what is on screen refetches as it does whenever the page becomes visible
+ * (`refetchOnWindowFocus`, which TanStack Query ties to the page's visibility).
  */
 export function useRepositoryChangeSubscription() {
     const port = useRepositoryPort();
@@ -107,4 +113,11 @@ export function useRepositoryChangeSubscription() {
             }),
         [port, queryClient],
     );
+    useEffect(() => {
+        const report = () => port.setWindowVisible(!document.hidden);
+        // the backend starts with the window visible
+        if (document.hidden) report();
+        document.addEventListener('visibilitychange', report);
+        return () => document.removeEventListener('visibilitychange', report);
+    }, [port]);
 }
