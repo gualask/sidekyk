@@ -1,9 +1,56 @@
 //! The main window: what its page knows about it, and showing and hiding it.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+
 use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
 use super::state::ProjectsState;
 use super::tray;
+
+/// If the page never says it painted (a script that failed to load), the window shows anyway
+/// after this long, rather than leave the app running with nothing on screen.
+const FIRST_SHOW_DEADLINE: Duration = Duration::from_secs(3);
+
+/// The window is created hidden (`visible: false` in `tauri.conf.json`) and shows once its page
+/// painted, so startup shows no blank frame.
+pub(crate) struct FirstShow {
+    started: Instant,
+    done: AtomicBool,
+}
+
+impl Default for FirstShow {
+    fn default() -> Self {
+        Self {
+            started: Instant::now(),
+            done: AtomicBool::new(false),
+        }
+    }
+}
+
+#[tauri::command]
+/// The page painted its first frame: the window, created hidden, shows. Only the first call
+/// counts, so a page loaded again (a crashed webview) does not show a window closed into the tray.
+pub(crate) fn show_window(app: AppHandle) {
+    show_first(&app);
+}
+
+/// Shows the window at the deadline if nothing showed it before.
+pub(crate) fn show_by_deadline(app: &AppHandle) {
+    let handle = app.clone();
+    let spawned = std::thread::Builder::new()
+        .name("first-show".to_string())
+        .spawn(move || {
+            std::thread::sleep(FIRST_SHOW_DEADLINE);
+            if show_first(&handle) {
+                tracing::warn!("the page did not paint in time: the window showed anyway");
+            }
+        });
+    if let Err(error) = spawned {
+        tracing::warn!(%error, "no deadline for the first show: showing the window now");
+        show_main_window(app);
+    }
+}
 
 #[tauri::command]
 /// The window was minimized, hidden or covered, or shows again: the page's visibility, which
@@ -13,8 +60,35 @@ pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option
     app.state::<ProjectsState>().set_window_visible(visible)
 }
 
-/// Brings the window back, minimized, hidden or behind others.
+/// Shows the window if nothing showed it yet, and says whether it did.
+fn show_first(app: &AppHandle) -> bool {
+    let first = record_show(app);
+    if first {
+        bring_back(app);
+    }
+    first
+}
+
+/// Brings the window back, minimized, hidden or behind others; the first time, also at startup.
 pub(crate) fn show_main_window(app: &AppHandle) {
+    record_show(app);
+    bring_back(app);
+}
+
+/// Records that the window shows, and the time from startup the first time: true only then.
+fn record_show(app: &AppHandle) -> bool {
+    let first_show = app.state::<FirstShow>();
+    let first = !first_show.done.swap(true, Ordering::Relaxed);
+    if first {
+        tracing::info!(
+            ms = first_show.started.elapsed().as_millis(),
+            "window shown"
+        );
+    }
+    first
+}
+
+fn bring_back(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();

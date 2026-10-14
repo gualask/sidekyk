@@ -152,10 +152,18 @@ tokens apply under that media query (`theme.css`), with no script. The first pai
 colors without waiting for the backend. In the browser fixtures the page follows the system's
 theme, or the devtools' emulation, and the setting is only kept.
 
+The window is created hidden and shows once the page has the workspace laid out: `AppShell` calls
+the `showWindow` runtime port when the project list is read (`show_window`), so startup shows no
+blank frame and no empty shell. The Changes panel asks for its snapshot in that same render, and
+on macOS the snapshot and the first diff are usually back before the window is on screen. Only
+the first call counts, so a page loaded again does not show a window closed into the tray. If
+the page never calls it (a script that failed to load), the backend shows the window after 3 s.
+
 ## Backend
 
 - `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Creates
-  the window (`create: false` in `tauri.conf.json`) in the theme of the settings, puts the icon
+  the window (`create: false` in `tauri.conf.json`) hidden, in the theme of the settings, and
+  shows it at the latest 3 s later (see State), puts the icon
   in the tray, restores the projects, and adds and shows the repository of the first CLI
   argument, if any. On macOS a click on the Dock's icon brings back a window closed into the
   tray.

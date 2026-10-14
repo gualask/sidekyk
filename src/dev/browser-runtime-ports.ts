@@ -128,5 +128,6 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },
         // the browser console already shows them
         reportError: () => undefined,
+        showWindow: () => undefined,
     };
 }

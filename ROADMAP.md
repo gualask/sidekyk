@@ -177,9 +177,15 @@ what needs measuring before deciding waits in **Performance review**, at the end
       from a terminal covering Sidekyk cost a snapshot, the open diff and every project's summary
       (0.4 s of CPU for ten projects). Costs nothing hidden; shown, at most one read of what is on
       screen every 30 s, plus one for each change the agent made while hidden
-- [ ] Badge or tray hint when the agent changes files while the window is hidden, from the mark
-      the watcher keeps while it drops its batches (no git while hidden)
-- [ ] Create the window hidden and show it after the first paint: no blank frame at startup
+- [x] Create the window hidden and show it after the first paint: no blank frame at startup. The
+      page asks for it (`show_window`) once the project list is read, so the workspace is laid
+      out; the Changes panel asks for its snapshot in the same render. Without a call within 3 s
+      (a page that failed to load) the backend shows it anyway. Seen in the app built with the
+      bundled frontend (debug Rust): shown 450 to 670 ms after start, with the snapshot and the
+      first diff back before macOS put the window on screen. To check in the packaged app: no
+      blank frame at startup, light and dark; on Linux and Windows, that a page in a window never
+      shown loads and calls back (WebKitGTK, WebView2). Costs nothing hidden or shown; at startup,
+      one thread asleep for 3 s
 - [ ] Compare against the default branch, for agents that commit as they go: diff the working
       tree against the merge base (`git diff --merge-base <default>`), so commits and uncommitted
       edits show together and an edit that undoes a commit shows as unchanged. The default branch

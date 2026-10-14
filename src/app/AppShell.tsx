@@ -26,6 +26,7 @@ import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-tran
 import { PanelTile } from './PanelTile';
 import { INITIAL_PANEL, PALETTE_PANELS, panelById, SUMMARIES } from './panels';
 import { useProblems } from './problems';
+import { useShowWindowWhen } from './providers';
 import { TopBar } from './TopBar';
 import type { ZoomLevel } from './workspace';
 import { useWorkspaceKeys } from './workspace-keys';
@@ -53,6 +54,8 @@ export function AppShell() {
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<PanelTarget | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
+    // the window, created hidden, shows with the workspace laid out, not an empty shell
+    useShowWindowWhen(!projects.isPending);
     const problems = useProblems(projects.data);
     // what the first paint does not need waits until the window has nothing else to do
     const [idle, setIdle] = useState(false);

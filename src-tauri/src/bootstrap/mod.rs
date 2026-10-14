@@ -13,7 +13,9 @@ use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::interfaces::tauri::tray;
-use crate::interfaces::tauri::window::{hide_on_close, on_run_event, show_main_window};
+use crate::interfaces::tauri::window::{
+    hide_on_close, on_run_event, show_by_deadline, show_main_window, FirstShow,
+};
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
@@ -67,11 +69,13 @@ pub(crate) fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(LocalRepositoryBackend::default())
         .manage(ProjectsState::default())
+        .manage(FirstShow::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
             create_windows(app.handle())?;
+            show_by_deadline(app.handle());
             tray::start(app.handle());
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
@@ -97,6 +101,7 @@ pub(crate) fn run() {
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
             tauri_commands::window::set_window_visible,
+            tauri_commands::window::show_window,
             tauri_commands::diagnostics::log_frontend_error,
         ])
         .build(::tauri::generate_context!())

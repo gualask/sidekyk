@@ -9,6 +9,7 @@ import { tauriRepository } from './tauri-repository';
 import { tauriSearch } from './tauri-search';
 import { tauriSettings } from './tauri-settings';
 import { tauriTitleBar } from './tauri-title-bar';
+import { showWindow } from './tauri-window';
 
 /** All runtime boundaries composed by the app shell. Each field remains a focused port. */
 export type RuntimePorts = {
@@ -19,6 +20,8 @@ export type RuntimePorts = {
     titleBar: TitleBarPort;
     /** Records an uncaught frontend error where problems are investigated (the app's log). */
     reportError: (message: string) => void;
+    /** Shows the window, created hidden so that startup shows no blank frame. */
+    showWindow: () => void;
 };
 
 export const tauriRuntimePorts: RuntimePorts = {
@@ -28,4 +31,5 @@ export const tauriRuntimePorts: RuntimePorts = {
     settings: tauriSettings,
     titleBar: tauriTitleBar,
     reportError: reportFrontendError,
+    showWindow,
 };

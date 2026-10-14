@@ -162,6 +162,9 @@ Tabler's. What it settles:
 - Long structured notes (a document with headings). They fit in a card for now; revisit if the
   need shows up in use.
 - A filter in the Files panel, and a flat list of results in it: `⌘K` is the search.
+- A dot on the tray's icon when the project on screen changes while the window is hidden. Dropped
+  on 2026-10-14: while an agent works it is always on, so it tells nothing, and it cannot say
+  which project changed.
 
 ## Follow the terminal
 
