@@ -20,7 +20,9 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `tray-icon`: the change count in the tray (+235 KiB on the release binary with its menu). On
+# Linux it loads libayatana-appindicator3 at runtime; without it the app runs with no tray.
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
 serde = { version = "1", features = ["derive"] }

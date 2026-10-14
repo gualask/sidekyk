@@ -155,11 +155,13 @@ theme, or the devtools' emulation, and the setting is only kept.
 ## Backend
 
 - `bootstrap/` — plugins (single instance, dialog, store), managed state, command list. Creates
-  the window (`create: false` in `tauri.conf.json`) in the theme of the settings, restores the
-  projects, and adds and shows the repository of the first CLI argument, if any.
+  the window (`create: false` in `tauri.conf.json`) in the theme of the settings, puts the icon
+  in the tray, restores the projects, and adds and shows the repository of the first CLI
+  argument, if any. On macOS a click on the Dock's icon brings back a window closed into the
+  tray.
 - `interfaces/tauri/` — commands (`projects.rs`, `repository.rs`, `search.rs`, `settings.rs`,
-  the window's visibility in `window.rs`, and `log_frontend_error` in `diagnostics.rs`) and
-  `state.rs`, the one place that changes the project
+  the window's visibility in `window.rs`, and `log_frontend_error` in `diagnostics.rs`), the
+  tray (`tray.rs`, see Tray), and `state.rs`, the one place that changes the project
   list and watches the project on screen. Blocking work runs on `spawn_blocking` (`blocking.rs`). At
   most one snapshot and one summary per project run at a time: requests that arrive during one share
   the next (`shared/coalesce.rs`), so a burst of refreshes costs two snapshots, not one per request.
@@ -208,6 +210,22 @@ nothing typed, every project and panel come back in their order and no file. Eac
 query matches on its own, in any order, case ignored; the matched letters come back as UTF-16
 offsets, which the frontend draws in bold. At most 500 files are sent; the rest are counted.
 `backend_timings` measures a search over every tracked path of a repository.
+
+### Tray
+
+The tray's icon shows how many files changed in the project on screen: next to the icon on
+macOS and Linux, in its tooltip everywhere (Windows has no text next to tray icons). The count
+comes from every snapshot or summary of the project on screen (`repository.rs`), so the tray
+runs no git of its own and stays as it was while the window is hidden. Switching project clears
+it until the next snapshot. Its menu shows the window or quits; on Windows a click shows the
+window and the right button opens the menu, on macOS and Linux a click opens the menu. macOS
+draws a monochrome template glyph (`icons/tray-template.png`, Tabler's `git-compare` until the
+app has its own icon) in the menu bar's colors; the other systems show the app's icon.
+
+While the icon is in the tray, closing the window hides it (`window.rs`); quitting is in the
+menu, and `⌘Q` on macOS. On Linux, Tauri loads libayatana-appindicator3 (or libappindicator3)
+at runtime and panics without it: the panic is caught, the app runs with no tray, and closing
+the window quits.
 
 ### Diffs
 

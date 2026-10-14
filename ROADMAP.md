@@ -142,12 +142,21 @@ what needs measuring before deciding waits in **Performance review**, at the end
 
 ## Next: see what the agent is doing
 
-- [ ] Tray icon with the change count, and a menu to show the window or quit
+- [x] Tray icon with the change count, and a menu to show the window or quit (`tray-icon`, a
+      feature of Tauri, decided on 2026-10-14). The count is the project on screen's changed
+      files, from its snapshots and summaries: no git of its own, so it stays as it was while
+      the window is hidden. Next to the icon on macOS (a template glyph in the menu bar) and
+      Linux, in the tooltip everywhere. The app keeps its Dock icon and its place in `⌘Tab`. On
+      Linux, without libayatana-appindicator3 the app runs with no tray. To check in the packaged
+      app: the glyph in the menu bar, light and dark; on Linux and Windows, the icon and the
+      menu. Costs nothing hidden or idle; +235 KiB on the release binary
 - [ ] Global shortcut to show and hide the window (configurable)
 - [ ] Follow the terminal (setting, off by default): when Sidekyk comes up, open the project of the
       terminal tab used just before it; kitty on macOS first, other terminals and systems when
       needed; any failure leaves the current project (see docs/evolution.md)
-- [ ] Closing the window hides it instead of quitting; quit from the tray
+- [x] Closing the window hides it instead of quitting, while the tray is there; quit from the
+      tray (or `⌘Q` on macOS). On macOS a click on the Dock's icon brings the window back. To
+      check in the packaged app: `⌘W` and the close button hide, `⌘Q` quits
 - [x] No work while the window is hidden, minimized or covered: the page's visibility
       (`visibilitychange`, which TanStack Query's focus refetch already follows) reaches the
       backend (`set_window_visible`), and the watcher drops its batches meanwhile: no
@@ -236,7 +245,8 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 - [ ] Diff context lines, in the settings dialog
 - [ ] Italian and English UI (as in Fyler)
-- [ ] Real app icon
+- [ ] Real app icon, and its glyph for the macOS menu bar (`icons/tray-template.png`, today
+      Tabler's `git-compare`)
 - [ ] Copy or reveal the log from the app, for bug reports
 
 ## Release

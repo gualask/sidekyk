@@ -4,6 +4,7 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
+use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::modules::repository::{
     self, FileDiff, FileDiffRequest, RepositorySnapshot, RepositorySummary,
@@ -18,8 +19,11 @@ pub(crate) async fn get_repository_snapshot(
 ) -> Result<RepositorySnapshot, AppError> {
     blocking("get_repository_snapshot", app, move |app| {
         let backend = app.state::<LocalRepositoryBackend>();
-        app.state::<ProjectsState>()
-            .snapshot(backend.inner(), &root)
+        let snapshot = app
+            .state::<ProjectsState>()
+            .snapshot(backend.inner(), &root);
+        tray::show_read(app, &root, snapshot.as_ref().ok().map(|s| &s.summary));
+        snapshot
     })
     .await
 }
@@ -32,7 +36,9 @@ pub(crate) async fn get_repository_summary(
 ) -> Result<RepositorySummary, AppError> {
     blocking("get_repository_summary", app, move |app| {
         let backend = app.state::<LocalRepositoryBackend>();
-        app.state::<ProjectsState>().summary(backend.inner(), &root)
+        let summary = app.state::<ProjectsState>().summary(backend.inner(), &root);
+        tray::show_read(app, &root, summary.as_ref().ok());
+        summary
     })
     .await
 }

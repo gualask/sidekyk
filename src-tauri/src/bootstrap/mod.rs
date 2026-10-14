@@ -12,6 +12,8 @@ use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
+use crate::interfaces::tauri::tray;
+use crate::interfaces::tauri::window::{hide_on_close, on_run_event, show_main_window};
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
@@ -32,14 +34,6 @@ fn create_windows(app: &::tauri::AppHandle) -> ::tauri::Result<()> {
             .build()?;
     }
     Ok(())
-}
-
-fn show_main_window(app: &::tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
 }
 
 /// Adds and shows a repository named at launch; a failure leaves the app as it was.
@@ -78,6 +72,7 @@ pub(crate) fn run() {
                 logging::init(&dir);
             }
             create_windows(app.handle())?;
+            tray::start(app.handle());
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
@@ -89,6 +84,7 @@ pub(crate) fn run() {
             watch_active(app.handle());
             Ok(())
         })
+        .on_window_event(hide_on_close)
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
             tauri_commands::projects::add_project,
@@ -103,8 +99,9 @@ pub(crate) fn run() {
             tauri_commands::window::set_window_visible,
             tauri_commands::diagnostics::log_frontend_error,
         ])
-        .run(::tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(::tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(on_run_event);
 }
 
 #[cfg(test)]

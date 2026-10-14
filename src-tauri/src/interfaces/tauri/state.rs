@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
 
+use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
@@ -86,6 +87,11 @@ pub(crate) struct ProjectsState {
 impl ProjectsState {
     pub(crate) fn list(&self) -> ProjectList {
         lock(&self.list).clone()
+    }
+
+    /// The project on screen.
+    pub(crate) fn active(&self) -> Option<RepositoryInfo> {
+        lock(&self.list).active().cloned()
     }
 
     /// A project the user added. Any other root is refused, so the frontend cannot point git
@@ -182,8 +188,9 @@ impl ProjectsState {
 pub(crate) fn watch_active(app: &tauri::AppHandle) {
     let state = app.state::<ProjectsState>();
     let mut watched = lock(&state.watched);
-    let Some(active) = state.list().active().cloned() else {
+    let Some(active) = state.active() else {
         *watched = None;
+        tray::clear(app);
         return;
     };
     if watched.as_ref().is_some_and(|w| w.root == active.root) {
@@ -191,8 +198,9 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     }
     // the previous watcher stops before the next one walks its tree
     *watched = None;
-    // a project put on screen is read in full anyway
+    // a project put on screen is read in full anyway, and its first snapshot fills the tray
     lock(&state.window).missed = None;
+    tray::clear(app);
     let watcher = match start_watcher(app, &active.root) {
         Ok(watcher) => {
             tracing::info!(root = %active.root, "project opened");
