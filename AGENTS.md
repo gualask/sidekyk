@@ -16,6 +16,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 
 - `pnpm tauri:dev`: the desktop app; its log is `sidekyk-dev.log` in the app's log directory (macOS: `~/Library/Logs/io.github.gualask.sidekyk/`).
 - `pnpm dev`: the frontend on fixtures, `http://localhost:1420/?dev=app&scenario=review|clean|no-repo|large|problems` (`src/dev/`). Check UI changes there, in light and dark.
+- UI work with the maintainer: start `pnpm dev` in the background once and keep it running until the maintainer asks to stop it; Vite reloads every change, so never restart it between edits. Open the fixture page in the Playwright browser with the dark theme emulated (`prefers-color-scheme: dark`) and leave it there, so the maintainer watches each change live in that window. Say when you change the emulation or the page, since it is the maintainer's view too.
 - Checks: `pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm boundaries:check`; `cargo test`, `cargo fmt -- --check`, `cargo clippy --all-targets -- -D warnings`, all with `--manifest-path src-tauri/Cargo.toml`.
 - Backend timings: `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml backend_timings -- --ignored --nocapture`.
 - Before handing off, run every check that covers the change: zero errors, zero warnings.
