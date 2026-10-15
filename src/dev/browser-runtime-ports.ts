@@ -36,17 +36,10 @@ function initialProjects(scenario: Scenario): ProjectInfo[] {
 /** Shortcuts macOS keeps on by default: registered, but macOS gets them first. */
 const MACOS_SHORTCUTS = ['Super+Space', 'Alt+Super+Space', 'Control+Super+Space'];
 
-/**
- * As macOS answers, to see the warnings: no shortcut with only `⌥` and `⇧`, and `⇧⌘Space` held by
- * another app.
- */
-function fixtureRefusal(keys: string): string | null {
-    const modifiers = keys.split('+').slice(0, -1);
-    if (!modifiers.includes('Control') && !modifiers.includes('Super')) {
-        return 'shortcut_not_allowed';
-    }
-    return keys === 'Shift+Super+Space' ? 'shortcut_taken' : null;
-}
+/** As the system answers, to see the warning: `⇧⌘Space` held by another app. */
+const TAKEN_SHORTCUTS = ['Shift+Super+Space'];
+
+const STORED_SHORTCUT = 'Control+Alt+Space';
 
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
@@ -70,13 +63,13 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     // only kept
     let settings: Settings = {
         theme: 'dark',
-        globalShortcut: { enabled: true, keys: 'Control+Alt+Space' },
+        globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
     };
     // in `problems`, another app holds the stored shortcut since startup
-    let shortcutStatus: GlobalShortcutStatus =
-        scenario === 'problems'
-            ? { kind: 'refused', keys: settings.globalShortcut.keys, reason: 'taken' }
-            : { kind: 'active', keys: settings.globalShortcut.keys, conflict: false };
+    const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;
+    let shortcutStatus: GlobalShortcutStatus = taken.includes(STORED_SHORTCUT)
+        ? { kind: 'refused', keys: STORED_SHORTCUT }
+        : { kind: 'active', keys: STORED_SHORTCUT, conflict: false };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
     const readable = (root: string) => {
@@ -158,16 +151,19 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         },
         settings: {
             getSettings: async () => settings,
+            // as the backend: the shortcut's settings unchanged change nothing, even refused
             setSettings: async (next) => {
                 const { enabled, keys } = next.globalShortcut;
-                if (enabled) {
-                    const refusal = fixtureRefusal(keys);
-                    if (refusal) throw failure(refusal);
+                const changed =
+                    enabled !== settings.globalShortcut.enabled ||
+                    keys !== settings.globalShortcut.keys;
+                if (changed) {
+                    if (enabled && taken.includes(keys)) throw failure('shortcut_taken');
+                    shortcutStatus = enabled
+                        ? { kind: 'active', keys, conflict: MACOS_SHORTCUTS.includes(keys) }
+                        : { kind: 'off' };
                 }
                 settings = next;
-                shortcutStatus = enabled
-                    ? { kind: 'active', keys, conflict: MACOS_SHORTCUTS.includes(keys) }
-                    : { kind: 'off' };
                 return settings;
             },
             getGlobalShortcutStatus: async () => shortcutStatus,

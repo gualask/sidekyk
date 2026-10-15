@@ -150,18 +150,20 @@ what needs measuring before deciding waits in **Performance review**, at the end
       Linux, without libayatana-appindicator3 the app runs with no tray. To check in the packaged
       app: the glyph in the menu bar, light and dark; on Linux and Windows, the icon and the
       menu. Costs nothing hidden or idle; +235 KiB on the release binary
-- [ ] Global shortcut to show and hide the window, on by default (decided on 2026-10-15, see
+- [x] Global shortcut to show and hide the window, on by default (decided on 2026-10-15, see
       docs/evolution.md, Global shortcut): hidden, minimized or behind other windows it brings
       the window to the front, in front it hides it (on macOS the whole app, so the app used
       before comes back). Registered with `tauri-plugin-global-shortcut` on macOS and Windows; on
       Linux the desktop's own shortcut runs `sidekyk --toggle`, since `global-hotkey`'s X11
       backend wakes every 50 ms and Wayland has none. In the settings, a switch and a field that
-      records a new combination; one the system turns down keeps the previous, and says why. A
-      stored shortcut refused at startup, or that macOS uses for itself (read with
-      `CopySymbolicHotKeys`), is a problem in the top bar. Its default keys are provisional
-      (`⌃⌥Space`). To check in the app: the toggle on macOS (not seen yet: synthetic key events
-      need Accessibility), on Windows, and `--toggle` from a Linux desktop's shortcut. Costs
-      nothing hidden or idle; +160 KiB on the macOS release binary
+      records a new combination (a function key may come alone), showing the modifiers held and
+      what is missing; one the system turns down keeps the previous, and says why. The backend
+      checks every combination before it registers or stores it. A stored shortcut refused at
+      startup, or that macOS uses for itself (read with `CopySymbolicHotKeys`), is a problem in
+      the top bar. Its default keys are provisional (`⌃⌥Space`). Seen in the app on macOS: the
+      toggle, `⌥Space` and a function key alone. To check: on Windows, and `--toggle` from a
+      Linux desktop's shortcut. Costs nothing hidden or idle; +160 KiB on the macOS release
+      binary
 - [ ] Follow the terminal (setting, off by default): when Sidekyk comes up, open the project of the
       terminal tab used just before it; kitty on macOS first, other terminals and systems when
       needed; any failure leaves the current project (see docs/evolution.md)

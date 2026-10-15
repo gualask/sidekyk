@@ -1,36 +1,35 @@
 import { Switch } from '@base-ui/react/switch';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
-import { errorMessage } from '@/shared/errors/app-error';
 import { MACOS } from '@/shared/platform/macos';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { copyLabel, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import { useGlobalShortcutStatus, useShortcutRecording } from '../application/settings.queries';
-import type { GlobalShortcut, Settings } from '../model/settings.types';
+import {
+    useGlobalShortcutStatus,
+    useSettings,
+    useShortcutRecording,
+    useUpdateSettings,
+} from '../application/settings.queries';
+import type { GlobalShortcut } from '../model/settings.types';
 import {
     formatShortcut,
-    heldModifiers,
+    neededModifiers,
+    pendingShortcut,
     type ShortcutHint,
     shortcutFromEvent,
     shortcutHint,
 } from '../model/shortcut-keys';
-import { conflictMessage, refusalMessage, refusalOf } from '../model/shortcut-problem';
+import { shortcutChangeError, shortcutProblem } from '../model/shortcut-problem';
 
 /**
  * The global shortcut that shows and hides Sidekyk. On macOS and Windows: a switch, and under it
  * the field that records a new combination, with what is wrong with it. On Linux the desktop's
- * own shortcut runs a command, which the setting gives to copy.
+ * own shortcut runs a command, which the setting gives to copy. Its changes and their failures
+ * are its own.
  */
-export function GlobalShortcutSetting({
-    settings,
-    update,
-    failure,
-}: {
-    settings: Settings;
-    update: (shortcut: GlobalShortcut) => void;
-    /** The last change's failure on its shortcut, with the shortcut it tried. */
-    failure: { error: unknown; shortcut: GlobalShortcut } | null;
-}) {
+export function GlobalShortcutSetting() {
+    const settings = useSettings().data;
+    const update = useUpdateSettings();
     const status = useGlobalShortcutStatus().data;
     const id = useId();
     const shortcut = settings.globalShortcut;
@@ -41,17 +40,13 @@ export function GlobalShortcutSetting({
         return <Row id={id} description="This system offers Sidekyk no global shortcut." />;
     }
 
-    let warning: string | null = null;
-    if (failure) {
-        const reason = refusalOf(failure.error);
-        warning = reason
-            ? refusalMessage(failure.shortcut.keys, reason, MACOS)
-            : errorMessage(failure.error);
-    } else if (status.kind === 'refused' && shortcut.enabled) {
-        warning = refusalMessage(status.keys, status.reason, MACOS);
-    } else if (status.kind === 'active' && status.conflict) {
-        warning = conflictMessage(status.keys, MACOS);
-    }
+    const change = (globalShortcut: GlobalShortcut) =>
+        update.mutate({ ...settings, globalShortcut });
+    // the change that failed says why; otherwise what the shortcut registered has against it
+    const warning =
+        update.isError && update.variables
+            ? shortcutChangeError(update.error, update.variables.globalShortcut.keys, MACOS)
+            : (shortcutProblem(status, MACOS)?.detail ?? null);
 
     return (
         <div className="py-2">
@@ -61,7 +56,7 @@ export function GlobalShortcutSetting({
                     aria-labelledby={id}
                     className="switch"
                     checked={shortcut.enabled}
-                    onCheckedChange={(enabled) => update({ ...shortcut, enabled })}
+                    onCheckedChange={(enabled) => change({ ...shortcut, enabled })}
                 >
                     <Switch.Thumb className="switch-thumb" />
                 </Switch.Root>
@@ -71,11 +66,11 @@ export function GlobalShortcutSetting({
                     <ShortcutRecorder
                         keys={shortcut.keys}
                         labelId={id}
-                        onRecord={(keys) => update({ enabled: true, keys })}
+                        onRecord={(keys) => change({ enabled: true, keys })}
                     />
                 </div>
             ) : null}
-            {warning && (shortcut.enabled || failure) ? (
+            {warning ? (
                 <p
                     role="alert"
                     className="mt-2 flex items-start gap-1.5 text-xs text-ui-warning-soft-text"
@@ -100,18 +95,16 @@ function Row({ id, description }: { id: string; description: string }) {
     );
 }
 
+const NEEDED = neededModifiers(MACOS);
+
 /** What the field says under itself while a combination is typed. */
-const HINTS: Record<ShortcutHint | 'start', string> = MACOS
-    ? {
-          start: 'Hold ⌘, ⌃ or ⌥ and press a key. Shortcuts macOS uses never reach Sidekyk.',
-          needsModifier: 'Hold ⌘, ⌃ or ⌥ too: a key alone would be taken from every app.',
-          unsupportedKey: 'End with a letter, a digit, F1–F20, Space or an arrow.',
-      }
-    : {
-          start: 'Hold Ctrl, Alt or Win and press a key.',
-          needsModifier: 'Hold Ctrl, Alt or Win too: a key alone would be taken from every app.',
-          unsupportedKey: 'End with a letter, a digit, F1–F20, Space or an arrow.',
-      };
+const HINTS: Record<ShortcutHint | 'start', string> = {
+    start: `Hold ${NEEDED} and press a key, or press a function key alone.${
+        MACOS ? ' Shortcuts macOS uses never reach Sidekyk.' : ''
+    }`,
+    needsModifier: `Hold ${NEEDED} too: a key alone would be taken from every app.`,
+    unsupportedKey: 'End with a letter, a digit, F1–F20, Space or an arrow.',
+};
 
 /**
  * The combination, and a new one typed after a click: modifiers and a key, `Esc` to keep the
@@ -131,7 +124,7 @@ function ShortcutRecorder({
     const hintId = useId();
     const [recording, setRecording] = useState(false);
     // the modifiers held so far, and what the last key pressed lacked
-    const [held, setHeld] = useState('');
+    const [pending, setPending] = useState<string | null>(null);
     const [hint, setHint] = useState<ShortcutHint | null>(null);
     const setBackendRecording = useShortcutRecording();
     // a combination ending with Space would press the button when Space comes up
@@ -139,7 +132,7 @@ function ShortcutRecorder({
 
     const record = (on: boolean) => {
         setRecording(on);
-        setHeld('');
+        setPending(null);
         setHint(null);
     };
 
@@ -163,12 +156,12 @@ function ShortcutRecorder({
             if (next !== keys) onRecord(next);
             return;
         }
-        setHeld(heldModifiers(event, MACOS));
+        setPending(pendingShortcut(event, MACOS));
         setHint(shortcutHint(event) ?? hint);
     });
 
     const onKeyUp = useEffectEvent((event: KeyboardEvent) => {
-        setHeld(heldModifiers(event, MACOS));
+        setPending(pendingShortcut(event, MACOS));
     });
 
     // While recording, keys are read from the whole window before anything else: WebKit gives
@@ -216,7 +209,7 @@ function ShortcutRecorder({
                     record(false);
                 }}
             >
-                {recording ? `${held || 'Press keys'}…` : formatShortcut(keys, MACOS)}
+                {recording ? (pending ?? 'Press keys…') : formatShortcut(keys, MACOS)}
             </button>
             {recording ? (
                 <p id={hintId} role="status" className="text-right text-xs text-ui-text-muted">

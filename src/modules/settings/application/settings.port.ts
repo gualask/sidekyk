@@ -6,8 +6,8 @@ export interface SettingsPort {
     getSettings(): Promise<Settings>;
     /**
      * Applies the settings at once (the window's theme, the global shortcut) and stores them. A
-     * shortcut the system turns down fails with `shortcut_taken` or `shortcut_not_allowed`, and
-     * leaves every setting as it was.
+     * shortcut the system turns down fails with `shortcut_taken`, and leaves every setting as it
+     * was.
      */
     setSettings(settings: Settings): Promise<Settings>;
     getGlobalShortcutStatus(): Promise<GlobalShortcutStatus>;

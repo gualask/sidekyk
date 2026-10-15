@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatShortcut, heldModifiers, shortcutFromEvent, shortcutHint } from './shortcut-keys';
+import {
+    formatShortcut,
+    neededModifiers,
+    pendingShortcut,
+    shortcutFromEvent,
+    shortcutHint,
+} from './shortcut-keys';
 
 const press = (
     code: string,
@@ -31,6 +37,12 @@ describe('shortcutFromEvent', () => {
     it('needs Ctrl, Alt or the command key', () => {
         expect(shortcutFromEvent(press('KeyA', {}))).toBeNull();
         expect(shortcutFromEvent(press('KeyA', { shift: true }))).toBeNull();
+        expect(shortcutFromEvent(press('Space', {}))).toBeNull();
+    });
+
+    it('takes a function key alone', () => {
+        expect(shortcutFromEvent(press('F13', {}))).toBe('F13');
+        expect(shortcutFromEvent(press('F5', { shift: true }))).toBe('Shift+F5');
     });
 
     it('leaves out keys whose character depends on the layout', () => {
@@ -74,10 +86,22 @@ describe('shortcutHint', () => {
     });
 });
 
-describe('heldModifiers', () => {
-    it('writes the modifiers held before the key', () => {
-        expect(heldModifiers(press('AltLeft', { ctrl: true, alt: true }), true)).toBe('⌃⌥');
-        expect(heldModifiers(press('AltLeft', { ctrl: true, alt: true }), false)).toBe('Ctrl+Alt+');
-        expect(heldModifiers(press('KeyA', {}), true)).toBe('');
+describe('pendingShortcut', () => {
+    it('writes the modifiers held, the key still to come', () => {
+        expect(pendingShortcut(press('AltLeft', { ctrl: true, alt: true }), true)).toBe('⌃⌥…');
+        expect(pendingShortcut(press('AltLeft', { ctrl: true, alt: true }), false)).toBe(
+            'Ctrl+Alt+…',
+        );
+    });
+
+    it('is nothing while no modifier is held', () => {
+        expect(pendingShortcut(press('KeyA', {}), true)).toBeNull();
+    });
+});
+
+describe('neededModifiers', () => {
+    it('names the modifiers one of which a shortcut needs', () => {
+        expect(neededModifiers(true)).toBe('⌃, ⌥ or ⌘');
+        expect(neededModifiers(false)).toBe('Ctrl, Alt or Win');
     });
 });

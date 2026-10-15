@@ -21,13 +21,6 @@ export interface Settings {
     globalShortcut: GlobalShortcut;
 }
 
-/** Why the system turned a shortcut down. */
-export type ShortcutRefusal =
-    /** Another app holds it, or the system keeps it for itself. */
-    | 'taken'
-    /** macOS allows no shortcut whose only modifiers are `⌥` and `⇧`. */
-    | 'notAllowed';
-
 /** Where the global shortcut stands, as the backend registered it. */
 export type GlobalShortcutStatus =
     | { kind: 'off' }
@@ -36,8 +29,11 @@ export type GlobalShortcutStatus =
      * first.
      */
     | { kind: 'active'; keys: string; conflict: boolean }
-    /** The stored shortcut could not be registered at startup: none works. */
-    | { kind: 'refused'; keys: string; reason: ShortcutRefusal }
+    /**
+     * The stored shortcut could not be registered at startup, as another app or the system holds
+     * it: none works.
+     */
+    | { kind: 'refused'; keys: string }
     /** No global shortcut on this system: the plugin could not start. */
     | { kind: 'unavailable' }
     /** Linux: the desktop's own shortcut runs this command, which shows or hides Sidekyk. */

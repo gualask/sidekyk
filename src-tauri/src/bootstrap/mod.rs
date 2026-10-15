@@ -5,13 +5,14 @@
 
 use std::path::{Path, PathBuf};
 
+use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
-use crate::interfaces::tauri::shortcut::{self, GlobalShortcutState};
+use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
@@ -27,10 +28,6 @@ fn folder_argument(args: &[String]) -> Option<PathBuf> {
         .find(|a| !a.starts_with('-'))
         .map(PathBuf::from)
 }
-
-/// `sidekyk --toggle`, run while Sidekyk runs, shows or hides its window: on Linux, the
-/// desktop's own shortcut runs it in place of a global shortcut.
-const TOGGLE_FLAG: &str = "--toggle";
 
 /// Creates the windows `tauri.conf.json` leaves to the app (`create: false`), already in the theme
 /// of the settings: their first paint has the right colors, with no flash of the system's theme.
@@ -79,16 +76,16 @@ pub(crate) fn run() {
         .manage(LocalRepositoryBackend::default())
         .manage(ProjectsState::default())
         .manage(FirstShow::default())
-        .manage(GlobalShortcutState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
             let settings = settings_store::load_settings(app.handle());
+            // before the windows: their pages reach the shortcut's state as they load
+            shortcut::start(app.handle(), &settings.global_shortcut);
             create_windows(app.handle(), settings.theme)?;
             show_by_deadline(app.handle());
             tray::start(app.handle());
-            shortcut::start(app.handle(), &settings.global_shortcut);
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
@@ -99,6 +96,12 @@ pub(crate) fn run() {
             // a moved or deleted repository shows its error in the project's panels
             watch_active(app.handle());
             Ok(())
+        })
+        // a page loaded again (a crashed webview) forgets a shortcut its predecessor was recording
+        .on_page_load(|webview, payload| {
+            if payload.event() == PageLoadEvent::Started {
+                shortcut::set_recording(webview.app_handle(), false);
+            }
         })
         .on_window_event(hide_on_close)
         .invoke_handler(::tauri::generate_handler![

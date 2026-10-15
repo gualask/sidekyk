@@ -1,27 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { isShortcutError, refusalOf, shortcutProblem } from './shortcut-problem';
+import { shortcutChangeError, shortcutProblem } from './shortcut-problem';
 
 const failure = (code: string) => ({ code, message: code });
 
-describe('refusalOf', () => {
-    it('reads why the system turned a shortcut down', () => {
-        expect(refusalOf(failure('shortcut_taken'))).toBe('taken');
-        expect(refusalOf(failure('shortcut_not_allowed'))).toBe('notAllowed');
-        expect(refusalOf(failure('invalid_shortcut'))).toBeNull();
+describe('shortcutChangeError', () => {
+    it('names the keys another app holds', () => {
+        expect(shortcutChangeError(failure('shortcut_taken'), 'Shift+Super+Space', true)).toBe(
+            'Another app or the system already uses ⇧⌘Space. Pick another.',
+        );
     });
 
-    it('counts an invalid shortcut as the shortcut failing', () => {
-        expect(isShortcutError(failure('invalid_shortcut'))).toBe(true);
-        expect(isShortcutError(failure('shortcut_taken'))).toBe(true);
-        expect(isShortcutError(failure('unknown'))).toBe(false);
+    it('reads any other failure as its message', () => {
+        expect(shortcutChangeError(failure('invalid_shortcut'), 'Shift+KeyA', true)).toBe(
+            'That is not a keyboard shortcut Sidekyk can register.',
+        );
     });
 });
 
 describe('shortcutProblem', () => {
     it('lists a shortcut refused at startup', () => {
-        expect(
-            shortcutProblem({ kind: 'refused', keys: 'Control+Alt+Space', reason: 'taken' }, false),
-        ).toEqual({
+        expect(shortcutProblem({ kind: 'refused', keys: 'Control+Alt+Space' }, false)).toEqual({
             title: 'The global shortcut is off',
             detail: 'Another app or the system already uses Ctrl+Alt+Space. Pick another.',
         });

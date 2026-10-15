@@ -4,6 +4,8 @@
 
 use std::ffi::{c_char, c_void, CStr};
 
+use crate::modules::settings::ShortcutKeys;
+
 type CFTypeRef = *const c_void;
 type CFIndex = isize;
 
@@ -44,10 +46,9 @@ extern "C" {
     fn CFRelease(value: CFTypeRef);
 }
 
-/// Whether one of macOS's own shortcuts, turned on, uses these keys (see
-/// `modules/settings/contracts.rs` for their form). Keys it cannot read count as free.
-pub(crate) fn system_uses(keys: &str) -> bool {
-    let Some(wanted) = carbon_hot_key(keys) else {
+/// Whether one of macOS's own shortcuts, turned on, uses these keys.
+pub(crate) fn system_uses(keys: &ShortcutKeys) -> bool {
+    let Some(wanted) = carbon_hot_key(keys.as_str()) else {
         return false;
     };
     // SAFETY: every object created or copied here is released before returning; values are
@@ -97,7 +98,8 @@ unsafe fn number(value: CFTypeRef) -> Option<i64> {
     (read != 0).then_some(out)
 }
 
-/// The keys as Carbon names them: the virtual key code and the modifier bits.
+/// The keys as Carbon names them: the virtual key code and the modifier bits. Every
+/// `ShortcutKeys` has a name (see the tests).
 fn carbon_hot_key(keys: &str) -> Option<(i64, i64)> {
     let mut parts: Vec<&str> = keys.split('+').collect();
     let code = virtual_key(parts.pop()?)?;
@@ -114,7 +116,8 @@ fn carbon_hot_key(keys: &str) -> Option<(i64, i64)> {
     Some((code, modifiers))
 }
 
-/// The virtual key code (`kVK_*`) of a `KeyboardEvent.code` a shortcut may end with.
+/// The virtual key code (`kVK_*`) of a key a shortcut may end with
+/// (`modules/settings/shortcut_keys.rs`).
 fn virtual_key(code: &str) -> Option<i64> {
     Some(match code {
         "KeyA" => 0x00,
@@ -206,9 +209,20 @@ mod tests {
     }
 
     #[test]
+    fn every_key_and_modifier_of_a_shortcut_has_a_carbon_name() {
+        use crate::modules::settings::shortcut_keys::{KEYS, MODIFIERS};
+        for key in KEYS {
+            assert!(virtual_key(key).is_some(), "{key}");
+        }
+        let all = format!("{}+Space", MODIFIERS.join("+"));
+        assert!(carbon_hot_key(&all).is_some());
+    }
+
+    #[test]
     fn reading_the_system_shortcuts_does_not_fail() {
         // which ones are on depends on the machine: this only reads them
-        let _ = system_uses("Super+Space");
-        assert!(!system_uses("Control+Alt+Shift+Super+F20"));
+        let keys = |k: &str| ShortcutKeys::parse(k).unwrap();
+        let _ = system_uses(&keys("Super+Space"));
+        assert!(!system_uses(&keys("Control+Alt+Shift+Super+F20")));
     }
 }

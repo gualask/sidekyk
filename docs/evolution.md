@@ -430,15 +430,23 @@ Decided on 2026-10-15: a global shortcut shows and hides Sidekyk from any app, o
 - **Behaviour**: hidden, minimized or behind other windows, it brings Sidekyk to the front; in
   front, it hides it. On macOS the whole app hides, so the app used before comes back.
 - **The setting** (mock: "Show and hide Sidekyk"): a switch, and under it a field that records a
-  new combination: at least `⌘`/`Win`, `Ctrl` or `⌥`/`Alt`, then a letter, a digit, F1-F20 or a
-  named key (punctuation's code names the US layout, so it is left out). While a combination is
-  typed, the current shortcut does nothing.
+  new combination: at least `⌘`/`Win`, `Ctrl` or `⌥`/`Alt`, then a letter, a digit or a named
+  key, or a function key (F1-F20) alone, which takes no character from any app. Punctuation is
+  left out: its code names the US layout's key. The backend checks the same rule before it
+  registers or stores one (`modules/settings`). While a combination is typed, the field shows
+  the modifiers held and what is missing, and the current shortcut does nothing; keys are read
+  from the whole window, since WebKit does not focus a button clicked.
 - **Conflicts**: a combination the system turns down keeps the previous one, and the field says
-  why. Windows and X11 refuse one another app holds; macOS does not (registrations are not
-  exclusive), refuses those with only `⌥`/`⌥⇧` since macOS 15, and does not report its own
-  shortcuts: Sidekyk reads them (`CopySymbolicHotKeys`) and warns. A stored shortcut refused at
-  startup, or that macOS uses too, is a problem in the top bar, fixed in the settings. Conflicts
-  inside another app (`⌥Space` typing a non-breaking space) cannot be seen.
+  why. Windows and X11 refuse one another app holds. macOS does not: registrations are not
+  exclusive, and no API lists other apps' hot keys. Nor does it report its own shortcuts, which
+  Sidekyk reads (`CopySymbolicHotKeys`) to warn; while they are on, their keys never reach the
+  field. A stored shortcut refused at startup, or that macOS uses too, is a problem in the top
+  bar, fixed in the settings. Conflicts inside another app (`⌥Space` typing a non-breaking space)
+  cannot be seen.
+- **`⌥`-only shortcuts work on macOS**: reports from macOS 15's betas said `RegisterEventHotKey`
+  refuses shortcuts whose only modifiers are `⌥`/`⌥⇧`. Tried on macOS 27.0.1 on 2026-10-15: they
+  register and are delivered (`⌥Space`), as is a function key alone (`F5`), so Sidekyk refuses
+  neither.
 - **Cost**: nothing while idle; one registration at startup and at each change. +160 KiB on the
   macOS release binary.
 
@@ -458,7 +466,9 @@ When these land, `AGENTS.md` changes too:
 - Explorer: `git grep` or ripgrep's crates for the search in contents.
 - Quick capture of a note through a global shortcut.
 - Global shortcut: its default combination (`⌃⌥Space`, `Ctrl+Alt+Space` for now, in
-  `DEFAULT_GLOBAL_SHORTCUT`), once the conflict warnings have been tried.
+  `DEFAULT_GLOBAL_SHORTCUT`). `⌃⌥Space` is free on a Mac with one input source; with two, macOS's
+  "next input source" uses it, which Sidekyk warns about. `⌥Space` is Raycast's and Alfred's
+  default.
 - Free canvas: revisit after semantic zoom has been used for a while.
 
 ## Sources

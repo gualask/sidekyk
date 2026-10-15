@@ -23,8 +23,6 @@ pub(crate) enum UserFacingErrorCode {
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
-    #[cfg(target_os = "macos")]
-    ShortcutNotAllowed,
     #[cfg(any(target_os = "macos", windows))]
     ShortcutTaken,
 }
@@ -41,8 +39,6 @@ impl UserFacingErrorCode {
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
-            #[cfg(target_os = "macos")]
-            Self::ShortcutNotAllowed => "shortcut_not_allowed",
             #[cfg(any(target_os = "macos", windows))]
             Self::ShortcutTaken => "shortcut_taken",
         }
@@ -163,10 +159,6 @@ mod tests {
     fn shortcut_error_codes_keep_the_wire_contract() {
         let cases = [
             (UserFacingErrorCode::InvalidShortcut, "invalid_shortcut"),
-            (
-                UserFacingErrorCode::ShortcutNotAllowed,
-                "shortcut_not_allowed",
-            ),
             (UserFacingErrorCode::ShortcutTaken, "shortcut_taken"),
         ];
         for (code, wire) in cases {

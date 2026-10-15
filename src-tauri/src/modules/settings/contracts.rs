@@ -43,18 +43,6 @@ pub(crate) struct Settings {
     pub(crate) global_shortcut: GlobalShortcut,
 }
 
-/// Why the system turned a shortcut down.
-#[cfg(any(target_os = "macos", windows))]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) enum ShortcutRefusal {
-    /// Another app holds it, or the system keeps it for itself.
-    Taken,
-    /// macOS allows no shortcut whose only modifiers are `⌥` and `⇧`.
-    #[cfg(target_os = "macos")]
-    NotAllowed,
-}
-
 /// Where the global shortcut stands, as registered. The frontend knows every platform's kinds;
 /// each platform builds only its own.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -68,12 +56,10 @@ pub(crate) enum GlobalShortcutStatus {
     /// them first.
     #[cfg(any(target_os = "macos", windows))]
     Active { keys: String, conflict: bool },
-    /// The stored shortcut could not be registered at startup: none works.
+    /// The stored shortcut could not be registered at startup, as another app or the system
+    /// holds it: none works.
     #[cfg(any(target_os = "macos", windows))]
-    Refused {
-        keys: String,
-        reason: ShortcutRefusal,
-    },
+    Refused { keys: String },
     /// No global shortcut on this system: the plugin could not start.
     #[cfg(any(target_os = "macos", windows))]
     Unavailable,
@@ -134,17 +120,9 @@ mod tests {
             ),
             (
                 GlobalShortcutStatus::Refused {
-                    keys: "Alt+Space".to_string(),
-                    reason: ShortcutRefusal::NotAllowed,
-                },
-                serde_json::json!({ "kind": "refused", "keys": "Alt+Space", "reason": "notAllowed" }),
-            ),
-            (
-                GlobalShortcutStatus::Refused {
                     keys: "Super+Space".to_string(),
-                    reason: ShortcutRefusal::Taken,
                 },
-                serde_json::json!({ "kind": "refused", "keys": "Super+Space", "reason": "taken" }),
+                serde_json::json!({ "kind": "refused", "keys": "Super+Space" }),
             ),
             (
                 GlobalShortcutStatus::Unavailable,
