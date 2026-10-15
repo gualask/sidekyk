@@ -2,5 +2,11 @@
 //! the layers around it.
 
 mod contracts;
+#[cfg(target_os = "macos")]
+mod shortcut;
 
-pub(crate) use contracts::{Settings, Theme};
+#[cfg(any(target_os = "macos", windows))]
+pub(crate) use contracts::ShortcutRefusal;
+pub(crate) use contracts::{GlobalShortcut, GlobalShortcutStatus, Settings, Theme};
+#[cfg(target_os = "macos")]
+pub(crate) use shortcut::macos_allows;

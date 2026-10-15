@@ -9,11 +9,14 @@ const USER_MESSAGES: Record<string, string> = {
     git_timed_out:
         'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',
     invalid_commit: 'That is not a commit of this repository.',
+    invalid_shortcut: 'That is not a keyboard shortcut Sidekyk can register.',
     not_a_repository: 'That folder is not inside a git repository.',
     path_outside_repository: 'That path is outside the repository.',
     project_not_found: 'That repository is no longer in Sidekyk.',
     repository_missing:
         'This repository was moved or deleted. Remove it from All projects, then add it again from its new folder.',
+    shortcut_not_allowed: 'macOS allows no shortcut whose only modifiers are ⌥ and ⇧. Add ⌘ or ⌃.',
+    shortcut_taken: 'Another app or the system already uses that shortcut. Pick another.',
 };
 
 function isAppErrorPayload(error: unknown): error is AppErrorPayload {

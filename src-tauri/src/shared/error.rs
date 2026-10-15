@@ -17,10 +17,16 @@ pub(crate) enum UserFacingErrorCode {
     GitNotFound,
     GitTimedOut,
     InvalidCommit,
+    #[cfg(any(target_os = "macos", windows))]
+    InvalidShortcut,
     NotARepository,
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
+    #[cfg(target_os = "macos")]
+    ShortcutNotAllowed,
+    #[cfg(any(target_os = "macos", windows))]
+    ShortcutTaken,
 }
 
 impl UserFacingErrorCode {
@@ -29,10 +35,16 @@ impl UserFacingErrorCode {
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
             Self::InvalidCommit => "invalid_commit",
+            #[cfg(any(target_os = "macos", windows))]
+            Self::InvalidShortcut => "invalid_shortcut",
             Self::NotARepository => "not_a_repository",
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
+            #[cfg(target_os = "macos")]
+            Self::ShortcutNotAllowed => "shortcut_not_allowed",
+            #[cfg(any(target_os = "macos", windows))]
+            Self::ShortcutTaken => "shortcut_taken",
         }
     }
 }
@@ -140,6 +152,22 @@ mod tests {
             ),
             (UserFacingErrorCode::ProjectNotFound, "project_not_found"),
             (UserFacingErrorCode::RepositoryMissing, "repository_missing"),
+        ];
+        for (code, wire) in cases {
+            assert_eq!(code.as_str(), wire);
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn shortcut_error_codes_keep_the_wire_contract() {
+        let cases = [
+            (UserFacingErrorCode::InvalidShortcut, "invalid_shortcut"),
+            (
+                UserFacingErrorCode::ShortcutNotAllowed,
+                "shortcut_not_allowed",
+            ),
+            (UserFacingErrorCode::ShortcutTaken, "shortcut_taken"),
         ];
         for (code, wire) in cases {
             assert_eq!(code.as_str(), wire);

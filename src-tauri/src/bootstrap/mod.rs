@@ -11,12 +11,14 @@ use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
+use crate::interfaces::tauri::shortcut::{self, GlobalShortcutState};
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
-    hide_on_close, on_run_event, show_by_deadline, show_main_window, FirstShow,
+    hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
+use crate::modules::settings::Theme;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -26,10 +28,13 @@ fn folder_argument(args: &[String]) -> Option<PathBuf> {
         .map(PathBuf::from)
 }
 
+/// `sidekyk --toggle`, run while Sidekyk runs, shows or hides its window: on Linux, the
+/// desktop's own shortcut runs it in place of a global shortcut.
+const TOGGLE_FLAG: &str = "--toggle";
+
 /// Creates the windows `tauri.conf.json` leaves to the app (`create: false`), already in the theme
 /// of the settings: their first paint has the right colors, with no flash of the system's theme.
-fn create_windows(app: &::tauri::AppHandle) -> ::tauri::Result<()> {
-    let theme = settings_store::load_settings(app).theme;
+fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()> {
     for config in app.config().app.windows.iter().filter(|w| !w.create) {
         WebviewWindowBuilder::from_config(app, config)?
             .theme(Some(window_theme(theme)))
@@ -60,8 +65,12 @@ pub(crate) fn run() {
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
         if let Some(folder) = folder_argument(&args) {
             open_or_log(app, &PathBuf::from(cwd).join(folder));
+            show_main_window(app);
+        } else if args.iter().skip(1).any(|a| a == TOGGLE_FLAG) {
+            toggle_main_window(app);
+        } else {
+            show_main_window(app);
         }
-        show_main_window(app);
     }));
 
     builder
@@ -70,13 +79,16 @@ pub(crate) fn run() {
         .manage(LocalRepositoryBackend::default())
         .manage(ProjectsState::default())
         .manage(FirstShow::default())
+        .manage(GlobalShortcutState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
-            create_windows(app.handle())?;
+            let settings = settings_store::load_settings(app.handle());
+            create_windows(app.handle(), settings.theme)?;
             show_by_deadline(app.handle());
             tray::start(app.handle());
+            shortcut::start(app.handle(), &settings.global_shortcut);
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
@@ -103,6 +115,8 @@ pub(crate) fn run() {
             tauri_commands::search::search,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
+            tauri_commands::shortcut::get_global_shortcut_status,
+            tauri_commands::shortcut::set_shortcut_recording,
             tauri_commands::window::set_window_visible,
             tauri_commands::window::show_window,
             tauri_commands::diagnostics::log_frontend_error,

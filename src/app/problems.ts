@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import { useMissingRepositories } from '@/modules/changes';
 import { type ProjectList, useRemoveProject } from '@/modules/projects';
+import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
+import { MACOS } from '@/shared/platform/macos';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
 export interface Problem {
@@ -11,23 +13,33 @@ export interface Problem {
 }
 
 /**
- * What needs the user, from what the app already knows: nothing is read to find problems. Today a
- * repository moved or deleted, which its panels show too; the list reaches it from any project.
+ * What needs the user, from what the app already knows: nothing is read to find problems. A
+ * repository moved or deleted, which its panels show too, and the list reaches from any project;
+ * a global shortcut the system turned down at startup, or that macOS uses too, fixed in the
+ * settings.
  */
-export function useProblems(list: ProjectList | undefined): Problem[] {
+export function useProblems(list: ProjectList | undefined, openSettings: () => void): Problem[] {
     const missing = useMissingRepositories();
     const { mutate: remove } = useRemoveProject();
+    const shortcut = useGlobalShortcutStatus().data;
 
-    return useMemo(
-        () =>
-            (list?.projects ?? [])
-                .filter((project) => missing.includes(project.root))
-                .map((project) => ({
-                    id: `missing:${project.root}`,
-                    title: `${project.name} was moved or deleted`,
-                    detail: `Nothing is left at ${project.root}. Remove it, then add it again from its new folder.`,
-                    fix: { label: 'Remove', run: () => remove(project.root) },
-                })),
-        [list, missing, remove],
-    );
+    return useMemo(() => {
+        const problems: Problem[] = (list?.projects ?? [])
+            .filter((project) => missing.includes(project.root))
+            .map((project) => ({
+                id: `missing:${project.root}`,
+                title: `${project.name} was moved or deleted`,
+                detail: `Nothing is left at ${project.root}. Remove it, then add it again from its new folder.`,
+                fix: { label: 'Remove', run: () => remove(project.root) },
+            }));
+        const shortcutIssue = shortcutProblem(shortcut, MACOS);
+        if (shortcutIssue) {
+            problems.push({
+                id: 'global-shortcut',
+                ...shortcutIssue,
+                fix: { label: 'Change shortcut', run: openSettings },
+            });
+        }
+        return problems;
+    }, [list, missing, remove, shortcut, openSettings]);
 }

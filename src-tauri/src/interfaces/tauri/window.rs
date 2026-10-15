@@ -88,7 +88,41 @@ fn record_show(app: &AppHandle) -> bool {
     first
 }
 
+/// The global shortcut and `sidekyk --toggle`: the window in front hides; minimized, hidden or
+/// behind others, it comes back to the front.
+pub(crate) fn toggle_main_window(app: &AppHandle) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let in_front = window.is_visible().unwrap_or(false)
+        && !window.is_minimized().unwrap_or(false)
+        && window.is_focused().unwrap_or(false);
+    if in_front {
+        hide_main_window(app);
+    } else {
+        show_main_window(app);
+    }
+}
+
+/// macOS hides the whole app, so the app used before comes back to the front; a window hidden
+/// alone would leave Sidekyk active with nothing on screen.
+#[cfg(target_os = "macos")]
+fn hide_main_window(app: &AppHandle) {
+    let _ = app.hide();
+}
+
+/// Elsewhere the window hides and the system brings the next one to the front.
+#[cfg(not(target_os = "macos"))]
+fn hide_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
 fn bring_back(app: &AppHandle) {
+    // the app hidden by the shortcut shows again with its window
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.unminimize();
         let _ = window.show();

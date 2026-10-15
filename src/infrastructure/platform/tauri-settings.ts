@@ -6,4 +6,6 @@ import type { SettingsPort } from '@/modules/settings';
 export const tauriSettings: SettingsPort = {
     getSettings: () => invoke('get_settings'),
     setSettings: (settings) => invoke('set_settings', { settings }),
+    getGlobalShortcutStatus: () => invoke('get_global_shortcut_status'),
+    setShortcutRecording: (recording) => invoke('set_shortcut_recording', { recording }),
 };

@@ -1,6 +1,6 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { ProjectList } from '@/modules/projects';
-import type { Settings } from '@/modules/settings';
+import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureSearch } from './fixture-search';
@@ -33,6 +33,21 @@ function initialProjects(scenario: Scenario): ProjectInfo[] {
     return [FIXTURE_REPOSITORY];
 }
 
+/** Shortcuts macOS keeps on by default: registered, but macOS gets them first. */
+const MACOS_SHORTCUTS = ['Super+Space', 'Alt+Super+Space', 'Control+Super+Space'];
+
+/**
+ * As macOS answers, to see the warnings: no shortcut with only `⌥` and `⇧`, and `⇧⌘Space` held by
+ * another app.
+ */
+function fixtureRefusal(keys: string): string | null {
+    const modifiers = keys.split('+').slice(0, -1);
+    if (!modifiers.includes('Control') && !modifiers.includes('Super')) {
+        return 'shortcut_not_allowed';
+    }
+    return keys === 'Shift+Super+Space' ? 'shortcut_taken' : null;
+}
+
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
     return { code, message: code };
@@ -53,7 +68,15 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     };
     // a browser tab follows the system's theme, or the one the devtools emulate: the setting is
     // only kept
-    let settings: Settings = { theme: 'dark' };
+    let settings: Settings = {
+        theme: 'dark',
+        globalShortcut: { enabled: true, keys: 'Control+Alt+Space' },
+    };
+    // in `problems`, another app holds the stored shortcut since startup
+    let shortcutStatus: GlobalShortcutStatus =
+        scenario === 'problems'
+            ? { kind: 'refused', keys: settings.globalShortcut.keys, reason: 'taken' }
+            : { kind: 'active', keys: settings.globalShortcut.keys, conflict: false };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
     const readable = (root: string) => {
@@ -136,9 +159,19 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         settings: {
             getSettings: async () => settings,
             setSettings: async (next) => {
+                const { enabled, keys } = next.globalShortcut;
+                if (enabled) {
+                    const refusal = fixtureRefusal(keys);
+                    if (refusal) throw failure(refusal);
+                }
                 settings = next;
+                shortcutStatus = enabled
+                    ? { kind: 'active', keys, conflict: MACOS_SHORTCUTS.includes(keys) }
+                    : { kind: 'off' };
                 return settings;
             },
+            getGlobalShortcutStatus: async () => shortcutStatus,
+            setShortcutRecording: async () => undefined,
         },
         // a browser tab draws no window controls over the page
         titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },

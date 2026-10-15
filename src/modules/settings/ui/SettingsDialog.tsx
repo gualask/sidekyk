@@ -6,6 +6,8 @@ import { type ReactNode, type RefObject, useId, useRef } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 import type { Theme } from '../model/settings.types';
+import { isShortcutError } from '../model/shortcut-problem';
+import { GlobalShortcutSetting } from './GlobalShortcutSetting';
 
 const THEMES: { value: Theme; label: string }[] = [
     { value: 'dark', label: 'Dark' },
@@ -27,6 +29,11 @@ export function SettingsDialog({
     const settings = useSettings().data;
     const update = useUpdateSettings();
     const current = useRef<HTMLElement>(null);
+    // a shortcut turned down is said under the shortcut, any other failure at the top
+    const shortcutFailure =
+        update.isError && isShortcutError(update.error) && update.variables
+            ? { error: update.error, shortcut: update.variables.globalShortcut }
+            : null;
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -48,7 +55,7 @@ export function SettingsDialog({
                             <IconX size={16} />
                         </Dialog.Close>
                     </div>
-                    {update.isError ? (
+                    {update.isError && !shortcutFailure ? (
                         <p role="alert" className="px-4 pt-3 text-ui-danger">
                             {errorMessage(update.error)}
                         </p>
@@ -65,6 +72,15 @@ export function SettingsDialog({
                                 />
                             )}
                         </Setting>
+                    </Section>
+                    <Section title="Shortcuts">
+                        <GlobalShortcutSetting
+                            settings={settings}
+                            update={(globalShortcut) =>
+                                update.mutate({ ...settings, globalShortcut })
+                            }
+                            failure={shortcutFailure}
+                        />
                     </Section>
                     <div className="dialog-foot">
                         <span>Changes apply at once</span>

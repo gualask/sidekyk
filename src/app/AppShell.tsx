@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
     ChangeCount,
     changesPanel,
@@ -56,12 +56,17 @@ export function AppShell() {
     const project = projects.data ? activeProject(projects.data) : null;
     // the window, created hidden, shows with the workspace laid out, not an empty shell
     useShowWindowWhen(!projects.isPending);
-    const problems = useProblems(projects.data);
     // what the first paint does not need waits until the window has nothing else to do
     const [idle, setIdle] = useState(false);
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
     const [paletteOpen, setPaletteOpen] = useState<boolean | null>(null);
+    // a problem's fix in the settings: they open in place of the palette
+    const openSettings = useCallback(() => {
+        setPaletteOpen((open) => (open ? false : open));
+        setSettingsOpen(true);
+    }, []);
+    const problems = useProblems(projects.data, openSettings);
     const activate = useActivateProject();
 
     /**

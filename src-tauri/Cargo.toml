@@ -63,3 +63,9 @@ strip = "debuginfo"
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-single-instance = "2.5.2"
+
+# The global shortcut that shows and hides the window (`global-hotkey`: Carbon hot keys on macOS,
+# `RegisterHotKey` on Windows; idle until pressed). Not on Linux: its X11 backend wakes every
+# 50 ms and Wayland has none, so there the desktop's own shortcut runs `sidekyk --toggle`.
+[target.'cfg(any(target_os = "macos", windows))'.dependencies]
+tauri-plugin-global-shortcut = "2.4.1"

@@ -413,6 +413,35 @@ over a long path or note title match almost any query.
   and a stable API do. The matcher sits behind `modules/search/rank.rs`, so changing it touches
   one file.
 
+## Global shortcut
+
+Decided on 2026-10-15: a global shortcut shows and hides Sidekyk from any app, on by default.
+
+- **Registered with `tauri-plugin-global-shortcut`** (Tauri's own, Apache-2.0/MIT) on macOS and
+  Windows, from Rust only, with no JavaScript API. It wraps `global-hotkey`, which asks the
+  system for the one combination: Carbon's `RegisterEventHotKey` on macOS, `RegisterHotKey` on
+  Windows. Idle until pressed, with no permission to ask. Rejected: `handy-keys` (every key of the
+  system through Sidekyk, Accessibility permission on macOS), `livesplit-hotkey` (little used).
+- **Not on Linux**: `global-hotkey`'s X11 backend wakes every 50 ms for as long as the app runs
+  (a `poll_for_event` loop with a sleep), and Wayland has no backend (its portal PRs are still
+  open). There the desktop's own keyboard settings run `sidekyk --toggle`, which the running
+  instance receives through single-instance. It works on X11 and Wayland at no cost, and the
+  desktop warns about conflicts itself. The settings give the command to copy.
+- **Behaviour**: hidden, minimized or behind other windows, it brings Sidekyk to the front; in
+  front, it hides it. On macOS the whole app hides, so the app used before comes back.
+- **The setting** (mock: "Show and hide Sidekyk"): a switch, and under it a field that records a
+  new combination: at least `⌘`/`Win`, `Ctrl` or `⌥`/`Alt`, then a letter, a digit, F1-F20 or a
+  named key (punctuation's code names the US layout, so it is left out). While a combination is
+  typed, the current shortcut does nothing.
+- **Conflicts**: a combination the system turns down keeps the previous one, and the field says
+  why. Windows and X11 refuse one another app holds; macOS does not (registrations are not
+  exclusive), refuses those with only `⌥`/`⌥⇧` since macOS 15, and does not report its own
+  shortcuts: Sidekyk reads them (`CopySymbolicHotKeys`) and warns. A stored shortcut refused at
+  startup, or that macOS uses too, is a problem in the top bar, fixed in the settings. Conflicts
+  inside another app (`⌥Space` typing a non-breaking space) cannot be seen.
+- **Cost**: nothing while idle; one registration at startup and at each change. +160 KiB on the
+  macOS release binary.
+
 ## What changes in the rules
 
 When these land, `AGENTS.md` changes too:
@@ -428,6 +457,8 @@ When these land, `AGENTS.md` changes too:
 - Sync: conflict strategy, and whether to encrypt notes before upload.
 - Explorer: `git grep` or ripgrep's crates for the search in contents.
 - Quick capture of a note through a global shortcut.
+- Global shortcut: its default combination (`⌃⌥Space`, `Ctrl+Alt+Space` for now, in
+  `DEFAULT_GLOBAL_SHORTCUT`), once the conflict warnings have been tried.
 - Free canvas: revisit after semantic zoom has been used for a while.
 
 ## Sources

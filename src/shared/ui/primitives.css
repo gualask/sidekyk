@@ -31,6 +31,16 @@
     .seg-item {
         @apply cursor-default px-2.5 py-1 text-xs text-ui-text-muted outline-none select-none hover:text-ui-text-secondary focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset data-checked:bg-ui-accent-soft data-checked:font-semibold data-checked:text-ui-accent-on-soft;
     }
+    /* on or off (Base UI's Switch, its Thumb inside) */
+    .switch {
+        @apply relative h-5 w-[34px] shrink-0 rounded-full bg-ui-border-hover transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-offset-2 focus-visible:ring-offset-ui-surface motion-reduce:transition-none;
+    }
+    .switch[data-checked] {
+        background-color: var(--ui-accent-solid);
+    }
+    .switch-thumb {
+        @apply absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-ui-surface shadow-sm transition-transform data-checked:translate-x-3.5 motion-reduce:transition-none;
+    }
     /* a modal dialog over the page (Base UI's Dialog): the settings, the command palette */
     .dialog-backdrop {
         @apply fixed inset-0 z-20 bg-[color-mix(in_srgb,var(--ui-bg)_55%,transparent)];
