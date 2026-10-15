@@ -255,8 +255,10 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_file_diff, load_snapshot, load_summary, resolve_repository, ChangeArea, ChangeKind,
-        ChangedFile, FileDiffRequest, IgnoredPaths, RepositorySnapshot,
+        load_commit_file_diff, load_commit_files, load_file_diff, load_recent_commits,
+        load_snapshot, load_summary, resolve_repository, ChangeArea, ChangeKind, ChangedFile,
+        Commit, CommitFileDiffRequest, CommitRequest, FileDiffRequest, IgnoredPaths,
+        RepositorySnapshot,
     };
     use crate::modules::search::{search, SearchRequest};
     use serde_json::json;
@@ -330,9 +332,9 @@ mod tests {
         assert_eq!(
             value["summary"]["files"],
             json!([
-                { "path": "README.md", "kind": "deleted", "additions": 0, "deletions": 1, "binary": false },
-                { "path": "src/cart.ts", "kind": "modified", "additions": 3, "deletions": 1, "binary": false },
-                { "path": "notes/todo.md", "kind": "untracked", "additions": null, "deletions": null, "binary": false },
+                { "path": "README.md", "origPath": null, "kind": "deleted", "additions": 0, "deletions": 1, "binary": false },
+                { "path": "src/cart.ts", "origPath": null, "kind": "modified", "additions": 3, "deletions": 1, "binary": false },
+                { "path": "notes/todo.md", "origPath": null, "kind": "untracked", "additions": null, "deletions": null, "binary": false },
             ])
         );
         assert_eq!(
@@ -401,6 +403,117 @@ mod tests {
         assert_eq!(staged.text, "");
 
         assert!(load_file_diff(&backend, &repo.info, &request("../x", "unstaged")).is_err());
+    }
+
+    #[test]
+    fn recent_commits_list_the_branch_and_show_what_each_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        git(root, &["init", "-q", "-b", "main"]);
+        git(root, &["config", "user.email", "test@example.com"]);
+        git(root, &["config", "user.name", "Test"]);
+        git(root, &["config", "commit.gpgsign", "false"]);
+        // a signature check in the user's config must not run, nor change the output
+        git(root, &["config", "log.showSignature", "true"]);
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, root).unwrap();
+
+        let none = load_recent_commits(&backend, &repo.info).unwrap();
+        assert!(none.commits.is_empty(), "before the first commit");
+        assert!(!none.more);
+
+        write(root, "src/cart.ts", "a\nb\nc\nd\ne\nf\n");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Add the cart"]);
+        git(root, &["mv", "src/cart.ts", "src/basket.ts"]);
+        write(root, "src/basket.ts", "a\nb\nc\nd\ne\nF\n");
+        write(root, "logo.png", "PNG\0data");
+        git(root, &["add", "."]);
+        git(
+            root,
+            &["commit", "-q", "-m", "Rename the cart\n\nWith a body."],
+        );
+
+        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let subjects: Vec<&str> = recent.commits.iter().map(|c| c.subject.as_str()).collect();
+        assert_eq!(subjects, ["Rename the cart", "Add the cart"]);
+        let (last, first) = (&recent.commits[0], &recent.commits[1]);
+        assert_eq!(last.parent.as_deref(), Some(first.sha.as_str()));
+        assert_eq!(first.parent, None);
+        assert_eq!(last.author, "Test");
+        assert!(last.time > 1_600_000_000);
+
+        let commit = |c: &Commit| CommitRequest {
+            sha: c.sha.clone(),
+            parent: c.parent.clone(),
+        };
+        let files = load_commit_files(&backend, &repo.info, &commit(last)).unwrap();
+        assert_eq!(
+            serde_json::to_value(&files).unwrap(),
+            json!({
+                "files": [
+                    { "path": "logo.png", "origPath": null, "kind": "added", "additions": null, "deletions": null, "binary": true },
+                    { "path": "src/basket.ts", "origPath": "src/cart.ts", "kind": "renamed", "additions": 1, "deletions": 1, "binary": false },
+                ],
+                "truncated": false
+            })
+        );
+        let root_files = load_commit_files(&backend, &repo.info, &commit(first)).unwrap();
+        assert_eq!(root_files.files.len(), 1);
+        assert_eq!(root_files.files[0].kind, ChangeKind::Added);
+
+        let diff = load_commit_file_diff(
+            &backend,
+            &repo.info,
+            &CommitFileDiffRequest {
+                commit: commit(last),
+                path: "src/basket.ts".into(),
+                orig_path: Some("src/cart.ts".into()),
+            },
+        )
+        .unwrap();
+        assert!(
+            diff.text.contains("rename from src/cart.ts") && diff.text.contains("-f\n+F\n"),
+            "{}",
+            diff.text
+        );
+        let added = load_commit_file_diff(
+            &backend,
+            &repo.info,
+            &CommitFileDiffRequest {
+                commit: commit(first),
+                path: "src/cart.ts".into(),
+                orig_path: None,
+            },
+        )
+        .unwrap();
+        assert!(added.text.contains("@@ -0,0 +1,6 @@"), "{}", added.text);
+
+        let outside = CommitFileDiffRequest {
+            commit: commit(last),
+            path: "../x".into(),
+            orig_path: None,
+        };
+        assert!(load_commit_file_diff(&backend, &repo.info, &outside).is_err());
+
+        // a merged branch: its commits are in the merge, which shows what it brought
+        git(root, &["checkout", "-q", "-b", "side"]);
+        write(root, "src/side.ts", "s\n");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Work on the side"]);
+        git(root, &["checkout", "-q", "main"]);
+        git(
+            root,
+            &["merge", "-q", "--no-ff", "-m", "Merge side", "side"],
+        );
+        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let subjects: Vec<&str> = recent.commits.iter().map(|c| c.subject.as_str()).collect();
+        assert_eq!(subjects, ["Merge side", "Rename the cart", "Add the cart"]);
+        assert!(recent.commits[0].merge);
+        assert!(!recent.commits[1].merge);
+        let merged = load_commit_files(&backend, &repo.info, &commit(&recent.commits[0])).unwrap();
+        let paths: Vec<&str> = merged.files.iter().map(|f| f.path.as_str()).collect();
+        assert_eq!(paths, ["src/side.ts"]);
     }
 
     #[test]
@@ -537,8 +650,9 @@ mod tests {
         )
     }
 
-    /// Times the snapshot, the summary, the palette's search over every tracked path and the diff
-    /// of the largest changed file on a real repository:
+    /// Times the snapshot, the summary, the palette's search over every tracked path, the recent
+    /// commits with the files of the newest, and the diff of the largest changed file on a real
+    /// repository:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
     #[test]
     #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
@@ -587,6 +701,29 @@ mod tests {
                 search(&palette, std::slice::from_ref(&repo.info), &tracked);
             })
         );
+
+        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        println!(
+            "recent commits ({}): {}",
+            recent.commits.len(),
+            time(20, || {
+                load_recent_commits(&backend, &repo.info).unwrap();
+            })
+        );
+        if let Some(newest) = recent.commits.first() {
+            let commit = CommitRequest {
+                sha: newest.sha.clone(),
+                parent: newest.parent.clone(),
+            };
+            let files = load_commit_files(&backend, &repo.info, &commit).unwrap();
+            println!(
+                "files of the newest commit ({}): {}",
+                files.files.len(),
+                time(20, || {
+                    load_commit_files(&backend, &repo.info, &commit).unwrap();
+                })
+            );
+        }
 
         let snapshot = load_snapshot(&backend, &repo.info).unwrap();
         let Some(largest) = snapshot

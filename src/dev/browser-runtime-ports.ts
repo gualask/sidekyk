@@ -2,6 +2,7 @@ import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { ProjectList } from '@/modules/projects';
 import type { Settings } from '@/modules/settings';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
@@ -55,10 +56,14 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     let settings: Settings = { theme: 'dark' };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
-    const snapshot = (root: string) => {
+    const readable = (root: string) => {
         project(root);
         if (root === MISSING_PROJECT.root) throw failure('repository_missing');
-        if (scenario === 'large' && scenarioData(root)) return largeSnapshot();
+    };
+    const large = (root: string) => scenario === 'large' && scenarioData(root);
+    const snapshot = (root: string) => {
+        readable(root);
+        if (large(root)) return largeSnapshot();
         return reviewSnapshot(!scenarioData(root));
     };
 
@@ -103,10 +108,21 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getSnapshot: async (root) => snapshot(root),
             getSummary: async (root) => snapshot(root).summary,
             getFileDiff: async (root, request) => {
-                if (root === MISSING_PROJECT.root) throw failure('repository_missing');
-                return scenario === 'large' && scenarioData(root)
-                    ? largeDiff(request)
-                    : reviewDiff(request);
+                readable(root);
+                return large(root) ? largeDiff() : reviewDiff(request);
+            },
+            // every project has the same history, even with a clean working tree
+            getRecentCommits: async (root) => {
+                readable(root);
+                return recentCommits(large(root));
+            },
+            getCommitFiles: async (root, commit) => {
+                readable(root);
+                return commitFiles(large(root), commit);
+            },
+            getCommitFileDiff: async (root, request) => {
+                readable(root);
+                return commitFileDiff(large(root), request);
             },
             onRepositoryChanged: () => () => undefined,
             setWindowVisible: async () => null,

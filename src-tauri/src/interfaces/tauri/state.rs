@@ -228,7 +228,7 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
     let emitter = app.clone();
     let root = resolved.info.root;
     let mut ignored = IgnoredPaths::new(root.clone().into());
-    let event = RepositoryChangedEvent::new(&root);
+    let watched_root = root.clone();
     let on_change = move |changes: WatchedChanges| {
         // The index may now track a file in an ignored directory, or the excludes changed.
         if changes.git_dir {
@@ -241,7 +241,7 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
         if window.hidden {
             let marked = changes.git_dir || ignored.any_maybe_visible(&changes.worktree);
             if marked {
-                window.missed = Some(event.root.clone());
+                window.missed = Some(watched_root.clone());
             }
             tracing::debug!(
                 git_dir = changes.git_dir,
@@ -261,7 +261,8 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
             "watcher batch"
         );
         if visible {
-            let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event.clone());
+            let event = RepositoryChangedEvent::new(&watched_root, changes.git_dir);
+            let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
         }
     };
     RepositoryWatcher::start(root.clone().into(), resolved.git_dir, on_change)

@@ -20,7 +20,7 @@ pub(super) struct StatusEntry {
 
 const SHORT_COMMIT: usize = 7;
 
-fn kind_of(code: char) -> Option<ChangeKind> {
+pub(super) fn kind_of(code: char) -> Option<ChangeKind> {
     match code {
         'M' => Some(ChangeKind::Modified),
         'T' => Some(ChangeKind::TypeChanged),

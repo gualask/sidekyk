@@ -1,4 +1,4 @@
-import type { ChangedFile, FileDiff, RepositorySnapshot } from '@/modules/changes';
+import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/changes';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
 
@@ -162,7 +162,7 @@ export function reviewSnapshot(clean: boolean): RepositorySnapshot {
     return { files, summary: fixtureSummary(branch, files) };
 }
 
-export function reviewDiff(file: Pick<ChangedFile, 'area' | 'path'>): FileDiff {
+export function reviewDiff(file: Pick<ChangedFile, 'area' | 'path'>): UnifiedDiff {
     const match = FILES.find((f) => f.area === file.area && f.path === file.path);
-    return { path: file.path, area: file.area, text: match?.diff ?? '', truncated: false };
+    return { text: match?.diff ?? '', truncated: false };
 }

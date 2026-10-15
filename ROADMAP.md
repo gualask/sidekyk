@@ -186,11 +186,23 @@ what needs measuring before deciding waits in **Performance review**, at the end
       blank frame at startup, light and dark; on Linux and Windows, that a page in a window never
       shown loads and calls back (WebKitGTK, WebView2). Costs nothing hidden or shown; at startup,
       one thread asleep for 3 s
-- [ ] Recent commits, as in VS Code's source control: the last commits of the branch on screen
-      (a bounded `git log`), and a click on one shows the files it changed and their diffs, read
-      only. Changes keeps comparing against HEAD, as VS Code and Zed do. Read when the list is
-      opened, never in the background. A section at the bottom of the Changes panel, as in VS
-      Code (decided on 2026-10-14)
+- [x] Recent commits, as in VS Code's source control (decided with the maintainer on 2026-10-15): a
+      section at the bottom of the Changes panel's list, closed until opened and then 40% of its
+      height, with the last 50 commits of the branch on screen drawn as VS Code's graph: one line, a
+      dot per commit, a ring for a merge, the author and how long ago. The list follows first
+      parents (`git log --first-parent -n 51 HEAD`, 1 MiB at most; none before the first commit), so
+      the one line is the branch's own history and a merge stands for what it brought. A click on a
+      commit shows its files in the list above, in place of the working tree's and on a tinted
+      background (`--ui-accent-tint`), under a card with the commit's hash, author, age and subject;
+      its × goes back to the working tree and closes the commits, as `Esc` does before it zooms out.
+      Its files (`git diff-tree --raw --numstat -M` against the first parent, at most 10,000) open
+      their diff in the same view, the hash in the header; `↑`/`↓` and `j`/`k` move in the list on
+      screen. Changes keeps comparing against HEAD. Commit ids from the frontend must be hashes
+      (`invalid_commit` otherwise), and `log.showSignature` is turned off so gpg never runs. What a
+      commit changed never changes: read once, never refreshed. The log is read again only when the
+      watcher saw the index, HEAD or refs change (`gitDir` on `repository-changed`), not on edits in
+      the working tree. Measured on Zed's clone: the log 13 ms, a commit's files 17 ms. Costs
+      nothing hidden, nothing while closed
 
 ## Next: bounded git
 

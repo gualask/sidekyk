@@ -10,14 +10,20 @@ workflow.
 agent edits files ─▶ notify watcher of the project on screen (250 ms quiet period, filtered)
                         └─▶ dropped while the window is hidden, minimized or covered
                         └─▶ skip paths git ignores (check-ignore, cached per directory)
-                        └─▶ event "repository-changed" { version: 1, root }
+                        └─▶ event "repository-changed" { version: 1, root, gitDir }
                               └─▶ frontend invalidates ['repository', root, …] queries
+                                  (the recent commits only when gitDir: index, HEAD or refs)
                                     ├─▶ get_repository_snapshot(root)  (status + numstat ×3,
                                     │                                   its summary included)
                                     ├─▶ get_repository_summary(root)   (only when no snapshot
                                     │                                   brings it: level 0)
-                                    └─▶ get_file_diff(root, …)         (one file, one area)
+                                    ├─▶ get_file_diff(root, …)         (one file, one area)
+                                    └─▶ get_recent_commits(root)       (only while unfolded)
 ```
+
+The files a commit changed and their diffs (`get_commit_files`, `get_commit_file_diff`) are read
+once, when asked for: a commit never changes, so they are cached under `['commit', root, …]`,
+apart from the repository's keys, and no change on disk or window shown reads them again.
 
 Projects are the repositories the user added (`get_projects`, `add_project`, `activate_project`,
 `remove_project`). Commands name a repository by its root, and the backend serves only roots in the
@@ -60,12 +66,15 @@ when switching back and forth with the agent's terminal, nothing runs.
   the app decides (`PaletteActions`).
 - `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
   - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
-  - `application/` — `RepositoryPort` (context-provided) and the TanStack Query hooks.
-  - `ui/` — the panel (`ChangesWorkspace`), file list, diff view and rows, the open file in the
-    panel's header; the summary's views: the project's facts in the breadcrumb, the change count
-    on the rail, the level 0 card's part (a chunk of its own, loaded with level 0). The file list
-    and the diff are virtualized (`@tanstack/react-virtual`): they are flat lists of fixed-height
-    rows (`fileListRows`, `diffRows`) and only the rows on screen are in the DOM.
+  - `application/` — `RepositoryPort` (context-provided), the TanStack Query hooks, and the
+    commit looked at in place of the working tree (`useCommitView`).
+  - `ui/` — the panel (`ChangesWorkspace`), file list, the recent commits (`RecentCommits`) and a
+    commit's files (`CommitFileList`) on the same virtualized rows (`useVirtualRows`), diff view and
+    rows, the open file in the panel's header; the summary's views: the project's facts in the
+    breadcrumb, the change count on the rail, the level 0 card's part (a chunk of its own, loaded
+    with level 0). The file list and the diff are virtualized (`@tanstack/react-virtual`): they are
+    flat lists of fixed-height rows (`fileListRows`, `diffRows`) and only the rows on screen are in
+    the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
   the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
   traffic lights overlay the top bar, which full screen turns off).
@@ -139,7 +148,8 @@ There is no client store. Git is the state: the project list, the snapshots, the
 the diffs are TanStack Query caches, the last three keyed by repository root first, so a change on
 disk refetches only that repository. A snapshot stores its summary in the summary's cache, and the
 project in the Changes panel never fetches a summary of its own. UI state is the zoom level
-(`AppShell`) and the selected file (`ChangesWorkspace`). Switching project updates the cached list
+(`AppShell`), and in `ChangesWorkspace` the selected file and the commit looked at, if any, with
+its file open. Switching project updates the cached list
 at once and the backend catches up; changes to the list run one at a time, in the user's order
 (one TanStack mutation scope), so quick switches end on the last project clicked; the list a change
 returns is shown only when no later change waits, so the screen never steps back through them.
@@ -178,10 +188,11 @@ the page never calls it (a script that failed to load), the backend shows the wi
 - `modules/settings/` — the settings and their defaults (`Settings`, `Theme`). No Tauri.
 - `modules/search/` — the command palette's ranking (`rank.rs`, over `nucleo-matcher`) and its
   wire contracts. Pure: it gets what to search. No Tauri.
-- `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, path
-  validation, the ignored-paths filter for watcher events, wire contracts. A repository moved or
-  deleted after it was added fails its snapshot and diffs with `repository_missing`, before git
-  runs. No Tauri; the outside world is the `RepositoryBackend` port.
+- `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, the
+  recent commits (`commits.rs`), path validation, the ignored-paths filter for watcher events, wire
+  contracts. A repository moved or deleted after it was added fails its snapshot and diffs with
+  `repository_missing`, before git runs. No Tauri; the outside world is the `RepositoryBackend`
+  port.
 - `infrastructure/` — `git_cli.rs` (the `git` CLI, found on PATH or in the usual install dirs,
   every call bounded: see Git limits),
   `watcher.rs` (`notify-debouncer-mini`, sorting events into git-dir and working-tree changes),
@@ -216,7 +227,8 @@ breadcrumb, on the card and in the tray.
 
 ### Git limits
 
-Every git call names the most output it reads (`max_stdout`, part of the `RepositoryBackend`
+The limits shared by the snapshot, the diffs and the recent commits are in `limits.rs`. Every
+git call names the most output it reads (`max_stdout`, part of the `RepositoryBackend`
 port): `git status` 8 MiB, a numstat 4 MiB, a diff 2 MiB, `check-ignore` the size of its input.
 Each pipe is read on a thread of its own while git writes, so past the limit git is killed
 instead of read to the end, and what was read comes back `truncated`: the last record of a cut
@@ -253,6 +265,22 @@ While the icon is in the tray, closing the window hides it (`window.rs`); quitti
 menu, and `⌘Q` on macOS. On Linux, Tauri loads libayatana-appindicator3 (or libappindicator3)
 at runtime and panics without it: the panic is caught, the app runs with no tray, and closing
 the window quits.
+
+### Recent commits
+
+The Changes panel's list ends with the recent commits, as VS Code's source control does, closed
+until opened; a commit clicked there shows its files in the list instead of the working tree's,
+on a tinted background under a card of the commit, until its × or `Esc` goes back to the working
+tree and closes the commits. `load_recent_commits` runs `git log -z
+--first-parent -n 51 HEAD` (one more than the 50 listed, to know whether older ones exist): the
+branch's own history, which the list draws as one line, a merge standing for the commits it
+brought. `--ignore-missing` makes a branch with no commit yet list none, and
+`--no-show-signature` keeps a `log.showSignature` in the user's config from running gpg. Each
+commit comes with its first parent: a commit's files (`git diff-tree -r -z --raw --numstat -M`,
+at most 10,000) and a file's diff (`git diff-tree -p`) compare it with that parent, or with
+nothing for a root commit (`--root`), so a merge shows what it brought to its branch, as in VS
+Code. The ids come from the frontend and must be hashes (`invalid_commit` otherwise), so they can
+never be read as an option. Every call has the limits of the others (see Git limits).
 
 ### Diffs
 

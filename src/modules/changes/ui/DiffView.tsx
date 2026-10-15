@@ -1,14 +1,17 @@
 import { IconFileOff } from '@tabler/icons-react';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, type RefObject, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
+import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import { useFileDiff } from '../application/repository.queries';
+import { useCommitFileDiff, useFileDiff } from '../application/repository.queries';
 import { formatFileForAgent, formatHunkForAgent } from '../model/agent-snippet';
+import { commitRequest, shortSha } from '../model/commits';
 import { type DiffHunk, parseUnifiedDiff } from '../model/diff-parser';
 import { diffRows, widestLine } from '../model/diff-rows';
-import type { ChangedFile } from '../model/repository.types';
+import type { ChangedFile, Commit, FileChange, UnifiedDiff } from '../model/repository.types';
 import { DiffLineRow, HunkHeaderRow } from './DiffRows';
 import { HUNK_ROW_HEIGHT, LINE_CHROME_WIDTH, LINE_ROW_HEIGHT } from './diff-layout';
 import { FileHeader } from './FileHeader';
@@ -79,21 +82,18 @@ function DiffLines({
     );
 }
 
-export function DiffView({
-    root,
+function DiffView({
+    diff,
     file,
+    source,
     header,
 }: {
-    root: string;
-    file: ChangedFile;
+    diff: UseQueryResult<UnifiedDiff | null>;
+    file: FileChange;
+    source: { label: string; title?: string };
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
 }) {
-    const diff = useFileDiff(root, {
-        path: file.path,
-        origPath: file.origPath,
-        area: file.area,
-    });
     const parsed = useMemo(
         () => (diff.data ? parseUnifiedDiff(diff.data.text) : null),
         [diff.data],
@@ -109,6 +109,7 @@ export function DiffView({
                 ? createPortal(
                       <FileHeader
                           file={file}
+                          source={source}
                           copied={fileCopied}
                           onCopy={
                               hunks.length > 0
@@ -146,5 +147,57 @@ export function DiffView({
                 ) : null}
             </div>
         </div>
+    );
+}
+
+/** The diff of a file changed in the working tree, in its area. */
+export function ChangeDiffView({
+    root,
+    file,
+    header,
+}: {
+    root: string;
+    file: ChangedFile;
+    header: HTMLElement | null;
+}) {
+    const diff = useFileDiff(root, {
+        path: file.path,
+        origPath: file.origPath,
+        area: file.area,
+    });
+    return (
+        <DiffView
+            diff={diff}
+            file={file}
+            source={{ label: CHANGE_AREA_LABEL[file.area] }}
+            header={header}
+        />
+    );
+}
+
+/** The diff of a file of a commit, against the commit's parent. */
+export function CommitDiffView({
+    root,
+    commit,
+    file,
+    header,
+}: {
+    root: string;
+    commit: Commit;
+    file: FileChange;
+    header: HTMLElement | null;
+}) {
+    const diff = useCommitFileDiff(root, {
+        commit: commitRequest(commit),
+        path: file.path,
+        origPath: file.origPath,
+    });
+    return (
+        <DiffView
+            diff={diff}
+            file={file}
+            source={{ label: shortSha(commit.sha), title: commit.subject }}
+            header={header}
+        />
     );
 }

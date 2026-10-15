@@ -16,6 +16,7 @@ pub(crate) enum AppError {
 pub(crate) enum UserFacingErrorCode {
     GitNotFound,
     GitTimedOut,
+    InvalidCommit,
     NotARepository,
     PathOutsideRepository,
     ProjectNotFound,
@@ -27,6 +28,7 @@ impl UserFacingErrorCode {
         match self {
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
+            Self::InvalidCommit => "invalid_commit",
             Self::NotARepository => "not_a_repository",
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
@@ -130,6 +132,7 @@ mod tests {
         let cases = [
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
+            (UserFacingErrorCode::InvalidCommit, "invalid_commit"),
             (UserFacingErrorCode::NotARepository, "not_a_repository"),
             (
                 UserFacingErrorCode::PathOutsideRepository,

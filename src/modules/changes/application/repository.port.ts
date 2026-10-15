@@ -1,10 +1,14 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
-    FileDiff,
+    CommitFileDiffRequest,
+    CommitFiles,
+    CommitRequest,
     FileDiffRequest,
+    RecentCommits,
     RepositoryChangedEvent,
     RepositorySnapshot,
     RepositorySummary,
+    UnifiedDiff,
 } from '../model/repository.types';
 
 /**
@@ -15,7 +19,11 @@ export interface RepositoryPort {
     getSnapshot(root: string): Promise<RepositorySnapshot>;
     /** Branch, changed paths and line totals, cheap enough for every project on screen. */
     getSummary(root: string): Promise<RepositorySummary>;
-    getFileDiff(root: string, request: FileDiffRequest): Promise<FileDiff>;
+    getFileDiff(root: string, request: FileDiffRequest): Promise<UnifiedDiff>;
+    /** The last commits of the branch on screen; none before the first commit. */
+    getRecentCommits(root: string): Promise<RecentCommits>;
+    getCommitFiles(root: string, commit: CommitRequest): Promise<CommitFiles>;
+    getCommitFileDiff(root: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
     /**

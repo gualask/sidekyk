@@ -1,4 +1,4 @@
-import type { ChangedFile, FileDiff, RepositorySnapshot } from '@/modules/changes';
+import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/changes';
 import { fixtureSummary } from './fixture-summary';
 
 /** Enough files and lines that rendering them all would be slow: checks the virtualized lists. */
@@ -43,7 +43,8 @@ export function largeSnapshot(): RepositorySnapshot {
 
 let diffText: string | null = null;
 
-export function largeDiff(file: Pick<ChangedFile, 'area' | 'path'>): FileDiff {
+/** Every file shows the same long diff, built once. */
+export function largeDiff(): UnifiedDiff {
     diffText ??= largeDiffText();
-    return { path: file.path, area: file.area, text: diffText, truncated: false };
+    return { text: diffText, truncated: false };
 }

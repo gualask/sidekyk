@@ -1,7 +1,13 @@
 import { type QueryCache, type QueryState, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
-import type { FileDiffRequest } from '../model/repository.types';
+import { commitRequest } from '../model/commits';
+import type {
+    Commit,
+    CommitFileDiffRequest,
+    CommitRequest,
+    FileDiffRequest,
+} from '../model/repository.types';
 import { useRepositoryPort } from './repository.port';
 
 /** Every query of a repository starts with its root, so a change on disk refetches only its own. */
@@ -12,6 +18,20 @@ const repositoryKeys = {
     summary: (root: string) => [...repositoryKeys.of(root), 'summary'] as const,
     diff: (root: string, request: FileDiffRequest) =>
         [...repositoryKeys.of(root), 'diff', request.area, request.path, request.origPath] as const,
+    commits: (root: string) => [...repositoryKeys.of(root), 'commits'] as const,
+};
+
+/**
+ * What a commit changed never changes: kept apart from the repository's keys, so neither a change
+ * on disk nor the window showing again reads it twice.
+ */
+const commitKeys = {
+    of: (root: string, commit: CommitRequest) =>
+        ['commit', root, commit.sha, commit.parent] as const,
+    files: (root: string, commit: CommitRequest) =>
+        [...commitKeys.of(root, commit), 'files'] as const,
+    diff: (root: string, request: CommitFileDiffRequest) =>
+        [...commitKeys.of(root, request.commit), 'diff', request.path, request.origPath] as const,
 };
 
 /**
@@ -75,6 +95,40 @@ export function useFileDiff(root: string, request: FileDiffRequest | null) {
     });
 }
 
+/**
+ * The last commits of the branch on screen, read only while `open`: the section is closed until
+ * asked for, and costs nothing until then. Once open, a change of HEAD or refs reads it again.
+ */
+export function useRecentCommits(root: string, open: boolean) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: repositoryKeys.commits(root),
+        queryFn: () => port.getRecentCommits(root),
+        enabled: open,
+    });
+}
+
+/** The files a commit changed, read once: a commit never changes. */
+export function useCommitFiles(root: string, commit: Commit | null) {
+    const port = useRepositoryPort();
+    const request = commit ? commitRequest(commit) : null;
+    return useQuery({
+        queryKey: request ? commitKeys.files(root, request) : ['commit', root, 'none'],
+        queryFn: () => (request ? port.getCommitFiles(root, request) : null),
+        enabled: request !== null,
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
+export function useCommitFileDiff(root: string, request: CommitFileDiffRequest) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: commitKeys.diff(root, request),
+        queryFn: () => port.getCommitFileDiff(root, request),
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
 /** The roots whose last read failed as moved or deleted, joined by NUL (no path has one). */
 function missingRoots(cache: QueryCache): string {
     const roots = new Set<string>();
@@ -117,8 +171,12 @@ export function useRepositoryChangeSubscription() {
     const queryClient = useQueryClient();
     useEffect(
         () =>
-            port.onRepositoryChanged(({ root }) => {
-                void queryClient.invalidateQueries({ queryKey: repositoryKeys.of(root) });
+            port.onRepositoryChanged(({ root, gitDir }) => {
+                void queryClient.invalidateQueries({
+                    queryKey: repositoryKeys.of(root),
+                    // files written in the working tree make no commit
+                    predicate: (query) => gitDir || query.queryKey[2] !== 'commits',
+                });
             }),
         [port, queryClient],
     );

@@ -27,16 +27,26 @@ export interface BranchStatus {
     behind: number;
 }
 
-/** One file in one area. A file with both staged and unstaged edits appears twice. */
-export interface ChangedFile {
+/**
+ * One changed path and its line counts, whatever compares it: a summary against HEAD (whatever the
+ * path's areas), or a commit against its parent. Also how a row or a header shows any file.
+ */
+export interface FileChange {
     path: string;
     origPath: string | null;
-    area: ChangeArea;
     kind: ChangeKind;
-    /** null for binary files and for files that were not counted. */
+    /**
+     * null for binary files, and for files whose lines were not read: new files past the limits,
+     * new files in a summary, files past a cut list.
+     */
     additions: number | null;
     deletions: number | null;
     binary: boolean;
+}
+
+/** One file in one area. A file with both staged and unstaged edits appears twice. */
+export interface ChangedFile extends FileChange {
+    area: ChangeArea;
 }
 
 /**
@@ -49,22 +59,12 @@ interface ChangeTotals {
     deletions: number;
 }
 
-/** One changed path against HEAD, whatever its areas. */
-interface SummaryFile {
-    path: string;
-    kind: ChangeKind;
-    /** null for binary files and for new files, which a summary does not read. */
-    additions: number | null;
-    deletions: number | null;
-    binary: boolean;
-}
-
 /** A repository at a glance: its card, its avatar in the rail, the breadcrumb. */
 export interface RepositorySummary {
     branch: BranchStatus;
     totals: ChangeTotals;
     /** The first changed paths in git's order, at most three. */
-    files: SummaryFile[];
+    files: FileChange[];
     /** git listed more changes than are read (10,000, as VS Code): the list and the file count stop there. */
     truncated: boolean;
 }
@@ -81,12 +81,54 @@ export interface FileDiffRequest {
     area: ChangeArea;
 }
 
-/** A unified diff exactly as git prints it. */
-export interface FileDiff {
-    path: string;
-    area: ChangeArea;
+/** A unified diff exactly as git prints it, of a changed file or of a file of a commit. */
+export interface UnifiedDiff {
     text: string;
+    /** Larger than 2 MiB: cut at its last whole line. */
     truncated: boolean;
+}
+
+/** One commit of the branch on screen, as the recent commits list it. */
+export interface Commit {
+    /** The full hash. */
+    sha: string;
+    /** The first parent, null for a root commit. A merge shows what it brought to it, as VS Code does. */
+    parent: string | null;
+    /** The commit has more than one parent. */
+    merge: boolean;
+    author: string;
+    /** The author date, in seconds since the Unix epoch. */
+    time: number;
+    subject: string;
+}
+
+/**
+ * The last commits of the branch on screen, newest first, following first parents: the commits of
+ * a branch merged into it are in its merge.
+ */
+export interface RecentCommits {
+    commits: Commit[];
+    /** The branch has older commits than those listed. */
+    more: boolean;
+}
+
+/** A commit, and the parent it is compared with. */
+export interface CommitRequest {
+    sha: string;
+    parent: string | null;
+}
+
+/** The files a commit changed, in git's order. */
+export interface CommitFiles {
+    files: FileChange[];
+    /** The commit changed more files than are read (10,000, as a snapshot). */
+    truncated: boolean;
+}
+
+export interface CommitFileDiffRequest {
+    commit: CommitRequest;
+    path: string;
+    origPath: string | null;
 }
 
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
@@ -94,4 +136,6 @@ export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 export interface RepositoryChangedEvent {
     version: 1;
     root: string;
+    /** The index, HEAD or refs changed too: only then may the recent commits have. */
+    gitDir: boolean;
 }

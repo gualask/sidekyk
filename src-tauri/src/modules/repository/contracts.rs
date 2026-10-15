@@ -18,13 +18,17 @@ pub(crate) struct RepositoryInfo {
 pub(crate) struct RepositoryChangedEvent {
     pub(crate) version: u8,
     pub(crate) root: String,
+    /// The index, HEAD or refs changed too: the recent commits may have, and only then are they
+    /// read again.
+    pub(crate) git_dir: bool,
 }
 
 impl RepositoryChangedEvent {
-    pub(crate) fn new(root: &str) -> Self {
+    pub(crate) fn new(root: &str, git_dir: bool) -> Self {
         Self {
             version: 1,
             root: root.to_string(),
+            git_dir,
         }
     }
 }
@@ -86,13 +90,16 @@ pub(crate) struct ChangeTotals {
     pub(crate) deletions: u32,
 }
 
-/// One changed path against HEAD, whatever its areas.
+/// One changed path and its line counts, whatever compares it: a summary against HEAD (whatever
+/// the path's areas), or a commit against its parent.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SummaryFile {
+pub(crate) struct FileChange {
     pub(crate) path: String,
+    pub(crate) orig_path: Option<String>,
     pub(crate) kind: ChangeKind,
-    /// `None` for binary files and for new files, which a summary does not read.
+    /// `None` for binary files, and for files whose lines were not read: new files in a summary,
+    /// files past a cut list.
     pub(crate) additions: Option<u32>,
     pub(crate) deletions: Option<u32>,
     pub(crate) binary: bool,
@@ -106,7 +113,7 @@ pub(crate) struct RepositorySummary {
     pub(crate) branch: BranchStatus,
     pub(crate) totals: ChangeTotals,
     /// The first changed paths in git's order, at most `SUMMARY_FILES`.
-    pub(crate) files: Vec<SummaryFile>,
+    pub(crate) files: Vec<FileChange>,
     /// git listed more changes than are read (`MAX_CHANGED_PATHS`, as VS Code): the list and the
     /// count of files stop there.
     pub(crate) truncated: bool,
@@ -129,14 +136,66 @@ pub(crate) struct FileDiffRequest {
     pub(crate) area: ChangeArea,
 }
 
-/// A unified diff as git prints it. The frontend parses it.
+/// A unified diff as git prints it, of a changed file or of a file of a commit. The frontend
+/// parses it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct FileDiff {
-    pub(crate) path: String,
-    pub(crate) area: ChangeArea,
+pub(crate) struct UnifiedDiff {
     pub(crate) text: String,
+    /// Larger than `MAX_DIFF_BYTES`: cut at its last whole line.
     pub(crate) truncated: bool,
+}
+
+/// One commit of the branch on screen, as the recent commits list it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Commit {
+    /// The full hash.
+    pub(crate) sha: String,
+    /// The first parent, `None` for a root commit. A merge shows what it brought to it, as VS
+    /// Code does.
+    pub(crate) parent: Option<String>,
+    /// The commit has more than one parent.
+    pub(crate) merge: bool,
+    pub(crate) author: String,
+    /// The author date, in seconds since the Unix epoch.
+    pub(crate) time: i64,
+    pub(crate) subject: String,
+}
+
+/// The last commits of the branch on screen, newest first, following first parents: the commits
+/// of a branch merged into it are in its merge.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct RecentCommits {
+    pub(crate) commits: Vec<Commit>,
+    /// The branch has older commits than those listed.
+    pub(crate) more: bool,
+}
+
+/// A commit, and the parent it is compared with (`Commit::parent`).
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommitRequest {
+    pub(crate) sha: String,
+    pub(crate) parent: Option<String>,
+}
+
+/// The files a commit changed, in git's order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommitFiles {
+    pub(crate) files: Vec<FileChange>,
+    /// The commit changed more files than are read (`MAX_CHANGED_PATHS`, as a snapshot).
+    pub(crate) truncated: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CommitFileDiffRequest {
+    pub(crate) commit: CommitRequest,
+    pub(crate) path: String,
+    pub(crate) orig_path: Option<String>,
 }
 
 #[cfg(test)]
@@ -168,8 +227,9 @@ mod tests {
                     additions: 0,
                     deletions: 2,
                 },
-                files: vec![SummaryFile {
+                files: vec![FileChange {
                     path: "b.ts".into(),
+                    orig_path: Some("a.ts".into()),
                     kind: ChangeKind::TypeChanged,
                     additions: None,
                     deletions: Some(2),
@@ -202,6 +262,7 @@ mod tests {
                     "totals": { "files": 1, "additions": 0, "deletions": 2 },
                     "files": [{
                         "path": "b.ts",
+                        "origPath": "a.ts",
                         "kind": "type-changed",
                         "additions": null,
                         "deletions": 2,
@@ -228,8 +289,95 @@ mod tests {
     #[test]
     fn repository_changed_event_is_versioned() {
         assert_eq!(
-            serde_json::to_value(RepositoryChangedEvent::new("/r")).unwrap(),
-            serde_json::json!({ "version": 1, "root": "/r" })
+            serde_json::to_value(RepositoryChangedEvent::new("/r", true)).unwrap(),
+            serde_json::json!({ "version": 1, "root": "/r", "gitDir": true })
+        );
+    }
+
+    #[test]
+    fn recent_commits_serialize_with_the_frontend_field_names() {
+        let commits = RecentCommits {
+            commits: vec![Commit {
+                sha: "a1b2c3d4".into(),
+                parent: None,
+                merge: false,
+                author: "Ada".into(),
+                time: 1_760_000_000,
+                subject: "Add the cart".into(),
+            }],
+            more: true,
+        };
+        assert_eq!(
+            serde_json::to_value(commits).unwrap(),
+            serde_json::json!({
+                "commits": [{
+                    "sha": "a1b2c3d4",
+                    "parent": null,
+                    "merge": false,
+                    "author": "Ada",
+                    "time": 1_760_000_000,
+                    "subject": "Add the cart"
+                }],
+                "more": true
+            })
+        );
+    }
+
+    #[test]
+    fn commit_files_serialize_with_the_frontend_field_names() {
+        let files = CommitFiles {
+            files: vec![FileChange {
+                path: "b.ts".into(),
+                orig_path: Some("a.ts".into()),
+                kind: ChangeKind::Renamed,
+                additions: Some(1),
+                deletions: Some(0),
+                binary: false,
+            }],
+            truncated: false,
+        };
+        assert_eq!(
+            serde_json::to_value(files).unwrap(),
+            serde_json::json!({
+                "files": [{
+                    "path": "b.ts",
+                    "origPath": "a.ts",
+                    "kind": "renamed",
+                    "additions": 1,
+                    "deletions": 0,
+                    "binary": false
+                }],
+                "truncated": false
+            })
+        );
+        let diff = UnifiedDiff {
+            text: "@@".into(),
+            truncated: true,
+        };
+        assert_eq!(
+            serde_json::to_value(diff).unwrap(),
+            serde_json::json!({ "text": "@@", "truncated": true })
+        );
+    }
+
+    #[test]
+    fn commit_file_diff_request_reads_the_frontend_payload() {
+        let request: CommitFileDiffRequest = serde_json::from_value(serde_json::json!({
+            "commit": { "sha": "a1b2c3d", "parent": "0f9e8d7" },
+            "path": "b.ts",
+            "origPath": "a.ts"
+        }))
+        .unwrap();
+        assert_eq!(
+            request,
+            CommitFileDiffRequest {
+                commit: CommitRequest {
+                    sha: "a1b2c3d".into(),
+                    parent: Some("0f9e8d7".into()),
+                },
+                path: "b.ts".into(),
+                orig_path: Some("a.ts".into()),
+            }
         );
     }
 }

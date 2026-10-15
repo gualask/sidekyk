@@ -30,8 +30,10 @@ export function fixtureSummary(branch: Branch, files: readonly ChangedFile[]): R
             const other = areas.find((file) => file.area !== 'staged');
             const kind =
                 other?.kind === 'deleted' ? 'deleted' : (staged?.kind ?? other?.kind ?? 'modified');
+            // as `git status`: a rename names the path it came from
+            const origPath = areas.find((file) => file.origPath !== null)?.origPath ?? null;
             if (areas[0].area === 'untracked') {
-                return { path, kind, additions: null, deletions: null, binary: false };
+                return { path, origPath, kind, additions: null, deletions: null, binary: false };
             }
             const add = (count: (file: ChangedFile) => number | null) =>
                 areas.some((file) => count(file) !== null)
@@ -39,6 +41,7 @@ export function fixtureSummary(branch: Branch, files: readonly ChangedFile[]): R
                     : null;
             return {
                 path,
+                origPath,
                 kind,
                 additions: add((file) => file.additions),
                 deletions: add((file) => file.deletions),

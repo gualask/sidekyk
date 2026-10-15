@@ -2,9 +2,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::contracts::{
-    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, SummaryFile,
+    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, FileChange, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary,
 };
+use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
 use super::numstat::{count_text_lines, parse_numstat_z, Counts, LineCounts};
 use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend};
@@ -17,15 +18,9 @@ const MAX_UNTRACKED_FILE_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_UNTRACKED_TOTAL_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNTRACKED_FILES_READ: usize = 2_000;
 
-/// At most this many changed paths are listed, as VS Code's `git.statusLimit`: past it, an
-/// unignored `node_modules` or build folder would fill the list and the payload for nothing.
-const MAX_CHANGED_PATHS: usize = 10_000;
-
-/// Output read from `git status` and from a numstat, well past what `MAX_CHANGED_PATHS` paths
-/// take (about 150 bytes each in `git status`), so that git is killed rather than read to the
-/// end when the paths are many more.
+/// Output read from `git status`, well past what `MAX_CHANGED_PATHS` paths take (about 150 bytes
+/// each), so that git is killed rather than read to the end when the paths are many more.
 const MAX_STATUS_BYTES: usize = 8 * 1024 * 1024;
-const MAX_NUMSTAT_BYTES: usize = 4 * 1024 * 1024;
 
 /// How many changed paths a summary lists: a card shows them, then how many more there are.
 const SUMMARY_FILES: usize = 3;
@@ -198,8 +193,9 @@ fn summarize(status: &StatusReport, tracked: &Numstat) -> RepositorySummary {
             } else {
                 tracked.counts.get(&entry.path).copied().unwrap_or_default()
             };
-            SummaryFile {
+            FileChange {
                 path: entry.path.clone(),
+                orig_path: entry.orig_path.clone(),
                 kind: kind_against_head(entry),
                 additions: counts.additions,
                 deletions: counts.deletions,

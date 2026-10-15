@@ -1,20 +1,22 @@
-import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import type { ChangedFile } from '../model/repository.types';
+import type { FileChange } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
 
 /**
- * The open file in the panel's header: its path, its area and counts, and the copy of the whole
- * file. Copy is an icon, as everywhere: its tooltip says what it copies, and it turns into a check
- * for a moment once done.
+ * The open file in the panel's header: its path, where it comes from (its area, or its commit)
+ * and counts, and the copy of the whole file. Copy is an icon, as everywhere: its tooltip says
+ * what it copies, and it turns into a check for a moment once done.
  */
 export function FileHeader({
     file,
+    source,
     copied,
     onCopy,
 }: {
-    file: ChangedFile;
+    file: FileChange;
+    /** Where the change is: "Staged", "Not staged", or a commit's hash with its subject. */
+    source: { label: string; title?: string };
     copied: CopyState;
     /** null while there is nothing to copy (no hunks). */
     onCopy: (() => void) | null;
@@ -28,8 +30,11 @@ export function FileHeader({
                 <span className="min-w-0 truncate" title={path}>
                     {path}
                 </span>
-                <span className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted">
-                    {CHANGE_AREA_LABEL[file.area]}
+                <span
+                    className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted"
+                    title={source.title}
+                >
+                    {source.label}
                 </span>
                 <span className="shrink-0 text-[11.5px] font-normal">
                     <LineCounts

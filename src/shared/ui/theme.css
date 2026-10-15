@@ -16,6 +16,8 @@
     --ui-accent-muted: #6366f1;
     --ui-accent-soft: #eef2ff;
     --ui-accent-soft-hover: #e0e7ff;
+    /* a whole area in another mode, such as a commit's files instead of the working tree's */
+    --ui-accent-tint: #f5f6fe;
     --ui-accent-on-soft: #4338ca;
     --ui-accent-solid: #4f46e5;
     --ui-accent-solid-hover: #4338ca;
@@ -67,6 +69,7 @@
         --ui-accent-muted: #a5b4fc;
         --ui-accent-soft: rgba(99, 102, 241, 0.15);
         --ui-accent-soft-hover: rgba(99, 102, 241, 0.25);
+        --ui-accent-tint: rgba(99, 102, 241, 0.05);
         --ui-accent-on-soft: #c7d2fe;
         --ui-danger: #f87171;
         --ui-danger-soft: rgba(127, 29, 29, 0.6);
@@ -109,6 +112,7 @@
     --color-ui-accent-muted: var(--ui-accent-muted);
     --color-ui-accent-soft: var(--ui-accent-soft);
     --color-ui-accent-soft-hover: var(--ui-accent-soft-hover);
+    --color-ui-accent-tint: var(--ui-accent-tint);
     --color-ui-accent-on-soft: var(--ui-accent-on-soft);
     --color-ui-accent-on-solid: var(--ui-accent-on-solid);
     --color-ui-danger: var(--ui-danger);

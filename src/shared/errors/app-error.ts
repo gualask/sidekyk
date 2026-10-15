@@ -8,6 +8,7 @@ const USER_MESSAGES: Record<string, string> = {
     git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
     git_timed_out:
         'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',
+    invalid_commit: 'That is not a commit of this repository.',
     not_a_repository: 'That folder is not inside a git repository.',
     path_outside_repository: 'That path is outside the repository.',
     project_not_found: 'That repository is no longer in Sidekyk.',

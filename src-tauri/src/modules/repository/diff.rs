@@ -1,17 +1,14 @@
 use std::path::{Component, Path};
 
-use super::contracts::{ChangeArea, FileDiff, FileDiffRequest, RepositoryInfo};
+use super::contracts::{ChangeArea, FileDiffRequest, RepositoryInfo, UnifiedDiff};
+use super::limits::MAX_DIFF_BYTES;
 use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
-/// Larger diffs are cut at the last whole line before this size, and git is killed instead of
-/// read to the end.
-const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
-
 /// Only a plain relative path may reach git: no `..`, no absolute path, nothing that names a
 /// file outside the repository.
-fn checked_path(path: &str) -> anyhow::Result<&str> {
+pub(super) fn checked_path(path: &str) -> anyhow::Result<&str> {
     let normal = !path.is_empty()
         && Path::new(path)
             .components()
@@ -24,7 +21,7 @@ fn checked_path(path: &str) -> anyhow::Result<&str> {
 }
 
 /// Output cut anywhere, back to its last whole line, if it has one.
-fn cut_at_line(mut bytes: Vec<u8>) -> Vec<u8> {
+pub(super) fn cut_at_line(mut bytes: Vec<u8>) -> Vec<u8> {
     if let Some(end) = bytes.iter().rposition(|&b| b == b'\n') {
         bytes.truncate(end + 1);
     }
@@ -35,7 +32,7 @@ pub(crate) fn load_file_diff(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
     request: &FileDiffRequest,
-) -> anyhow::Result<FileDiff> {
+) -> anyhow::Result<UnifiedDiff> {
     let root = existing_root(repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
@@ -72,9 +69,7 @@ pub(crate) fn load_file_diff(
         out.stdout
     };
 
-    Ok(FileDiff {
-        path: request.path.clone(),
-        area: request.area,
+    Ok(UnifiedDiff {
         text: String::from_utf8_lossy(&bytes).into_owned(),
         truncated: out.truncated,
     })
