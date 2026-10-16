@@ -164,9 +164,6 @@ what needs measuring before deciding waits in **Performance review**, at the end
       toggle, `⌥Space` and a function key alone. To check: on Windows, and `--toggle` from a
       Linux desktop's shortcut. Costs nothing hidden or idle; +160 KiB on the macOS release
       binary
-- [ ] Follow the terminal (setting, off by default): when Sidekyk comes up, open the project of the
-      terminal tab used just before it; kitty on macOS first, other terminals and systems when
-      needed; any failure leaves the current project (see docs/evolution.md)
 - [x] Closing the window hides it instead of quitting, while the tray is there; quit from the
       tray (or `⌘Q` on macOS). On macOS a click on the Dock's icon brings the window back. To
       check in the packaged app: `⌘W` and the close button hide, `⌘Q` quits
@@ -346,5 +343,8 @@ numbers the others are judged on.
   changes things.
 - Editing files: the explorer only shows them; "open in editor" is the way to change one.
 - Running or embedding the agent.
+- Following the terminal: opening on the project of the terminal tab used just before. No signal
+  for it holds across agents, terminals, tmux and systems (docs/evolution.md, Follow the terminal:
+  dropped); switching is manual (`[`/`]`, `⌘K`, the rail, `sidekyk .`).
 - Replacing the `git` CLI with an in-process library (`gix`, libgit2) while process startup is
   not what the timings show as slow.

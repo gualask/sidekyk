@@ -86,7 +86,7 @@ Tabler's. What it settles:
 - **Settings**: a small modal dialog, opened from a gear in the top bar and with `⌘,`; changes
   apply at once, `Esc` or a click outside closes it. Sections: Appearance (theme), Diff (the view
   a diff opens in, the scrollbar's width, context lines later), Notes (long lines, Google Drive
-  sync), and the settings still to come (global shortcut, follow the terminal) as they land.
+  sync), and Shortcuts (the global shortcut).
   Same dialog component as the palette.
 
 ### Changes
@@ -169,38 +169,37 @@ Tabler's. What it settles:
   in view. Dropped on 2026-10-14: Changes compares against HEAD, as VS Code and Zed do, and what
   was committed is looked at in the recent commits instead.
 
-## Follow the terminal
+## Follow the terminal: dropped
 
-The usual flow: in each terminal tab, `cd` into a repository and start the agent there (`claude`).
-Sidekyk is brought up from anywhere (global shortcut, launcher, Dock or taskbar). With this feature
-on, it opens on the project of the terminal tab used just before, so moving to another tab and
-bringing Sidekyk up again shows the other project. No manual linking: the link is the directory
-the agent was started in.
+Decided with the maintainer on 2026-10-16: no automatic switch to the project of the terminal tab
+used just before. Switching stays manual and fast: `[`/`]`, `⌘K`, the rail, and `sidekyk .` from
+the tab (an alias away), which opens that tab's repository in the running app.
 
-- **Which terminal**: Sidekyk remembers the last app that was frontmost before it. macOS reports
-  every app activation without any permission. Remembering it, instead of looking at the frontmost
-  app when Sidekyk appears, makes the launcher and the Dock work like the shortcut.
-- **Which tab**: Sidekyk asks that terminal for its active tab and the directory of its foreground
-  process, then resolves the git root and opens that project (adding it if new).
-- **Terminals**: one adapter each, since there is no generic way to know a terminal's active tab.
-  kitty first, through its remote control (`kitty @ ls`, which needs remote control turned on in
-  `kitty.conf`; socket-only, and used only to read). iTerm2, WezTerm and Terminal.app when needed
-  (AppleScript or their CLI; macOS asks once for automation permission).
-- **Opt-in, off by default**, in the settings. It depends on each terminal's API and
-  configuration, so it must never get in the way: if anything fails (unknown terminal, remote
-  control off, a tab outside any repository, the last app was not a terminal), Sidekyk silently
-  stays on the project it showed.
-- **Cost**: one call when Sidekyk is brought up, nothing while idle.
-- **To check when implementing**: whether `kitty @ ls` on kitty 0.49 marks the focused tab and
-  window, and how the socket is named when several kitty instances run.
-- **Platforms**: designed on macOS first. kitty's remote control works the same on Linux; what
-  differs is knowing the last app that was in front. On Windows a foreground-window hook can tell
-  it; on X11 the window manager reports the active window; on Wayland an app generally cannot see
-  other apps' windows, so the feature may stay unavailable there. To check per platform when
-  implementing; where it cannot work, the setting is hidden.
-- **Rejected**: picking a window with a click, as macOS's screenshot tool does. It selects a
-  window, not a tab (two tabs of one kitty window are one window), and reading other apps' window
-  titles needs the screen recording permission.
+The idea was: each terminal tab runs an agent in its repository, and Sidekyk, brought up from
+anywhere, opens on the project of the tab used last. The only thing every setup shares is that a
+terminal is used; the agent (Claude Code, Codex, opencode…), the terminal, the shell, tmux and the
+system all vary. Every signal for "the tab used last" holds on one of these and breaks on another:
+
+- **The terminal's API** (kitty's remote control, WezTerm's CLI, iTerm2's AppleScript): any agent
+  and shell, but one adapter per terminal, a setting to turn on in each (kitty needs
+  `allow_remote_control` and `listen_on`, then a restart), none for Windows Terminal or on
+  Wayland, and under tmux the terminal sees the tmux client, not the pane. Built and working on
+  macOS with kitty (the app in front from `CGWindowListCopyWindowInfo`, kitty's socket from
+  `libproc`, its protocol spoken directly), then dropped for this reason.
+- **The agent's hooks** (Claude Code's `UserPromptSubmit`): any terminal and system, but not every
+  agent has them (Codex, opencode).
+- **A shell hook** (`precmd`, `PROMPT_COMMAND`): any terminal, but the shell is silent while the
+  agent runs in its tab, which is when it matters.
+- **The tty's last input** (its access time, which `w` reads for the idle time): any terminal,
+  agent and shell on Linux, but checked on macOS 27: input read from a pty leaves its access time
+  unchanged, so it says nothing there; Windows has no ttys.
+- **The window title**: most terminals show the active tab's, but macOS needs the screen
+  recording or accessibility permission to read it, and agents overwrite it.
+
+Kept in mind, not planned: **following the activity**, the project whose files changed last when
+Sidekyk comes up. It needs nothing from the agent, the terminal or the system, but answers "where
+is an agent writing", not "which tab did I look at": with two agents at work, the last to write
+wins. To weigh once real use says the manual switch is not enough.
 
 ## Ideas from tazly
 
