@@ -1,19 +1,20 @@
 import { IconFileOff } from '@tabler/icons-react';
 import type { UseQueryResult } from '@tanstack/react-query';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { type ReactNode, type RefObject, useMemo, useRef } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
+import type { DiffView } from '@/shared/git/diff-view';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
+import { useChangesSettings } from '../application/changes-settings';
 import { useCommitFileDiff, useFileDiff } from '../application/repository.queries';
-import { formatFileForAgent, formatHunkForAgent } from '../model/agent-snippet';
 import { commitRequest, shortSha } from '../model/commits';
-import { type DiffHunk, parseUnifiedDiff } from '../model/diff-parser';
-import { diffRows, widestLine } from '../model/diff-rows';
+import { fileText } from '../model/copied';
+import { parseUnifiedDiff } from '../model/diff-parser';
+import { diffRows, wholeFileRows, widestLine } from '../model/diff-rows';
 import type { ChangedFile, Commit, FileChange, UnifiedDiff } from '../model/repository.types';
-import { DiffLineRow, HunkHeaderRow } from './DiffRows';
-import { HUNK_ROW_HEIGHT, LINE_CHROME_WIDTH, LINE_ROW_HEIGHT } from './diff-layout';
+import { wholeFile } from '../model/whole-file';
+import { DiffList } from './DiffList';
 import { FileHeader } from './FileHeader';
 
 function Notice({ children }: { children: ReactNode }) {
@@ -24,83 +25,63 @@ function Notice({ children }: { children: ReactNode }) {
     );
 }
 
-/**
- * Every hunk as one virtualized list: only the rows on screen are in the DOM, so a diff of tens
- * of thousands of lines scrolls like a short one.
- */
-function DiffLines({
-    path,
-    hunks,
-    scrollRef,
-}: {
-    path: string;
-    hunks: readonly DiffHunk[];
-    scrollRef: RefObject<HTMLDivElement | null>;
-}) {
-    const rows = useMemo(() => diffRows(hunks), [hunks]);
-    const widest = useMemo(() => widestLine(hunks), [hunks]);
-    const { copied, copy } = useCopyToClipboard();
-    const virtualizer = useVirtualizer({
-        count: rows.length,
-        getScrollElement: () => scrollRef.current,
-        estimateSize: (index) => (rows[index]?.kind === 'hunk' ? HUNK_ROW_HEIGHT : LINE_ROW_HEIGHT),
-        overscan: 30,
-    });
+/** Lines left above the change the whole file opens on, so it shows where it sits. */
+const LINES_ABOVE = 3;
 
-    return (
-        <div
-            className="relative border-b border-ui-border bg-ui-surface font-mono text-xs"
-            style={{
-                height: virtualizer.getTotalSize(),
-                minWidth: `calc(${LINE_CHROME_WIDTH}px + ${widest}ch)`,
-            }}
-        >
-            {virtualizer.getVirtualItems().map((item) => {
-                const row = rows[item.index];
-                if (!row) return null;
-                const id = `hunk-${row.hunkIndex}`;
-                return (
-                    <div
-                        key={item.key}
-                        className="absolute top-0 left-0 w-full"
-                        style={{ transform: `translateY(${item.start}px)` }}
-                    >
-                        {row.kind === 'hunk' ? (
-                            <HunkHeaderRow
-                                hunk={row.hunk}
-                                first={row.hunkIndex === 0}
-                                copied={copied?.id === id ? copied : null}
-                                onCopy={() => void copy(id, formatHunkForAgent(path, row.hunk))}
-                            />
-                        ) : (
-                            <DiffLineRow line={row.line} />
-                        )}
-                    </div>
-                );
-            })}
-        </div>
-    );
+/** How a diff shows, and how it switches: the panel keeps the view across files. */
+export interface DiffViewChoice {
+    view: DiffView;
+    /** The hunk to open on, after a switch; otherwise the first. */
+    openOn: number | null;
+    /** Switches the view, opening it on `hunk`. */
+    onChange: (view: DiffView, hunk: number) => void;
 }
 
-function DiffView({
+function DiffPane({
     diff,
     file,
-    source,
+    badge,
     header,
+    choice,
+    commit,
 }: {
     diff: UseQueryResult<UnifiedDiff | null>;
     file: FileChange;
-    source: { label: string; title?: string };
+    /** Where the change is, next to the path (see `FileHeader`). */
+    badge: { label: string; title?: string };
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
+    choice: DiffViewChoice;
+    /** The commit shown (its short hash); null for the working tree. */
+    commit: string | null;
 }) {
+    const { view, openOn } = choice;
     const parsed = useMemo(
         () => (diff.data ? parseUnifiedDiff(diff.data.text) : null),
         [diff.data],
     );
-    const scrollRef = useRef<HTMLDivElement>(null);
+    // the whole file comes as one hunk: its changes, as git's hunks, for their copy
+    const whole = useMemo(
+        () => (parsed && view === 'file' ? wholeFile(parsed.hunks) : null),
+        [parsed, view],
+    );
+    const rows = useMemo(
+        () => (whole ? wholeFileRows(whole) : diffRows(parsed?.hunks ?? [])),
+        [whole, parsed],
+    );
+    const widest = useMemo(() => widestLine(parsed?.hunks ?? []), [parsed]);
+    const { copyTemplate } = useChangesSettings();
+    // what `{row}` names: the file, its path before a rename, and the commit shown, if any
+    const copySource = useMemo(
+        () => ({ path: file.path, origPath: file.origPath, commit }),
+        [file.path, file.origPath, commit],
+    );
+    // state, not a ref: React attaches a parent's ref after its children's effects, so lines
+    // mounted with it, from a diff already read, would find no element to scroll
+    const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+    const currentHunk = useRef<(() => number) | null>(null);
     const { copied, copy } = useCopyToClipboard();
-    const hunks = parsed?.hunks ?? [];
+    const hunks = whole?.hunks ?? parsed?.hunks ?? [];
     const fileCopied = copied?.id === 'file' ? copied : null;
 
     return (
@@ -109,20 +90,34 @@ function DiffView({
                 ? createPortal(
                       <FileHeader
                           file={file}
-                          source={source}
+                          badge={badge}
+                          view={view}
+                          onViewChange={(next) =>
+                              choice.onChange(next, currentHunk.current?.() ?? 0)
+                          }
                           copied={fileCopied}
                           onCopy={
                               hunks.length > 0
-                                  ? () => void copy('file', formatFileForAgent(file.path, hunks))
+                                  ? () =>
+                                        void copy('file', fileText(copyTemplate, copySource, hunks))
                                   : null
                           }
                       />,
                       header,
                   )
                 : null}
-            <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto">
-                {hunks.length > 0 ? (
-                    <DiffLines path={file.path} hunks={hunks} scrollRef={scrollRef} />
+            <div ref={setScrollElement} className="min-h-0 flex-1 overflow-auto">
+                {scrollElement && hunks.length > 0 ? (
+                    <DiffList
+                        source={copySource}
+                        rows={rows}
+                        hunks={hunks}
+                        widest={widest}
+                        scrollElement={scrollElement}
+                        openOn={openOn}
+                        linesAbove={whole ? LINES_ABOVE : 0}
+                        currentHunk={currentHunk}
+                    />
                 ) : null}
 
                 {diff.isPending ? <Notice>Loading diff…</Notice> : null}
@@ -142,7 +137,9 @@ function DiffView({
                 ) : null}
                 {diff.data?.truncated ? (
                     <Notice>
-                        The diff is too large and was cut. Open the file to see the rest.
+                        {view === 'file'
+                            ? 'The file is too large to show whole: it was cut here.'
+                            : 'The diff is too large and was cut. Open the file to see the rest.'}
                     </Notice>
                 ) : null}
             </div>
@@ -155,22 +152,27 @@ export function ChangeDiffView({
     root,
     file,
     header,
+    choice,
 }: {
     root: string;
     file: ChangedFile;
     header: HTMLElement | null;
+    choice: DiffViewChoice;
 }) {
     const diff = useFileDiff(root, {
         path: file.path,
         origPath: file.origPath,
         area: file.area,
+        wholeFile: choice.view === 'file',
     });
     return (
-        <DiffView
+        <DiffPane
             diff={diff}
             file={file}
-            source={{ label: CHANGE_AREA_LABEL[file.area] }}
+            badge={{ label: CHANGE_AREA_LABEL[file.area] }}
             header={header}
+            choice={choice}
+            commit={null}
         />
     );
 }
@@ -181,23 +183,28 @@ export function CommitDiffView({
     commit,
     file,
     header,
+    choice,
 }: {
     root: string;
     commit: Commit;
     file: FileChange;
     header: HTMLElement | null;
+    choice: DiffViewChoice;
 }) {
     const diff = useCommitFileDiff(root, {
         commit: commitRequest(commit),
         path: file.path,
         origPath: file.origPath,
+        wholeFile: choice.view === 'file',
     });
     return (
-        <DiffView
+        <DiffPane
             diff={diff}
             file={file}
-            source={{ label: shortSha(commit.sha), title: commit.subject }}
+            badge={{ label: shortSha(commit.sha), title: commit.subject }}
             header={header}
+            choice={choice}
+            commit={shortSha(commit.sha)}
         />
     );
 }

@@ -62,4 +62,51 @@
     .menu-item.danger {
         @apply text-ui-danger;
     }
+
+    /* A copy's confirmation: what was copied lights up, then fades. Kept, without the fade, while
+       motion is reduced. */
+    .copy-flash,
+    .copy-flash-failed {
+        animation: copy-flash 600ms ease-out forwards;
+    }
+    .copy-flash {
+        background-color: color-mix(in srgb, var(--ui-accent) 30%, transparent);
+    }
+    .copy-flash-failed {
+        background-color: color-mix(in srgb, var(--ui-danger) 30%, transparent);
+    }
+    @keyframes copy-flash {
+        from {
+            opacity: 1;
+        }
+        to {
+            opacity: 0;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .copy-flash,
+        .copy-flash-failed {
+            animation: none;
+            opacity: 0.6;
+        }
+    }
+
+    /* A copy's confirmation in a corner: shown, then fading out before it goes. */
+    .copied-chip {
+        animation: copied-chip 1200ms ease-in forwards;
+    }
+    @keyframes copied-chip {
+        0%,
+        70% {
+            opacity: 1;
+        }
+        100% {
+            opacity: 0;
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .copied-chip {
+            animation: none;
+        }
+    }
 }

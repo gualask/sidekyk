@@ -20,6 +20,16 @@ pub(super) fn checked_path(path: &str) -> anyhow::Result<&str> {
     }
 }
 
+/// The lines of context around each change: three, as git's default, or every line of the file
+/// (git's largest), so the diff is the whole file with its changes.
+pub(super) fn context_option(whole_file: bool) -> &'static str {
+    if whole_file {
+        "-U2147483647"
+    } else {
+        "-U3"
+    }
+}
+
 /// Output cut anywhere, back to its last whole line, if it has one.
 pub(super) fn cut_at_line(mut bytes: Vec<u8>) -> Vec<u8> {
     if let Some(end) = bytes.iter().rposition(|&b| b == b'\n') {
@@ -36,7 +46,11 @@ pub(crate) fn load_file_diff(
     let root = existing_root(repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
-    let base = ["--no-color", "--no-ext-diff", "-U3"];
+    let base = [
+        "--no-color",
+        "--no-ext-diff",
+        context_option(request.whole_file),
+    ];
 
     let mut args = vec!["diff"];
     let mut ok_codes = vec![0];

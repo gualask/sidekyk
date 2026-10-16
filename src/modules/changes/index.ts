@@ -1,3 +1,4 @@
+export { ChangesSettingsProvider } from './application/changes-settings';
 export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
 export {
     useMissingRepositories,

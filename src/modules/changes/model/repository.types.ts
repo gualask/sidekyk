@@ -79,6 +79,8 @@ export interface FileDiffRequest {
     path: string;
     origPath: string | null;
     area: ChangeArea;
+    /** Every line of the file as context, for the whole-file view; otherwise three, as git's. */
+    wholeFile: boolean;
 }
 
 /** A unified diff exactly as git prints it, of a changed file or of a file of a commit. */
@@ -129,6 +131,8 @@ export interface CommitFileDiffRequest {
     commit: CommitRequest;
     path: string;
     origPath: string | null;
+    /** Every line of the file as context, for the whole-file view; otherwise three, as git's. */
+    wholeFile: boolean;
 }
 
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';

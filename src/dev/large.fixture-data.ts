@@ -15,15 +15,34 @@ const FILES: ChangedFile[] = Array.from({ length: FILE_COUNT }, (_, i) => ({
     binary: false,
 }));
 
+/** A hunk's lines; unchanged lines between hunks are left to `wholeFileDiff`. */
+const HUNK_SPAN = 98;
+const HUNK_GAP = 10;
+
+/**
+ * Hunks as git cuts them, so the whole-file view finds the same ones: three unchanged lines at
+ * each end, a line replaced every fifth line, and ten unchanged lines between hunks.
+ */
 function largeDiffText(): string {
     const lines: string[] = [];
-    for (let start = 1; start <= DIFF_LINES; start += 100) {
-        lines.push(`@@ -${start},100 +${start},100 @@ export function block${start}() {`);
-        for (let i = 0; i < 100; i++) {
-            const n = start + i;
+    let oldStart = 1;
+    let newStart = 1;
+    while (lines.length < DIFF_LINES) {
+        const body: string[] = [];
+        for (let i = 0; i < HUNK_SPAN; i++) {
+            const n = newStart + i;
             const text = `    const value${n} = compute(${n}, 'a fairly long line to scroll sideways ${'x'.repeat(n % 120)}');`;
-            lines.push(i % 10 === 0 ? `-${text}` : i % 10 === 1 ? `+${text}` : ` ${text}`);
+            const changed = i >= 3 && i < HUNK_SPAN - 3 ? (i - 3) % 5 : -1;
+            body.push(changed === 0 ? `-${text}` : changed === 1 ? `+${text}` : ` ${text}`);
         }
+        const oldLines = body.filter((line) => !line.startsWith('+')).length;
+        const newLines = body.filter((line) => !line.startsWith('-')).length;
+        lines.push(
+            `@@ -${oldStart},${oldLines} +${newStart},${newLines} @@ export function block${newStart}() {`,
+            ...body,
+        );
+        oldStart += oldLines + HUNK_GAP;
+        newStart += newLines + HUNK_GAP;
     }
     return `${lines.join('\n')}\n`;
 }

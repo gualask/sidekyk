@@ -7,7 +7,7 @@ use super::contracts::{
     ChangeKind, Commit, CommitFileDiffRequest, CommitFiles, CommitRequest, FileChange,
     RecentCommits, RepositoryInfo, UnifiedDiff,
 };
-use super::diff::{checked_path, cut_at_line};
+use super::diff::{checked_path, context_option, cut_at_line};
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
 use super::numstat::{parse_numstat_z, Counts};
 use super::open::existing_root;
@@ -198,7 +198,12 @@ pub(crate) fn load_commit_file_diff(
     // both sides of a rename, so git can pair them
     let paths: Vec<&str> = orig_path.into_iter().chain([path]).collect();
     let args = diff_tree_args(
-        &["-p", "--no-color", "--no-ext-diff", "-U3"],
+        &[
+            "-p",
+            "--no-color",
+            "--no-ext-diff",
+            context_option(request.whole_file),
+        ],
         &request.commit,
         &paths,
     )?;

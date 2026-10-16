@@ -4,13 +4,20 @@ import { RadioGroup } from '@base-ui/react/radio-group';
 import { IconX } from '@tabler/icons-react';
 import { type ReactNode, type RefObject, useId, useRef } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { DiffView } from '@/shared/git/diff-view';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 import type { Theme } from '../model/settings.types';
+import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
 
 const THEMES: { value: Theme; label: string }[] = [
     { value: 'dark', label: 'Dark' },
     { value: 'light', label: 'Light' },
+];
+
+const DIFF_VIEWS: { value: DiffView; label: string }[] = [
+    { value: 'changes', label: 'Changes' },
+    { value: 'file', label: 'Full file' },
 ];
 
 /**
@@ -67,6 +74,24 @@ export function SettingsDialog({
                             )}
                         </Setting>
                     </Section>
+                    <Section title="Diff">
+                        <Setting
+                            label="Open diffs as"
+                            description="Only the changed lines, or the whole file with the changes highlighted. The panel's header switches it any time."
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={DIFF_VIEWS}
+                                    value={settings.diffView}
+                                    onChange={(diffView) =>
+                                        update.mutate({ ...settings, diffView })
+                                    }
+                                />
+                            )}
+                        </Setting>
+                        <CopyTemplateSetting />
+                    </Section>
                     <Section title="Shortcuts">
                         <GlobalShortcutSetting />
                     </Section>
@@ -121,7 +146,10 @@ function Setting({
     );
 }
 
-/** One value among a few, as segments; `current` gets the one chosen, for the dialog's focus. */
+/**
+ * One value among a few, as segments; `current`, if given, gets the one chosen, for the dialog's
+ * focus.
+ */
 function Choice<T extends string>({
     labelId,
     options,
@@ -132,7 +160,7 @@ function Choice<T extends string>({
     labelId: string;
     options: { value: T; label: string }[];
     value: T;
-    current: RefObject<HTMLElement | null>;
+    current?: RefObject<HTMLElement | null>;
     onChange: (value: T) => void;
 }) {
     return (

@@ -1,13 +1,15 @@
 import { IconCircleCheck } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { DiffView } from '@/shared/git/diff-view';
 import type { PanelProps } from '@/shared/panels/panel';
 import { isKeyTaken } from '@/shared/ui/keys';
+import { useChangesSettings } from '../application/changes-settings';
 import { useCommitView } from '../application/commit-view';
 import { useRepositorySnapshot } from '../application/repository.queries';
 import { fileKey, orderedFiles } from '../model/file-groups';
 import { CommitFileList } from './CommitFileList';
-import { ChangeDiffView, CommitDiffView } from './DiffView';
+import { ChangeDiffView, CommitDiffView, type DiffViewChoice } from './DiffView';
 import { FileList } from './FileList';
 import { RecentCommits } from './RecentCommits';
 
@@ -43,6 +45,15 @@ export function ChangesWorkspace({ project, header, target }: PanelProps) {
     // a file that left the list (committed, reverted) hands the selection to the first one
     const selected = files.find((file) => fileKey(file) === selectedKey) ?? files[0] ?? null;
     const selectedIndex = selected ? files.indexOf(selected) : -1;
+    // the file whose diff shows: of the commit viewed, or of the working tree
+    const shownKey = viewed
+        ? commitFile
+            ? `${viewed.sha}:${commitFile.path}`
+            : null
+        : selected
+          ? fileKey(selected)
+          : null;
+    const diffView = useDiffViewChoice(shownKey);
 
     // the arrows move in the list on screen
     const onArrow = useEffectEvent((event: KeyboardEvent) => {
@@ -120,22 +131,25 @@ export function ChangesWorkspace({ project, header, target }: PanelProps) {
                     />
                 </aside>
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
-                    {viewed ? (
+                    {/* until the settings say which view a diff opens in, no diff is asked for */}
+                    {!diffView ? null : viewed ? (
                         commitFile ? (
                             <CommitDiffView
-                                key={`${viewed.sha}:${commitFile.path}`}
+                                key={`${shownKey}:${diffView.view}`}
                                 root={project.root}
                                 commit={viewed}
                                 file={commitFile}
                                 header={header}
+                                choice={diffView}
                             />
                         ) : null
                     ) : selected ? (
                         <ChangeDiffView
-                            key={fileKey(selected)}
+                            key={`${shownKey}:${diffView.view}`}
                             root={project.root}
                             file={selected}
                             header={header}
+                            choice={diffView}
                         />
                     ) : snapshot.isSuccess ? (
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-ui-text-muted">
@@ -147,4 +161,27 @@ export function ChangesWorkspace({ project, header, target }: PanelProps) {
             </div>
         </div>
     );
+}
+
+/**
+ * The view diffs show in: the settings' until the header switches it, and again once the setting
+ * changes. A switch opens the new view on the hunk that was being read; showing another file
+ * forgets it, so every file opens on its first change. null until the settings are read.
+ */
+function useDiffViewChoice(shownKey: string | null): DiffViewChoice | null {
+    const defaultView = useChangesSettings().diffView;
+    const [chosen, setChosen] = useState<{ view: DiffView; over: DiffView } | null>(null);
+    const [switched, setSwitched] = useState<{ file: string | null; hunk: number } | null>(null);
+    // another file shows: the hunk of the last switch was in the one before
+    if (switched && switched.file !== shownKey) setSwitched(null);
+    if (!defaultView) return null;
+    const view = chosen?.over === defaultView ? chosen.view : defaultView;
+    return {
+        view,
+        openOn: switched?.file === shownKey ? switched.hunk : null,
+        onChange: (next, hunk) => {
+            setChosen({ view: next, over: defaultView });
+            setSwitched({ file: shownKey, hunk });
+        },
+    };
 }

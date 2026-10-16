@@ -17,7 +17,14 @@ const repositoryKeys = {
     snapshot: (root: string) => [...repositoryKeys.of(root), 'snapshot'] as const,
     summary: (root: string) => [...repositoryKeys.of(root), 'summary'] as const,
     diff: (root: string, request: FileDiffRequest) =>
-        [...repositoryKeys.of(root), 'diff', request.area, request.path, request.origPath] as const,
+        [
+            ...repositoryKeys.of(root),
+            'diff',
+            request.area,
+            request.path,
+            request.origPath,
+            request.wholeFile,
+        ] as const,
     commits: (root: string) => [...repositoryKeys.of(root), 'commits'] as const,
 };
 
@@ -31,7 +38,13 @@ const commitKeys = {
     files: (root: string, commit: CommitRequest) =>
         [...commitKeys.of(root, commit), 'files'] as const,
     diff: (root: string, request: CommitFileDiffRequest) =>
-        [...commitKeys.of(root, request.commit), 'diff', request.path, request.origPath] as const,
+        [
+            ...commitKeys.of(root, request.commit),
+            'diff',
+            request.path,
+            request.origPath,
+            request.wholeFile,
+        ] as const,
 };
 
 /**
@@ -120,11 +133,12 @@ export function useCommitFiles(root: string, commit: Commit | null) {
     });
 }
 
-export function useCommitFileDiff(root: string, request: CommitFileDiffRequest) {
+export function useCommitFileDiff(root: string, request: CommitFileDiffRequest | null) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: commitKeys.diff(root, request),
-        queryFn: () => port.getCommitFileDiff(root, request),
+        queryKey: request ? commitKeys.diff(root, request) : ['commit', root, 'none'],
+        queryFn: () => (request ? port.getCommitFileDiff(root, request) : null),
+        enabled: request !== null,
         staleTime: Number.POSITIVE_INFINITY,
     });
 }

@@ -3,6 +3,8 @@
  * Change both sides together.
  */
 
+import type { DiffView } from '@/shared/git/diff-view';
+
 /** The app's colors. Dark by default; it no longer follows the system's. */
 export type Theme = 'dark' | 'light';
 
@@ -19,6 +21,10 @@ export interface GlobalShortcut {
 export interface Settings {
     theme: Theme;
     globalShortcut: GlobalShortcut;
+    /** The view a diff opens in. */
+    diffView: DiffView;
+    /** What a copy from a diff puts on the clipboard (`shared/copy/copy-template.ts`). */
+    copyTemplate: string;
 }
 
 /** Where the global shortcut stands, as the backend registered it. */

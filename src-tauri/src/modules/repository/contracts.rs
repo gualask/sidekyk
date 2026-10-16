@@ -134,6 +134,9 @@ pub(crate) struct FileDiffRequest {
     pub(crate) path: String,
     pub(crate) orig_path: Option<String>,
     pub(crate) area: ChangeArea,
+    /// Every line of the file as context, for the whole-file view; otherwise three, as git's.
+    #[serde(default)]
+    pub(crate) whole_file: bool,
 }
 
 /// A unified diff as git prints it, of a changed file or of a file of a commit. The frontend
@@ -196,6 +199,9 @@ pub(crate) struct CommitFileDiffRequest {
     pub(crate) commit: CommitRequest,
     pub(crate) path: String,
     pub(crate) orig_path: Option<String>,
+    /// Every line of the file as context, for the whole-file view; otherwise three, as git's.
+    #[serde(default)]
+    pub(crate) whole_file: bool,
 }
 
 #[cfg(test)]
@@ -279,11 +285,13 @@ mod tests {
         let request: FileDiffRequest = serde_json::from_value(serde_json::json!({
             "path": "src/a.ts",
             "origPath": null,
-            "area": "untracked"
+            "area": "untracked",
+            "wholeFile": true
         }))
         .unwrap();
         assert_eq!(request.area, ChangeArea::Untracked);
         assert_eq!(request.orig_path, None);
+        assert!(request.whole_file);
     }
 
     #[test]
@@ -365,7 +373,8 @@ mod tests {
         let request: CommitFileDiffRequest = serde_json::from_value(serde_json::json!({
             "commit": { "sha": "a1b2c3d", "parent": "0f9e8d7" },
             "path": "b.ts",
-            "origPath": "a.ts"
+            "origPath": "a.ts",
+            "wholeFile": false
         }))
         .unwrap();
         assert_eq!(
@@ -377,6 +386,7 @@ mod tests {
                 },
                 path: "b.ts".into(),
                 orig_path: Some("a.ts".into()),
+                whole_file: false,
             }
         );
     }

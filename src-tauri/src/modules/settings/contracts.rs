@@ -1,6 +1,6 @@
 //! Wire contracts shared with the frontend (`src/modules/settings/model/settings.types.ts`).
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// The app's colors. It no longer follows the system's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -9,6 +9,43 @@ pub(crate) enum Theme {
     #[default]
     Dark,
     Light,
+}
+
+/// The view a diff opens in: only the changed lines, or the whole file with its changes marked.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiffView {
+    #[default]
+    Changes,
+    File,
+}
+
+/// What a copy from a diff puts on the clipboard: `{row}` becomes where the text is
+/// (`src/cart.ts:14`, `src/cart.ts:12-15`) and `{text}` the text copied. The frontend fills it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub(crate) struct CopyTemplate(String);
+
+/// The default: where, then what, with no formatting that could break where it is pasted.
+pub(crate) const DEFAULT_COPY_TEMPLATE: &str = "{row}\n{text}";
+
+impl Default for CopyTemplate {
+    fn default() -> Self {
+        Self(DEFAULT_COPY_TEMPLATE.to_string())
+    }
+}
+
+/// A template with no placeholder copies the same text whatever is clicked: one stored so (by a
+/// hand-edited file; the settings refuse it) takes the default.
+impl<'de> Deserialize<'de> for CopyTemplate {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let template = String::deserialize(deserializer)?;
+        if template.contains("{row}") || template.contains("{text}") {
+            Ok(Self(template))
+        } else {
+            Ok(Self::default())
+        }
+    }
 }
 
 /// The shortcut that shows and hides the window from any app, on by default. Its default keys are
@@ -41,6 +78,8 @@ impl Default for GlobalShortcut {
 pub(crate) struct Settings {
     pub(crate) theme: Theme,
     pub(crate) global_shortcut: GlobalShortcut,
+    pub(crate) diff_view: DiffView,
+    pub(crate) copy_template: CopyTemplate,
 }
 
 /// Where the global shortcut stands, as registered. The frontend knows every platform's kinds;
@@ -80,10 +119,14 @@ mod tests {
                 enabled: false,
                 keys: "Super+Shift+KeyK".to_string(),
             },
+            diff_view: DiffView::File,
+            copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
         };
         let json = serde_json::json!({
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
+            "diffView": "file",
+            "copyTemplate": "Look at {row}:\n{text}",
         });
         assert_eq!(serde_json::to_value(&settings).unwrap(), json);
         assert_eq!(serde_json::from_value::<Settings>(json).unwrap(), settings);
@@ -99,7 +142,25 @@ mod tests {
                     enabled: true,
                     keys: DEFAULT_GLOBAL_SHORTCUT.to_string(),
                 },
+                diff_view: DiffView::Changes,
+                copy_template: CopyTemplate::default(),
             }
+        );
+    }
+
+    #[test]
+    fn a_copy_template_without_placeholders_takes_the_default() {
+        let template = |value: &str| {
+            serde_json::from_value::<Settings>(serde_json::json!({ "copyTemplate": value }))
+                .unwrap()
+                .copy_template
+        };
+        assert_eq!(template("Fix this"), CopyTemplate::default());
+        assert_eq!(template(""), CopyTemplate::default());
+        assert_eq!(template("{text}"), CopyTemplate("{text}".to_string()));
+        assert_eq!(
+            serde_json::to_value(CopyTemplate::default()).unwrap(),
+            serde_json::json!("{row}\n{text}")
         );
     }
 

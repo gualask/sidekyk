@@ -381,6 +381,10 @@ mod tests {
         let request = |path: &str, area: &str| -> FileDiffRequest {
             serde_json::from_value(json!({ "path": path, "origPath": null, "area": area })).unwrap()
         };
+        let whole_file = |path: &str, area: &str| FileDiffRequest {
+            whole_file: true,
+            ..request(path, area)
+        };
 
         let unstaged =
             load_file_diff(&backend, &repo.info, &request("src/cart.ts", "unstaged")).unwrap();
@@ -401,6 +405,28 @@ mod tests {
         let staged =
             load_file_diff(&backend, &repo.info, &request("src/cart.ts", "staged")).unwrap();
         assert_eq!(staged.text, "");
+
+        // the whole file: every line around the change, in one hunk
+        write(root, "src/long.ts", &"x\n".repeat(20));
+        git(root, &["add", "src/long.ts"]);
+        write(root, "src/long.ts", &format!("{}y\n", "x\n".repeat(19)));
+        let changes =
+            load_file_diff(&backend, &repo.info, &request("src/long.ts", "unstaged")).unwrap();
+        assert!(
+            changes.text.contains("@@ -17,4 +17,4 @@"),
+            "{}",
+            changes.text
+        );
+        let whole =
+            load_file_diff(&backend, &repo.info, &whole_file("src/long.ts", "unstaged")).unwrap();
+        assert!(whole.text.contains("@@ -1,20 +1,20 @@"), "{}", whole.text);
+        let new_file =
+            load_file_diff(&backend, &repo.info, &whole_file("new.ts", "untracked")).unwrap();
+        assert!(
+            new_file.text.contains("@@ -0,0 +1 @@\n+x\n"),
+            "{}",
+            new_file.text
+        );
 
         assert!(load_file_diff(&backend, &repo.info, &request("../x", "unstaged")).is_err());
     }
@@ -469,6 +495,7 @@ mod tests {
                 commit: commit(last),
                 path: "src/basket.ts".into(),
                 orig_path: Some("src/cart.ts".into()),
+                whole_file: false,
             },
         )
         .unwrap();
@@ -484,15 +511,33 @@ mod tests {
                 commit: commit(first),
                 path: "src/cart.ts".into(),
                 orig_path: None,
+                whole_file: false,
             },
         )
         .unwrap();
         assert!(added.text.contains("@@ -0,0 +1,6 @@"), "{}", added.text);
+        let whole = load_commit_file_diff(
+            &backend,
+            &repo.info,
+            &CommitFileDiffRequest {
+                commit: commit(last),
+                path: "src/basket.ts".into(),
+                orig_path: Some("src/cart.ts".into()),
+                whole_file: true,
+            },
+        )
+        .unwrap();
+        assert!(
+            whole.text.contains("@@ -1,6 +1,6 @@\n a\n"),
+            "{}",
+            whole.text
+        );
 
         let outside = CommitFileDiffRequest {
             commit: commit(last),
             path: "../x".into(),
             orig_path: None,
+            whole_file: false,
         };
         assert!(load_commit_file_diff(&backend, &repo.info, &outside).is_err());
 

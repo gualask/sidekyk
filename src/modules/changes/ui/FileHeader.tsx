@@ -1,22 +1,32 @@
+import type { DiffView } from '@/shared/git/diff-view';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { FileChange } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
 
+const VIEWS: { value: DiffView; label: string; title: string }[] = [
+    { value: 'changes', label: 'Changes', title: 'Only the changed lines' },
+    { value: 'file', label: 'Full file', title: 'The whole file, changes highlighted' },
+];
+
 /**
  * The open file in the panel's header: its path, where it comes from (its area, or its commit)
- * and counts, and the copy of the whole file. Copy is an icon, as everywhere: its tooltip says
- * what it copies, and it turns into a check for a moment once done.
+ * and counts, the view it shows in, and the copy of the whole file. Copy is an icon, as
+ * everywhere: its tooltip says what it copies, and it turns into a check for a moment once done.
  */
 export function FileHeader({
     file,
-    source,
+    badge,
+    view,
+    onViewChange,
     copied,
     onCopy,
 }: {
     file: FileChange;
     /** Where the change is: "Staged", "Not staged", or a commit's hash with its subject. */
-    source: { label: string; title?: string };
+    badge: { label: string; title?: string };
+    view: DiffView;
+    onViewChange: (view: DiffView) => void;
     copied: CopyState;
     /** null while there is nothing to copy (no hunks). */
     onCopy: (() => void) | null;
@@ -32,9 +42,9 @@ export function FileHeader({
                 </span>
                 <span
                     className="shrink-0 rounded-[5px] bg-ui-surface-hover px-1.5 py-px font-sans text-[11px] font-medium text-ui-text-muted"
-                    title={source.title}
+                    title={badge.title}
                 >
-                    {source.label}
+                    {badge.label}
                 </span>
                 <span className="shrink-0 text-[11.5px] font-normal">
                     <LineCounts
@@ -44,6 +54,24 @@ export function FileHeader({
                     />
                 </span>
             </span>
+            {/* plain buttons styled as segments: Base UI stays out of the first paint */}
+            <fieldset className="seg" aria-label="Diff view">
+                {VIEWS.map((option) => (
+                    <button
+                        key={option.value}
+                        type="button"
+                        className="seg-item py-0.5 font-semibold"
+                        title={option.title}
+                        aria-pressed={option.value === view}
+                        data-checked={option.value === view ? '' : undefined}
+                        onClick={() => {
+                            if (option.value !== view) onViewChange(option.value);
+                        }}
+                    >
+                        {option.label}
+                    </button>
+                ))}
+            </fieldset>
             <button
                 type="button"
                 className="btn-icon h-[26px] w-[26px]"

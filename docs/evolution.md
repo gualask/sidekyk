@@ -93,7 +93,10 @@ Tabler's. What it settles:
 
 - **The diff** shows only the changed lines, or the whole file with the changes marked ("Full
   file", which opens on the current or first change); the header switches it, and the settings
-  choose the default. In the whole file a hunk is outlined on hover, its copy at its top right.
+  choose the default. A click copies, the same in both views: a line from its code, a hunk from
+  its lines' numbers (a line in the gutter groups them) or its header, and text selected with
+  the mouse when the button comes up. What a click would copy lights up under the pointer.
+  Everything goes through a template the user writes in the settings (`{row}`, `{text}`).
 - **The scrollbar is a map of the changes**: one mark per hunk at its place (added, removed or
   both), under a translucent thumb; a click on a mark goes to that change, elsewhere jumps there,
   the thumb drags. Narrow or wide, in the settings.

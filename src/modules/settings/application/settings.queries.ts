@@ -1,19 +1,31 @@
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import type { Settings } from '../model/settings.types';
-import { useSettingsPort } from './settings.port';
+import { type SettingsPort, useSettingsPort } from './settings.port';
 
 const settingsKey = ['settings'] as const;
 const shortcutStatusKey = ['settings', 'global-shortcut'] as const;
 
-/** The settings; the component waits for them (`Suspense`), read once per session. */
-export function useSettings() {
-    const port = useSettingsPort();
-    return useSuspenseQuery({
+/** The settings, read once per session: the backend answers from memory. */
+function settingsQuery(port: SettingsPort) {
+    return {
         queryKey: settingsKey,
         queryFn: () => port.getSettings(),
         staleTime: Number.POSITIVE_INFINITY,
-    });
+    };
+}
+
+/** The settings; the component waits for them (`Suspense`). */
+export function useSettings() {
+    return useSuspenseQuery(settingsQuery(useSettingsPort()));
+}
+
+/**
+ * The settings without waiting for them: `undefined` until read. Read at startup by what the
+ * first screen needs of them (the view a diff opens in), from the backend's memory.
+ */
+export function useSettingsWhenRead(): Settings | undefined {
+    return useQuery(settingsQuery(useSettingsPort())).data;
 }
 
 /**

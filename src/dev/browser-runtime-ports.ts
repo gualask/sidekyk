@@ -1,11 +1,13 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { ProjectList } from '@/modules/projects';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
+import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
+import { wholeFileDiff } from './whole-file.fixture';
 
 export const SCENARIOS = ['review', 'clean', 'no-repo', 'large', 'problems'] as const;
 export type Scenario = (typeof SCENARIOS)[number];
@@ -64,6 +66,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     let settings: Settings = {
         theme: 'dark',
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
+        diffView: 'changes',
+        copyTemplate: DEFAULT_COPY_TEMPLATE,
     };
     // in `problems`, another app holds the stored shortcut since startup
     const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;
@@ -125,7 +129,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getSummary: async (root) => snapshot(root).summary,
             getFileDiff: async (root, request) => {
                 readable(root);
-                return large(root) ? largeDiff() : reviewDiff(request);
+                const diff = large(root) ? largeDiff() : reviewDiff(request);
+                return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
             // every project has the same history, even with a clean working tree
             getRecentCommits: async (root) => {
@@ -138,7 +143,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             },
             getCommitFileDiff: async (root, request) => {
                 readable(root);
-                return commitFileDiff(large(root), request);
+                const diff = commitFileDiff(large(root), request);
+                return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
             onRepositoryChanged: () => () => undefined,
             setWindowVisible: async () => null,

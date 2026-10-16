@@ -1,6 +1,11 @@
-import { CopyIcon } from '@/shared/ui/CopyIcon';
-import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
+import {
+    BRACKET_WIDTH,
+    NUMBER_WIDTH,
+    SIGN_WIDTH,
+    TEXT_PADDING_LEFT,
+    TEXT_PADDING_RIGHT,
+} from './diff-layout';
 
 const ROW_TONE: Record<DiffLine['kind'], string> = {
     context: '',
@@ -18,54 +23,59 @@ const GUTTER_TONE: Record<DiffLine['kind'], string> = {
 
 const SIGN: Record<DiffLine['kind'], string> = { context: '', add: '+', del: '−', note: '' };
 
-/** A hunk's `@@` header. Clicking it copies the hunk, formatted for an agent. */
+/** A hunk's `@@` header: a click copies the hunk, as a click on its lines' numbers does. */
 export function HunkHeaderRow({
     hunk,
     first,
-    copied,
     onCopy,
 }: {
     hunk: DiffHunk;
     first: boolean;
-    copied: CopyState;
     onCopy: () => void;
 }) {
     return (
         <button
             type="button"
             onClick={onCopy}
-            title="Copy this hunk, ready to paste to your agent"
-            className={`group flex h-6 w-full items-center gap-3 bg-ui-diff-hunk-bg px-4 text-left text-ui-diff-hunk-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset ${
+            title="Copy this hunk"
+            className={`flex h-6 w-full cursor-pointer items-center gap-3 bg-ui-diff-hunk-bg px-4 text-left text-ui-diff-hunk-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset ${
                 first ? '' : 'border-t border-ui-border'
             }`}
         >
             <span className="whitespace-pre">{hunk.header}</span>
-            <span
-                className={`ml-auto flex items-center gap-1 font-sans font-medium transition-opacity ${
-                    copied
-                        ? 'opacity-100'
-                        : 'opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100'
-                }`}
-            >
-                <CopyIcon copied={copied} />
-                {copyLabel(copied, 'Copy hunk')}
-            </span>
         </button>
     );
 }
 
+/**
+ * A line, its number and sign in the gutter (`data-part="gutter"`, which a click turns into a
+ * copy of the whole hunk): its number in the file now, or for a removed line where it was, as a
+ * copy names it.
+ */
 export function DiffLineRow({ line }: { line: DiffLine }) {
     const gutter = `shrink-0 select-none ${GUTTER_TONE[line.kind]}`;
     return (
-        <div className={`flex h-5 leading-5 ${ROW_TONE[line.kind]}`}>
-            <span className={`w-12 px-2 text-right tabular-nums ${gutter}`}>
-                {line.oldNumber ?? ''}
+        <div className={`relative flex h-5 cursor-pointer leading-5 ${ROW_TONE[line.kind]}`}>
+            <span data-part="gutter" className="flex shrink-0">
+                {/* where a hunk's bracket goes */}
+                <span className={gutter} style={{ width: BRACKET_WIDTH }} />
+                {/* one column: the line in the file now, or where a removed line was */}
+                <span
+                    className={`px-2 text-right tabular-nums ${gutter}`}
+                    style={{ width: NUMBER_WIDTH }}
+                >
+                    {(line.kind === 'del' ? line.oldNumber : line.newNumber) ?? ''}
+                </span>
+                <span className={`text-center ${gutter}`} style={{ width: SIGN_WIDTH }}>
+                    {SIGN[line.kind]}
+                </span>
             </span>
-            <span className={`w-12 px-2 text-right tabular-nums ${gutter}`}>
-                {line.newNumber ?? ''}
+            <span
+                className="flex-1 whitespace-pre"
+                style={{ paddingLeft: TEXT_PADDING_LEFT, paddingRight: TEXT_PADDING_RIGHT }}
+            >
+                {line.text}
             </span>
-            <span className={`w-5 text-center ${gutter}`}>{SIGN[line.kind]}</span>
-            <span className="flex-1 pr-6 pl-1 whitespace-pre">{line.text}</span>
         </div>
     );
 }

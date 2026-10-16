@@ -114,6 +114,8 @@
     --color-ui-accent-soft-hover: var(--ui-accent-soft-hover);
     --color-ui-accent-tint: var(--ui-accent-tint);
     --color-ui-accent-on-soft: var(--ui-accent-on-soft);
+    --color-ui-accent-solid: var(--ui-accent-solid);
+    --color-ui-accent-solid-hover: var(--ui-accent-solid-hover);
     --color-ui-accent-on-solid: var(--ui-accent-on-solid);
     --color-ui-danger: var(--ui-danger);
     --color-ui-danger-soft: var(--ui-danger-soft);

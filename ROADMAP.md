@@ -231,8 +231,19 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Then: explore the repository
 
-- [ ] Whole-file view in Changes ("Full file"): the file with its changes marked, opening on the
-      current change; the default view in the settings. The Files panel shows changed files on it
+- [x] Whole-file view in Changes ("Full file"): the file with its changes marked, switched in the
+      diff's header ("Changes | Full file") and chosen as the default in the settings (Diff, "Open
+      diffs as"). The backend sends the diff with every line as context (`wholeFile`, `-U` at
+      git's largest), for the working tree and for commits, under the same 2 MiB bound; the
+      frontend cuts its changes into git's own three-line hunks (checked against git on 1,370
+      files of this repository's and Zed's history), so a hunk copies as in the Changes view. A
+      file opens on its first change,
+      three lines above it; switching the view keeps the hunk at the top. The settings are read at
+      startup with the project list, from the backend's memory, so the first diff asks for its
+      view. Measured: on a 13,291-line file of Zed, the whole-file diff takes 20 ms as the
+      three-line one, and weighs 491 KB against 3 KB; in the fixtures, a 50,000-line file switches
+      view in about 140 ms (dev build). Costs nothing hidden or idle; shown, the whole-file diff
+      only while that view is on. The Files panel shows changed files on it
 - [ ] Files panel: tree from `git ls-files` plus untracked files, virtualized, with a bounded
       payload; keyboard, compact folders, change colors and adjustable width as in the approved
       mock
@@ -261,7 +272,22 @@ Before the explorer adds more git reads, so they all share the same limits.
 
 ## Then: feedback to the agent
 
-- [ ] Copy selected lines, not only whole hunks
+- [x] Copy with a click, the same in both views (decided with the maintainer on 2026-10-16): a line
+      from its code, a hunk from its lines' numbers (a line in the gutter groups them) or its `@@`
+      header, which lights it up the same way (the header names no action of its own), and text
+      selected with the mouse by itself when the button comes up; a click inside a selection still
+      copies the line, and a double click copies the line, then the word. What a click would copy
+      lights up under the pointer (the pointer a hand, as on a button), flashes once copied, and a
+      chip at the top right of what was copied, in the part on screen, says what it was ("Copied
+      line 14") or that it failed, gone a moment later: not a toast, which is for events nothing on
+      screen waits for. Everything goes through the user's template, in the settings ("Copy as",
+      with a placeholder at least, and a reset): `{row}` where the text is (`src/cart.ts:14`,
+      `:12-15`; a removed line names the path it had before a rename, and a commit's diff names the
+      commit, since its numbers are of that version: `src/cart.ts:14 (a1b2c3d)`, `(removed in
+      a1b2c3d)`), `{text}` a line as it is, a hunk with its `+` and `-`, a selection exactly; by
+      default `{row}` then `{text}` on the next line, with no formatting that could break where it
+      is pasted. The whole file's copy puts each hunk through it. One listener on the list for the
+      pointer, none per row. Costs nothing hidden or idle
 - [ ] Collect several hunks with a short comment each, then copy them as one batch
 
 ## Review
