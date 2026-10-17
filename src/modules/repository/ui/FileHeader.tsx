@@ -27,9 +27,10 @@ const SHOW_IN = {
 const ICON_BUTTON = 'btn-icon h-[26px] w-[26px]';
 
 /**
- * The file open in a panel, in the panel's header: its path, where it comes from (its area, its
- * commit, or that it did not change) and counts, the view a diff shows in, the way to the other
- * panel, and a copy: of the diff when there is one, else of the path. Copy is an icon, as
+ * The file open in a panel, in the panel's header: its path, what the panel shows nowhere else
+ * about it (in Changes, that it did not change: its list already has a change's area and counts;
+ * in Files, its area and counts), the view a diff shows in, the way to the other panel, and a
+ * copy: of the diff when there is one, else of the path. Copy is an icon, as
  * everywhere: its tooltip says what it copies, and it turns into a check for a moment once done.
  */
 export function FileHeader({
@@ -44,7 +45,7 @@ export function FileHeader({
     path: string;
     /** The path before a rename. */
     origPath?: string | null;
-    /** "Staged", "Not staged", a commit's hash with its subject, "Unchanged". */
+    /** "Unchanged" in Changes; in Files, "Staged", "Not staged" or "New file". */
     badge?: { label: string; title?: string } | null;
     counts?: Pick<FileChange, 'additions' | 'deletions' | 'binary'> | null;
     /** The view a diff shows in, and its switch. */

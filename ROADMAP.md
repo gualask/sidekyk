@@ -1,408 +1,137 @@
 # Roadmap
 
-What Sidekyk does today and what is still missing, in priority order. Sidekyk is growing from a
-changes viewer into a project workspace (changes, files, notes, several projects); the direction,
-the decisions taken and the open ones are in [docs/evolution.md](docs/evolution.md). Items move to
-**Done** as they land; each one keeps repositories read-only and follows the performance golden
-rule in `AGENTS.md`, and says what it costs while the window is hidden and while it is shown.
+Priority order. Direction and decisions: `docs/evolution.md`; how things work:
+`docs/architecture.md`. Every item keeps repositories read-only, follows the performance golden
+rule (`AGENTS.md`) and states its cost hidden and shown. Performance work that needs measuring
+first waits in **Performance review**.
 
-The feature set comes first. Performance work that is a sure win is part of the items below;
-what needs measuring before deciding waits in **Performance review**, at the end.
+## Done
 
-## Done (MVP)
+MVP and hardening:
 
-- [x] Open a repository from a folder picker, the first CLI argument, or the last one used
-- [x] Summary bar: branch, ahead/behind, changed files, lines added/removed against HEAD,
-      uncommitted indicator (now the project's facts in the breadcrumb)
-- [x] File list grouped as changes, new files and staged, with per-file line counts
-- [x] Unified diff per file, with line numbers, binary and truncation notices
-- [x] Automatic refresh on file and ref changes (filtered, debounced watcher) and on window focus
-- [x] Copy a hunk or a whole file for an agent (`path:lines` plus a `diff` block)
-- [x] Keyboard navigation between files (`↑`/`↓`, `j`/`k`)
-- [x] Light and dark theme following the system
-- [x] Browser fixtures (`?dev=app&scenario=…`) for UI work without Tauri
+- [x] Open a repository (folder picker, first CLI argument, last used); file list grouped as
+      changes / new files / staged with line counts; unified diff with binary and cut notices;
+      watcher refresh (filtered, debounced); keyboard between files; browser fixtures
+- [x] Ignored paths never refresh (`check-ignore`, cached per directory); snapshot's git in
+      parallel; one snapshot in flight per project; untracked reads bounded; virtualized lists;
+      `core.fsmonitor=false`; `backend_timings`; `tracing` logs (release keeps `info`+, +144 KiB)
+- [x] Bounded git: every call names its max output (status 8 MiB, numstat 4 MiB, diff 2 MiB) and
+      is killed past it or after 30 s (`git_timed_out`); at most 10,000 changed paths ("too many
+      changes", counts read `10000+`)
 
-## Done: performance and hardening
+Workspace:
 
-- [x] Ignore changes in gitignored paths (`git check-ignore --stdin`, cached per directory and
-      cleared when a `.gitignore` changes), so a build or a dependency install does not refresh
-      the app over and over
-- [x] Run the snapshot's git commands in parallel (`std::thread::scope`)
-- [x] At most one snapshot in flight per repository; later requests coalesce into it
-- [x] Bound the total bytes and the number of untracked files read for line counts
-- [x] Virtualized diff and file list for very large changes (`@tanstack/react-virtual`)
-- [x] Release profile with LTO and one codegen unit
-- [x] Run git with `-c core.fsmonitor=false`, so a repository's config cannot run a command on
-      every refresh
-- [x] Snapshot and diff timings on any repository (`backend_timings`)
-- [x] Seen in the real app (git calls traced with `GIT_TRACE`): startup runs one snapshot and one
-      diff, writes in an ignored directory cost one `check-ignore` and then nothing, an edit or a
-      commit refreshes within about 300 ms
-- [x] Structured logs (`tracing`): detailed in development, compiled out of release builds below
-      `info`, where only startup, failures and panics are kept for bug reports (+144 KiB on the
-      release binary)
+- [x] Panel contract (`PanelDefinition`, one lazy chunk per module, no queries off screen) and
+      level 0 summaries (status + numstat vs HEAD; 52 ms on Zed's clone)
+- [x] Projects as app data: add, remove, switch (rail, `[`/`]`, `⌘K`); only the project on screen
+      is watched; `repository_missing` for a moved repository
+- [x] Shell of the approved mock: breadcrumb top bar (macOS overlay title bar), rail, level 0
+      cards, level 1 tiles, level 2 full screen; zoom transitions (View Transitions, 320 ms)
+- [x] Settings dialog (`⌘,`): theme (dark default), diff view, copy template, global shortcut
+- [x] Toasts (passing events) and top-bar problems (lasting, each with its fix)
+- [x] Command palette (`⌘K`): projects, panels, changed files, ranked in Rust (`nucleo-matcher`,
+      0.34 ms / 4,366 paths; +199 KiB binary)
+- [x] Keyboard model: `↵`/`Esc` zoom, `1`-`9` panels, `[`/`]` projects, `←`/`→` tiles at level 1
+      (selected tile takes `j`/`k`), `⌘`+scroll and pinch (macOS) zoom
+- [x] Tiles show the panel's icon, title and key in its tooltip (2026-10-17)
 
-## Next: workspace foundation
+See what the agent is doing:
 
-- [x] Panel model: one module per panel with a common contract (`PanelDefinition` in
-      `src/shared/panels`: id, title, icon, lazy component, and since then its header and its
-      level 0 summary), composed in `src/app/panels.ts`; panels off screen run no queries, and
-      each loads as its own chunk, the startup panel's fetched with the app instead of after the
-      first render. A panel is mounted again for another project, so its state belongs to one
-      project. Costs nothing hidden or shown
-- [x] Panel summary: a panel tells about a project on its level 0 card (`summary` in the
-      contract, a chunk of its own loaded with level 0). Changes gives the card how many files
-      changed, the branch, the lines and the first files; the same summary puts the change count
-      on the rail's avatars and the project's facts (branch, changes) in the breadcrumb, which
-      replace the summary bar. A summary is `git status` and one numstat against HEAD, new files
-      counted but not read (`get_repository_summary`, coalesced per project; 52 ms against 57 ms
-      for a snapshot on Zed's clone, both mostly `git status`); the project in the Changes panel
-      takes it from its snapshot, with no git of its own. Hidden, nothing; shown, one summary per
-      other project once the first paint is done and again when the window comes to the front,
-      none while idle
-- [x] Review the approved mock with the maintainer (`.local/mocks/workspace.html`): frozen for the
-      MVP on 2026-10-12, described in docs/evolution.md (Approved mock), which the UI items below
-      follow
-- [ ] Icons of the mock from Tabler (`@tabler/icons-react`, already the app's set, imported one
-      file per icon by `vite.config.ts`): the mock's glyphs and SVGs (chevron, minimize, zoom,
-      settings, overview, close, more, trash, folder, compare, open in editor) are placeholders.
-      Copy is `IconCopy`, then `IconCheck` for a moment, as `DiffRows.tsx` already does. The
-      shell's are in (overview, zoom, more, trash, add), and Files' (folder, compare, chevron);
-      the rest come with their features
-- [x] Base UI for palette, menus, selects and tooltips (decided on 2026-10-12, see
-      docs/evolution.md, UI components), loaded with the code that first needs it, never in the
-      first paint
-- [x] Projects as app data, replacing the single last repository (migrated on first start): add,
-      remove from the card's ⋯ menu, switch from the rail. Commands name a project by its root
-      and serve only the projects in the list; only the project on screen is watched and
-      refreshed. Switching shows the project at once, and quick switches end on the last one
-      clicked (changes to the list run in order, front and back). A repository moved or deleted
-      says so in its panels (`repository_missing`). Costs nothing for the projects not on screen
-- [x] All projects up to date when looked at: the level 0 cards read their summaries again each
-      time level 0 shows (about 65 ms for ten projects in parallel, 0.4 s of CPU), which also
-      refreshes the counts on the rail. Decided on 2026-10-13 instead of a light watcher for every
-      project (docs/evolution.md, Projects): level 0 is for choosing a project, not for watching
-      them all. Costs nothing hidden, nothing while idle
-- [x] Shell of the approved mock, first part: top bar with the breadcrumb (overlay title bar on
-      macOS, the traffic lights in it, room for them only when they show: not in full screen),
-      project rail, level 0 cards with "+ Add a repository" and the ⋯ menu, level 1 tiles and
-      level 2 full screen with Changes as their only panel. Level 0 and Base UI's menu are a
-      chunk of their own, fetched once the window is idle after the first paint. Costs nothing
-      hidden; shown, on macOS, at most one `isFullscreen` call in flight while the window
-      resizes, and one more if it resized meanwhile. To check in the packaged
-      app: the traffic lights' position (`trafficLightPosition` in `tauri.conf.json`)
-- [x] Settings dialog (`⌘,`, `Ctrl+,` on Linux and Windows, a gear in the top bar): theme, dark
-      by default or light, which replaces following the system. Stored with the projects
-      (`settings.json`), applied at once. The backend creates the window in the stored theme
-      and the page follows the window's (`prefers-color-scheme`), so the first paint is right
-      without asking the backend. The dialog is a chunk of its own with Base UI's, fetched once
-      the window is idle. The other settings of the mock (the diff's default view and scrollbar
-      width, the notes' long lines and sync) join it with their features.
-      Costs nothing hidden or shown; opening it reads the settings once per session
-- [x] Zoom transitions (View Transitions): a project grows from its card into its panels and
-      back, a panel from its tile to full screen; every change of level goes through one function
-      (`zoomTransition`). Without the API (older WebKitGTK) or with reduced motion, the level just
-      changes. Lazy parts render at once when their chunk is already loaded (`preloadable`), so a
-      transition never captures an empty frame. Costs nothing hidden or idle; shown, 320 ms of
-      compositing per zoom
-- [ ] Semantic zoom, the rest of the mock: splitters and panels minimized to the top bar (with
-      Files and Notes). Level 1 has tiles only: no tabs (decided on 2026-10-13). The open file is
-      in the Changes tile's header already (`header` in the panel contract), with the copy of the
-      whole file as an icon
-- [x] Toasts for passing events and a top-bar list of lasting problems, each with its fix.
-      Toasts (Base UI's, bottom center, at most three) say what failed when nothing on screen
-      waits for it: adding, opening (a project switch) or removing a project. Information leaves
-      after 4 s, an error stays until closed, and the same message again refreshes the toast on
-      screen instead of stacking a copy. The problems come from what the app already read, with
-      no git of their own: today a repository moved or deleted, seen from any project and fixed by
-      removing it. The toaster is a chunk of its own fetched with the first toast, the problems'
-      popover with the first problem; the settings dialog keeps its errors inside it. Costs
-      nothing hidden, nothing shown while nothing fails; +2.2 kB on the first paint's chunk
-      (0.65 kB gzip), +25 kB in Base UI's chunk (fetched once the window is idle)
-- [x] Command palette (`⌘K`, `Ctrl+K` on Linux and Windows, or the search button in the top
-      bar): projects, the panels of the project on screen, and its changed files, which open in
-      Changes full screen (`PanelProps.target`, the way Files and Notes will open what is picked).
-      Every key typed is ranked in the backend with `nucleo-matcher` (decided on 2026-10-13, see
-      docs/evolution.md, Fuzzy matching) over the changed paths of the last snapshot, with no git:
-      0.34 ms for the 4,366 paths of Zed's clone. At most 500 files come back, the rest counted;
-      the list is virtualized and the matched letters are bold. `Esc` empties the field, then
-      closes. The palette is a chunk of its own with Base UI's dialog and autocomplete, fetched
-      once the window is idle. Every project's files and the notes join with their features.
-      Costs nothing hidden, nothing shown until opened; +2.4 kB on the first paint's chunk
-      (0.75 kB gzip), +32 kB in Base UI's chunk (fetched once the window is idle), +199 KiB on
-      the release binary (the matcher with its Unicode case folding and normalization tables)
-- [x] Keyboard model of the mock: `↵`/`Esc` zoom (`Esc` leaves a field first; dialogs and menus
-      keep their own keys), `1`-`9` open a panel full screen, `[`/`]` switch project (also typed
-      with `⌥` or `AltGr`, as on Italian keyboards), the arrows move among the cards at level 0,
-      which opens on the project on screen. `⌘`/`Ctrl`+scroll zooms on what is under the
-      pointer, with the wheel listened to only while the modifier is held, so scrolling never
-      waits for it. A trackpad pinch zooms through WebKit's gesture events on macOS; on Linux and
-      Windows it would need a wheel listener on every scroll, so it does not zoom there. To check
-      in the packaged app: the pinch in WKWebView. At level 1 the tile clicked, or reached with
-      `←`/`→`, is selected (an accent border): `↵` zooms into it and it takes `j`/`k`, the arrows
-      moving among tiles as in the mock (`PanelProps.place` and `selected`); full screen a panel
-      takes the arrows too. +2.6 kB on the first paint's chunk (1 kB gzip)
+- [x] Tray icon with the change count; closing hides to the tray (+235 KiB)
+- [x] Global shortcut to show/hide (`tauri-plugin-global-shortcut` on macOS/Windows, `sidekyk
+      --toggle` on Linux; default `⌃⌥Space`, provisional; +160 KiB)
+- [x] No git while hidden/minimized/covered; on show, read only what may have changed (watcher
+      mark, or older than 30 s)
+- [x] Window created hidden, shown after the first paint (fallback 3 s)
+- [x] Recent commits in Changes (VS Code's graph, first parents, 50); a commit's files replace the
+      list until `×`/`Esc`
 
-## Next: see what the agent is doing
+Explore and copy:
 
-- [x] Tray icon with the change count, and a menu to show the window or quit (`tray-icon`, a
-      feature of Tauri, decided on 2026-10-14). The count is the project on screen's changed
-      files, from its snapshots and summaries: no git of its own, so it stays as it was while
-      the window is hidden. Next to the icon on macOS (a template glyph in the menu bar) and
-      Linux, in the tooltip everywhere. The app keeps its Dock icon and its place in `⌘Tab`. On
-      Linux, without libayatana-appindicator3 the app runs with no tray. To check in the packaged
-      app: the glyph in the menu bar, light and dark; on Linux and Windows, the icon and the
-      menu. Costs nothing hidden or idle; +235 KiB on the release binary
-- [x] Global shortcut to show and hide the window, on by default (decided on 2026-10-15, see
-      docs/evolution.md, Global shortcut): hidden, minimized or behind other windows it brings
-      the window to the front, in front it hides it (on macOS the whole app, so the app used
-      before comes back). Registered with `tauri-plugin-global-shortcut` on macOS and Windows; on
-      Linux the desktop's own shortcut runs `sidekyk --toggle`, since `global-hotkey`'s X11
-      backend wakes every 50 ms and Wayland has none. In the settings, a switch and a field that
-      records a new combination (a function key may come alone), showing the modifiers held and
-      what is missing; one the system turns down keeps the previous, and says why. The backend
-      checks every combination before it registers or stores it. A stored shortcut refused at
-      startup, or that macOS uses for itself (read with `CopySymbolicHotKeys`), is a problem in
-      the top bar. Its default keys are provisional (`⌃⌥Space`). Seen in the app on macOS: the
-      toggle, `⌥Space` and a function key alone. To check: on Windows, and `--toggle` from a
-      Linux desktop's shortcut. Costs nothing hidden or idle; +160 KiB on the macOS release
-      binary
-- [x] Closing the window hides it instead of quitting, while the tray is there; quit from the
-      tray (or `⌘Q` on macOS). On macOS a click on the Dock's icon brings the window back. To
-      check in the packaged app: `⌘W` and the close button hide, `⌘Q` quits
-- [x] No work while the window is hidden, minimized or covered: the page's visibility
-      (`visibilitychange`, which TanStack Query's focus refetch already follows) reaches the
-      backend (`set_window_visible`), and the watcher drops its batches meanwhile: no
-      `check-ignore`, no snapshot, no diff. When the window shows again, the snapshot and the open
-      diff refetch. On macOS a window covered by others counts as hidden (WKWebView follows the
-      window's occlusion). Seen in the real app: writes while hidden cost the watcher's batch
-      only, and showing the window runs one snapshot and one diff. Costs nothing hidden; shown,
-      one `git diff` more each time the window comes back
-- [x] Read again on show only what may have changed (decided on 2026-10-14, see
-      docs/evolution.md, Projects): the project on screen when the watcher saw something while
-      the window was hidden, the other projects' summaries when they are older than 30 s, at
-      level 0 too. The project on screen is also read again past 30 s, the safety net for changes
-      the watcher cannot see. While hidden, the watcher marks a batch from what it already knows
-      of the ignored directories, with no git: a build in `dist/` leaves no mark once `dist/` was
-      seen ignored, a path never asked about does. `set_window_visible` answers with the marked
-      project. Seen in the real app: shown again within 30 s with nothing changed, no git; after a
-      write, one snapshot and one diff; past 30 s, everything on screen. Before, each `⌘Tab` back
-      from a terminal covering Sidekyk cost a snapshot, the open diff and every project's summary
-      (0.4 s of CPU for ten projects). Costs nothing hidden; shown, at most one read of what is on
-      screen every 30 s, plus one for each change the agent made while hidden
-- [x] Create the window hidden and show it after the first paint: no blank frame at startup. The
-      page asks for it (`show_window`) once the project list is read, so the workspace is laid
-      out; the Changes panel asks for its snapshot in the same render. Without a call within 3 s
-      (a page that failed to load) the backend shows it anyway. Seen in the app built with the
-      bundled frontend (debug Rust): shown 450 to 670 ms after start, with the snapshot and the
-      first diff back before macOS put the window on screen. To check in the packaged app: no
-      blank frame at startup, light and dark; on Linux and Windows, that a page in a window never
-      shown loads and calls back (WebKitGTK, WebView2). Costs nothing hidden or shown; at startup,
-      one thread asleep for 3 s
-- [x] Recent commits, as in VS Code's source control (decided with the maintainer on 2026-10-15): a
-      section at the bottom of the Changes panel's list, closed until opened and then 40% of its
-      height, with the last 50 commits of the branch on screen drawn as VS Code's graph: one line, a
-      dot per commit, a ring for a merge, the author and how long ago. The list follows first
-      parents (`git log --first-parent -n 51 HEAD`, 1 MiB at most; none before the first commit), so
-      the one line is the branch's own history and a merge stands for what it brought. A click on a
-      commit shows its files in the list above, in place of the working tree's and on a tinted
-      background (`--ui-accent-tint`), under a card with the commit's hash, author, age and subject;
-      its × goes back to the working tree and closes the commits, as `Esc` does before it zooms out.
-      Its files (`git diff-tree --raw --numstat -M` against the first parent, at most 10,000) open
-      their diff in the same view, the hash in the header; `↑`/`↓` and `j`/`k` move in the list on
-      screen. Changes keeps comparing against HEAD. Commit ids from the frontend must be hashes
-      (`invalid_commit` otherwise), and `log.showSignature` is turned off so gpg never runs. What a
-      commit changed never changes: read once, never refreshed. The log is read again only when the
-      watcher saw the index, HEAD or refs change (`gitDir` on `repository-changed`), not on edits in
-      the working tree. Measured on Zed's clone: the log 13 ms, a commit's files 17 ms. Costs
-      nothing hidden, nothing while closed
+- [x] Whole-file view ("Changes | Full file", default in settings): diff with full context, cut
+      into git's three-line hunks; 20 ms on a 13,291-line file
+- [x] Copy with a click in both views (line, hunk, selection) through the user's `{row}`/`{text}`
+      template
+- [x] Files panel (2026-10-17): tree of `git ls-files` (cached + others, minus deleted; 200,000
+      max) kept in Rust, served per open folder (10,000 entries max); compact folders, VS Code
+      order and change colors; collapse-all; read again only when a path is added/removed or the
+      git dir changes (48 ms on Zed's clone, a folder 3 µs). In a tile the tree alone, Changes
+      being the viewer; full screen tree + viewer. One shared selection (VS Code-style
+      auto-reveal). Tree width dragged and stored (`filesTreeWidth`)
+- [x] File view (`get_file_content`): files of the tree only, first 2 MiB, binary/link/submodule
+      notices, links never followed; same rows and copy as diffs
 
-## Next: bounded git
+## Next
 
-Before the explorer adds more git reads, so they all share the same limits.
+- [ ] Search by name in `⌘K`, active project first; opening one reveals it in the tree. Needs
+      every project's path list in the backend (the ranking exists)
+- [ ] Search in contents in `⌘K` (mode), in the backend (`git grep` or ripgrep crates), streaming,
+      cancellable
+- [ ] Rest of semantic zoom: splitters, panels minimized to the top bar (with Notes)
+- [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
 
-- [x] A timeout on every git call that kills git, so a hung command (network drive, huge
-      repository) cannot hold the coalesced snapshot forever: 30 s, then `git_timed_out`, which
-      the panels show like any error and the log keeps as a warning
-- [x] Bound reads while reading, not after: each git call names the most output it reads
-      (`git status` 8 MiB, a numstat 4 MiB, a diff 2 MiB, `check-ignore` its input's size), and
-      git is killed past it instead of read to the end. At most 10,000 changed paths, as VS
-      Code's `git.statusLimit`: past them Changes says "too many changes" above the list, which
-      stops there, and the counts read `10000+` (breadcrumb, card, tray). Each pipe is read on a
-      thread of its own; measured: a snapshot of Zed's clone takes 57 ms before and after.
-      Costs nothing hidden or idle
+## Notes
 
-## Then: explore the repository
+- [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes)
+- [ ] Optional Google Drive sync/backup (OAuth loopback + PKCE, tokens in the OS credential store,
+      local first, conflicts keep both); nothing runs until an account is connected
 
-- [x] Whole-file view in Changes ("Full file"): the file with its changes marked, switched in the
-      diff's header ("Changes | Full file") and chosen as the default in the settings (Diff, "Open
-      diffs as"). The backend sends the diff with every line as context (`wholeFile`, `-U` at
-      git's largest), for the working tree and for commits, under the same 2 MiB bound; the
-      frontend cuts its changes into git's own three-line hunks (checked against git on 1,370
-      files of this repository's and Zed's history), so a hunk copies as in the Changes view. A
-      file opens on its first change,
-      three lines above it; switching the view keeps the hunk at the top. The settings are read at
-      startup with the project list, from the backend's memory, so the first diff asks for its
-      view. Measured: on a 13,291-line file of Zed, the whole-file diff takes 20 ms as the
-      three-line one, and weighs 491 KB against 3 KB; in the fixtures, a 50,000-line file switches
-      view in about 140 ms (dev build). Costs nothing hidden or idle; shown, the whole-file diff
-      only while that view is on. The Files panel shows changed files on it
-- [x] Files panel (decided with the maintainer on 2026-10-17): at level 1 a tile with the tree
-      alone, right of Changes and as wide as the tree; a file picked there shows in Changes, the
-      viewer (a file that did not change as its text, badged "Unchanged", until `Esc` or a click
-      in the list goes back), and the tree keeps the keys. `2` shows it full screen, the tree
-      with the file next to it. The backend lists the files once (`git ls-files
-      --cached --others --exclude-standard`, without `--deleted`; at most 200,000 files, 32 MiB)
-      and keeps the list of the project on screen; the frontend asks for each open folder that
-      shows (`get_directory`, at most 10,000 entries, the rest counted), so the payload is what is
-      open. The backend resolves compact folders ("modules/changes") and sorts as VS Code's
-      explorer (folders first, case ignored, numbers by value). The list is read again only when a
-      watcher batch has a path not ignored that appeared or disappeared (a `stat` of the batch's
-      paths against the list), when the git dir changed, or after the window was hidden with a
-      mark; an edit to a file reads nothing, and the open folders are answered from memory.
-      Changes color the names (amber, green for new; a folder its strongest), with no mark; the
-      tooltip says it. Keys: `j`/`k` and `Space` (opens a folder) in the tile, where `j`/`k` also
-      show a file in Changes; `←→↑↓↵` full screen. The file shown is one for both panels, as in
-      VS Code: picked in Changes it is revealed in the tree, picked in the tree it is selected in
-      Changes' list when it changed. It and the open folders are kept per project for the session; the tree's width is dragged
-      and stored in the settings (`filesTreeWidth`), a double click fits every open row, a second
-      goes back, the file view keeps 240 px. "Show in Files" in Changes' header and "Show in
-      Changes" in Files' go to the other panel at the hunk being read (`PanelProps.show`). The
-      Changes panel now keeps its selected file across zooms too. One viewer and one header serve
-      both panels (`Pane`, `FileHeader`). Measured on Zed's clone: the
-      list 48 ms (the snapshot 57 ms), a folder 3 µs. Costs nothing hidden or idle; shown, one
-      `git ls-files` when the tree is first shown and after a file is added or removed. +3.9 kB on
-      the first paint's chunk (1.4 kB gzip), +3.2 kB in the vendor chunk (TanStack's
-      `useQueries`), and the panel's chunk (fetched with the app, as its tile shows at level 1)
-- [x] File view through the backend (`get_file_content`): only a file of the tree, never one git
-      ignores, its first 2 MiB cut at a whole line, binary when a NUL comes in the first 8 KiB, a
-      link shown with its target and never followed (nor any folder on the way), a submodule said
-      so. Its text is on the rows of the diff view, which copy a line or a selection with a click
-      as in Changes. A changed file shows whole with its changes marked, the diff of the area
-      Changes lists first, so its hunks are those of Changes. Costs nothing hidden or idle; shown,
-      the open file read again with each change on disk, as the open diff is
-- [ ] Search by name (fuzzy) in `⌘K`, the active project's files first; opening one shows it
-      in the tree. No filter in the panel. The ranking is there already (`modules/search`): it
-      needs the path list of every project, kept by the backend
-- [ ] Search in contents in `⌘K`, as a mode, in the backend (`git grep` or ripgrep's crates),
-      streaming and cancellable
+## Then
 
-## Then: notes
-
-- [ ] Notes panel as cards in lists (plain text, done, copy, move between lists, the user's order;
-      docs/evolution.md, Approved mock), stored at application level in the app data directory
-      (format and granularity decided at implementation)
-- [ ] Optional sync and backup with Google Drive: OAuth 2.0 for desktop apps (loopback, PKCE),
-      tokens in the OS credential store, sync in the backend, local first, conflicts kept as both
-      versions (see docs/evolution.md for the checked facts and the open decisions). Nothing of
-      it starts until an account is connected
-
-## Then: all projects at a glance
-
-- [ ] Semantic zoom level 0: one card per project (changes in progress, notes), doubling as the
-      project switcher
-
-## Then: feedback to the agent
-
-- [x] Copy with a click, the same in both views (decided with the maintainer on 2026-10-16): a line
-      from its code, a hunk from its lines' numbers (a line in the gutter groups them) or its `@@`
-      header, which lights it up the same way (the header names no action of its own), and text
-      selected with the mouse by itself when the button comes up; a click inside a selection still
-      copies the line, and a double click copies the line, then the word. What a click would copy
-      lights up under the pointer (the pointer a hand, as on a button), flashes once copied, and a
-      chip at the top right of what was copied, in the part on screen, says what it was ("Copied
-      line 14") or that it failed, gone a moment later: not a toast, which is for events nothing on
-      screen waits for. Everything goes through the user's template, in the settings ("Copy as",
-      with a placeholder at least, and a reset): `{row}` where the text is (`src/cart.ts:14`,
-      `:12-15`; a removed line names the path it had before a rename, and a commit's diff names the
-      commit, since its numbers are of that version: `src/cart.ts:14 (a1b2c3d)`, `(removed in
-      a1b2c3d)`), `{text}` a line as it is, a hunk with its `+` and `-`, a selection exactly; by
-      default `{row}` then `{text}` on the next line, with no formatting that could break where it
-      is pasted. The whole file's copy puts each hunk through it. One listener on the list for the
-      pointer, none per row. Costs nothing hidden or idle
-- [ ] Collect several hunks with a short comment each, then copy them as one batch
-
-## Review
-
-- [ ] The scrollbar as a map of the changes: one mark per hunk, click to go there; narrow or wide
-      in the settings
-- [ ] `n`/`p`: next or previous change, on to the next or previous file at either end
-- [ ] Syntax highlighting, loaded lazily, only for the rows on screen, and skipped above a size
-      limit
-- [ ] Side-by-side view
-- [ ] Collapse unchanged regions and expand context on demand
+- [ ] Level 0 cards with notes (changes in progress, waiting notes)
+- [ ] Collect several hunks with a comment each, copy as one batch
+- [ ] Scrollbar as a map of the changes (marks per hunk, click to go; narrow/wide setting)
+- [ ] `n`/`p`: next/previous change, across files
+- [ ] Syntax highlighting: lazy, rows on screen only, skipped above a size limit
+- [ ] Side-by-side view; collapse unchanged regions with expand on demand
 - [ ] Open a file in the editor at the hunk's line
-
-## App
-
-- [ ] Diff context lines, in the settings dialog
-- [ ] Italian and English UI (as in Fyler)
-- [ ] Real app icon, and its glyph for the macOS menu bar (`icons/tray-template.png`, today
-      Tabler's `git-compare`)
-- [ ] Copy or reveal the log from the app, for bug reports
+- [ ] Diff context lines setting; Italian and English UI (as in Fyler); real app icon and tray
+      glyph (today Tabler's `git-compare`); copy or reveal the log for bug reports
 
 ## Release
 
-- [ ] CI running the same checks as `AGENTS.md`, with the Rust tests on macOS, Linux and Windows
-      (the end-to-end tests run a real git, so they catch path and process differences)
-- [ ] Signed release builds and self-update (as in Fyler); the update check runs at startup or on
-      demand, never on a timer
-- [ ] Linux and Windows testing of the packaged app. On Linux, inotify needs one watch per
-      directory, and `notify`'s recursive mode watches them all, ignored ones and links
-      included: one watch per directory not ignored instead, added as directories appear (about
-      670 for the ten repositories in `~/Dev` against 33,000 to 47,000; `clean-flow` alone has
-      8,222, past the 8,192 of older kernels). Handle the `max_user_watches` limit, shared with
-      the user's editors: a watch that fails must not fail the whole project. On
-      Windows, check that watcher paths (`C:\…`) match git's (`C:/…`) in the ignored-paths filter
-      and the git-dir check, case included. On both, check that the page becomes hidden
-      (`visibilitychange`) when the window is minimized, so the watcher stops refreshing (WebView2
-      may need its controller told). On both, check that the page's `prefers-color-scheme`
-      follows the window's theme, at startup and when the setting changes (WebKitGTK reads GTK's
-      `gtk-application-prefer-dark-theme`, WebView2 its preferred color scheme). On Linux, which
-      WebKitGTK versions run the zoom transitions (WebKit enabled View Transitions by default in
-      February 2024)
+- [ ] CI with the `AGENTS.md` checks; Rust tests on macOS, Linux, Windows (end-to-end tests run a
+      real git)
+- [ ] Signed builds and self-update (as in Fyler); update check at startup or on demand only
+- [ ] Linux watcher: one inotify watch per directory not ignored (~670 vs 33,000-47,000 for the
+      ten repos in `~/Dev`; `clean-flow` alone 8,222 > old 8,192 limit); a failed watch must not
+      fail the project
+- [ ] To verify on the packaged app and other systems:
+  - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, `⌘W` hides and
+    `⌘Q` quits, no blank frame at startup
+  - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
+    git-dir check, case included
+  - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
+    runs View Transitions
+  - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
+    `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
+    follows the window theme
 
 ## Performance review
 
-Once the feature set is in. These need measuring before deciding; the first three give the
-numbers the others are judged on.
+Measure first; the first three give the numbers the rest are judged on.
 
-- [ ] First paint and file switch timings as a repeatable script (today measured by hand on the
-      `large` fixture), and the same in the packaged app
-- [ ] Performance budgets in `docs/performance.md`, with a baseline measured on the packaged app:
-      cold start to first paint, show from hidden, file switch, snapshot and diff on the
-      reference repositories, idle CPU and wakeups, memory (app and WebView processes), bundle
-      and binary size. A change that exceeds a budget says why in its commit
-- [ ] Reference repositories for `backend_timings`: a small one, this one, a large one (tens of
-      thousands of files, e.g. the Linux kernel) and an unignored `node_modules` with thousands
-      of untracked files
-- [ ] Idle footprint: CPU, wakeups and memory with the window shown and hidden, with nothing
-      changing and during an agent's burst of writes (`powermetrics`, Activity Monitor's energy
-      impact, `footprint`)
-- [ ] Hiding the window: keep the WebView alive (instant show, its memory stays) or destroy it
-      (memory freed, slower show)
-- [ ] The tray's change count while hidden: the watcher's mark only, or a throttled `git status`
-      without line counts
-- [ ] Sustained churn: while writes never stop, `notify-debouncer-mini` reports every 250 ms, so
-      the app runs a snapshot, the open diff and a `check-ignore` four times a second (measured:
-      200 writes in 3 s gave 14 of each). Decide whether snapshots need a minimum interval, and
-      whether paths git tracks can skip `check-ignore` (today only ignored directories are
-      remembered)
-- [ ] Prefetch the diffs next to the selected file, if file switching shows a visible wait
-- [ ] Syntax highlighting and fuzzy search off the main thread, if they show up in the timings
-- [ ] Files panel refreshed only when paths are added or removed, not on every edit (the
-      debouncer reports paths, not event kinds)
-- [ ] Bundle and binary size budgets checked in CI (timings stay manual: too noisy on shared
-      runners)
+- [ ] First paint and file switch timings as a script, also on the packaged app
+- [ ] Budgets in `docs/performance.md` (cold start, show from hidden, file switch, snapshot and
+      diff on reference repos, idle CPU/wakeups, memory, bundle and binary size); a commit over
+      budget says why
+- [ ] Reference repos for `backend_timings`: small, this one, Linux kernel scale, an unignored
+      `node_modules`
+- [ ] Idle footprint shown/hidden, quiet and during a burst (`powermetrics`, `footprint`)
+- [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
+- [ ] Tray count while hidden: watcher mark only, or a throttled `git status`
+- [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
+      interval? skip `check-ignore` for tracked paths?
+- [ ] The open file (Files) and the open diff are read again on every change on disk; restrict to
+      changes that touch them
+- [ ] Prefetch neighbouring diffs, if switching shows a wait; highlighting and fuzzy search off
+      the main thread, if timings say so
+- [ ] Bundle and binary size budgets in CI
 
 ## Out of scope
 
-- Writing to git: staging, committing, reverting. Sidekyk only shows; the agent or the terminal
-  changes things.
-- Editing files: the explorer only shows them; "open in editor" is the way to change one.
-- Running or embedding the agent.
-- Following the terminal: opening on the project of the terminal tab used just before. No signal
-  for it holds across agents, terminals, tmux and systems (docs/evolution.md, Follow the terminal:
-  dropped); switching is manual (`[`/`]`, `⌘K`, the rail, `sidekyk .`).
-- Replacing the `git` CLI with an in-process library (`gix`, libgit2) while process startup is
-  not what the timings show as slow.
+- Writing to git or to files (stage, commit, revert, edit): the agent, terminal or editor does it
+- Running or embedding the agent
+- Following the terminal's active tab (no signal holds across agents/terminals/tmux/OSes; see
+  evolution)
+- Replacing the `git` CLI with `gix`/libgit2 while process startup is not the measured bottleneck

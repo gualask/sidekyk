@@ -1,5 +1,6 @@
-import { IconFileText } from '@tabler/icons-react';
+import { IconCopyMinus, IconFileText } from '@tabler/icons-react';
 import { type PointerEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import type { PanelProps } from '@/shared/panels/panel';
@@ -127,6 +128,27 @@ export function FilesWorkspace({
 
     const width = useTreeWidth();
     const treeBox = useRef<HTMLDivElement>(null);
+    // as VS Code's "Collapse Folders in Explorer"; the file shown is revealed again once another
+    // is picked
+    const collapse = header
+        ? createPortal(
+              <>
+                  {/* in a tile the button sits on the right, by the zoom, as Changes' actions do */}
+                  {place === 'tile' ? <span className="flex-1" /> : null}
+                  <button
+                      type="button"
+                      className="btn-icon h-[26px] w-[26px]"
+                      title="Collapse folders"
+                      aria-label="Collapse folders"
+                      disabled={open.size === 0}
+                      onClick={() => setState((current) => ({ ...current, open: new Set() }))}
+                  >
+                      <IconCopyMinus size={14} />
+                  </button>
+              </>,
+              header,
+          )
+        : null;
     const tree = (
         <div className="flex h-full flex-col">
             {error ? (
@@ -161,6 +183,7 @@ export function FilesWorkspace({
                 className="flex h-full flex-col bg-ui-surface font-mono text-[12.5px]"
                 style={{ width: width.value }}
             >
+                {collapse}
                 {tooMany}
                 <div className="min-h-0 flex-1">{tree}</div>
             </div>
@@ -205,6 +228,7 @@ export function FilesWorkspace({
 
     return (
         <div className="flex h-full flex-col">
+            {collapse}
             {tooMany}
             <div className="flex min-h-0 flex-1">
                 <div

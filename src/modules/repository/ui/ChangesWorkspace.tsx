@@ -1,7 +1,6 @@
 import { IconCircleCheck } from '@tabler/icons-react';
 import { useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
-import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -10,7 +9,6 @@ import { useCommitView } from '../application/commit-view';
 import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
-import { shortSha } from '../model/commits';
 import { fileKey } from '../model/file-groups';
 import { selectedFile, selectionOf } from '../model/selection';
 import { fileTarget } from '../model/targets';
@@ -178,11 +176,6 @@ export function ChangesWorkspace({
                                     <FileHeader
                                         path={commitFile.path}
                                         origPath={commitFile.origPath}
-                                        badge={{
-                                            label: shortSha(viewed.sha),
-                                            title: viewed.subject,
-                                        }}
-                                        counts={commitFile}
                                         view={viewSwitch(pane.currentHunk)}
                                         copyDiff={{
                                             copied: pane.fileCopied,
@@ -204,8 +197,6 @@ export function ChangesWorkspace({
                                 <FileHeader
                                     path={selected.path}
                                     origPath={selected.origPath}
-                                    badge={{ label: CHANGE_AREA_LABEL[selected.area] }}
-                                    counts={selected}
                                     view={viewSwitch(pane.currentHunk)}
                                     showIn={showInFiles(selected.path, pane.currentHunk)}
                                     copyDiff={{ copied: pane.fileCopied, onCopy: pane.copyFile }}

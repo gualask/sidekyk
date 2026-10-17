@@ -11,8 +11,8 @@ const HEADER =
 
 /**
  * A panel, in a tile (level 1) or full screen (level 2). Its header carries what the panel puts
- * there (what is open in it, its actions); a tile's also has the panel's title and the button that
- * zooms into it. Full screen the breadcrumb names the panel, so a panel with nothing to show in
+ * there (what is open in it, its actions); a tile's also has the panel's icon, which names it in
+ * its tooltip, and the button that zooms into it. Full screen the breadcrumb names the panel, so a panel with nothing to show in
  * its header has none.
  */
 export function PanelTile({
@@ -65,10 +65,16 @@ export function PanelTile({
         >
             {onZoomIn ? (
                 <div className={`${HEADER} pr-2 pl-3`}>
-                    <span className="font-bold" title={`${panel.title} (${shortcut})`}>
-                        {panel.title}
+                    {/* the panel's icon names it, its tooltip the title and the key that opens it */}
+                    <span
+                        role="img"
+                        className="grid shrink-0 place-items-center text-ui-text-muted"
+                        title={`${panel.title} (${shortcut})`}
+                        aria-label={panel.title}
+                    >
+                        <panel.icon size={15} stroke={1.75} />
                     </span>
-                    {/* parts the title from what the panel shows, while it shows something */}
+                    {/* parts the icon from what the panel shows, while it shows something */}
                     <span className="h-4 w-px shrink-0 bg-ui-border has-[+div:empty]:hidden" />
                     <div ref={setHeader} className="contents" />
                     <button
