@@ -90,7 +90,8 @@ Explore and copy:
 
 - [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes).
       Built (2026-10-17): storage, full screen and tile, reorder, Undo toasts, ⌘K by name, long
-      lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects
+      lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects. Left:
+      try it in the app (`pnpm tauri:dev`; so far browser fixtures and Rust tests only)
 - [x] Export a project's notes to Markdown from the Notes panel's ⋯ (never inside a repository);
       removing a project with notes asks: export then remove, or delete (nothing left on disk)
 - [x] A moved repository is relinked with Locate… (the problem's fix): notes and layout follow,
