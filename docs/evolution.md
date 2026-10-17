@@ -38,8 +38,10 @@ Workspace:
 - Copy is one icon everywhere, its tooltip says what it copies, a check once done.
 - Keys: `↵`/`Esc` zoom (`Esc` progressive: field, menu, mode, then zoom), `1`/`2`/`3` panels,
   `[`/`]` projects, `⌘`+scroll and pinch zoom under the pointer (`Ctrl` on Linux/Windows).
-- `⌘K` is the only search (projects, panels, every project's files, notes, note lists); panels
-  have no filter. A project's own files first.
+- The palette is the only search; panels have no filter. `⌘K` goes by name (projects, panels, the
+  project's files, notes, note lists), `⌘F` finds in the project's files, its open file first
+  (2026-10-17: one key for "find" rather than an editor's in-file `⌘F` plus project `⌘⇧F`; the
+  find bar over the viewer covers the in-file case).
 - Toasts for passing events (bottom center, max three; errors stay); lasting problems in the top
   bar with their fix.
 - Theme dark by default, light in settings; no system following.
@@ -130,6 +132,24 @@ paint chunk.
   is at most one turn stale. No debounce on show.
 - Inactive projects' caches expire (`gcTime`).
 
+## Beyond developers: folders without git (direction 2026-10-17)
+
+- A project may be any folder (documents of any kind), for users who are not developers; git
+  optional. Without git: no Changes, summary counts, recent commits or tray count; Files and Notes
+  are the panels.
+- Already free of git: the tree (`FileTree` from a path list), the file viewer (`read_entry`), the
+  palette's ranking, notes. Tied to git: Changes, snapshot/summary, commits, tray count, the
+  watcher's filter (`check-ignore`), the file list (`git ls-files`), opening a project
+  (`not_a_repository`).
+- Rule from now: what does not need git does not use it. Content search runs in-process over a
+  file list; the file list sits behind a port (`ignore`, ripgrep's walker, the candidate without
+  git).
+- Open: two templates (developer / everyday) chosen by the user, or panels derived per project
+  (git → Changes), the template at most a global preference hiding developer parts (leaning to
+  derived); level 0 card without git; watcher filter without git (`.gitignore`/`.ignore` rules);
+  documents (PDF, Office) need text extraction and likely an index (`tantivy`), i.e. work in the
+  background against the golden rule: a separate decision, with measures.
+
 ## Explorer
 
 - Tree from `git ls-files` (`.gitignore` applies); deleted tracked files left out (Changes lists
@@ -138,8 +158,12 @@ paint chunk.
   Files is the second panel of the repository module (once `changes`), sharing its viewer.
 - Search by name in `⌘K` (built 2026-10-17): the project on screen only, never other projects'
   files (switching project is searching its name); none at level 0, which would mean every
-  project. Change shown as a quiet word, not a colored name. Search in contents: `⌘K` mode, in
-  the backend, streaming and cancellable.
+  project. Change shown as a quiet word, not a colored name.
+- Search in contents (built 2026-10-17): in-process over a file list, not `git grep`, so it also
+  serves folders without git and notes. `grep-searcher` + `grep-regex` chosen over our own loop on
+  `regex` + `memchr`: same time and CPU on Zed's clone (36-41 ms, ~0.28 s CPU on 8 threads; the
+  cost is reading files), 4.7-5.8 MB peak against 20-25 MB (whole files in memory), and other
+  encodings. Hence: narrowing, a line limit, a typing pause.
 - Libraries chosen at implementation time with pros and cons (`AGENTS.md`).
 
 ## Notes storage and sync
@@ -191,7 +215,8 @@ the first network access, backend only.
 
 - Notes: format and granularity.
 - Sync: `drive.appdata` or `drive.file`; conflict strategy; client-side encryption.
-- Search in contents: `git grep` or ripgrep crates.
+- Folders without git: templates or derived panels; documents' text and an index (see Beyond
+  developers).
 - Quick capture of a note via a global shortcut.
 - Global shortcut default (`⌃⌥Space` for now; taken by "next input source" with two input
   sources; `⌥Space` is Raycast's and Alfred's).

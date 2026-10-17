@@ -16,6 +16,7 @@ import type {
     CommitRequest,
     Directory,
     FileDiffRequest,
+    RepositorySnapshot,
 } from '../model/repository.types';
 import { useRepositoryPort } from './repository.port';
 
@@ -83,6 +84,12 @@ export function useRepositorySnapshot(root: string) {
             return snapshot;
         },
     });
+}
+
+/** A project's snapshot as last read, if any, without reading one or watching for the next. */
+export function useSnapshotOf(): (root: string) => RepositorySnapshot | undefined {
+    const queryClient = useQueryClient();
+    return (root) => queryClient.getQueryData(repositoryKeys.snapshot(root));
 }
 
 /**

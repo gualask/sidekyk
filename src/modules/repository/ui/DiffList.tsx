@@ -14,7 +14,8 @@ import {
 } from '../model/copied';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
-import { DiffLineRow, HunkHeaderRow } from './DiffRows';
+import type { FindMatch } from '../model/find';
+import { DiffLineRow, HunkHeaderRow, type LineFound } from './DiffRows';
 import {
     BRACKET_WIDTH,
     diffLayout,
@@ -43,6 +44,7 @@ type Flash = Span & { label: string; right: number; key: number };
  *
  * It opens on hunk `openOn` (the first if null), `linesAbove` lines above it; `currentHunk` tells
  * which hunk is being read meanwhile, as many lines below the top, for the other view to open on.
+ * `found` marks the text looked for, and brings the match being read on screen.
  */
 export function DiffList({
     source,
@@ -53,6 +55,7 @@ export function DiffList({
     openOn,
     linesAbove,
     currentHunk,
+    found,
 }: {
     source: CopySource;
     rows: readonly DiffRow[];
@@ -63,6 +66,7 @@ export function DiffList({
     openOn: number | null;
     linesAbove: number;
     currentHunk: RefObject<(() => number) | null>;
+    found: { matches: readonly FindMatch[]; current: number } | null;
 }) {
     const { copyTemplate } = useRepositorySettings();
     const listRef = useRef<HTMLDivElement>(null);
@@ -85,6 +89,35 @@ export function DiffList({
             currentHunk.current = null;
         };
     }, [currentHunk, virtualizer, layout, rows, linesAbove]);
+
+    // the text looked for, row by row, and the match being read, centred when it is off screen
+    const foundRows = useMemo(() => {
+        const byRow = new Map<number, [number, number][]>();
+        for (const { row, start, end } of found?.matches ?? []) {
+            const ranges = byRow.get(row) ?? [];
+            ranges.push([start, end]);
+            byRow.set(row, ranges);
+        }
+        return byRow;
+    }, [found?.matches]);
+    const currentMatch = found ? found.matches[found.current] : undefined;
+    useEffect(() => {
+        if (!currentMatch) return;
+        const range = virtualizer.range;
+        if (range && currentMatch.row >= range.startIndex && currentMatch.row <= range.endIndex) {
+            return;
+        }
+        virtualizer.scrollToIndex(currentMatch.row, { align: 'center' });
+    }, [currentMatch, virtualizer]);
+    const lineFound = (index: number): LineFound | undefined => {
+        const ranges = foundRows.get(index);
+        if (!ranges) return undefined;
+        const current =
+            currentMatch?.row === index
+                ? ranges.findIndex(([start]) => start === currentMatch.start)
+                : null;
+        return { ranges, current };
+    };
 
     // what was copied flashes and says what it was, in the part of the list on screen; a new key
     // each time replays both
@@ -148,7 +181,7 @@ export function DiffList({
                                 onCopy={() => copyTarget({ kind: 'hunk', hunk: row.hunkIndex })}
                             />
                         ) : (
-                            <DiffLineRow line={row.line} />
+                            <DiffLineRow line={row.line} found={lineFound(item.index)} />
                         )}
                     </div>
                 );

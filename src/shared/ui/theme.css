@@ -32,6 +32,9 @@
     --ui-warning-soft: #fffbeb;
     --ui-warning-soft-text: #92400e;
     --ui-warning-on-solid: #1f1300;
+    /* the text found in the viewer (find bar), and the match being read */
+    --ui-find-match: rgba(250, 204, 21, 0.35);
+    --ui-find-current: rgba(249, 115, 22, 0.55);
     --ui-diff-add-bg: #ecfdf3;
     --ui-diff-add-gutter: #d1fadf;
     --ui-diff-add-mark: #047857;
@@ -81,6 +84,8 @@
         --ui-warning-soft: rgba(69, 26, 3, 0.6);
         --ui-warning-soft-text: #fde68a;
         --ui-warning-on-solid: #1f1300;
+        --ui-find-match: rgba(250, 204, 21, 0.22);
+        --ui-find-current: rgba(251, 146, 60, 0.6);
         --ui-diff-add-bg: rgba(16, 185, 129, 0.11);
         --ui-diff-add-gutter: rgba(16, 185, 129, 0.2);
         --ui-diff-add-mark: #6ee7b7;
@@ -127,6 +132,8 @@
     --color-ui-warning-soft: var(--ui-warning-soft);
     --color-ui-warning-soft-text: var(--ui-warning-soft-text);
     --color-ui-warning-on-solid: var(--ui-warning-on-solid);
+    --color-ui-find-match: var(--ui-find-match);
+    --color-ui-find-current: var(--ui-find-current);
     --color-ui-diff-add-bg: var(--ui-diff-add-bg);
     --color-ui-diff-add-gutter: var(--ui-diff-add-gutter);
     --color-ui-diff-add-mark: var(--ui-diff-add-mark);

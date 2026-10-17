@@ -23,6 +23,7 @@ pub(crate) use contracts::{
 };
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::{IgnoredPaths, Visible};
+pub(crate) use limits::MAX_FILE_BYTES;
 pub(crate) use open::{repository_name, resolve_repository};
 pub(crate) use ports::{GitOutput, RepositoryBackend, WorktreeEntry};
 pub(crate) use snapshot::{load_snapshot, load_summary};

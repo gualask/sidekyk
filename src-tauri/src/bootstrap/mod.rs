@@ -118,6 +118,8 @@ pub(crate) fn run() {
             tauri_commands::repository::get_directory,
             tauri_commands::repository::get_file_content,
             tauri_commands::search::search,
+            tauri_commands::search::search_contents,
+            tauri_commands::search::stop_content_search,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
             tauri_commands::shortcut::get_global_shortcut_status,

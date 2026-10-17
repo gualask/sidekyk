@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 pub(crate) struct GitOutput {
@@ -33,6 +34,10 @@ pub(crate) trait RepositoryBackend: Send + Sync {
     /// nothing is there or a folder on the way is a link: a file's first `limit` bytes, a link's
     /// target, or a folder (a submodule).
     fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry>;
+
+    /// The file at `path` (relative) under `root`, to read as a stream, or `None` when it is not a
+    /// file there: missing, a link (never followed), a folder, or behind a folder that is a link.
+    fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>>;
 }
 
 /// A path of the working tree, as `read_entry` finds it.

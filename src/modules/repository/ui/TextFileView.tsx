@@ -1,6 +1,7 @@
 import { IconFileOff, IconFolder, IconLink } from '@tabler/icons-react';
 import { type ReactNode, useMemo } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { FindBarState } from '../application/find';
 import { useFileContent } from '../application/repository.queries';
 import { textLines, textRows } from '../model/diff-rows';
 import { Notice, Pane, type PaneHeader } from './Pane';
@@ -16,12 +17,15 @@ export function TextFileView({
     path,
     header,
     renderHeader,
+    find = null,
 }: {
     root: string;
     path: string;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
     renderHeader: (pane: PaneHeader) => ReactNode;
+    /** A text looked for in the file, if any. */
+    find?: FindBarState | null;
 }) {
     const content = useFileContent(root, path);
     const data = content.data;
@@ -39,6 +43,7 @@ export function TextFileView({
             widest={widest}
             openOn={null}
             linesAbove={0}
+            find={find}
         >
             {content.isPending ? <Notice>Loading file…</Notice> : null}
             {content.isError ? (

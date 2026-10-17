@@ -48,3 +48,25 @@ export interface SearchResults {
     /** The files that matched past the ones sent. */
     moreFiles: number;
 }
+
+/** A line where the text searched is: its number, its text (cut around the first match when long,
+ * `…` marking a cut) and where the text is in it. */
+interface ContentLine {
+    number: number;
+    text: string;
+    highlights: Highlight[];
+}
+
+/** A file's lines where the text searched is, in order. */
+export interface ContentFile {
+    path: string;
+    lines: ContentLine[];
+}
+
+/** How a search in contents ended, once its files were all sent. */
+export interface ContentEnd {
+    /** More lines matched than were sent: the search stopped there. */
+    more: boolean;
+    /** A newer search, or the palette closing, stopped this one. */
+    cancelled: boolean;
+}

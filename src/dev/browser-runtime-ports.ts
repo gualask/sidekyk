@@ -5,7 +5,7 @@ import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureTree } from './files.fixture-data';
-import { fixtureSearch } from './fixture-search';
+import { fixtureContentSearch, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
 import { wholeFileDiff } from './whole-file.fixture';
@@ -173,6 +173,15 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         search: {
             search: async (request) =>
                 fixtureSearch(request, list.projects, searchedFiles(request.root)),
+            searchContents: async (root, query, onFiles) => {
+                const { files, end } = fixtureContentSearch(tree(root).files, query, (path) => {
+                    const content = fixtureFileContent(path);
+                    return content.kind === 'text' ? content.text : null;
+                });
+                if (files.length > 0) onFiles(files);
+                return end;
+            },
+            stopContentSearch: async () => undefined,
         },
         settings: {
             getSettings: async () => settings,

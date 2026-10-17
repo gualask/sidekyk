@@ -1,11 +1,13 @@
 //! The command palette's search: what was typed, ranked against the projects, the panels and the
-//! files of the project on screen. Pure: the caller hands over what to search, nothing is read
-//! from disk or git.
+//! files of the project on screen (`⌘K`), or looked for in those files' contents (`⌘F`). Names are
+//! ranked from what the caller hands over; contents are read through the repository's port.
 
+mod contents;
 mod contracts;
 mod rank;
 
-pub(crate) use contracts::{SearchRequest, SearchResults};
+pub(crate) use contents::{narrows, search_contents, ContentSearch};
+pub(crate) use contracts::{ContentEnd, ContentFile, SearchRequest, SearchResults};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,6 +19,15 @@ use crate::modules::repository::{ChangeKind, ChangedFile, FileTree, RepositoryIn
 
 /// At most this many files go back: the palette shows the best, the rest are counted.
 const FILE_LIMIT: usize = 500;
+
+/// Threads a search runs on at most, so a key typed never takes the whole machine.
+const MAX_THREADS: usize = 8;
+
+fn threads() -> usize {
+    std::thread::available_parallelism()
+        .map_or(1, std::num::NonZero::get)
+        .min(MAX_THREADS)
+}
 
 /// A project's files: those git lists, and how they changed as its last snapshot found.
 pub(crate) struct ProjectFiles {

@@ -4,6 +4,7 @@ export {
     useRepositoryChangeSubscription,
 } from './application/repository.queries';
 export { RepositorySettingsProvider } from './application/repository-settings';
+export { useShownFile } from './application/selection';
 export {
     type ChangedFile,
     type Commit,

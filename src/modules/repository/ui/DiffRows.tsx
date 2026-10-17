@@ -47,12 +47,41 @@ export function HunkHeaderRow({
     );
 }
 
+/** Where the text looked for is in a line (UTF-16 offsets), and which of them is being read. */
+export interface LineFound {
+    ranges: readonly (readonly [start: number, end: number])[];
+    /** The one being read, if it is in this line. */
+    current: number | null;
+}
+
+/** A line's text, with the text looked for marked in it. */
+function FoundText({ text, found }: { text: string; found: LineFound }) {
+    const parts = [];
+    let at = 0;
+    found.ranges.forEach(([start, end], index) => {
+        if (start > at) parts.push(text.slice(at, start));
+        parts.push(
+            <mark
+                key={start}
+                className={`rounded-[2px] text-current ${
+                    index === found.current ? 'bg-ui-find-current' : 'bg-ui-find-match'
+                }`}
+            >
+                {text.slice(start, end)}
+            </mark>,
+        );
+        at = end;
+    });
+    if (at < text.length) parts.push(text.slice(at));
+    return parts;
+}
+
 /**
  * A line, its number and sign in the gutter (`data-part="gutter"`, which a click turns into a
  * copy of the whole hunk): its number in the file now, or for a removed line where it was, as a
- * copy names it.
+ * copy names it. `found` marks the text looked for in it.
  */
-export function DiffLineRow({ line }: { line: DiffLine }) {
+export function DiffLineRow({ line, found }: { line: DiffLine; found?: LineFound }) {
     const gutter = `shrink-0 select-none ${GUTTER_TONE[line.kind]}`;
     return (
         <div className={`relative flex h-5 cursor-pointer leading-5 ${ROW_TONE[line.kind]}`}>
@@ -74,7 +103,7 @@ export function DiffLineRow({ line }: { line: DiffLine }) {
                 className="flex-1 whitespace-pre"
                 style={{ paddingLeft: TEXT_PADDING_LEFT, paddingRight: TEXT_PADDING_RIGHT }}
             >
-                {line.text}
+                {found ? <FoundText text={line.text} found={found} /> : line.text}
             </span>
         </div>
     );

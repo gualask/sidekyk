@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -17,7 +18,9 @@ use crate::modules::repository::{
     RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, Visible,
     REPOSITORY_CHANGED_EVENT,
 };
-use crate::modules::search::{self, ProjectFiles, SearchRequest, SearchResults};
+use crate::modules::search::{
+    self, ContentEnd, ContentFile, ContentSearch, ProjectFiles, SearchRequest, SearchResults,
+};
 use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -95,6 +98,19 @@ pub(crate) struct ProjectsState {
     /// watcher saw a file added or removed, or the git dir change.
     trees: Mutex<HashMap<String, CachedTree>>,
     tree_reads: PerProject<Arc<FileTree>>,
+    /// The last search in contents that read every file it was given, for the next one to read
+    /// only the files it found when the text grew. Dropped at any change the watcher sees.
+    contents: Mutex<Option<LastContents>>,
+    /// Counts the searches in contents started or stopped: a search goes on while it is the last.
+    content_runs: AtomicU64,
+}
+
+/// A complete search in contents: in which tree, for what, and the files where it found it.
+struct LastContents {
+    root: String,
+    tree: Arc<FileTree>,
+    query: String,
+    files: Arc<[String]>,
 }
 
 impl ProjectsState {
@@ -201,6 +217,67 @@ impl ProjectsState {
             return Err(user_facing(UserFacingErrorCode::FileMissing));
         }
         repository::load_file_content(backend, &self.project(root)?, path)
+    }
+
+    /// The lines of a project's files where `query` is, sent to `send` as they are found. A newer
+    /// search, or `stop_content_search`, stops this one. When the text grew from the last
+    /// complete search's, in the same files and with nothing changed since, only the files it
+    /// found are read.
+    pub(crate) fn search_contents(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+        query: &str,
+        send: &(dyn Fn(Vec<ContentFile>) + Sync),
+    ) -> anyhow::Result<ContentEnd> {
+        let run = self.content_runs.fetch_add(1, Ordering::Relaxed) + 1;
+        let cancelled = || self.content_runs.load(Ordering::Relaxed) != run;
+        let tree = self.file_tree(backend, root)?;
+        let narrowed = lock(&self.contents)
+            .as_ref()
+            .filter(|last| {
+                last.root == root
+                    && Arc::ptr_eq(&last.tree, &tree)
+                    && search::narrows(&last.query, query)
+            })
+            .map(|last| last.files.clone());
+        let files: Vec<&str> = match &narrowed {
+            Some(files) => files.iter().map(String::as_str).collect(),
+            None => tree.files().iter().map(String::as_str).collect(),
+        };
+        let searched = search::search_contents(
+            &ContentSearch {
+                backend,
+                root: Path::new(root),
+                files: &files,
+                query,
+            },
+            &cancelled,
+            send,
+        );
+        let cancelled = cancelled();
+        if !cancelled && !searched.cut {
+            *lock(&self.contents) = Some(LastContents {
+                root: root.to_string(),
+                tree,
+                query: query.to_string(),
+                files: searched.files.into(),
+            });
+        }
+        Ok(ContentEnd {
+            more: searched.cut,
+            cancelled,
+        })
+    }
+
+    /// Stops the search in contents going on, if any: the palette closed.
+    pub(crate) fn stop_content_search(&self) {
+        self.content_runs.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// A file may have changed: a search in contents reads every file again.
+    fn forget_contents(&self) {
+        lock(&self.contents).take();
     }
 
     /// The files of a project may have changed: its tree is read again when next asked for.
@@ -337,6 +414,7 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
             if marked {
                 window.missed = Some(watched_root.clone());
                 state.forget_tree(&watched_root);
+                state.forget_contents();
             }
             tracing::debug!(
                 git_dir = changes.git_dir,
@@ -362,6 +440,7 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
             "watcher batch"
         );
         if visible {
+            state.forget_contents();
             let event = RepositoryChangedEvent::new(&watched_root, changes.git_dir);
             let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
         }

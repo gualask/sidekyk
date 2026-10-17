@@ -330,6 +330,10 @@ mod tests {
             unreachable!()
         }
 
+        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn std::io::Read + Send>> {
+            unreachable!()
+        }
+
         fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {
             if self.size as u64 > limit {
                 return None;
@@ -394,6 +398,10 @@ mod tests {
         }
 
         fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
+            unreachable!()
+        }
+
+        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn std::io::Read + Send>> {
             unreachable!()
         }
 

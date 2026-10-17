@@ -1,11 +1,12 @@
 //! Tauri adapter for the command palette's search.
 
+use tauri::ipc::Channel;
 use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
-use crate::modules::search::{SearchRequest, SearchResults};
+use crate::modules::search::{ContentEnd, ContentFile, SearchRequest, SearchResults};
 use crate::shared::error::AppError;
 
 #[tauri::command]
@@ -22,4 +23,30 @@ pub(crate) async fn search(
             .search(backend.inner(), &request))
     })
     .await
+}
+
+#[tauri::command]
+/// The lines of the project's files where `query` is, sent through `on_files` as they are found
+/// (`⌘F`); a newer search stops this one.
+pub(crate) async fn search_contents(
+    app: tauri::AppHandle,
+    root: String,
+    query: String,
+    on_files: Channel<Vec<ContentFile>>,
+) -> Result<ContentEnd, AppError> {
+    blocking("search_contents", app, move |app| {
+        let backend = app.state::<LocalRepositoryBackend>();
+        app.state::<ProjectsState>()
+            .search_contents(backend.inner(), &root, &query, &|files| {
+                // the page went away: nothing left to stop
+                let _ = on_files.send(files);
+            })
+    })
+    .await
+}
+
+#[tauri::command]
+/// Stops the search in contents going on: the palette closed.
+pub(crate) fn stop_content_search(state: tauri::State<'_, ProjectsState>) {
+    state.stop_content_search();
 }

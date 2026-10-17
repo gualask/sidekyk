@@ -32,7 +32,8 @@ Workspace:
 - [x] Command palette (`⌘K`): projects, panels, changed files, ranked in Rust (`nucleo-matcher`,
       0.34 ms / 4,366 paths; +199 KiB binary)
 - [x] Keyboard model: `↵`/`Esc` zoom, `1`-`9` panels, `[`/`]` projects, `←`/`→` tiles at level 1
-      (selected tile takes `j`/`k`), `⌘`+scroll and pinch (macOS) zoom
+      (selected tile takes `j`/`k`), `⌘`+scroll and pinch (macOS) zoom; `?` (and the top bar's
+      `?`) shows the shortcuts in a card, bottom right, as the mock
 - [x] Tiles show the panel's icon, title and key in its tooltip (2026-10-17)
 
 See what the agent is doing:
@@ -64,11 +65,16 @@ Explore and copy:
       Rust, plus deleted files), none at level 0; change marked by a word; `↵` goes through the
       shared selection. Scoring on threads from 20,000 paths (Zed's 4,366: 0.37 ms; 200,000
       synthetic: 80 → 14 ms)
+- [x] Search in contents (`⌘F`, 2026-10-17): the palette's other mode (`⌘K`/`⌘F` switch, text
+      kept), ripgrep's crates in-process over the tree's files through the port (no git), up to
+      8 threads, first 2 MiB per file, stops at 2,000 lines, results streamed; the file shown
+      first; a longer text reads only the files the last complete search found (43-50 ms on
+      Zed's clone, ~5 MB). `↵` opens the file with a find bar at the line (`3/12`, `↵`/`⇧↵`,
+      `Esc`)
 
 ## Next
 
-- [ ] Search in contents in `⌘K` (mode), in the backend (`git grep` or ripgrep crates), streaming,
-      cancellable
+- [ ] `⌘F` with a file open: the find bar directly, the palette for the project from there
 - [ ] Rest of semantic zoom: splitters, panels minimized to the top bar (with Notes)
 - [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
 
@@ -77,6 +83,12 @@ Explore and copy:
 - [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes)
 - [ ] Optional Google Drive sync/backup (OAuth loopback + PKCE, tokens in the OS credential store,
       local first, conflicts keep both); nothing runs until an account is connected
+
+## Beyond developers
+
+- [ ] Projects as plain folders, git optional: Files and Notes, no Changes; file list and watcher
+      filter without git (direction and open points in evolution, Beyond developers)
+- [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
 
 ## Then
 

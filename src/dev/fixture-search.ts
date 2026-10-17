@@ -1,5 +1,11 @@
 import type { ChangedFile } from '@/modules/repository';
-import type { Highlight, SearchRequest, SearchResults } from '@/modules/search';
+import type {
+    ContentEnd,
+    ContentFile,
+    Highlight,
+    SearchRequest,
+    SearchResults,
+} from '@/modules/search';
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 
@@ -76,4 +82,42 @@ export function fixtureSearch(
         }
     }
     return results;
+}
+
+/** As the backend's `MAX_LINES`. */
+const CONTENT_LINE_LIMIT = 2_000;
+
+/**
+ * A stand-in for the backend's search in contents (`src-tauri/src/modules/search/contents.rs`):
+ * literal, case ignored unless the text has a capital, line by line, stopping at the same limit.
+ * Long lines are not cut. `read` gives a file's text, or null for one with none.
+ */
+export function fixtureContentSearch(
+    paths: readonly string[],
+    query: string,
+    read: (path: string) => string | null,
+): { files: ContentFile[]; end: ContentEnd } {
+    const literal = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(literal, /\p{Lu}/u.test(query) ? 'gu' : 'giu');
+    const files: ContentFile[] = [];
+    let lines = 0;
+    for (const path of paths) {
+        const text = read(path);
+        if (text === null) continue;
+        const found: ContentFile = { path, lines: [] };
+        for (const [index, line] of text.split('\n').entries()) {
+            const highlights = [...line.matchAll(pattern)].map(
+                (match): Highlight => [match.index, match.index + match[0].length],
+            );
+            if (highlights.length === 0) continue;
+            if (lines === CONTENT_LINE_LIMIT) {
+                if (found.lines.length > 0) files.push(found);
+                return { files, end: { more: true, cancelled: false } };
+            }
+            lines += 1;
+            found.lines.push({ number: index + 1, text: line, highlights });
+        }
+        if (found.lines.length > 0) files.push(found);
+    }
+    return { files, end: { more: false, cancelled: false } };
 }

@@ -1,4 +1,4 @@
-import { IconSearch, IconSettings } from '@tabler/icons-react';
+import { IconHelp, IconSearch, IconSettings } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { ProjectFacts } from '@/modules/repository';
 import type { PanelDefinition } from '@/shared/panels/panel';
@@ -35,7 +35,7 @@ function Crumb({ onClick, children }: { onClick?: () => void; children: string }
 
 /**
  * The window's top bar: where you are (all projects, a project, a panel), the way back, the
- * command palette, the problems that last, if any, and the settings. On macOS it is also the
+ * command palette, the problems that last, if any, the settings and the shortcuts. On macOS it is also the
  * title bar: the traffic lights sit in its first 78 pixels, and its empty parts drag the window.
  */
 export function TopBar({
@@ -46,6 +46,8 @@ export function TopBar({
     onZoom,
     onOpenSettings,
     onOpenPalette,
+    helpOpen,
+    onToggleHelp,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
@@ -54,6 +56,8 @@ export function TopBar({
     onZoom: (level: ZoomLevel) => void;
     onOpenSettings: () => void;
     onOpenPalette: () => void;
+    helpOpen: boolean;
+    onToggleHelp: () => void;
 }) {
     const overlaid = useTitleBarOverlaid();
     const separator = <span className="font-normal text-ui-text-muted">/</span>;
@@ -95,7 +99,7 @@ export function TopBar({
                 <button
                     type="button"
                     className="flex h-[26px] items-center gap-1.5 rounded-[7px] border border-ui-border pr-1.5 pl-2 text-xs text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
-                    title="Go to a project, a panel or a changed file"
+                    title="Go to a project, a panel or a file"
                     aria-label="Go to"
                     onClick={onOpenPalette}
                 >
@@ -115,6 +119,16 @@ export function TopBar({
                     onClick={onOpenSettings}
                 >
                     <IconSettings size={16} />
+                </button>
+                <button
+                    type="button"
+                    className="btn-icon h-7 w-7"
+                    title="Shortcuts (?)"
+                    aria-label="Shortcuts"
+                    aria-pressed={helpOpen}
+                    onClick={onToggleHelp}
+                >
+                    <IconHelp size={16} />
                 </button>
             </div>
         </header>

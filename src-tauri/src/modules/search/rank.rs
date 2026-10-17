@@ -5,16 +5,13 @@ use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 
 use std::cmp::Reverse;
-use std::num::NonZero;
 
 use super::contracts::Highlight;
+use super::threads;
 
 /// From this many texts, scoring is split over threads: a large repository's every file is scored
 /// at each key typed (200,000 paths: ~80 ms on one thread).
 const PARALLEL_FROM: usize = 20_000;
-
-/// Threads scoring at most, so a key typed never takes the whole machine.
-const MAX_THREADS: usize = 8;
 
 /// What the texts ranked are: names, or paths with `/` between their parts.
 #[derive(Clone, Copy)]
@@ -96,9 +93,7 @@ impl Ranker {
 
     /// The score of every text that matches, with its position, in the texts' order.
     fn scores(&mut self, texts: &[&str]) -> Vec<(u32, usize)> {
-        let threads = std::thread::available_parallelism()
-            .map_or(1, NonZero::get)
-            .min(MAX_THREADS);
+        let threads = threads();
         if texts.len() < PARALLEL_FROM || threads == 1 {
             return score(&self.pattern, &mut self.matcher, &mut self.chars, texts, 0);
         }

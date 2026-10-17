@@ -6,6 +6,7 @@ import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { useCommitView } from '../application/commit-view';
+import { useFileFind } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
@@ -48,6 +49,8 @@ export function ChangesWorkspace({
         path: selectedPath,
     } = useSelectedFile(project.root);
     const commitView = useCommitView(project.root);
+    // the file shown, whose find bar goes when another shows
+    const find = useFileFind(project.root, selected?.path ?? selectedPath);
     const { commit: viewed, file: commitFile } = commitView;
     const selectedIndex = selected ? files.indexOf(selected) : -1;
     // a file of the tree that did not change, once the list says so
@@ -67,6 +70,7 @@ export function ChangesWorkspace({
         const next = selectionOf(shown.path, selection);
         setSelection(next);
         commitView.leave();
+        if (shown.find) find.open(shown.path, shown.find);
         const { change } = selectedFile(next, files);
         if (shown.hunk !== null && change) openAt(fileKey(change), shown.hunk);
     });
@@ -193,6 +197,7 @@ export function ChangesWorkspace({
                             view={diffView.view}
                             openOn={diffView.openOn}
                             header={header}
+                            find={find.barFor(selected.path)}
                             renderHeader={(pane) => (
                                 <FileHeader
                                     path={selected.path}
@@ -201,7 +206,7 @@ export function ChangesWorkspace({
                                     showIn={
                                         // a deleted file is not in the tree
                                         selected.kind === 'deleted'
-                                            ? undefined
+                                            ? null
                                             : showInFiles(selected.path, pane.currentHunk)
                                     }
                                     copyDiff={{ copied: pane.fileCopied, onCopy: pane.copyFile }}
@@ -214,6 +219,7 @@ export function ChangesWorkspace({
                             root={project.root}
                             path={unchanged}
                             header={header}
+                            find={find.barFor(unchanged)}
                             renderHeader={() => (
                                 <FileHeader
                                     path={unchanged}

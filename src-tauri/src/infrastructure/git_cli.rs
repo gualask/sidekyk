@@ -249,17 +249,7 @@ impl RepositoryBackend for LocalRepositoryBackend {
     }
 
     fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry> {
-        // every folder on the way is a real one, so a link cannot lead out of the repository
-        let mut folder = root.to_path_buf();
-        for name in path.parent()?.components() {
-            folder.push(name);
-            let meta = std::fs::symlink_metadata(&folder).ok()?;
-            if !meta.is_dir() {
-                return None;
-            }
-        }
-        let full = root.join(path);
-        let meta = std::fs::symlink_metadata(&full).ok()?;
+        let (full, meta) = inside(root, path)?;
         if meta.is_symlink() {
             return std::fs::read_link(&full).ok().map(WorktreeEntry::Link);
         }
@@ -276,6 +266,31 @@ impl RepositoryBackend for LocalRepositoryBackend {
         head.truncate(limit);
         Some(WorktreeEntry::File { head, truncated })
     }
+
+    fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>> {
+        let (full, meta) = inside(root, path)?;
+        if !meta.is_file() {
+            return None;
+        }
+        let file = std::fs::File::open(full).ok()?;
+        Some(Box::new(file))
+    }
+}
+
+/// `path` (relative) under `root` and what is there, not following a link, or `None` when nothing
+/// is there or a folder on the way is not a real one, so a link cannot lead out of the repository.
+fn inside(root: &Path, path: &Path) -> Option<(PathBuf, std::fs::Metadata)> {
+    let mut folder = root.to_path_buf();
+    for name in path.parent()?.components() {
+        folder.push(name);
+        let meta = std::fs::symlink_metadata(&folder).ok()?;
+        if !meta.is_dir() {
+            return None;
+        }
+    }
+    let full = root.join(path);
+    let meta = std::fs::symlink_metadata(&full).ok()?;
+    Some((full, meta))
 }
 
 #[cfg(test)]
@@ -289,7 +304,9 @@ mod tests {
         ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest,
         IgnoredPaths, RepositorySnapshot, Visible,
     };
-    use crate::modules::search::{search, ProjectFiles, SearchRequest};
+    use crate::modules::search::{
+        search, search_contents, ContentSearch, ProjectFiles, SearchRequest,
+    };
     use serde_json::json;
 
     fn git(root: &Path, args: &[&str]) {
@@ -653,6 +670,43 @@ mod tests {
     }
 
     #[test]
+    fn contents_are_searched_in_files_only_never_through_a_link() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, "src/new.ts", "let needle;\n");
+        write(root, "logo.png", "PNG\0needle");
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            write(outside.path(), "secret.txt", "needle\n");
+            std::os::unix::fs::symlink(outside.path(), root.join("linked")).unwrap();
+            std::os::unix::fs::symlink("src/new.ts", root.join("alias.ts")).unwrap();
+        }
+
+        let tree = load_file_tree(&backend, &repo.info).unwrap();
+        // a path through the linked folder, as a stale list could hold
+        let files: Vec<&str> = tree
+            .files()
+            .iter()
+            .map(String::as_str)
+            .chain(["linked/secret.txt"])
+            .collect();
+        let searched = search_contents(
+            &ContentSearch {
+                backend: &backend,
+                root,
+                files: &files,
+                query: "needle",
+            },
+            &|| false,
+            &|_| {},
+        );
+        assert_eq!(searched.files, ["src/new.ts"]);
+    }
+
+    #[test]
     fn changes_git_ignores_do_not_count_unless_the_file_is_tracked() {
         let dir = scratch_repo();
         let backend = LocalRepositoryBackend::default();
@@ -853,6 +907,26 @@ mod tests {
                 });
             })
         );
+
+        // `⌘F` over every file of the tree: many lines (stops at the limit), and none
+        let files: Vec<&str> = tree.files().iter().map(String::as_str).collect();
+        for query in ["fn new", "zzqxw"] {
+            println!(
+                "contents {query:?}: {}",
+                time(10, || {
+                    search_contents(
+                        &ContentSearch {
+                            backend: &backend,
+                            root: Path::new(&repo.info.root),
+                            files: &files,
+                            query,
+                        },
+                        &|| false,
+                        &|_| {},
+                    );
+                })
+            );
+        }
 
         let recent = load_recent_commits(&backend, &repo.info).unwrap();
         println!(

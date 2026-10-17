@@ -55,6 +55,34 @@ pub(crate) struct FileMatch {
     pub(crate) highlights: Vec<Highlight>,
 }
 
+/// A line where the text searched is: its number, its text (cut around the first match when
+/// long, `…` marking a cut) and where the text is in it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ContentLine {
+    pub(crate) number: u32,
+    pub(crate) text: String,
+    pub(crate) highlights: Vec<Highlight>,
+}
+
+/// A file's lines where the text searched is, in order.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ContentFile {
+    pub(crate) path: String,
+    pub(crate) lines: Vec<ContentLine>,
+}
+
+/// How a search in contents ended, once its files were all sent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ContentEnd {
+    /// More lines matched than were sent: the search stopped there.
+    pub(crate) more: bool,
+    /// A newer search, or the palette closing, stopped this one.
+    pub(crate) cancelled: bool,
+}
+
 /// The matches, best first in each group. With nothing typed: every project and panel, no files.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -122,6 +150,33 @@ mod tests {
                 ],
                 "moreFiles": 2
             })
+        );
+    }
+
+    #[test]
+    fn contents_use_the_frontend_field_names() {
+        let files = vec![ContentFile {
+            path: "src/a.ts".into(),
+            lines: vec![ContentLine {
+                number: 12,
+                text: "let total;".into(),
+                highlights: vec![[4, 9]],
+            }],
+        }];
+        assert_eq!(
+            serde_json::to_value(&files).unwrap(),
+            serde_json::json!([{
+                "path": "src/a.ts",
+                "lines": [{ "number": 12, "text": "let total;", "highlights": [[4, 9]] }]
+            }])
+        );
+        let end = ContentEnd {
+            more: true,
+            cancelled: false,
+        };
+        assert_eq!(
+            serde_json::to_value(&end).unwrap(),
+            serde_json::json!({ "more": true, "cancelled": false })
         );
     }
 }

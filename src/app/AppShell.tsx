@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import {
     activeProject,
     loadProjectsOverview,
@@ -15,8 +15,9 @@ import {
     filesPanel,
     fileTarget,
     useRepositoryChangeSubscription,
+    useShownFile,
 } from '@/modules/repository';
-import { loadCommandPalette, type PaletteActions } from '@/modules/search';
+import { loadCommandPalette, type PaletteActions, type PaletteMode } from '@/modules/search';
 import { loadSettingsDialog } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
@@ -38,6 +39,11 @@ const SettingsDialog = preloadable(loadSettingsDialog, (module) => module.Settin
 const CommandPalette = preloadable(loadCommandPalette, (module) => module.CommandPalette);
 
 /** Without a project, the palette offers no panel. */
+/** Loaded when first asked for: the first paint does not show it. */
+const ShortcutsHelp = lazy(() =>
+    import('./ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
+);
+
 const NO_PANELS: typeof PALETTE_PANELS = [];
 
 /** A project and its panels, at level 1 or full screen: the zoom carries it to and from its card. */
@@ -62,6 +68,11 @@ export function AppShell() {
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
     const [paletteOpen, setPaletteOpen] = useState<boolean | null>(null);
+    const [paletteMode, setPaletteMode] = useState<PaletteMode>('names');
+    const [helpOpen, setHelpOpen] = useState(false);
+    const toggleHelp = () => setHelpOpen((open) => !open);
+    // the file shown, whose lines found come first: worked out only while the palette is open
+    const shownFile = useShownFile(level > 0 ? (project?.root ?? null) : null);
     // a problem's fix in the settings: they open in place of the palette
     const openSettings = useCallback(() => {
         setPaletteOpen((open) => (open ? false : open));
@@ -100,10 +111,12 @@ export function AppShell() {
         setTarget({ panel: next.id, target: nextTarget });
     };
 
-    // one dialog at a time: the palette and the settings close each other
-    const togglePalette = () => {
+    // one dialog at a time: the palette and the settings close each other. The palette's other
+    // key switches what it looks for, its own key closes it
+    const togglePalette = (mode: PaletteMode) => {
         setSettingsOpen((open) => (open ? false : open));
-        setPaletteOpen((open) => !open);
+        setPaletteMode(mode);
+        setPaletteOpen((open) => !(open && paletteMode === mode));
     };
     const toggleSettings = () => {
         setPaletteOpen((open) => (open ? false : open));
@@ -121,10 +134,10 @@ export function AppShell() {
             if (next) zoom(2, next);
         },
         // as a file picked in the tree: in Files' own viewer when it is full screen, else Changes
-        openFile: (path) =>
+        openFile: (path, find) =>
             show(
                 level === 2 && panel === filesPanel ? filesPanel.id : changesPanel.id,
-                fileTarget(path),
+                fileTarget(path, null, find ?? null),
             ),
     };
 
@@ -151,6 +164,7 @@ export function AppShell() {
         },
         toggleSettings,
         togglePalette,
+        toggleHelp,
     });
     useZoomGestures({
         // what is under the pointer zooms in as its own control would, so the zoom grows from it
@@ -185,7 +199,9 @@ export function AppShell() {
                 problems={problems}
                 onZoom={zoom}
                 onOpenSettings={toggleSettings}
-                onOpenPalette={togglePalette}
+                onOpenPalette={() => togglePalette('names')}
+                helpOpen={helpOpen}
+                onToggleHelp={toggleHelp}
             />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
@@ -206,6 +222,11 @@ export function AppShell() {
                     />
                 ) : null}
             </main>
+            {helpOpen ? (
+                <Suspense fallback={null}>
+                    <ShortcutsHelp onClose={() => setHelpOpen(false)} />
+                </Suspense>
+            ) : null}
             {settingsOpen === null ? null : (
                 <Suspense fallback={null}>
                     <SettingsDialog.Component open={settingsOpen} onOpenChange={setSettingsOpen} />
@@ -216,8 +237,11 @@ export function AppShell() {
                     <CommandPalette.Component
                         open={paletteOpen}
                         onOpenChange={setPaletteOpen}
+                        mode={paletteMode}
+                        onModeChange={setPaletteMode}
                         projectName={project?.name ?? null}
                         root={level > 0 ? (project?.root ?? null) : null}
+                        currentFile={paletteOpen ? shownFile() : null}
                         panels={project ? PALETTE_PANELS : NO_PANELS}
                         actions={paletteActions}
                     />

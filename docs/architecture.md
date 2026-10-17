@@ -38,17 +38,20 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - `modules/projects/`: project list, rail, level 0 cards (lazy chunk with Base UI's menu), empty
   screen.
 - `modules/settings/`: settings queries and dialog (lazy chunk).
-- `modules/search/`: palette (lazy chunk); ranking is the backend's; the app decides what an item
-  opens (`PaletteActions`).
+- `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`,
+  `useContentSearch`: 150 ms pause, results kept until the next text's first files); ranking and
+  reading are the backend's; the app decides what an item opens (`PaletteActions`).
 - `modules/repository/`: the repository on screen as two panels (`panel.ts`): Changes (review
   and the viewer of any file) and Files (the tree).
   - `model/`: wire types, diff parser, whole-file hunks, copy format, file grouping, tree rows and
-    keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`).
+    keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`),
+    matches of the find bar (`find.ts`).
   - `application/`: `RepositoryPort`, TanStack Query hooks, commit view, session state
     (`useSessionState`, a live store by key; `useSelectedFile` for the shared selection),
-    `useShownTarget`, `RepositorySettings` (what the app passes from the settings).
+    `useShownTarget`, `useFileFind` (the find bar's text, per project), `RepositorySettings`
+    (what the app passes from the settings).
   - `ui/`: `ChangesWorkspace`, `FilesWorkspace`, `FileTree` (+ `tree-layout.ts`), the viewer
-    `Pane` (rows, copy, current hunk) under `ChangeDiffView`, `CommitDiffView`, `TextFileView`,
+    `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`, `TextFileView`,
     one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count, level 0 card).
     Lists, tree and diff are virtualized flat lists of fixed-height rows.
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
@@ -77,14 +80,18 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 - A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
 - Changes and Files share one selection per project (`model/selection.ts`): a changed file by key,
   or a tree path shown as a change while it is one. Changes selects it in its list; Files reveals
-  it (opens the folders above). Targets (`changesTarget`, `fileTarget`) carry the hunk to open on.
+  it (opens the folders above). Targets (`fileTarget`) carry the path, the hunk to open on and a
+  text to find from a line (opens the find bar: on that file only, until closed; `Esc` closes it
+  first).
 
 ### Zoom and keyboard
 
 - `AppShell` owns level, selected tile / full-screen panel and the pending target; every level
   change goes through `zoom` inside a view transition. `preloadable` parts render at once when
   their chunk is loaded, so a transition never captures an empty frame.
-- `app/workspace-keys.ts`: `↵`/`Esc`, `1`-`9`, `←`/`→` (tiles), `[`/`]`, `⌘,`, `⌘K`. Keys a field,
+- `app/workspace-keys.ts`: `↵`/`Esc`, `1`-`9`, `←`/`→` (tiles), `[`/`]`, `⌘,`, `⌘K`, `⌘F` (also
+  inside the palette, to switch mode), `?` (`ShortcutsHelp`, lazy; list kept by hand: a new
+  shortcut adds its line). Keys a field,
   dialog or menu takes are theirs. Panels listen with `useWindowKeys`; a panel taking `↵`/`Esc`
   listens while capturing and the workspace skips handled keys.
 - `app/zoom-gestures.ts`: the wheel listener exists only while `⌘`/`Ctrl` is held.
@@ -118,7 +125,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
   content (`tree.rs`), path checks, ignored-paths filter, contracts. No Tauri; the outside world is
-  the `RepositoryBackend` port (`git`, `read_file`, `read_entry`).
+  the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`).
 - `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`, `logging.rs`.
 - `shared/`: `AppError` (`{ code, message }`, stable codes), `coalesce.rs` (one run in flight,
   later callers share the next), `sync.rs`.
@@ -173,6 +180,15 @@ tree (read if missing) plus deleted files, each marked from the last snapshot (m
 deleted). Words match independently, case ignored; matched letters return as UTF-16 offsets; at
 most 500 files, the best picked without sorting the rest. From 20,000 paths scoring runs on up to
 8 threads.
+
+`search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
+`open_file` (never through a link), up to 8 threads taking the next file, a fixed buffer each,
+binary skipped at the first NUL, UTF-16 by BOM, the first 2 MiB per file (what the viewer
+shows). Literal, smart case, at least 2 characters; stops at 2,000 lines; long lines cut to 300
+characters around the first match. Files go through a `Channel` in batches every 50 ms. Each
+search counts a run: a newer one (or `stop_content_search`) stops it. A complete search is kept
+so a longer text (`narrows`) reads only the files it found, in the same tree; any watcher batch
+drops it.
 
 ### Tray
 

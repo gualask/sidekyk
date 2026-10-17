@@ -208,6 +208,10 @@ mod tests {
             unreachable!()
         }
 
+        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn std::io::Read + Send>> {
+            unreachable!()
+        }
+
         fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
             unreachable!()
         }

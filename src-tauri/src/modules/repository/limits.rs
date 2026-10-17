@@ -17,4 +17,4 @@ pub(super) const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
 pub(super) const MAX_TREE_PATHS: usize = 200_000;
 
 /// The Files panel shows a file's first 2 MiB, cut at the last whole line, as a diff is.
-pub(super) const MAX_FILE_BYTES: usize = MAX_DIFF_BYTES;
+pub(crate) const MAX_FILE_BYTES: usize = MAX_DIFF_BYTES;

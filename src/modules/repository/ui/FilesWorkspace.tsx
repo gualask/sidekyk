@@ -6,6 +6,7 @@ import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
+import { useFileFind } from '../application/find';
 import { useTreeDirectories } from '../application/repository.queries';
 import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
@@ -70,6 +71,7 @@ export function FilesWorkspace({
     const { open, selected } = state;
     // the file shown, one for both panels: Changes selects it in its list
     const { snapshot, files, setSelection, change, path: file } = useSelectedFile(root);
+    const find = useFileFind(root, change?.path ?? file);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
     const marks = useMemo(() => changeMarks(files), [files]);
@@ -105,6 +107,7 @@ export function FilesWorkspace({
     useShownTarget(target, (shown) => {
         openFile(shown.path, shown.hunk);
         reveal(shown.path);
+        if (shown.find) find.open(shown.path, shown.find);
     });
 
     // before the workspace's keys, so `↵` opens what is selected instead of zooming; in a tile a
@@ -198,6 +201,7 @@ export function FilesWorkspace({
             view="file"
             openOn={openOn?.file === change.path ? openOn.hunk : null}
             header={header}
+            find={find.barFor(change.path)}
             renderHeader={(pane) => (
                 <FileHeader
                     path={change.path}
@@ -222,6 +226,7 @@ export function FilesWorkspace({
             root={root}
             path={file}
             header={header}
+            find={find.barFor(file)}
             renderHeader={() => <FileHeader path={file} />}
         />
     );

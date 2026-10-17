@@ -1,5 +1,5 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
-import type { Highlight, SearchResults } from './search.types';
+import type { ContentFile, Highlight, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
 export interface PalettePanel {
@@ -19,13 +19,22 @@ export type PaletteItem =
           mark: ChangeMark | null;
           label: string;
           highlights: Highlight[];
+      }
+    | {
+          kind: 'line';
+          path: string;
+          /** The line's number in the file. */
+          number: number;
+          label: string;
+          highlights: Highlight[];
       };
 
 /** The list as one flat run of rows, so only the rows on screen are rendered. */
 export type PaletteRow =
     | { kind: 'group'; label: string }
     | { kind: 'item'; item: PaletteItem; index: number }
-    | { kind: 'more'; count: number };
+    | { kind: 'more'; count: number }
+    | { kind: 'file'; path: string; count: number };
 
 /** The items, in the order the list shows them, and the rows that show them under their groups. */
 export function paletteRows(
@@ -83,6 +92,43 @@ export function paletteRows(
         }
     }
     if (results.moreFiles > 0) rows.push({ kind: 'more', count: results.moreFiles });
+    return { items, rows };
+}
+
+/**
+ * The lines found in the files' contents, under their files: those of the file shown first, as
+ * "In this file", then the others' in their order.
+ */
+export function contentRows(
+    files: readonly ContentFile[],
+    current: string | null,
+): { items: PaletteItem[]; rows: PaletteRow[] } {
+    const items: PaletteItem[] = [];
+    const rows: PaletteRow[] = [];
+    const addLines = (file: ContentFile) => {
+        for (const line of file.lines) {
+            const item: PaletteItem = {
+                kind: 'line',
+                path: file.path,
+                number: line.number,
+                label: line.text,
+                highlights: line.highlights,
+            };
+            rows.push({ kind: 'item', item, index: items.length });
+            items.push(item);
+        }
+    };
+    const shown = files.find((file) => file.path === current);
+    if (shown) {
+        rows.push({ kind: 'group', label: 'In this file' });
+        addLines(shown);
+    }
+    const others = files.filter((file) => file !== shown);
+    if (shown && others.length > 0) rows.push({ kind: 'group', label: 'Other files' });
+    for (const file of others) {
+        rows.push({ kind: 'file', path: file.path, count: file.lines.length });
+        addLines(file);
+    }
     return { items, rows };
 }
 
