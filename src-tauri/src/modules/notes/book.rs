@@ -1,7 +1,7 @@
 //! A project's notes in memory, and every change to them. Pure: each change says which files it
 //! touched, and `NotesStore` writes them.
 
-use super::contracts::{DeletedList, Note, NoteList, ProjectNotes};
+use super::contracts::{DeletedList, Note, NoteList, NotesSummary, ProjectNotes};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// The longest note, in bytes of UTF-8: a long answer of an agent fits many times over.
@@ -52,6 +52,24 @@ fn checked_name(name: &str) -> anyhow::Result<String> {
     Ok(name)
 }
 
+/// A note's first line, as a row shows it, is cut past this many characters.
+const TITLE_CHARS: usize = 160;
+
+/// A note's first line that is not blank, cut to fit a row: what names it (the palette, a
+/// project's card).
+pub(crate) fn note_title(text: &str) -> String {
+    let line = text
+        .lines()
+        .map(str::trim)
+        .find(|l| !l.is_empty())
+        .unwrap_or("");
+    let mut title: String = line.chars().take(TITLE_CHARS).collect();
+    if line.chars().count() > TITLE_CHARS {
+        title.push('…');
+    }
+    title
+}
+
 /// Whether `id` is one this module makes: it names a file, so nothing else is let through.
 pub(crate) fn is_id(id: &str) -> bool {
     id.len() == 16 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
@@ -97,6 +115,22 @@ impl Book {
             open_list,
         };
         (book, touched)
+    }
+
+    /// What a project's card tells of its notes: how many wait, and the newest.
+    pub(super) fn summary(&self) -> NotesSummary {
+        let open = self.notes.iter().filter(|n| n.done.is_none());
+        NotesSummary {
+            open: open.clone().count() as u32,
+            // written in the same millisecond, the higher one is the newer: new notes go on top
+            newest: open
+                .max_by(|a, b| {
+                    a.created
+                        .cmp(&b.created)
+                        .then(b.position.total_cmp(&a.position))
+                })
+                .map(|n| note_title(&n.text)),
+        }
     }
 
     pub(super) fn snapshot(&self) -> ProjectNotes {
@@ -644,6 +678,20 @@ mod tests {
     }
 
     #[test]
+    fn a_summary_counts_open_notes_and_names_the_newest() {
+        let mut book = with_notes(&["a", "b"]);
+        book.add(id(9), RELEASE, "newest\nmore".into(), 9).unwrap();
+        book.set_done(&id_of(&book, "a"), true, 10).unwrap();
+        assert_eq!(
+            book.summary(),
+            NotesSummary {
+                open: 2,
+                newest: Some("newest".into()),
+            }
+        );
+    }
+
+    #[test]
     fn a_book_taken_in_joins_lists_of_the_same_name_below_their_notes() {
         let mut target = with_notes(&["a"]);
         let mut source = book();
@@ -675,6 +723,14 @@ mod tests {
         let mut book = book();
         assert!(book.open(GENERAL).unwrap().is_empty());
         assert_eq!(book.open(RELEASE).unwrap(), vec![Touched::State]);
+    }
+
+    #[test]
+    fn a_note_is_named_by_its_first_line_cut_to_fit() {
+        let long = "x".repeat(TITLE_CHARS + 10);
+        assert_eq!(note_title(&long).chars().count(), TITLE_CHARS + 1);
+        assert_eq!(note_title("   \n\n"), "");
+        assert_eq!(note_title("\n  Watcher plan \n1."), "Watcher plan");
     }
 
     #[test]

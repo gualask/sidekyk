@@ -9,4 +9,8 @@ export const notesPanel = definePanel({
     tileMinWidth: 320,
     load: () => import('./ui/NotesWorkspace'),
     pick: (module) => module.NotesWorkspace,
+    summary: {
+        load: () => import('./ui/NotesSummary'),
+        pick: (module) => module.NotesSummary,
+    },
 });

@@ -3,6 +3,7 @@ import {
     type Note,
     type NoteList,
     type NotesPort,
+    noteTitle,
     openNotes,
     type ProjectNotes,
     positionAt,
@@ -276,6 +277,20 @@ export function fixtureNotes(
             b.notes.push(...deleted.notes.map((n) => ({ ...n })));
             b.openList = deleted.list.id;
             return snapshot(b);
+        },
+        // as the backend's `Book::summary`
+        notesSummary: async (root) => {
+            const open = book(root).notes.filter((n) => n.done === null);
+            const newest = open.reduce<Note | null>(
+                (best, n) =>
+                    !best ||
+                    n.created > best.created ||
+                    (n.created === best.created && n.position < best.position)
+                        ? n
+                        : best,
+                null,
+            );
+            return { open: open.length, newest: newest ? noteTitle(newest.text) : null };
         },
         countNotes: async (root) => book(root).notes.length,
         // as if saved where the dialog first offers

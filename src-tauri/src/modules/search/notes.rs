@@ -4,31 +4,14 @@
 
 use super::contracts::{Highlight, ListMatch, NoteMatch, Snippet};
 use super::rank::{Ranker, Texts};
-use crate::modules::notes::{Note, NoteList};
+use crate::modules::notes::{note_title as title, Note, NoteList};
 
 /// At most this many notes go back.
 pub(super) const NOTE_LIMIT: usize = 50;
-/// A note's first line, as the palette shows it, is cut past this many characters.
-const TITLE_CHARS: usize = 160;
-/// Around the text found in a note, the characters shown before and after it.
 const BEFORE: usize = 24;
 const AFTER: usize = 48;
 /// The least text looked for inside notes: one letter is in every note.
 const MIN_SUBSTRING: usize = 2;
-
-/// A note's first line that is not blank, cut to fit a row.
-fn title(text: &str) -> String {
-    let line = text
-        .lines()
-        .map(str::trim)
-        .find(|l| !l.is_empty())
-        .unwrap_or("");
-    let mut title: String = line.chars().take(TITLE_CHARS).collect();
-    if line.chars().count() > TITLE_CHARS {
-        title.push('…');
-    }
-    title
-}
 
 /// The UTF-16 length of some characters, as the frontend counts offsets.
 fn utf16(chars: &[char]) -> u32 {
@@ -264,12 +247,5 @@ mod tests {
             .map(|n| n.id)
             .collect();
         assert_eq!(ids, ["a", "r", "d"]);
-    }
-
-    #[test]
-    fn a_long_first_line_is_cut() {
-        let long = "x".repeat(TITLE_CHARS + 10);
-        assert_eq!(title(&long).chars().count(), TITLE_CHARS + 1);
-        assert_eq!(title("   \n\n"), "");
     }
 }

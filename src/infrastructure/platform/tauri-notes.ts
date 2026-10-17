@@ -16,6 +16,7 @@ export const tauriNotes: NotesPort = {
     deleteList: (root, id) => invoke('delete_note_list', { root, id }),
     restoreList: (root, deleted) => invoke('restore_note_list', { root, deleted }),
     openList: (root, id) => invoke('open_note_list', { root, id }),
+    notesSummary: (root) => invoke('notes_summary', { root }),
     countNotes: (root) => invoke('count_notes', { root }),
     exportNotes: (root) => invoke('export_notes', { root }),
 };

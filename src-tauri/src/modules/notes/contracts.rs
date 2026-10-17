@@ -40,6 +40,16 @@ pub(crate) struct ProjectNotes {
     pub(crate) open_list: String,
 }
 
+/// What a project's card at all projects tells of its notes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NotesSummary {
+    /// The notes not done.
+    pub(crate) open: u32,
+    /// The first line of the open note written last.
+    pub(crate) newest: Option<String>,
+}
+
 /// A list deleted with its notes, handed back to bring them all back (undo).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -146,6 +156,18 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<DeletedList>(json).unwrap(),
             deleted
+        );
+    }
+
+    #[test]
+    fn a_summary_uses_the_frontend_field_names() {
+        let summary = NotesSummary {
+            open: 2,
+            newest: Some("Try the rail".into()),
+        };
+        assert_eq!(
+            serde_json::to_value(summary).unwrap(),
+            serde_json::json!({ "open": 2, "newest": "Try the rail" })
         );
     }
 

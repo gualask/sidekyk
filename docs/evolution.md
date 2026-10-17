@@ -28,8 +28,7 @@ Workspace:
 
 - Breadcrumb (All projects / project / panel) is the only "where am I"; project rail on the left.
 - Level 0 card: branch, changed files with counts, waiting notes with the newest; ⋯ removes the
-  project (repository untouched). Once notes exist, removing must not lose them silently (undo,
-  or keep until re-added).
+  project (repository untouched), asking first about its notes (export or delete).
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes left; Files (and Notes)
   right. Splitter between Changes and Files (2026-10-17): it drags the tree's width, the same
   setting as full screen (one value, as VS Code's sidebar), double click fits as the tree's own
@@ -74,7 +73,7 @@ Files (built 2026-10-17):
   mock kept them apart). A commit's file leaves the tree alone.
 - Tree width as every sidebar's (Workspace); the fit takes the open rows.
 
-Notes *(to build)*:
+Notes (built 2026-10-17):
 
 - Cards, not documents: plain text, user's order (new on top), each marked done when used. Done
   cards fold into "Done (n)".

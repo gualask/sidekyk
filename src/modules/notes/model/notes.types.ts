@@ -39,3 +39,11 @@ export interface DeletedList {
     index: number;
     notes: Note[];
 }
+
+/** What a project's card at all projects tells of its notes. */
+export interface NotesSummary {
+    /** The notes not done. */
+    open: number;
+    /** The first line of the open note written last. */
+    newest: string | null;
+}

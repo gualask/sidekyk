@@ -254,3 +254,16 @@ export function useRereadNotes() {
     const client = useQueryClient();
     return useCallback(() => void client.invalidateQueries({ queryKey: ['notes'] }), [client]);
 }
+
+/**
+ * What a project's card tells of its notes, read each time all projects shows (the backend keeps
+ * it in memory once read).
+ */
+export function useNotesSummary(root: string) {
+    const port = useNotesPort();
+    return useQuery({
+        queryKey: ['notes-summary', root],
+        queryFn: () => port.notesSummary(root),
+        staleTime: 0,
+    });
+}

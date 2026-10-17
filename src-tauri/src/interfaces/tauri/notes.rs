@@ -8,7 +8,9 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::{write_chosen_file, NotesFiles};
-use crate::modules::notes::{to_markdown, DeletedList, Note, NoteList, NotesStore, ProjectNotes};
+use crate::modules::notes::{
+    to_markdown, DeletedList, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
+};
 use crate::shared::error::{user_facing, AppError, UserFacingErrorCode};
 
 /// Runs `work` on a project's notes, once the project is known to be in the list.
@@ -182,6 +184,18 @@ pub(crate) async fn open_note_list(
 ) -> Result<(), AppError> {
     with_notes("open_note_list", app, root, move |store, files, root| {
         store.open_list(files, root, &id)
+    })
+    .await
+}
+
+#[tauri::command]
+/// What a project's card at all projects tells of its notes.
+pub(crate) async fn notes_summary(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<NotesSummary, AppError> {
+    with_notes("notes_summary", app, root, |store, files, root| {
+        store.summary(files, root)
     })
     .await
 }

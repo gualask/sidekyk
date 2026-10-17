@@ -7,7 +7,8 @@ mod markdown;
 mod ports;
 mod store;
 
-pub(crate) use contracts::{DeletedList, Note, NoteList, ProjectNotes};
+pub(crate) use book::note_title;
+pub(crate) use contracts::{DeletedList, Note, NoteList, NotesSummary, ProjectNotes};
 pub(crate) use markdown::to_markdown;
 pub(crate) use ports::NotesStorage;
 pub(crate) use store::NotesStore;

@@ -19,8 +19,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use super::book::{is_id, Book, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
-    DeletedList, Note, NoteList, ProjectNotes, StoredLists, StoredNote, StoredProject, StoredState,
-    STORED_VERSION,
+    DeletedList, Note, NoteList, NotesSummary, ProjectNotes, StoredLists, StoredNote,
+    StoredProject, StoredState, STORED_VERSION,
 };
 use super::ports::NotesStorage;
 use crate::shared::sync::lock;
@@ -124,6 +124,8 @@ pub(crate) struct NotesStore {
     /// Which folder holds each project's notes, by root: read once.
     folders: Mutex<Option<HashMap<String, String>>>,
     open: Mutex<Option<OpenBook>>,
+    /// What the projects' cards tell, by root, once read: notes change only through here.
+    summaries: Mutex<HashMap<String, NotesSummary>>,
 }
 
 impl NotesStore {
@@ -229,6 +231,7 @@ impl NotesStore {
         }
         let mut touched = touched;
         touched.append(&mut current.pending);
+        lock(&self.summaries).remove(root);
         if let Err(error) = self.write(storage, current, touched) {
             *open = None;
             return Err(error);
@@ -313,6 +316,24 @@ impl NotesStore {
         self.change(storage, root, |book| Ok((book.snapshot(), Vec::new())))
     }
 
+    /// What a project's card tells of its notes: from those in memory, else read once (without
+    /// replacing those in memory) and kept until they change.
+    pub(crate) fn summary(
+        &self,
+        storage: &dyn NotesStorage,
+        root: &str,
+    ) -> anyhow::Result<NotesSummary> {
+        if let Some(open) = lock(&self.open).as_ref().filter(|o| o.root == root) {
+            return Ok(open.book.summary());
+        }
+        if let Some(summary) = lock(&self.summaries).get(root) {
+            return Ok(summary.clone());
+        }
+        let summary = self.load(storage, root)?.book.summary();
+        lock(&self.summaries).insert(root.into(), summary.clone());
+        Ok(summary)
+    }
+
     /// How many notes a project has, open and done, counted from its files without reading them.
     pub(crate) fn count(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<usize> {
         let Some(folder) = self.folder_of(storage, root)? else {
@@ -338,6 +359,7 @@ impl NotesStore {
         if let Some(found) = lock(&self.folders).as_mut() {
             found.remove(root);
         }
+        lock(&self.summaries).remove(root);
         if open.as_ref().is_some_and(|o| o.root == root) {
             *open = None;
         }
@@ -383,6 +405,9 @@ impl NotesStore {
             found.remove(from);
             found.entry(to.into()).or_insert(from_folder);
         }
+        let mut summaries = lock(&self.summaries);
+        summaries.remove(from);
+        summaries.remove(to);
         Ok(())
     }
 
@@ -695,6 +720,28 @@ pub(crate) mod tests {
 
         let notes = NotesStore::default().notes(&storage, ROOT).unwrap();
         assert_eq!(notes.notes.len(), 1);
+    }
+
+    #[test]
+    fn a_summary_is_kept_until_the_notes_change() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        for root in [ROOT, "/dev/docs"] {
+            let list = store.notes(&storage, root).unwrap().open_list;
+            store.add_note(&storage, root, &list, "a".into()).unwrap();
+        }
+        // ROOT is not the one in memory: read once, kept
+        assert_eq!(store.summary(&storage, ROOT).unwrap().open, 1);
+        let list = store.notes(&storage, ROOT).unwrap().open_list;
+        store.add_note(&storage, ROOT, &list, "b".into()).unwrap();
+        store.notes(&storage, "/dev/docs").unwrap();
+        assert_eq!(
+            store.summary(&storage, ROOT).unwrap(),
+            NotesSummary {
+                open: 2,
+                newest: Some("b".into()),
+            }
+        );
     }
 
     #[test]

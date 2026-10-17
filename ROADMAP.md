@@ -39,6 +39,8 @@ Workspace:
       setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
 - [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
       double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
+- [x] Level 0 cards tell the notes waiting and the newest (`notes_summary`, kept in memory once
+      read, until they change)
 - [x] Side column (2026-10-17): Files above Notes, splitter between them, 320 px at least with
       Notes; Files and Notes minimize to chips in the top bar; tiles kept per project
 
@@ -84,7 +86,7 @@ Explore and copy:
 
 ## Next
 
-- [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
+- [x] Mock icons from Tabler: all in (2026-10-17); open in editor's comes with that feature
 
 ## Notes
 
@@ -107,7 +109,6 @@ Explore and copy:
 
 ## Then
 
-- [ ] Level 0 cards with notes (changes in progress, waiting notes)
 - [ ] Collect several hunks with a comment each, copy as one batch
 - [ ] Scrollbar as a map of the changes (marks per hunk, click to go; narrow/wide setting)
 - [ ] `n`/`p`: next/previous change, across files
