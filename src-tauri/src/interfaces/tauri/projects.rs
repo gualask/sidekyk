@@ -5,9 +5,11 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
+use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::modules::notes::NotesStore;
 use crate::modules::projects::{ProjectList, TilesLayout};
+use crate::modules::repository::resolve_repository;
 use crate::shared::error::AppError;
 
 #[tauri::command]
@@ -74,6 +76,39 @@ pub(crate) async fn set_project_layout(
     blocking("set_project_layout", app, move |app| {
         app.state::<ProjectsState>()
             .update_stored(app, |list| list.set_layout(&root, layout))
+    })
+    .await
+}
+
+#[tauri::command]
+/// Asks for the folder a moved repository is in now, and puts the project there, its notes and
+/// layout with it; into the project already there, if it is one. `None` when cancelled.
+pub(crate) async fn relocate_project(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<Option<ProjectList>, AppError> {
+    blocking("relocate_project", app, move |app| {
+        let projects = app.state::<ProjectsState>();
+        let project = projects.project(&root)?;
+        let Some(folder) = app
+            .dialog()
+            .file()
+            .set_title(format!("Locate {}", project.name))
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        let backend = app.state::<LocalRepositoryBackend>();
+        let found = resolve_repository(backend.inner(), &folder.into_path()?)?.info;
+        if found.root == root {
+            return Ok(Some(projects.list()));
+        }
+        // the notes first: if they cannot follow, the project stays where it was
+        app.state::<NotesStore>()
+            .relink(app.state::<NotesFiles>().inner(), &root, &found.root)?;
+        projects
+            .update(app, |list| list.relocate(&root, found))
+            .map(Some)
     })
     .await
 }

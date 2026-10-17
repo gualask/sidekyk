@@ -1,5 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { loadRemoveProjectDialog, newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    loadRemoveProjectDialog,
+    newNoteTarget,
+    notesPanel,
+    notesTarget,
+    useRereadNotes,
+} from '@/modules/notes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -11,6 +17,7 @@ import {
     useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
+    useRelocateProject,
     useRemoveProject,
 } from '@/modules/projects';
 import {
@@ -116,7 +123,17 @@ export function AppShell() {
     // a project to remove, once asked what to do with its notes
     const [removing, setRemoving] = useState<ProjectInfo | null>(null);
     const { mutate: removeProject } = useRemoveProject();
-    const problems = useProblems(projects.data, openSettings, setRemoving);
+    // a moved repository found again: its notes may have joined another project's
+    const rereadNotes = useRereadNotes();
+    const { mutate: relocate } = useRelocateProject(rereadNotes);
+    const fixProject = useMemo(
+        () => ({
+            locate: (project: ProjectInfo) => relocate(project.root),
+            remove: setRemoving,
+        }),
+        [relocate],
+    );
+    const problems = useProblems(projects.data, openSettings, fixProject);
     const activate = useActivateProject();
 
     /**

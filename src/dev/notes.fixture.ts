@@ -133,7 +133,11 @@ function largeBook(): Book {
 export function fixtureNotes(
     initial: (root: string) => 'review' | 'large' | 'empty',
     checkRoot: (root: string) => void,
-): NotesPort & { peek: (root: string) => ProjectNotes; drop: (root: string) => void } {
+): NotesPort & {
+    peek: (root: string) => ProjectNotes;
+    drop: (root: string) => void;
+    relink: (from: string, to: string) => void;
+} {
     const books = new Map<string, Book>();
     const book = (root: string): Book => {
         checkRoot(root);
@@ -171,6 +175,27 @@ export function fixtureNotes(
         /** A project removed takes its notes, as the backend's `remove_project`. */
         drop: (root) => {
             books.delete(root);
+        },
+        /**
+         * A project found elsewhere takes its notes there, as the backend's `relink`; into the
+         * notes there, if any (lists of one name join, without the backend's placing).
+         */
+        relink: (from, to) => {
+            const moved = books.get(from);
+            books.delete(from);
+            if (!moved) return;
+            const target = books.get(to);
+            if (!target) {
+                books.set(to, moved);
+                return;
+            }
+            for (const list of moved.lists) {
+                const same = target.lists.find((l) => l.name === list.name);
+                if (!same) target.lists.push(list);
+                for (const n of moved.notes.filter((n) => n.list === list.id)) {
+                    target.notes.push({ ...n, list: same?.id ?? list.id });
+                }
+            }
         },
         getNotes: async (root) => snapshot(book(root)),
         addNote: async (root, listId, text) => {

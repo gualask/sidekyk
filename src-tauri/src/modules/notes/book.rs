@@ -346,6 +346,43 @@ impl Book {
         Ok((self.snapshot(), touched))
     }
 
+    /// Takes in another book of the same project (found again where another project was): its
+    /// lists join those of the same name, the others come last; its open notes go below the open
+    /// ones of their list, in their order; done ones keep when they were done.
+    pub(super) fn absorb(&mut self, other: Book) -> Vec<Touched> {
+        let mut touched = vec![Touched::Lists];
+        let mut into = std::collections::HashMap::new();
+        for list in other.lists {
+            match self.lists.iter().find(|l| l.name == list.name) {
+                Some(own) => {
+                    into.insert(list.id, own.id.clone());
+                }
+                None => {
+                    into.insert(list.id.clone(), list.id.clone());
+                    self.lists.push(list);
+                }
+            }
+        }
+        let mut notes = other.notes;
+        notes.sort_by(|a, b| a.position.total_cmp(&b.position));
+        for mut note in notes {
+            note.list = into
+                .get(&note.list)
+                .cloned()
+                .unwrap_or_else(|| self.lists[0].id.clone());
+            if note.done.is_none() {
+                note.position = self
+                    .open_notes(&note.list, "")
+                    .last()
+                    .map_or(0.0, |bottom| bottom.position + 1.0);
+            }
+            self.notes.retain(|n| n.id != note.id);
+            touched.push(Touched::Note(note.id.clone()));
+            self.notes.push(note);
+        }
+        touched
+    }
+
     pub(super) fn open(&mut self, id: &str) -> anyhow::Result<Vec<Touched>> {
         self.list_index(id)?;
         if self.open_list == id {
@@ -604,6 +641,33 @@ mod tests {
         assert_eq!(book.open_list, id(5));
         assert!(book.add_list(id(6), "   ").is_err());
         assert_eq!(book.rename_list(&id(5), "Arch").unwrap().0.name, "Arch");
+    }
+
+    #[test]
+    fn a_book_taken_in_joins_lists_of_the_same_name_below_their_notes() {
+        let mut target = with_notes(&["a"]);
+        let mut source = book();
+        source.lists[0].id = "3000000000000000".into();
+        source.lists[1].name = "Ideas".into();
+        source.notes = Vec::new();
+        source
+            .add(id(20), "3000000000000000", "b".into(), 1)
+            .unwrap();
+        let ideas = source.lists[1].id.clone();
+        source.add(id(21), &ideas, "i".into(), 1).unwrap();
+        let touched = target.absorb(source);
+        assert_eq!(order(&target, GENERAL), ["a", "b"]);
+        assert_eq!(order(&target, &ideas), ["i"]);
+        assert_eq!(
+            target
+                .lists
+                .iter()
+                .map(|l| l.name.as_str())
+                .collect::<Vec<_>>(),
+            ["General", "Release", "Ideas"]
+        );
+        assert!(touched.contains(&Touched::Lists));
+        assert!(touched.contains(&Touched::Note(id(20))));
     }
 
     #[test]

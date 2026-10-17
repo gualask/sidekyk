@@ -250,6 +250,11 @@ drops it.
   stays). The frontend asks before (`RemoveProjectDialog`, notes module, lazy, from the overview's
   ⋯ and the missing-repository problem): no notes (`count_notes`, files counted, nothing read),
   it goes at once; else export then remove, or remove and delete; a count that fails asks too.
+- A moved repository (`relocate_project`, the problem's Locate…): the folder picked resolves to its
+  repository; the notes follow first (`relink`: `project.json` takes the new root; into another
+  project's notes when it is one: lists of one name join, open notes go below, the old folder
+  goes), then the list (`relocate`: same place, layout, on screen). The same folder changes
+  nothing. Problems carry several fixes (Locate…, Remove).
 - `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
 
 ### Tray

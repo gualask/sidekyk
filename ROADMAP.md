@@ -93,8 +93,8 @@ Explore and copy:
       lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects
 - [x] Export a project's notes to Markdown from the Notes panel's ⋯ (never inside a repository);
       removing a project with notes asks: export then remove, or delete (nothing left on disk)
-- [ ] A moved repository is relinked with Locate…, notes follow (merged into a project already
-      there)
+- [x] A moved repository is relinked with Locate… (the problem's fix): notes and layout follow,
+      into the project already there if it is one
 - [ ] Optional Google Drive sync/backup (OAuth loopback + PKCE, tokens in the OS credential store,
       local first, conflicts keep both); nothing runs until an account is connected
 

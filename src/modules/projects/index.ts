@@ -5,6 +5,7 @@ export {
     useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
+    useRelocateProject,
     useRemoveProject,
 } from './application/projects.queries';
 export {

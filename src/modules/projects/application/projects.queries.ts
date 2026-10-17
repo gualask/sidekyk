@@ -125,6 +125,28 @@ export function useRemoveProject() {
     });
 }
 
+/**
+ * Asks where a moved repository is now and puts its project there; `onRelocated` follows, unless
+ * the user cancelled. A failure is a toast.
+ */
+export function useRelocateProject(onRelocated: () => void) {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    const showToast = useShowToast();
+    return useMutation({
+        ...projectsChange,
+        mutationFn: (root: string) => port.relocateProject(root),
+        onSuccess: (list) => {
+            if (!list) return;
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            onRelocated();
+        },
+        onError: (error, root) => {
+            showToast(errorToast(`Could not locate ${projectName(queryClient, root)}`, error));
+        },
+    });
+}
+
 /** A project's tiles until the user changes them: none minimized, the side column split even. */
 export const DEFAULT_TILES_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
 

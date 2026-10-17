@@ -114,9 +114,12 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         }
     };
 
+    // as the backend, notes need the project in the list, not its repository: a moved one's stay
     const notes = fixtureNotes(
         (root) => (!scenarioData(root) ? 'empty' : large(root) ? 'large' : 'review'),
-        readable,
+        (root) => {
+            project(root);
+        },
     );
     // as the backend, the palette searches the notes of the project on screen
     const searchedNotes = (root: string | null) => {
@@ -157,6 +160,18 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     projects,
                     active: list.active === root ? (next?.root ?? null) : list.active,
                     layouts,
+                });
+            },
+            // in `problems`, the moved project is found next to where it was
+            relocateProject: async (root) => {
+                const moved = project(root);
+                const found = { root: `${moved.root}-moved`, name: moved.name };
+                notes.relink(moved.root, found.root);
+                const { [moved.root]: layout, ...layouts } = list.layouts;
+                return update({
+                    projects: list.projects.map((p) => (p === moved ? found : p)),
+                    active: list.active === moved.root ? found.root : list.active,
+                    layouts: layout ? { ...layouts, [found.root]: layout } : layouts,
                 });
             },
             setProjectLayout: async (root, layout) =>

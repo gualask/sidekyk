@@ -66,6 +66,34 @@ impl ProjectList {
         Ok(())
     }
 
+    /// A project found again at `found` (its repository moved): it takes the new root in its
+    /// place, its layout with it, and stays on screen if it was. When `found` is a project already,
+    /// the old one goes into it instead.
+    pub(crate) fn relocate(&mut self, root: &str, found: RepositoryInfo) -> anyhow::Result<()> {
+        let index = self
+            .projects
+            .iter()
+            .position(|p| p.root == root)
+            .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
+        if found.root == root {
+            return Ok(());
+        }
+        let was_active = self.active.as_deref() == Some(root);
+        let layout = self.layouts.remove(root);
+        if self.find(&found.root).is_ok() {
+            self.projects.remove(index);
+        } else {
+            if let Some(layout) = layout {
+                self.layouts.insert(found.root.clone(), layout);
+            }
+            self.projects[index] = found.clone();
+        }
+        if was_active {
+            self.active = Some(found.root);
+        }
+        Ok(())
+    }
+
     /// Forgets a project; its repository is left as it is. When it was on screen, the one after
     /// it takes its place, or the one before it when it was the last.
     pub(crate) fn remove(&mut self, root: &str) -> anyhow::Result<()> {
@@ -182,5 +210,31 @@ mod tests {
         let mut stored = list(&["/a"], Some("/a"));
         stored.layouts.insert("/gone".into(), layout(0.5));
         assert!(stored.normalized().layouts.is_empty());
+    }
+
+    #[test]
+    fn a_project_found_elsewhere_keeps_its_place_and_layout() {
+        let mut projects = list(&["/a", "/b"], Some("/a"));
+        projects.set_layout("/a", layout(0.3)).unwrap();
+        projects.relocate("/a", project("/moved")).unwrap();
+        assert_eq!(
+            projects
+                .projects
+                .iter()
+                .map(|p| p.root.as_str())
+                .collect::<Vec<_>>(),
+            ["/moved", "/b"]
+        );
+        assert_eq!(projects.active.as_deref(), Some("/moved"));
+        assert_eq!(projects.layouts["/moved"].split, 0.3);
+        assert!(!projects.layouts.contains_key("/a"));
+    }
+
+    #[test]
+    fn a_project_found_at_another_project_goes_into_it() {
+        let mut projects = list(&["/a", "/b"], Some("/a"));
+        projects.relocate("/a", project("/b")).unwrap();
+        assert_eq!(projects, list(&["/b"], Some("/b")));
+        assert!(projects.relocate("/gone", project("/c")).is_err());
     }
 }

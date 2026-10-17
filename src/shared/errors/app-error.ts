@@ -20,7 +20,7 @@ const USER_MESSAGES: Record<string, string> = {
     path_outside_repository: 'That path is outside the repository.',
     project_not_found: 'That repository is no longer in Sidekyk.',
     repository_missing:
-        'This repository was moved or deleted. Remove it from All projects, then add it again from its new folder.',
+        "This repository was moved or deleted. Locate its new folder from the top bar's warning, or remove it.",
     shortcut_taken: 'Another app or the system already uses that shortcut. Pick another.',
 };
 

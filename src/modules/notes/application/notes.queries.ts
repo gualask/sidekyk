@@ -245,3 +245,12 @@ export function useNotesCount(root: string) {
         staleTime: 0,
     });
 }
+
+/**
+ * Reads every project's notes again, those on screen now, the others when they show: for a
+ * change made outside Notes, such as a project's notes joining another's.
+ */
+export function useRereadNotes() {
+    const client = useQueryClient();
+    return useCallback(() => void client.invalidateQueries({ queryKey: ['notes'] }), [client]);
+}

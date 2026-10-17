@@ -10,7 +10,8 @@ export interface Problem {
     id: string;
     title: string;
     detail: string;
-    fix: { label: string; run: () => void };
+    /** What fixes it, the usual first. */
+    fixes: { label: string; run: () => void }[];
 }
 
 /**
@@ -22,7 +23,7 @@ export interface Problem {
 export function useProblems(
     list: ProjectList | undefined,
     openSettings: () => void,
-    removeProject: (project: ProjectInfo) => void,
+    fixProject: { locate: (project: ProjectInfo) => void; remove: (project: ProjectInfo) => void },
 ): Problem[] {
     const missing = useMissingRepositories();
     const shortcut = useGlobalShortcutStatus().data;
@@ -33,17 +34,20 @@ export function useProblems(
             .map((project) => ({
                 id: `missing:${project.root}`,
                 title: `${project.name} was moved or deleted`,
-                detail: `Nothing is left at ${project.root}. Remove it, then add it again from its new folder.`,
-                fix: { label: 'Remove', run: () => removeProject(project) },
+                detail: `Nothing is left at ${project.root}. Locate its new folder: its notes and layout follow. Or remove it.`,
+                fixes: [
+                    { label: 'Locate…', run: () => fixProject.locate(project) },
+                    { label: 'Remove', run: () => fixProject.remove(project) },
+                ],
             }));
         const shortcutIssue = shortcutProblem(shortcut, MACOS);
         if (shortcutIssue) {
             problems.push({
                 id: 'global-shortcut',
                 ...shortcutIssue,
-                fix: { label: 'Change shortcut', run: openSettings },
+                fixes: [{ label: 'Change shortcut', run: openSettings }],
             });
         }
         return problems;
-    }, [list, missing, removeProject, shortcut, openSettings]);
+    }, [list, missing, fixProject, shortcut, openSettings]);
 }

@@ -344,6 +344,48 @@ impl NotesStore {
         Ok(())
     }
 
+    /// A project found again at `to` (its repository moved): its notes go with it. When `to` has
+    /// notes already (it is a project too), they take these in and this project's folder goes.
+    pub(crate) fn relink(
+        &self,
+        storage: &dyn NotesStorage,
+        from: &str,
+        to: &str,
+    ) -> anyhow::Result<()> {
+        if from == to {
+            return Ok(());
+        }
+        let mut open = lock(&self.open);
+        let Some(from_folder) = self.folder_of(storage, from)? else {
+            return Ok(());
+        };
+        // whatever was read is read again
+        *open = None;
+        if self.folder_of(storage, to)?.is_none() {
+            write_json(
+                storage,
+                &from_folder,
+                PROJECT_FILE,
+                &StoredProject {
+                    version: STORED_VERSION,
+                    root: to.into(),
+                },
+            )?;
+        } else {
+            let source = self.load(storage, from)?;
+            let mut target = self.load(storage, to)?;
+            let mut touched = target.book.absorb(source.book);
+            touched.append(&mut target.pending);
+            self.write(storage, &mut target, touched)?;
+            storage.remove_folder(&from_folder)?;
+        }
+        if let Some(found) = lock(&self.folders).as_mut() {
+            found.remove(from);
+            found.entry(to.into()).or_insert(from_folder);
+        }
+        Ok(())
+    }
+
     /// Looks at a project's lists and notes where they are kept, without a copy: the palette
     /// searches them at every key.
     pub(crate) fn with_notes<T>(
@@ -670,6 +712,61 @@ pub(crate) mod tests {
         assert_eq!(store.count(&storage, ROOT).unwrap(), 0);
         // added again, it starts with none
         assert!(store.notes(&storage, ROOT).unwrap().notes.is_empty());
+    }
+
+    #[test]
+    fn notes_follow_their_project_found_elsewhere() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let list = store.notes(&storage, ROOT).unwrap().open_list;
+        store.add_note(&storage, ROOT, &list, "a".into()).unwrap();
+        store.relink(&storage, ROOT, "/moved/shop").unwrap();
+
+        let fresh = NotesStore::default();
+        assert!(fresh.notes(&storage, ROOT).unwrap().notes.is_empty());
+        assert_eq!(
+            fresh.notes(&storage, "/moved/shop").unwrap().notes[0].text,
+            "a"
+        );
+        assert_eq!(storage.folders().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn notes_found_where_they_were_stay() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let list = store.notes(&storage, ROOT).unwrap().open_list;
+        store.add_note(&storage, ROOT, &list, "a".into()).unwrap();
+        store.relink(&storage, ROOT, ROOT).unwrap();
+        assert_eq!(
+            NotesStore::default()
+                .notes(&storage, ROOT)
+                .unwrap()
+                .notes
+                .len(),
+            1
+        );
+    }
+
+    #[test]
+    fn notes_found_at_another_project_join_its_own() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        for (root, text) in [(ROOT, "old"), ("/moved/shop", "new")] {
+            let list = store.notes(&storage, root).unwrap().open_list;
+            store.add_note(&storage, root, &list, text.into()).unwrap();
+        }
+        store.relink(&storage, ROOT, "/moved/shop").unwrap();
+
+        let notes = NotesStore::default()
+            .notes(&storage, "/moved/shop")
+            .unwrap();
+        let mut texts: Vec<&str> = notes.notes.iter().map(|n| n.text.as_str()).collect();
+        texts.sort_unstable();
+        assert_eq!(texts, ["new", "old"]);
+        // one General list, the old one's notes in it
+        assert_eq!(notes.lists.len(), 1);
+        assert_eq!(storage.folders().unwrap().len(), 1);
     }
 
     #[test]

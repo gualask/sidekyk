@@ -13,6 +13,7 @@ export const tauriProjects: ProjectsPort = {
     addProject: () => invoke('add_project'),
     activateProject: (root) => invoke('activate_project', { root }),
     removeProject: (root) => invoke('remove_project', { root }),
+    relocateProject: (root) => invoke('relocate_project', { root }),
     setProjectLayout: (root, layout) => invoke('set_project_layout', { root, layout }),
     onProjectsChanged: (listener) =>
         onTauriEvent<ProjectsChangedEvent>(PROJECTS_CHANGED_EVENT, () => listener()),

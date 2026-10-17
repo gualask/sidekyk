@@ -3,7 +3,8 @@ import { IconAlertTriangle } from '@tabler/icons-react';
 import type { Problem } from './problems';
 
 /**
- * The top bar's warning: how many problems last, and their list with a fix each. Loaded with the
+ * The top bar's warning: how many problems last, and their list with their fixes, the usual one
+ * first. Loaded with the
  * first problem, with Base UI's popover.
  */
 export function ProblemsButton({ problems }: { problems: Problem[] }) {
@@ -31,12 +32,17 @@ export function ProblemsButton({ problems }: { problems: Problem[] }) {
                                             {problem.detail}
                                         </div>
                                     </div>
-                                    <Popover.Close
-                                        className="btn-ghost-sm shrink-0"
-                                        onClick={problem.fix.run}
-                                    >
-                                        {problem.fix.label}
-                                    </Popover.Close>
+                                    <div className="flex shrink-0 flex-col items-stretch gap-1.5">
+                                        {problem.fixes.map((fix) => (
+                                            <Popover.Close
+                                                key={fix.label}
+                                                className="btn-ghost-sm justify-center"
+                                                onClick={fix.run}
+                                            >
+                                                {fix.label}
+                                            </Popover.Close>
+                                        ))}
+                                    </div>
                                 </li>
                             ))}
                         </ul>
