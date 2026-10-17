@@ -8,6 +8,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { trackDrag } from './pointer-drag';
 
 /** The sidebars' widths as last dragged, by sidebar, and how to store one; the app keeps them. */
 export interface SidebarWidths {
@@ -39,6 +40,8 @@ export interface SidebarWidth {
     drag: (event: PointerEvent<HTMLElement>, box: HTMLElement, side: 'left' | 'right') => void;
     /** Fits the sidebar to what it shows, at the width given; a second fit goes back. */
     fit: (fitting: number, box: HTMLElement) => void;
+    /** Back to its default width. */
+    reset: () => void;
 }
 
 /**
@@ -74,33 +77,22 @@ export function useSidebarWidth(
     return {
         style: { width: value, maxWidth: `calc(100% - ${CONTENT_MIN_WIDTH}px)` },
         drag: (event, box, side) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            const bar = event.currentTarget;
             const from = event.clientX;
             const start = shown(box);
             const sign = side === 'right' ? 1 : -1;
-            bar.setPointerCapture(event.pointerId);
             // a click is no drag: the clicks of a double click leave the width before a fit alone
-            let moved = false;
-            const move = (pointer: globalThis.PointerEvent) => {
-                moved = true;
-                resize(box, start + sign * (pointer.clientX - from));
-            };
-            const end = () => {
-                bar.removeEventListener('pointermove', move);
-                bar.removeEventListener('pointerup', end);
-                bar.removeEventListener('pointercancel', end);
-                if (!moved) return;
-                const last = shown(box);
-                resize(box, last);
-                beforeFit.current = undefined;
-                setDragged({ width: last, over: stored });
-                store(last);
-            };
-            bar.addEventListener('pointermove', move);
-            bar.addEventListener('pointerup', end);
-            bar.addEventListener('pointercancel', end);
+            trackDrag(
+                event,
+                (pointer) => resize(box, start + sign * (pointer.clientX - from)),
+                (moved) => {
+                    if (!moved) return;
+                    const last = shown(box);
+                    resize(box, last);
+                    beforeFit.current = undefined;
+                    setDragged({ width: last, over: stored });
+                    store(last);
+                },
+            );
         },
         fit: (fitting, box) => {
             if (beforeFit.current !== undefined) {
@@ -115,6 +107,11 @@ export function useSidebarWidth(
             if (target <= current + 1) return;
             beforeFit.current = stored;
             store(target);
+        },
+        reset: () => {
+            beforeFit.current = undefined;
+            setDragged(null);
+            store(null);
         },
     };
 }

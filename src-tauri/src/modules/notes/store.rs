@@ -28,8 +28,6 @@ use crate::shared::sync::lock;
 const PROJECT_FILE: &str = "project.json";
 const LISTS_FILE: &str = "lists.json";
 const STATE_FILE: &str = "state.json";
-/// What a write leaves behind when the app stops halfway; removed when found.
-const TEMP_SUFFIX: &str = ".tmp";
 /// A note's file: its text, JSON-escaped (6 bytes for a control character at worst), and a few
 /// fields.
 const NOTE_FILE_LIMIT: u64 = MAX_NOTE_BYTES as u64 * 6 + 4096;
@@ -153,6 +151,19 @@ impl NotesStore {
         Ok(folders.as_ref().and_then(|f| f.get(root).cloned()))
     }
 
+    /// A new folder's name for a project: one no project has, nor any file is in.
+    fn free_folder(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<String> {
+        loop {
+            let folder = folder_name(root);
+            let taken = lock(&self.folders)
+                .as_ref()
+                .is_some_and(|found| found.values().any(|f| *f == folder));
+            if !taken && storage.files(&folder)?.is_empty() {
+                return Ok(folder);
+            }
+        }
+    }
+
     fn load(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<OpenBook> {
         let started = Instant::now();
         let folder = self.folder_of(storage, root)?;
@@ -161,9 +172,7 @@ impl NotesStore {
         let mut open_list = None;
         if let Some(folder) = folder.as_deref() {
             for file in storage.files(folder)? {
-                if file.ends_with(TEMP_SUFFIX) {
-                    storage.remove(folder, &file)?;
-                } else if file == LISTS_FILE {
+                if file == LISTS_FILE {
                     if let Some(stored) =
                         parse::<StoredLists>(storage, folder, &file, OTHER_FILE_LIMIT)
                     {
@@ -236,7 +245,7 @@ impl NotesStore {
         let folder = match &open.folder {
             Some(folder) => folder.clone(),
             None => {
-                let folder = folder_name(&open.root);
+                let folder = self.free_folder(storage, &open.root)?;
                 write_json(
                     storage,
                     &folder,
@@ -302,6 +311,19 @@ impl NotesStore {
         root: &str,
     ) -> anyhow::Result<ProjectNotes> {
         self.change(storage, root, |book| Ok((book.snapshot(), Vec::new())))
+    }
+
+    /// Looks at a project's lists and notes where they are kept, without a copy: the palette
+    /// searches them at every key.
+    pub(crate) fn with_notes<T>(
+        &self,
+        storage: &dyn NotesStorage,
+        root: &str,
+        look: impl FnOnce(&[NoteList], &[Note]) -> T,
+    ) -> anyhow::Result<T> {
+        self.change(storage, root, |book| {
+            Ok((look(&book.lists, &book.notes), Vec::new()))
+        })
     }
 
     pub(crate) fn add_note(
@@ -583,7 +605,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn leftovers_go_and_a_broken_note_is_skipped() {
+    fn a_broken_note_is_skipped() {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
         let list = store.notes(&storage, ROOT).unwrap().open_list;
@@ -592,16 +614,21 @@ pub(crate) mod tests {
         storage
             .write(&folder, "0123456789abcdef.json", b"{ not json")
             .unwrap();
-        storage
-            .write(&folder, "0123456789abcdef.json.tmp", b"half")
-            .unwrap();
 
         let notes = NotesStore::default().notes(&storage, ROOT).unwrap();
         assert_eq!(notes.notes.len(), 1);
-        assert!(!storage
-            .names()
-            .iter()
-            .any(|(_, file)| file.ends_with(TEMP_SUFFIX)));
+    }
+
+    #[test]
+    fn a_new_folder_never_takes_one_in_use() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        // two projects of the same name
+        for root in ["/a/shop", "/b/shop"] {
+            let list = store.notes(&storage, root).unwrap().open_list;
+            store.add_note(&storage, root, &list, root.into()).unwrap();
+        }
+        assert_eq!(storage.folders().unwrap().len(), 2);
     }
 
     #[test]

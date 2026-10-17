@@ -128,8 +128,23 @@ export function AppShell() {
         });
     };
 
-    // a panel shows something in another: the other tile, selected, or full screen in place of
-    // the first
+    // a tile flies to its chip in the top bar, and back
+    const minimize = (tile: PanelDefinition) =>
+        zoomTransition(() => {
+            changeLayout((current) => ({ ...current, minimized: [...current.minimized, tile.id] }));
+            if (panel === tile) setPanel(MAIN_TILE.panel);
+        });
+    const restore = (tile: PanelDefinition) =>
+        zoomTransition(() => {
+            changeLayout((current) => ({
+                ...current,
+                minimized: current.minimized.filter((id) => id !== tile.id),
+            }));
+            setPanel(tile);
+        });
+
+    // a panel shows something in another: the other tile, selected (back from the top bar if it
+    // waited there), or full screen in place of the first
     const show: PanelProps['show'] = (id, nextTarget) => {
         const next = panelById(id);
         if (!next) return;
@@ -137,7 +152,8 @@ export function AppShell() {
             zoom(2, next, nextTarget);
             return;
         }
-        setPanel(next);
+        if (layout.minimized.includes(next.id)) restore(next);
+        else setPanel(next);
         setTarget({ panel: next.id, target: nextTarget });
     };
 
@@ -174,27 +190,9 @@ export function AppShell() {
                 level === 2 && panel === filesPanel ? filesPanel.id : MAIN_TILE.panel.id,
                 fileTarget(path, null, find ?? null),
             ),
-        // in Notes, at the same zoom: its tile, back from the top bar if it waited there
-        openNotes: (list, note) => {
-            if (level === 1 && layout.minimized.includes(notesPanel.id)) restore(notesPanel);
-            show(notesPanel.id, notesTarget(list, note));
-        },
+        // in Notes, at the same zoom
+        openNotes: (list, note) => show(notesPanel.id, notesTarget(list, note)),
     };
-
-    // a tile flies to its chip in the top bar, and back
-    const minimize = (tile: PanelDefinition) =>
-        zoomTransition(() => {
-            changeLayout((current) => ({ ...current, minimized: [...current.minimized, tile.id] }));
-            if (panel === tile) setPanel(MAIN_TILE.panel);
-        });
-    const restore = (tile: PanelDefinition) =>
-        zoomTransition(() => {
-            changeLayout((current) => ({
-                ...current,
-                minimized: current.minimized.filter((id) => id !== tile.id),
-            }));
-            setPanel(tile);
-        });
 
     const zoomIn = () => {
         if (level < 2) zoom((level + 1) as ZoomLevel);
@@ -320,6 +318,9 @@ export function AppShell() {
 /** Changes fills what the side column leaves, keeping its least width while the window allows. */
 const MAIN_SIZE = { flexGrow: 1, flexBasis: 0, minWidth: `min(${MAIN_TILE.minWidth}px, 100%)` };
 
+/** A tile of the side column fills its slot. */
+const SIDE_SIZE = { flexGrow: 1, flexBasis: 0 };
+
 /** What a panel was asked to show, and which panel. */
 interface Asked {
     panel: string;
@@ -421,20 +422,20 @@ function Workspace({
                 />
                 {side.length > 0 ? (
                     <SideColumn
-                        panels={side}
+                        panels={SIDE_TILES}
+                        shown={side}
                         split={layout.split}
                         onSplit={onSplit}
-                        tile={(tile, size, edge) => (
+                        tile={(tile, tileFit) => (
                             <PanelTile
-                                key={tile.id}
                                 panel={tile}
                                 project={project}
                                 target={targetOf(tile.id)}
                                 selected={tile === panel}
                                 show={show}
                                 findInFiles={findInFiles}
-                                tile={size}
-                                edge={edge}
+                                tile={SIDE_SIZE}
+                                tileFit={tileFit}
                                 onZoomIn={() => zoom(2, tile)}
                                 onMinimize={() => onMinimize(tile)}
                                 onSelect={() => select(tile)}

@@ -8,7 +8,7 @@ use super::state::ProjectsState;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::modules::notes::NotesStore;
-use crate::modules::search::{ContentEnd, ContentFile, SearchRequest, SearchResults};
+use crate::modules::search::{search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults};
 use crate::shared::error::AppError;
 
 #[tauri::command]
@@ -23,11 +23,14 @@ pub(crate) async fn search(
         let backend = app.state::<LocalRepositoryBackend>();
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
+        let query = request.query.clone();
         Ok(app
             .state::<ProjectsState>()
             .search(backend.inner(), &request, |root| {
                 notes
-                    .notes(files.inner(), root)
+                    .with_notes(files.inner(), root, |lists, found| {
+                        search_notes(&query, lists, found)
+                    })
                     .inspect_err(
                         |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
                     )

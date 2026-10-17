@@ -1,6 +1,6 @@
 import { IconChevronDown } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
@@ -11,6 +11,8 @@ import { autosize } from './notes-layout';
 
 /** The room between cards, and around them, in pixels. */
 const GAP = 6;
+/** A card's height before it is measured: one line of text and its meta. */
+const CARD_ESTIMATE = 64;
 /** How long a note brought into view stays lit up, as its animation (`.note-flash`). */
 const FLASH_MS = 1200;
 
@@ -24,7 +26,6 @@ export function NoteCards({
     notes,
     list,
     actions,
-    composer,
     focusComposer,
     onComposerFocused,
     reveal,
@@ -34,9 +35,7 @@ export function NoteCards({
     notes: ProjectNotes;
     list: NoteList;
     actions: NoteActions;
-    /** The field to write in, which `⌘N` focuses. */
-    composer: RefObject<HTMLTextAreaElement | null>;
-    /** The field takes the focus as it shows, for a list just made. */
+    /** The field to write in takes the focus (as it shows): a list just made, `⌘N`. */
     focusComposer: boolean;
     onComposerFocused: () => void;
     /** A note of the list to bring into view, and light up for a moment (one found in the palette). */
@@ -66,7 +65,7 @@ export function NoteCards({
     const virtualizer = useVirtualizer({
         count: items.length,
         getScrollElement: () => scroller.current,
-        estimateSize: () => 64,
+        estimateSize: () => CARD_ESTIMATE,
         getItemKey: (index) => {
             const item = items[index];
             return item.kind === 'note' ? item.note.id : 'done';
@@ -103,14 +102,14 @@ export function NoteCards({
     return (
         <div className="flex h-full min-w-0 flex-1 flex-col">
             <Composer
-                field={composer}
                 focus={focusComposer}
                 onFocused={onComposerFocused}
                 list={list}
                 hint={empty}
                 onAdd={async (text) => {
-                    await actions.add(list.id, text);
-                    virtualizer.scrollToOffset(0);
+                    const added = await actions.add(list.id, text);
+                    if (added) virtualizer.scrollToOffset(0);
+                    return added !== undefined;
                 }}
             />
             <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-3">
@@ -178,35 +177,41 @@ export function NoteCards({
  * at once.
  */
 function Composer({
-    field,
     focus,
     onFocused,
     list,
     hint,
     onAdd,
 }: {
-    field: RefObject<HTMLTextAreaElement | null>;
     focus: boolean;
     onFocused: () => void;
     list: NoteList;
     hint: boolean;
-    onAdd: (text: string) => Promise<void>;
+    /** Whether the note was added. */
+    onAdd: (text: string) => Promise<boolean>;
 }) {
     const [text, setText] = useState('');
+    const field = useRef<HTMLTextAreaElement>(null);
     useEffect(() => {
         if (!focus) return;
         field.current?.focus();
         onFocused();
-    }, [focus, field, onFocused]);
-    const add = (value: string) => {
+    }, [focus, onFocused]);
+    // one note at a time: a second ↵ while the first is being added adds nothing
+    const adding = useRef(false);
+    // the field keeps the text until the note is added: a failure loses nothing; what was typed
+    // meanwhile stays
+    const add = async (value: string) => {
         const note = value.trimEnd();
-        if (note.trim() === '') return;
+        if (note.trim() === '' || adding.current) return;
+        adding.current = true;
+        const added = await onAdd(note);
+        adding.current = false;
+        const typed = field.current;
+        if (!added || !typed || typed.value !== value) return;
         setText('');
-        if (field.current) {
-            field.current.value = '';
-            autosize(field.current);
-        }
-        void onAdd(note);
+        typed.value = '';
+        autosize(typed);
     };
 
     return (
@@ -228,14 +233,14 @@ function Composer({
                         return;
                     }
                     event.preventDefault();
-                    add(text);
+                    void add(text);
                 }}
                 onPaste={(event) => {
                     if (text !== '') return;
                     const pasted = event.clipboardData.getData('text/plain');
                     if (pasted.trim() === '') return;
                     event.preventDefault();
-                    add(pasted);
+                    void add(pasted);
                 }}
             />
             {hint ? (

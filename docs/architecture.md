@@ -57,11 +57,15 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu): lists on
   the left full screen, cards of the open list (virtualized, measured heights), reorder mode.
   `useProjectNotes` reads a project once (`['notes', root]`, never stale: only the app writes);
-  `useNoteActions` changes the cache at once, then takes the backend's answer, a failure reads
-  again. A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`, a click
-  outside); emptied, it goes.
+  `useNoteActions` changes the cache at once, then sends the change after those before it
+  (`ChangeQueue`, per project: the backend gets them in order); only the last answer is shown, a
+  skipped one makes the notes read again at the end, a failure too. Answers update notes in place
+  (`withUpdated`), only add and restore add one. Undo undoes that change only (done, a move back
+  to its place). A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`,
+  a click outside, not the window losing the focus); emptied, it goes (Undo).
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
-- `shared/`: tokens, primitives, session state (`useSessionState`), `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
+- `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
+  `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
   `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type, change
   areas, panel contract.
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
@@ -76,16 +80,19 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 ### Panels
 
 - `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, optional level 0
-  `summary`. `app/panels.ts` lists them in shortcut order and the level 1 tiles, preloading their
-  chunks: `MAIN_TILE` (Changes, fills, keeps 560 px) and `SIDE_TILES` (Files above Notes) in
-  `SideColumn`: as wide as the tree (`sidebarWidths.files`), at least 320 px with Notes in it
-  (160 px without), giving way first; a splitter between its tiles (`split`, the upper's share).
-  Files and Notes minimize to chips in the top bar (`zoom-panel-*` names: the view transition
-  flies tile and chip into each other); ←/→ skip them, `2`/`3` still open them full screen.
+  `summary`, optional `tileMinWidth`. `app/panels.ts` lists them in shortcut order and the level 1
+  tiles, preloading their chunks: `MAIN_TILE` (Changes, fills, keeps 560 px) and `SIDE_TILES`
+  (Files above Notes) in `SideColumn`, which owns their width (`SIDE_WIDTH`: the tree's setting,
+  `sidebarWidths.files`), at least the widest `tileMinWidth` shown (Files 160, Notes 320), giving
+  way first. Its splitter's double click fits what tiles need (`PanelProps.tileFit`: Files tells
+  its tree's), else goes back to the default. A splitter between its tiles (`split`); each tile
+  keeps its place in the tree, so minimizing one never remounts the other. Files and Notes
+  minimize to chips in the top bar (`zoom-panel-*` names: the view transition flies tile and chip
+  into each other); `show` to a minimized tile brings it back; ←/→ skip them, `2`/`3` still open
+  them full screen.
 - `PanelProps`: `project`; `header` (element filled through a portal; in a tile after the panel's
-  icon, full screen shown only when filled); `edge` (for the side column's top tile: the gap
-  before the column and the column, where Files portals the splitter that drags it; without
-  Files the column has its own, fitting its least width); `target` (a request in the panel's terms, a new object
+  icon, full screen shown only when filled); `tileFit` (in a tile the app sizes: the panel
+  registers how wide it needs it, for the splitter's double click); `target` (a request in the panel's terms, a new object
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
@@ -134,7 +141,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 - Project list changes run in one mutation scope, in order; the last switch wins.
 - Tiles per project (`ProjectList.layouts`, by root: minimized panels, split; `useProjectLayout`,
   `set_project_layout`): shown at once (in the same render, for the view transition), stored
-  after; a removed project's layout goes with it.
+  after (`update_stored`: no watcher or cache touched); a removed project's layout goes with it.
 - Theme: the backend sets the window theme, the page follows `prefers-color-scheme`; no script.
 - The window is created hidden and shown once the project list is read (`show_window`, first
   call only; backend fallback after 3 s).
@@ -207,7 +214,8 @@ deleted). Words match independently, case ignored; matched letters return as UTF
 most 500 files, the best picked without sorting the rest. From 20,000 paths scoring runs on up to
 8 threads.
 
-The same project's notes (`modules/search/notes.rs`, read through `NotesStore` if not in memory):
+The same project's notes (`modules/search/notes.rs`, ranked where `NotesStore` keeps them, no
+copy; read first if not in memory; only a project of the list):
 lists by name; notes by first line (fuzzy), else by the text typed anywhere in them (substring,
 case ignored, 2 characters at least) with the part around it on one line; open before done, at
 most 50. 1,000 notes: 3.5 ms a key. The palette shows lists and notes before files; `↵` opens
@@ -230,7 +238,9 @@ drops it.
   files it touched (written beside, `sync_all`, renamed over; a leftover `.tmp` is removed when
   read), a failed write drops the memory copy. Nothing is written for a project until its first
   change. Ids: 16 hex digits, the only names let through to files.
-- A note is at most 1 MiB (`note_too_long`); a broken file is skipped and logged, never removed.
+- A note is at most 1 MiB (`note_too_long`); a missing note or list is `note_missing` /
+  `note_list_missing`; a broken file is skipped and logged, never removed; a change that changes
+  nothing writes nothing. A new folder never takes one in use (two projects of one name).
 - `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
 
 ### Tray

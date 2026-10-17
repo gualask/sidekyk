@@ -12,7 +12,6 @@ use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
-use crate::modules::notes::ProjectNotes;
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
     self, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths, RepositoryBackend,
@@ -20,7 +19,8 @@ use crate::modules::repository::{
     REPOSITORY_CHANGED_EVENT,
 };
 use crate::modules::search::{
-    self, ContentEnd, ContentFile, ContentSearch, ProjectFiles, SearchRequest, SearchResults,
+    self, ContentEnd, ContentFile, ContentSearch, ListMatch, NoteMatch, ProjectFiles,
+    SearchRequest, SearchResults,
 };
 use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
@@ -155,32 +155,34 @@ impl ProjectsState {
 
     /// The palette's matches: the projects, the panels the frontend names, and the files of the
     /// project asked for, as its tree lists them (read if not yet) and its last snapshot found
-    /// them changed. A project whose files cannot be read offers none.
+    /// them changed. A project whose files cannot be read offers none. Its notes are `notes_of`'s,
+    /// asked only for a project of the list.
     pub(crate) fn search(
         &self,
         backend: &dyn RepositoryBackend,
         request: &SearchRequest,
-        notes_of: impl FnOnce(&str) -> Option<ProjectNotes>,
+        notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
     ) -> SearchResults {
         let list = self.list();
-        search::search(
-            request,
-            &list.projects,
-            |root| {
-                let tree = self
-                .file_tree(backend, root)
-                .inspect_err(
-                    |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
-                )
-                .ok()?;
-                let changed = lock(&self.changed)
-                    .get(root)
-                    .cloned()
-                    .unwrap_or_else(|| Arc::from([]));
-                Some(ProjectFiles { tree, changed })
-            },
-            notes_of,
-        )
+        let files_of = |root: &str| self.searched_files(backend, root);
+        let notes_of = |root: &str| list.find(root).ok().and_then(|_| notes_of(root));
+        search::search(request, &list.projects, files_of, notes_of)
+    }
+
+    /// The files the palette searches in a project: its tree, and how its last snapshot found
+    /// them changed; none when they cannot be listed.
+    fn searched_files(&self, backend: &dyn RepositoryBackend, root: &str) -> Option<ProjectFiles> {
+        let tree = self
+            .file_tree(backend, root)
+            .inspect_err(
+                |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
+            )
+            .ok()?;
+        let changed = lock(&self.changed)
+            .get(root)
+            .cloned()
+            .unwrap_or_else(|| Arc::from([]));
+        Some(ProjectFiles { tree, changed })
     }
 
     /// A project's files, read again only when they may have changed, sharing the read in flight.
@@ -341,21 +343,29 @@ impl ProjectsState {
         app: &tauri::AppHandle,
         change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
     ) -> anyhow::Result<ProjectList> {
-        let list = {
-            let mut list = lock(&self.list);
-            change(&mut list)?;
-            // stored while still locked, so concurrent changes reach the disk in their order
-            if let Err(error) = settings_store::save_projects(app, &list) {
-                tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
-            }
-            list.clone()
-        };
+        let list = self.update_stored(app, change)?;
         self.snapshots.retain(&list);
         self.summaries.retain(&list);
         self.tree_reads.retain(&list);
         lock(&self.changed).retain(|root, _| list.find(root).is_ok());
         watch_active(app);
         Ok(list)
+    }
+
+    /// Changes the list and stores it, and nothing else: for what changes neither the projects
+    /// nor the one on screen, such as a project's tiles.
+    pub(crate) fn update_stored(
+        &self,
+        app: &tauri::AppHandle,
+        change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
+    ) -> anyhow::Result<ProjectList> {
+        let mut list = lock(&self.list);
+        change(&mut list)?;
+        // stored while still locked, so concurrent changes reach the disk in their order
+        if let Err(error) = settings_store::save_projects(app, &list) {
+            tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
+        }
+        Ok(list.clone())
     }
 }
 

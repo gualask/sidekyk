@@ -5,7 +5,11 @@ export function autosize(field: HTMLTextAreaElement | null) {
     field.style.height = `${field.scrollHeight}px`;
 }
 
-/** A list row's padding and the room its count takes, in pixels: what a fit adds to a name. */
+/**
+ * What a list row adds to its name, in pixels, as `NoteLists` lays it out: the row's left padding
+ * (`pl-3`), the gap and the count's room (`gap-2`, two digits and the trash in their place), its
+ * right padding (`pr-2`) and the lists' own (`p-1.5`).
+ */
 const LIST_ROW_EXTRA = 12 + 8 + 28 + 12;
 
 /** What the lists need to show every name whole, from their font's width. */

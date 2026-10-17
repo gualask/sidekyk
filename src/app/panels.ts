@@ -1,6 +1,5 @@
-import type { CSSProperties } from 'react';
 import { notesPanel } from '@/modules/notes';
-import { changesPanel, filesPanel } from '@/modules/repository';
+import { changesPanel, FILES_TREE_WIDTH, filesPanel } from '@/modules/repository';
 import type { PanelDefinition } from '@/shared/panels/panel';
 
 /**
@@ -22,18 +21,18 @@ export const MAIN_TILE = { panel: changesPanel, minWidth: 560 };
  */
 export const SIDE_TILES: readonly PanelDefinition[] = [filesPanel, notesPanel];
 
-/** The side column's least width, with Notes in it or not. */
-export function sideMinWidth(panels: readonly PanelDefinition[]): number {
-    return panels.includes(notesPanel) ? 320 : 160;
-}
+/**
+ * The side column's width is the Files tree's (one setting with Files full screen): what the
+ * column shows first, and what gives way first.
+ */
+export const SIDE_WIDTH = { sidebar: 'files', initial: FILES_TREE_WIDTH.initial };
 
-/** The side column's width: its own, bounded by what Changes keeps. */
-export function sideWidth(width: CSSProperties, min: number): CSSProperties {
-    return {
-        ...width,
-        minWidth: min,
-        maxWidth: `max(${min}px, 100% - ${MAIN_TILE.minWidth + TILE_GAP}px)`,
-    };
+/** A tile's border, both sides (`PanelTile`): what a tile adds to what its panel shows. */
+export const TILE_BORDERS = 2;
+
+/** The side column's least width: the widest least width of the tiles in it. */
+export function sideMinWidth(panels: readonly PanelDefinition[]): number {
+    return Math.max(0, ...panels.map((panel) => panel.tileMinWidth ?? 0));
 }
 
 /** The panels shown as tiles, in their order: Changes, then the side column's not minimized. */

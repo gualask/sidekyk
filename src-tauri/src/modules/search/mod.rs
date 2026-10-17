@@ -8,7 +8,10 @@ mod notes;
 mod rank;
 
 pub(crate) use contents::{narrows, search_contents, ContentSearch};
-pub(crate) use contracts::{ContentEnd, ContentFile, SearchRequest, SearchResults};
+pub(crate) use contracts::{
+    ContentEnd, ContentFile, ListMatch, NoteMatch, SearchRequest, SearchResults,
+};
+pub(crate) use notes::search_notes;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -16,7 +19,6 @@ use std::sync::Arc;
 use contracts::{ChangeMark, FileMatch, PanelMatch, ProjectMatch};
 use rank::{Ranker, Texts};
 
-use crate::modules::notes::ProjectNotes;
 use crate::modules::repository::{ChangeKind, ChangedFile, FileTree, RepositoryInfo};
 
 /// At most this many files go back: the palette shows the best, the rest are counted.
@@ -40,12 +42,13 @@ pub(crate) struct ProjectFiles {
 /// Ranks the projects, the panels and the files, lists and notes of the project the request names
 /// against the query. With nothing typed, every project and panel in their order and nothing of
 /// the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
-/// something is typed, as listing a project's files may run git and its notes be read from disk.
+/// something is typed, as listing a project's files may run git and its notes be read from disk;
+/// `notes_of` ranks them where they are kept (`search_notes`).
 pub(crate) fn search(
     request: &SearchRequest,
     projects: &[RepositoryInfo],
     files_of: impl FnOnce(&str) -> Option<ProjectFiles>,
-    notes_of: impl FnOnce(&str) -> Option<ProjectNotes>,
+    notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
 
@@ -74,11 +77,7 @@ pub(crate) fn search(
     let (files, more_files) = root.and_then(files_of).map_or((Vec::new(), 0), |files| {
         search_files(&request.query, &files)
     });
-    let (lists, notes) = root
-        .and_then(notes_of)
-        .map_or((Vec::new(), Vec::new()), |notes| {
-            notes::search_notes(&request.query, &notes)
-        });
+    let (lists, notes) = root.and_then(notes_of).unwrap_or_default();
 
     SearchResults {
         projects,

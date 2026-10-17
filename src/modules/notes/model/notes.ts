@@ -32,6 +32,16 @@ export function lineCount(text: string): number {
     return text.trimEnd().split('\n').length;
 }
 
+/** A note's first line that is not blank: what names it in a row (reorder, the palette). */
+export function noteTitle(text: string): string {
+    return (
+        text
+            .split('\n')
+            .map((line) => line.trim())
+            .find((line) => line !== '') ?? ''
+    );
+}
+
 /** What a card says under its text: when it was written or done, and its length once cut. */
 export function noteMeta(note: Note, now: number): string {
     const at = note.done ?? note.edited;
@@ -43,15 +53,16 @@ export function noteMeta(note: Note, now: number): string {
         .join(' · ');
 }
 
-/** The notes with those changed in place, and those not there yet added. */
-export function withNotes(project: ProjectNotes, changed: readonly Note[]): ProjectNotes {
+/** The notes with those changed in place; one no longer there stays gone. */
+export function withUpdated(project: ProjectNotes, changed: readonly Note[]): ProjectNotes {
     const byId = new Map(changed.map((note) => [note.id, note]));
-    const notes = project.notes.map((note) => {
-        const next = byId.get(note.id);
-        if (next) byId.delete(note.id);
-        return next ?? note;
-    });
-    return { ...project, notes: [...notes, ...byId.values()] };
+    return { ...project, notes: project.notes.map((note) => byId.get(note.id) ?? note) };
+}
+
+/** The notes with those given in place, or added when not there: a note written or put back. */
+export function withNotes(project: ProjectNotes, notes: readonly Note[]): ProjectNotes {
+    const ids = new Set(notes.map((note) => note.id));
+    return { ...project, notes: [...project.notes.filter((note) => !ids.has(note.id)), ...notes] };
 }
 
 /** The notes without one. */

@@ -3,11 +3,13 @@ import {
     doneNotes,
     lineCount,
     noteMeta,
+    noteTitle,
     openCounts,
     openNotes,
     positionAt,
     withNotes,
     withoutNote,
+    withUpdated,
 } from './notes';
 import type { Note, ProjectNotes } from './notes.types';
 
@@ -59,19 +61,28 @@ describe('notes', () => {
         );
     });
 
-    it('merges notes that changed and drops one deleted', () => {
+    it('updates notes in place, never bringing back one deleted', () => {
         const project: ProjectNotes = {
             lists: [{ id: 'g', name: 'General' }],
             notes: [note('a', 0), note('b', 1)],
             openList: 'g',
         };
-        const merged = withNotes(project, [note('b', -1), note('n', 5)]);
-        expect(merged.notes.map((n) => [n.id, n.position])).toEqual([
+        const updated = withUpdated(project, [note('b', -1), note('gone', 5)]);
+        expect(updated.notes.map((n) => [n.id, n.position])).toEqual([
             ['a', 0],
             ['b', -1],
-            ['n', 5],
         ]);
-        expect(withoutNote(merged, 'a').notes.map((n) => n.id)).toEqual(['b', 'n']);
+        const added = withNotes(withoutNote(updated, 'a'), [note('a', 3), note('n', 4)]);
+        expect(added.notes.map((n) => [n.id, n.position])).toEqual([
+            ['b', -1],
+            ['a', 3],
+            ['n', 4],
+        ]);
+    });
+
+    it('names a note by its first line that is not blank', () => {
+        expect(noteTitle('\n  Watcher plan \n1. coalesce')).toBe('Watcher plan');
+        expect(noteTitle('  \n')).toBe('');
     });
 
     it('places a note between its new neighbors', () => {

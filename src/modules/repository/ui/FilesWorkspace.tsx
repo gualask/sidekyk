@@ -56,7 +56,7 @@ const FULL_KEYS = new Set([
 export function FilesWorkspace({
     project,
     header,
-    edge,
+    tileFit,
     target,
     place,
     selected: hasKeys,
@@ -176,6 +176,13 @@ export function FilesWorkspace({
         </div>
     ) : null;
 
+    // in a tile, the tile's splitter fits the tree, as the tree's own does full screen
+    useEffect(() => {
+        if (!tileFit) return;
+        tileFit(() => (treeBox.current ? fittingWidth(rows, treeBox.current) : 0));
+        return () => tileFit(null);
+    }, [tileFit, rows]);
+
     // the tree's edge, by the file viewer full screen
     const splitter = (
         <SidebarSplitter
@@ -188,28 +195,12 @@ export function FilesWorkspace({
     );
 
     if (place === 'tile') {
-        // in a tile, the gap before the side column, by Changes: it drags the column, which the
-        // tree fills (its tile's border taken into account by a fit)
-        const column = edge ? { current: edge.box } : null;
+        // in a tile the tree fills it; the app sets its width, the tree's (one setting)
         return (
             <div
                 ref={treeBox}
                 className="flex h-full w-full flex-col bg-ui-surface font-mono text-[12.5px]"
             >
-                {edge && column
-                    ? createPortal(
-                          <SidebarSplitter
-                              width={treeWidth}
-                              box={column}
-                              place="gap"
-                              fitting={() =>
-                                  treeBox.current ? fittingWidth(rows, treeBox.current) + 2 : 0
-                              }
-                              what="tree"
-                          />,
-                          edge.gap,
-                      )
-                    : null}
                 {collapse}
                 {tooMany}
                 <div className="min-h-0 flex-1">{tree}</div>

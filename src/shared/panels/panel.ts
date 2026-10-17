@@ -11,12 +11,6 @@ export interface PanelTarget {
     key: string;
 }
 
-/** The gap before the side column, and the column, whose width a splitter in the gap drags. */
-export interface PanelEdge {
-    gap: HTMLElement;
-    box: HTMLElement;
-}
-
 /** Where a panel is: a tile among a project's panels (level 1), or full screen (level 2). */
 type PanelPlace = 'tile' | 'full';
 
@@ -29,11 +23,11 @@ export interface PanelProps {
      */
     header: HTMLElement | null;
     /**
-     * In the side column, for the tile on top: the gap before the column, where the panel puts the
-     * splitter that drags the column's width (`box`) through a portal (`SidebarSplitter`,
-     * `place="gap"`); null in any other place and until it is mounted.
+     * In a tile whose width the app sets: tells it how wide the tile must be to show all the panel
+     * has (a function measuring it, null to stop), for its splitter's double click. Null in any
+     * other place.
      */
-    edge: PanelEdge | null;
+    tileFit: ((measure: (() => number) | null) => void) | null;
     /** What to show, when the app asks for something; null leaves the panel as the user left it. */
     target: PanelTarget | null;
     place: PanelPlace;
@@ -65,6 +59,8 @@ export interface PanelDefinition {
     id: string;
     title: string;
     icon: ComponentType<{ size?: number; stroke?: number; className?: string }>;
+    /** As a tile beside another, the least width it keeps while the window has room. */
+    tileMinWidth?: number;
     /**
      * The panel itself, loaded on its first show (one chunk per module). Its queries live inside
      * it, so a panel that is not on screen runs none. It is mounted again for another project, so
@@ -95,7 +91,7 @@ export function definePanel<M, S = never>({
     pick,
     summary,
     ...panel
-}: Pick<PanelDefinition, 'id' | 'title' | 'icon'> &
+}: Pick<PanelDefinition, 'id' | 'title' | 'icon' | 'tileMinWidth'> &
     LazyPart<M, PanelProps> & {
         summary?: LazyPart<S, PanelSummaryProps>;
     }): PanelDefinition {

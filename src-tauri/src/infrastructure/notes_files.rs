@@ -8,6 +8,9 @@ use anyhow::Context;
 
 use crate::modules::notes::NotesStorage;
 
+/// What a write writes before it renames over the file.
+const TEMP_SUFFIX: &str = ".tmp";
+
 pub(crate) struct NotesFiles {
     dir: PathBuf,
 }
@@ -62,8 +65,14 @@ impl NotesStorage for NotesFiles {
         entries(&self.dir, true)
     }
 
+    /// A write cut short leaves its file beside the one it replaces: such leftovers are removed
+    /// here, never listed.
     fn files(&self, folder: &str) -> anyhow::Result<Vec<String>> {
-        entries(&self.path(folder, None)?, false)
+        let mut files = entries(&self.path(folder, None)?, false)?;
+        for leftover in files.extract_if(.., |name| name.ends_with(TEMP_SUFFIX)) {
+            self.remove(folder, &leftover)?;
+        }
+        Ok(files)
     }
 
     fn read(&self, folder: &str, file: &str, limit: u64) -> anyhow::Result<Option<Vec<u8>>> {
@@ -90,7 +99,7 @@ impl NotesStorage for NotesFiles {
     /// folder replaces a file whole, on every system.
     fn write(&self, folder: &str, file: &str, bytes: &[u8]) -> anyhow::Result<()> {
         let path = self.path(folder, Some(file))?;
-        let temp = self.path(folder, Some(&format!("{file}.tmp")))?;
+        let temp = self.path(folder, Some(&format!("{file}{TEMP_SUFFIX}")))?;
         fs::create_dir_all(self.path(folder, None)?)
             .with_context(|| format!("creating the folder of {}", path.display()))?;
         let mut out =
@@ -137,6 +146,16 @@ mod tests {
         notes.remove("shop-123456", "a.json").unwrap();
         notes.remove("shop-123456", "a.json").unwrap();
         assert_eq!(notes.read("shop-123456", "a.json", 3).unwrap(), None);
+    }
+
+    #[test]
+    fn a_write_cut_short_leaves_nothing_listed() {
+        let data = tempfile::tempdir().unwrap();
+        let notes = NotesFiles::new(data.path());
+        notes.write("shop-123456", "a.json", b"one").unwrap();
+        std::fs::write(data.path().join("notes/shop-123456/b.json.tmp"), b"half").unwrap();
+        assert_eq!(notes.files("shop-123456").unwrap(), ["a.json"]);
+        assert!(!data.path().join("notes/shop-123456/b.json.tmp").exists());
     }
 
     #[test]
@@ -196,11 +215,14 @@ mod tests {
                 NotesStore::default().notes(&files, root).unwrap();
             })
         );
+        let mut edits = 0;
         println!(
             "edit a note: {:?}",
             median(50, || {
+                // a text unchanged writes nothing: each edit changes it
+                edits += 1;
                 store
-                    .set_note_text(&files, root, &ids[500], "edited".into())
+                    .set_note_text(&files, root, &ids[500], format!("edited {edits}"))
                     .unwrap();
             })
         );
@@ -209,11 +231,21 @@ mod tests {
             serde_json::json!({ "query": "zzqx", "panels": [], "root": root }),
         )
         .unwrap();
-        let snapshot = store.notes(&files, root).unwrap();
         println!(
             "palette over 1,000 notes: {:?}",
             median(50, || {
-                crate::modules::search::search(&request, &[], |_| None, |_| Some(snapshot.clone()));
+                crate::modules::search::search(
+                    &request,
+                    &[],
+                    |_| None,
+                    |root| {
+                        store
+                            .with_notes(&files, root, |lists, notes| {
+                                crate::modules::search::search_notes(&request.query, lists, notes)
+                            })
+                            .ok()
+                    },
+                );
             })
         );
         println!(

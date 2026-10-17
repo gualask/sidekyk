@@ -1,23 +1,19 @@
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { MACOS } from '@/shared/platform/macos';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { altLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
+import { InlineField } from '@/shared/ui/InlineField';
 import { isField } from '@/shared/ui/keys';
 import type { NoteActions } from '../application/notes.queries';
-import { openNotes } from '../model/notes';
+import { noteTitle, openNotes } from '../model/notes';
 import type { NoteList, ProjectNotes } from '../model/notes.types';
 
 const ROW_HEIGHT = 34;
 /** The keys that move the note picked, as this system names them. */
-const UP = MACOS ? '⌥↑' : 'Alt+↑';
-const DOWN = MACOS ? '⌥↓' : 'Alt+↓';
+const UP = altLabel('↑');
+const DOWN = altLabel('↓');
 const GAP = 4;
-
-/** A note's first line, as a reorder row shows it. */
-function firstLine(text: string): string {
-    return text.trim().split('\n')[0] ?? '';
-}
 
 /**
  * Reorder mode: one line per open note, so the whole list fits. `↑`/`↓` pick a note, `⌥↑`/`⌥↓`
@@ -61,11 +57,27 @@ export function ReorderNotes({
         if (at >= 0) virtualizer.scrollToIndex(at, { align: 'auto' });
     }, [at, virtualizer]);
 
-    const move = (index: number, to: number) => {
-        const note = open[index];
-        if (!note || to < 0 || to >= open.length || to === index) return;
-        onSelect(note.id);
-        void actions.place(note, list.id, to);
+    // the order and the note picked as the keys left them, ahead of the render that shows them:
+    // keys pressed quickly go on from there
+    const order = useRef<string[]>([]);
+    const picked = useRef(selected);
+    useLayoutEffect(() => {
+        order.current = open.map((note) => note.id);
+        picked.current = selected;
+    }, [open, selected]);
+    const pick = (id: string) => {
+        picked.current = id;
+        onSelect(id);
+    };
+    const move = (id: string, to: number) => {
+        const ids = order.current;
+        const from = ids.indexOf(id);
+        const note = open.find((open) => open.id === id);
+        if (!note || from < 0 || to < 0 || to >= ids.length || to === from) return;
+        ids.splice(from, 1);
+        ids.splice(to, 0, id);
+        pick(id);
+        actions.place(note, list.id, to);
     };
 
     // before the workspace's keys: `↵` and `Esc` leave the mode instead of zooming
@@ -79,8 +91,10 @@ export function ReorderNotes({
             } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
                 event.preventDefault();
                 const step = event.key === 'ArrowUp' ? -1 : 1;
-                if (event.altKey) move(at, at + step);
-                else if (open[at + step]) onSelect(open[at + step].id);
+                const from = order.current.indexOf(picked.current);
+                const next = order.current[from + step];
+                if (event.altKey) move(picked.current, from + step);
+                else if (next) pick(next);
             }
         },
         { capture: true },
@@ -126,7 +140,7 @@ export function ReorderNotes({
                                         disabled={row.index === 0}
                                         title={`Move up (${UP})`}
                                         aria-label="Move up"
-                                        onClick={() => move(row.index, row.index - 1)}
+                                        onClick={() => move(note.id, row.index - 1)}
                                     >
                                         <IconChevronUp size={13} />
                                     </button>
@@ -136,7 +150,7 @@ export function ReorderNotes({
                                             count={open.length}
                                             onEnd={(to) => {
                                                 setTyping(null);
-                                                if (to !== null) move(row.index, to - 1);
+                                                if (to !== null) move(note.id, to - 1);
                                             }}
                                         />
                                     ) : (
@@ -146,7 +160,7 @@ export function ReorderNotes({
                                             title={`Type a position (1–${open.length})`}
                                             aria-label={`Position ${row.index + 1} of ${open.length}`}
                                             onClick={() => {
-                                                onSelect(note.id);
+                                                pick(note.id);
                                                 setTyping(note.id);
                                             }}
                                         >
@@ -159,7 +173,7 @@ export function ReorderNotes({
                                         disabled={row.index === open.length - 1}
                                         title={`Move down (${DOWN})`}
                                         aria-label="Move down"
-                                        onClick={() => move(row.index, row.index + 1)}
+                                        onClick={() => move(note.id, row.index + 1)}
                                     >
                                         <IconChevronDown size={13} />
                                     </button>
@@ -168,9 +182,9 @@ export function ReorderNotes({
                                     type="button"
                                     className="h-full min-w-0 flex-1 truncate text-left text-[13px] text-ui-text-secondary focus-visible:outline-none"
                                     aria-pressed={on}
-                                    onClick={() => onSelect(note.id)}
+                                    onClick={() => pick(note.id)}
                                 >
-                                    {firstLine(note.text)}
+                                    {noteTitle(note.text)}
                                 </button>
                             </div>
                         );
@@ -191,41 +205,18 @@ function PositionInput({
     count: number;
     onEnd: (position: number | null) => void;
 }) {
-    const ended = useRef(false);
-    const field = useRef<HTMLInputElement>(null);
-    // typing a position is why the field shows
-    useEffect(() => {
-        field.current?.focus();
-        field.current?.select();
-    }, []);
-    const end = (value: number | null) => {
-        if (ended.current) return;
-        ended.current = true;
-        onEnd(value);
-    };
-    const typed = (field: HTMLInputElement) => {
-        const value = Number.parseInt(field.value, 10);
-        return Number.isFinite(value) && value >= 1 ? Math.min(value, count) : null;
-    };
     return (
-        <input
+        <InlineField
+            initial={String(position)}
+            onEnd={(typed) => {
+                const value = typed === null ? Number.NaN : Number.parseInt(typed, 10);
+                onEnd(Number.isFinite(value) && value >= 1 ? Math.min(value, count) : null);
+            }}
             type="number"
             min={1}
             max={count}
-            defaultValue={position}
-            ref={field}
             aria-label="Position"
             className="h-6 w-12 rounded-md border border-ui-accent bg-ui-surface px-1 text-center font-mono text-xs outline-none"
-            onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    end(typed(event.currentTarget));
-                } else if (event.key === 'Escape') {
-                    event.preventDefault();
-                    end(null);
-                }
-            }}
-            onBlur={(event) => end(typed(event.currentTarget))}
         />
     );
 }

@@ -14,7 +14,7 @@ const SAVE_DELAY_MS = 500;
 /**
  * One note: done on the left, copy and ⋯ on the right, the text in between, four lines until
  * clicked. Clicked, the text is edited in place: saved as typing pauses, closed by `Esc`, `⌘↵` or a
- * click outside; emptied, the note goes.
+ * click outside; emptied, the note goes (with Undo).
  */
 export function NoteCard({
     note,
@@ -181,7 +181,8 @@ function NoteEditor({
     };
     const close = () => {
         window.clearTimeout(timer.current);
-        if (latest.current.trim() === '') void actions.remove(note, { undoable: false });
+        // emptied, it goes; the toast brings it back with the text last saved
+        if (latest.current.trim() === '') void actions.remove(note);
         else save();
         onClose();
     };
@@ -217,7 +218,11 @@ function NoteEditor({
                 timer.current = window.setTimeout(save, SAVE_DELAY_MS);
             }}
             // `Esc` blurs a field (the workspace's keys), a click outside too
-            onBlur={close}
+            // the window losing the focus (⌘Tab to the agent's terminal) leaves the card open:
+            // the focus comes back to it
+            onBlur={() => {
+                if (document.hasFocus()) close();
+            }}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                     event.preventDefault();

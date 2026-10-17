@@ -26,7 +26,6 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     const root = project.root;
     const { data: notes, error } = useProjectNotes(root);
     const actions = useNoteActions(root);
-    const composer = useRef<HTMLTextAreaElement>(null);
     // the note picked in reorder mode, or null out of it
     const [reorder, setReorder] = useState<string | null>(null);
     // a list just made, whose field takes the focus once it shows
@@ -55,8 +54,10 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
         (event) => {
             if (!hasKeys || event.defaultPrevented || shortcutKey(event) !== 'n') return;
             event.preventDefault();
+            // through the list's field taking the focus as it shows: out of reorder mode it is
+            // not there yet
             setReorder(null);
-            composer.current?.focus();
+            if (notes) setWriteIn(notes.openList);
         },
         { capture: true },
     );
@@ -87,7 +88,6 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                 notes={notes}
                 list={list}
                 actions={actions}
-                composer={composer}
                 focusComposer={writeIn === list.id}
                 onComposerFocused={() => setWriteIn(null)}
                 reveal={reveal}
@@ -96,7 +96,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
             />
         );
 
-    const openList = (id: string, write: boolean) => {
+    const onListOpened = (id: string, write: boolean) => {
         setReorder(null);
         setWriteIn(write ? id : null);
     };
@@ -110,7 +110,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                               notes={notes}
                               list={list}
                               actions={actions}
-                              onOpen={openList}
+                              onOpen={onListOpened}
                           />,
                           header,
                       )
@@ -127,7 +127,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                 className="shrink-0 overflow-auto border-r border-ui-border"
                 style={width.style}
             >
-                <NoteLists notes={notes} actions={actions} onOpen={openList} />
+                <NoteLists notes={notes} actions={actions} onOpen={onListOpened} />
             </div>
             <SidebarSplitter
                 width={width}

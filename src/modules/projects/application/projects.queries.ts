@@ -2,7 +2,7 @@ import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tansta
 import { useCallback, useEffect } from 'react';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { ProjectList, TilesLayout } from '../model/project.types';
-import { useProjectsPort } from './projects.port';
+import { type ProjectsPort, useProjectsPort } from './projects.port';
 
 const projectsKey = ['projects'] as const;
 
@@ -28,9 +28,13 @@ function projectName(queryClient: QueryClient, root: string): string {
     return list?.projects.find((project) => project.root === root)?.name ?? root;
 }
 
+/** The list, as every reader of it asks for it. */
+function projectsQuery(port: ProjectsPort) {
+    return { queryKey: projectsKey, queryFn: () => port.getProjects() };
+}
+
 export function useProjects() {
-    const port = useProjectsPort();
-    return useQuery({ queryKey: projectsKey, queryFn: () => port.getProjects() });
+    return useQuery(projectsQuery(useProjectsPort()));
 }
 
 /** Reads the list again when the backend changed it, such as a folder given on the command line. */
@@ -121,8 +125,8 @@ export function useRemoveProject() {
     });
 }
 
-/** A project's tiles until the user changes them. */
-const DEFAULT_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
+/** A project's tiles until the user changes them: none minimized, the side column split even. */
+export const DEFAULT_TILES_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
 
 /**
  * How a project lays out its tiles, and how to change it: shown at once, stored after. A failure
@@ -133,9 +137,8 @@ export function useProjectLayout(root: string | null) {
     const queryClient = useQueryClient();
     const showToast = useShowToast();
     const layout = useQuery({
-        queryKey: projectsKey,
-        queryFn: () => port.getProjects(),
-        select: (list) => (root ? list.layouts[root] : undefined) ?? DEFAULT_LAYOUT,
+        ...projectsQuery(port),
+        select: (list) => (root ? list.layouts[root] : undefined) ?? DEFAULT_TILES_LAYOUT,
     }).data;
     const { mutate } = useMutation({
         ...projectsChange,
@@ -154,7 +157,7 @@ export function useProjectLayout(root: string | null) {
             if (!root) return;
             const list = queryClient.getQueryData<ProjectList>(projectsKey);
             if (!list) return;
-            const layout = next(list.layouts[root] ?? DEFAULT_LAYOUT);
+            const layout = next(list.layouts[root] ?? DEFAULT_TILES_LAYOUT);
             queryClient.setQueryData<ProjectList>(projectsKey, {
                 ...list,
                 layouts: { ...list.layouts, [root]: layout },
@@ -163,5 +166,5 @@ export function useProjectLayout(root: string | null) {
         },
         [root, queryClient, mutate],
     );
-    return [layout ?? DEFAULT_LAYOUT, change] as const;
+    return [layout ?? DEFAULT_TILES_LAYOUT, change] as const;
 }

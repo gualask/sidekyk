@@ -1,6 +1,6 @@
 import { IconX } from '@tabler/icons-react';
 import { MACOS } from '@/shared/platform/macos';
-import { shortcutLabel } from '@/shared/platform/shortcut';
+import { altLabel, shortcutLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken } from '@/shared/ui/keys';
 import { PALETTE_PANELS } from './panels';
@@ -31,7 +31,7 @@ const SHORTCUTS: Shortcut[] = [
     { label: 'Close the note you edit', keys: ['Esc', shortcutLabel('↵')] },
     {
         label: "Reorder notes (from a note's ⋯)",
-        keys: MACOS ? ['⌥↑', '⌥↓'] : ['Alt+↑', 'Alt+↓'],
+        keys: [altLabel('↑'), altLabel('↓')],
     },
     { label: 'Settings', keys: [shortcutLabel(',')] },
     { label: 'Show or hide this', keys: ['?'] },

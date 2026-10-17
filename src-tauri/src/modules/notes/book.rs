@@ -35,6 +35,10 @@ fn missing() -> anyhow::Error {
     user_facing(UserFacingErrorCode::NoteMissing)
 }
 
+fn list_missing() -> anyhow::Error {
+    user_facing(UserFacingErrorCode::NoteListMissing)
+}
+
 fn checked_text(text: &str) -> anyhow::Result<()> {
     if text.len() > MAX_NOTE_BYTES {
         return Err(user_facing(UserFacingErrorCode::NoteTooLong));
@@ -118,7 +122,7 @@ impl Book {
         self.lists
             .iter()
             .position(|l| l.id == id)
-            .ok_or_else(missing)
+            .ok_or_else(list_missing)
     }
 
     /// The open notes of a list but `except`, from the top.
@@ -168,10 +172,11 @@ impl Book {
     ) -> anyhow::Result<(Note, Vec<Touched>)> {
         checked_text(&text)?;
         let note = self.note_mut(id)?;
-        if note.text != text {
-            note.text = text;
-            note.edited = now;
+        if note.text == text {
+            return Ok((note.clone(), Vec::new()));
         }
+        note.text = text;
+        note.edited = now;
         Ok((note.clone(), vec![Touched::Note(id.into())]))
     }
 
@@ -183,9 +188,10 @@ impl Book {
         now: u64,
     ) -> anyhow::Result<(Note, Vec<Touched>)> {
         let note = self.note_mut(id)?;
-        if note.done.is_some() != done {
-            note.done = done.then_some(now);
+        if note.done.is_some() == done {
+            return Ok((note.clone(), Vec::new()));
         }
+        note.done = done.then_some(now);
         Ok((note.clone(), vec![Touched::Note(id.into())]))
     }
 
@@ -521,7 +527,6 @@ mod tests {
         let mut book = book();
         for error in [
             book.set_text("gone", "x".into(), 1).unwrap_err(),
-            book.add(id(1), "gone", "x".into(), 1).unwrap_err(),
             book.delete("gone").unwrap_err(),
         ] {
             assert_eq!(
@@ -529,6 +534,19 @@ mod tests {
                 Some(UserFacingErrorCode::NoteMissing)
             );
         }
+        let error = book.add(id(1), "gone", "x".into(), 1).unwrap_err();
+        assert_eq!(
+            user_facing_code(&error),
+            Some(UserFacingErrorCode::NoteListMissing)
+        );
+    }
+
+    #[test]
+    fn a_change_that_changes_nothing_writes_nothing() {
+        let mut book = with_notes(&["a"]);
+        let a = id_of(&book, "a");
+        assert!(book.set_text(&a, "a".into(), 5).unwrap().1.is_empty());
+        assert!(book.set_done(&a, false, 5).unwrap().1.is_empty());
     }
 
     #[test]

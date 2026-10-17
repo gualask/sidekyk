@@ -1,8 +1,12 @@
 import { IconPlus, IconTrash } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
+import { InlineField } from '@/shared/ui/InlineField';
 import type { NoteActions } from '../application/notes.queries';
 import { openCounts } from '../model/notes';
 import type { ProjectNotes } from '../model/notes.types';
+
+/** The longest list name, as the backend keeps it (`MAX_LIST_NAME` in `book.rs`). */
+const MAX_LIST_NAME = 200;
 
 /**
  * The lists of a project: "New list" first, so it is never a scroll away, then the lists with
@@ -104,37 +108,15 @@ export function NoteLists({
 
 /** A list's name being typed: `↵` or leaving keeps it, `Esc` drops it. */
 function NameField({ initial, onEnd }: { initial: string; onEnd: (name: string | null) => void }) {
-    const field = useRef<HTMLInputElement>(null);
-    const ended = useRef(false);
-    const end = (name: string | null) => {
-        if (ended.current) return;
-        ended.current = true;
-        onEnd(name?.trim() || null);
-    };
-    useEffect(() => {
-        field.current?.focus();
-        field.current?.select();
-    }, []);
     return (
-        <input
-            ref={field}
-            defaultValue={initial}
+        <InlineField
+            initial={initial}
+            onEnd={(name) => onEnd(name?.trim() || null)}
             spellCheck={false}
             placeholder="List name"
             aria-label="List name"
-            maxLength={200}
+            maxLength={MAX_LIST_NAME}
             className="mx-0.5 my-px rounded-md border border-ui-accent bg-ui-surface px-2.5 py-[5px] text-[13px] outline-none"
-            onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                    event.preventDefault();
-                    end(event.currentTarget.value);
-                } else if (event.key === 'Escape') {
-                    // before the workspace's keys, which would blur the field and keep the name
-                    event.preventDefault();
-                    end(null);
-                }
-            }}
-            onBlur={(event) => end(event.currentTarget.value)}
         />
     );
 }

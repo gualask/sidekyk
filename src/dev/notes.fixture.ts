@@ -1,4 +1,12 @@
-import type { DeletedList, Note, NoteList, NotesPort, ProjectNotes } from '@/modules/notes';
+import {
+    type DeletedList,
+    type Note,
+    type NoteList,
+    type NotesPort,
+    openNotes,
+    type ProjectNotes,
+    positionAt,
+} from '@/modules/notes';
 
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
@@ -157,11 +165,6 @@ export function fixtureNotes(
         if (!found) throw failure('note_missing');
         return found;
     };
-    const openNotes = (b: Book, listId: string, except: string) =>
-        b.notes
-            .filter((n) => n.list === listId && n.done === null && n.id !== except)
-            .sort((x, y) => x.position - y.position);
-
     return {
         /** The notes as they are, for the palette's search. */
         peek: (root) => snapshot(book(root)),
@@ -169,12 +172,11 @@ export function fixtureNotes(
         addNote: async (root, listId, text) => {
             const b = book(root);
             list(b, listId);
-            const top = openNotes(b, listId, '')[0];
             const now = Date.now();
             const added: Note = {
                 id: newId(),
                 list: listId,
-                position: top ? top.position - 1 : 0,
+                position: positionAt(openNotes(b.notes, listId), '', 0),
                 text,
                 created: now,
                 edited: now,
@@ -183,6 +185,7 @@ export function fixtureNotes(
             b.notes.push(added);
             return { ...added };
         },
+        // as the backend, without renumbering: positions here never run out of room
         setNoteText: async (root, id, text) => {
             const found = note(book(root), id);
             if (found.text !== text) {
@@ -200,19 +203,8 @@ export function fixtureNotes(
             const b = book(root);
             list(b, listId);
             const moved = note(b, id);
-            const open = openNotes(b, listId, id);
-            const at = Math.min(index, open.length);
-            const before = open[at - 1]?.position;
-            const after = open[at]?.position;
+            moved.position = positionAt(openNotes(b.notes, listId), id, index);
             moved.list = listId;
-            moved.position =
-                before === undefined
-                    ? after === undefined
-                        ? 0
-                        : after - 1
-                    : after === undefined
-                      ? before + 1
-                      : (before + after) / 2;
             return [{ ...moved }];
         },
         restoreNote: async (root, restored) => {

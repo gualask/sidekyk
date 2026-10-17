@@ -67,7 +67,7 @@ pub(crate) async fn set_project_layout(
 ) -> Result<ProjectList, AppError> {
     blocking("set_project_layout", app, move |app| {
         app.state::<ProjectsState>()
-            .update(app, |list| list.set_layout(&root, layout))
+            .update_stored(app, |list| list.set_layout(&root, layout))
     })
     .await
 }

@@ -1,4 +1,4 @@
-import type { ProjectNotes } from '@/modules/notes';
+import { doneNotes, noteTitle, openNotes, type ProjectNotes } from '@/modules/notes';
 import type { ChangedFile } from '@/modules/repository';
 import type {
     ContentEnd,
@@ -94,16 +94,6 @@ export function fixtureSearch(
     return results;
 }
 
-/** A note's first line that is not blank. */
-function title(text: string): string {
-    return (
-        text
-            .split('\n')
-            .map((line) => line.trim())
-            .find(Boolean) ?? ''
-    );
-}
-
 /**
  * As the backend's `search_notes`: lists by name, notes by first line, else by the text typed in
  * them (two letters at least), with the part around it. No scoring: notes keep their order.
@@ -114,20 +104,18 @@ function searchNotes(query: string, notes: ProjectNotes, results: SearchResults)
         if (highlights) results.lists.push({ ...list, highlights });
     }
     const listName = (id: string) => notes.lists.find((list) => list.id === id)?.name ?? '';
-    // open by place, then done, the last done first
-    const ordered = [...notes.notes].sort((a, b) => {
-        if (a.done === null || b.done === null) {
-            return a.done === b.done ? a.position - b.position : a.done === null ? -1 : 1;
-        }
-        return b.done - a.done;
-    });
+    // open before done, list by list, as the backend
+    const ordered = [
+        ...notes.lists.flatMap((list) => openNotes(notes.notes, list.id)),
+        ...notes.lists.flatMap((list) => doneNotes(notes.notes, list.id)),
+    ];
     const byText: SearchResults['notes'] = [];
     for (const note of ordered) {
         const found = {
             id: note.id,
             list: note.list,
             listName: listName(note.list),
-            title: title(note.text),
+            title: noteTitle(note.text),
             done: note.done !== null,
         };
         const highlights = match(found.title, query);

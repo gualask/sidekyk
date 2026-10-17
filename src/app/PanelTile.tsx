@@ -1,6 +1,6 @@
 import { IconArrowsMaximize, IconMinus } from '@tabler/icons-react';
 import { type CSSProperties, Suspense, useState } from 'react';
-import type { PanelDefinition, PanelEdge, PanelProps, PanelTarget } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -26,7 +26,7 @@ export function PanelTile({
     show,
     findInFiles,
     tile,
-    edge = null,
+    tileFit = null,
     onZoomIn,
     onMinimize,
     onSelect,
@@ -41,8 +41,8 @@ export function PanelTile({
     findInFiles: PanelProps['findInFiles'];
     /** The tile's size among a project's panels; none full screen. */
     tile?: CSSProperties;
-    /** For the tile on top of the side column: where its splitter goes. */
-    edge?: PanelEdge | null;
+    /** For a tile whose width the app sets: where the panel says how wide it needs it. */
+    tileFit?: PanelProps['tileFit'];
     /** Shows the panel as a tile, whose header zooms into it; without it, the panel is full screen. */
     onZoomIn?: () => void;
     /** For a tile that can wait in the top bar: minimizes it there. */
@@ -118,7 +118,7 @@ export function PanelTile({
                         key={project.root}
                         project={project}
                         header={header}
-                        edge={edge}
+                        tileFit={tileFit}
                         target={target}
                         place={onZoomIn ? 'tile' : 'full'}
                         selected={selected}

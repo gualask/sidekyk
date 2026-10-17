@@ -4,7 +4,7 @@
 
 use super::contracts::{Highlight, ListMatch, NoteMatch, Snippet};
 use super::rank::{Ranker, Texts};
-use crate::modules::notes::{Note, ProjectNotes};
+use crate::modules::notes::{Note, NoteList};
 
 /// At most this many notes go back.
 pub(super) const NOTE_LIMIT: usize = 50;
@@ -75,12 +75,11 @@ fn snippet(text: &str, query: &[char]) -> Option<Snippet> {
     })
 }
 
-fn note_match(note: &Note, notes: &ProjectNotes, highlights: Vec<Highlight>) -> NoteMatch {
+fn note_match(note: &Note, lists: &[NoteList], highlights: Vec<Highlight>) -> NoteMatch {
     NoteMatch {
         id: note.id.clone(),
         list: note.list.clone(),
-        list_name: notes
-            .lists
+        list_name: lists
             .iter()
             .find(|l| l.id == note.list)
             .map(|l| l.name.clone())
@@ -94,27 +93,40 @@ fn note_match(note: &Note, notes: &ProjectNotes, highlights: Vec<Highlight>) -> 
 
 /// The lists whose names match, and the notes found, best first: first lines that match, then
 /// notes holding the text typed, open before done, in the user's order.
-pub(super) fn search_notes(query: &str, notes: &ProjectNotes) -> (Vec<ListMatch>, Vec<NoteMatch>) {
+pub(crate) fn search_notes(
+    query: &str,
+    lists: &[NoteList],
+    notes: &[Note],
+) -> (Vec<ListMatch>, Vec<NoteMatch>) {
     let mut names = Ranker::new(query, Texts::Names);
-    let list_names: Vec<&str> = notes.lists.iter().map(|l| l.name.as_str()).collect();
+    let list_names: Vec<&str> = lists.iter().map(|l| l.name.as_str()).collect();
     let (ranked, _) = names.rank(&list_names, usize::MAX);
-    let lists = ranked
+    let list_matches = ranked
         .into_iter()
         .map(|r| ListMatch {
-            id: notes.lists[r.index].id.clone(),
-            name: notes.lists[r.index].name.clone(),
+            id: lists[r.index].id.clone(),
+            name: lists[r.index].name.clone(),
             highlights: r.highlights,
         })
         .collect();
 
-    // the user's order: open notes by place, then done ones, the last done first
-    let mut ordered: Vec<&Note> = notes.notes.iter().collect();
-    ordered.sort_by(|a, b| match (a.done, b.done) {
-        (None, None) => a.position.total_cmp(&b.position),
-        (None, Some(_)) => std::cmp::Ordering::Less,
-        (Some(_), None) => std::cmp::Ordering::Greater,
-        (Some(x), Some(y)) => y.cmp(&x),
+    // the user's order: open notes before done ones, list by list, open ones by place within
+    // their list (a place means nothing across lists), done ones the last done first
+    let mut ordered: Vec<(Option<usize>, &Note)> = notes
+        .iter()
+        .map(|note| (lists.iter().position(|l| l.id == note.list), note))
+        .collect();
+    ordered.sort_by(|(list_a, a), (list_b, b)| {
+        a.done
+            .is_some()
+            .cmp(&b.done.is_some())
+            .then_with(|| list_a.cmp(list_b))
+            .then_with(|| match (a.done, b.done) {
+                (Some(x), Some(y)) => y.cmp(&x),
+                _ => a.position.total_cmp(&b.position),
+            })
     });
+    let ordered: Vec<&Note> = ordered.into_iter().map(|(_, note)| note).collect();
     let titles: Vec<String> = ordered.iter().map(|n| title(&n.text)).collect();
     let title_refs: Vec<&str> = titles.iter().map(String::as_str).collect();
     let (ranked, _) = names.rank(&title_refs, NOTE_LIMIT);
@@ -123,7 +135,7 @@ pub(super) fn search_notes(query: &str, notes: &ProjectNotes) -> (Vec<ListMatch>
         .into_iter()
         .map(|r| {
             found[r.index] = true;
-            note_match(ordered[r.index], notes, r.highlights)
+            note_match(ordered[r.index], lists, r.highlights)
         })
         .collect();
 
@@ -137,13 +149,13 @@ pub(super) fn search_notes(query: &str, notes: &ProjectNotes) -> (Vec<ListMatch>
                 continue;
             }
             if let Some(snippet) = snippet(&note.text, &query) {
-                let mut found = note_match(note, notes, Vec::new());
+                let mut found = note_match(note, lists, Vec::new());
                 found.snippet = Some(snippet);
                 matches.push(found);
             }
         }
     }
-    (lists, matches)
+    (list_matches, matches)
 }
 
 #[cfg(test)]
@@ -163,8 +175,19 @@ mod tests {
         }
     }
 
-    fn notes() -> ProjectNotes {
-        ProjectNotes {
+    struct Notes {
+        lists: Vec<NoteList>,
+        notes: Vec<Note>,
+    }
+
+    impl Notes {
+        fn search(&self, query: &str) -> (Vec<ListMatch>, Vec<NoteMatch>) {
+            search_notes(query, &self.lists, &self.notes)
+        }
+    }
+
+    fn notes() -> Notes {
+        Notes {
             lists: vec![
                 NoteList {
                     id: "l1".into(),
@@ -185,13 +208,12 @@ mod tests {
                 ),
                 note("d", 2.0, "Old idea about the watcher", Some(5)),
             ],
-            open_list: "l1".into(),
         }
     }
 
     #[test]
     fn lists_match_by_name() {
-        let (lists, _) = search_notes("rel", &notes());
+        let (lists, _) = notes().search("rel");
         assert_eq!(lists.len(), 1);
         assert_eq!(lists[0].name, "Release");
         assert_eq!(lists[0].highlights, vec![[0, 3]]);
@@ -199,7 +221,7 @@ mod tests {
 
     #[test]
     fn notes_match_by_first_line_then_by_their_text() {
-        let (_, found) = search_notes("watcher", &notes());
+        let (_, found) = notes().search("watcher");
         let ids: Vec<&str> = found.iter().map(|n| n.id.as_str()).collect();
         // both first lines match; the open one first
         assert_eq!(ids, ["a", "d"]);
@@ -207,7 +229,7 @@ mod tests {
         assert_eq!(found[0].list_name, "Architecture");
         assert!(found[1].done);
 
-        let (_, found) = search_notes("per dir", &notes());
+        let (_, found) = notes().search("per dir");
         assert_eq!(found.len(), 1);
         let snippet = found[0].snippet.as_ref().unwrap();
         // cut before, line breaks as spaces, nothing cut after
@@ -223,8 +245,25 @@ mod tests {
 
     #[test]
     fn one_letter_is_not_looked_for_inside_notes() {
-        let (_, found) = search_notes("q", &notes());
+        let (_, found) = notes().search("q");
         assert!(found.iter().all(|n| n.snippet.is_none()));
+    }
+
+    #[test]
+    fn notes_keep_to_their_lists_in_order() {
+        let mut found = notes();
+        // first in its list, but its list comes second
+        found.notes.push(Note {
+            list: "l2".into(),
+            ..note("r", -9.0, "Watcher release note", None)
+        });
+        let ids: Vec<String> = found
+            .search("watcher")
+            .1
+            .into_iter()
+            .map(|n| n.id)
+            .collect();
+        assert_eq!(ids, ["a", "r", "d"]);
     }
 
     #[test]

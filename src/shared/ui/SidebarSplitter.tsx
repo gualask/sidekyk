@@ -17,8 +17,11 @@ export function SidebarSplitter({
     /** The sidebar, whose width the splitter sets. */
     box: RefObject<HTMLElement | null>;
     place: 'edge' | 'gap';
-    /** The width that shows all the sidebar has, measured on the double click. */
-    fitting: (box: HTMLElement) => number;
+    /**
+     * The width that shows all the sidebar has, measured on the double click; null when there is
+     * nothing to fit: the double click goes back to the default width.
+     */
+    fitting: (box: HTMLElement) => number | null;
     /** What the sidebar shows, for the tooltip: "tree", "list". */
     what: string;
 }) {
@@ -34,7 +37,10 @@ export function SidebarSplitter({
                     width.drag(event, box.current, place === 'edge' ? 'right' : 'left');
             }}
             onDoubleClick={() => {
-                if (box.current) width.fit(fitting(box.current), box.current);
+                if (!box.current) return;
+                const fit = fitting(box.current);
+                if (fit === null) width.reset();
+                else width.fit(fit, box.current);
             }}
         >
             <span className="absolute inset-y-1/4 left-[3px] w-0.5 rounded-sm group-hover:bg-ui-accent" />

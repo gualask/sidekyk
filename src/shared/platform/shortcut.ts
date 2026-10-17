@@ -8,6 +8,11 @@ export function shortcutLabel(key: string): string {
     return MACOS ? `⌘${key}` : `Ctrl+${key}`;
 }
 
+/** A key with `⌥` (`Alt`), as tooltips name it: `⌥↑` or `Alt+↑`. */
+export function altLabel(key: string): string {
+    return MACOS ? `⌥${key}` : `Alt+${key}`;
+}
+
 /** Whether only the platform's modifier is held among `⌘` and `Ctrl`, as a shortcut needs. */
 export function hasShortcutModifier(event: { metaKey: boolean; ctrlKey: boolean }): boolean {
     return MACOS ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;

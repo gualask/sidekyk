@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import { openNotes, positionAt, withNotes, withoutNote } from '../model/notes';
-import type { Note, ProjectNotes } from '../model/notes.types';
+import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
+import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
+import { changeQueue } from './change-queue';
 import { useNotesPort } from './notes.port';
 
 const notesKey = (root: string) => ['notes', root] as const;
@@ -21,9 +22,10 @@ export function useProjectNotes(root: string) {
 }
 
 /**
- * Every change to a project's notes. Each shows at once in the cache, then goes to the backend,
- * whose answer replaces it; a failure tells why and reads the notes again. What can be undone
- * says so in a toast with Undo.
+ * Every change to a project's notes. Each shows at once in the cache, then goes to the backend
+ * after the changes made before it (`changeQueue`); the answer of the last one is shown, and if
+ * answers were skipped behind newer changes, the notes are read again. A failure tells why and
+ * reads them again too. What can be undone says so in a toast with Undo, which undoes only that.
  */
 export function useNoteActions(root: string) {
     const port = useNotesPort();
@@ -32,134 +34,147 @@ export function useNoteActions(root: string) {
 
     return useMemo(() => {
         const key = notesKey(root);
+        const queue = changeQueue(root);
         const current = () => client.getQueryData<ProjectNotes>(key);
         const update = (change: (notes: ProjectNotes) => ProjectNotes) =>
             client.setQueryData<ProjectNotes>(key, (notes) => (notes ? change(notes) : notes));
-        /** Runs a call to the backend; a failure tells what failed and reads the notes again. */
-        const run = async <T>(what: string, call: Promise<T>): Promise<T | undefined> => {
+        const reread = () => void client.invalidateQueries({ queryKey: key });
+        /** A note as on screen, with some of its fields changed. */
+        const patch = (id: string, fields: Partial<Note>) =>
+            update((notes) => ({
+                ...notes,
+                notes: notes.notes.map((note) => (note.id === id ? { ...note, ...fields } : note)),
+            }));
+        const updated = (notes: Note[]) => update((all) => withUpdated(all, notes));
+
+        /** Sends a change; `shown` puts its answer on screen when nothing newer is there. */
+        const send = async <T>(
+            what: string,
+            call: () => Promise<T>,
+            shown: (value: T) => void = () => undefined,
+        ): Promise<T | undefined> => {
             try {
-                return await call;
+                const answer = await queue.run(call);
+                if (answer.kind === 'apply') shown(answer.value);
+                else if (answer.kind === 'reread') reread();
+                return answer.value;
             } catch (error) {
                 showToast(errorToast(what, error));
-                void client.invalidateQueries({ queryKey: key });
+                reread();
                 return undefined;
             }
         };
-        const merge = (changed: Note[] | undefined) => {
-            if (changed) update((notes) => withNotes(notes, changed));
+
+        /** Moves a note to `index` among the open notes of `list`. */
+        const place = async (note: Note, list: string, index: number) => {
+            const notes = current();
+            if (notes) {
+                const position = positionAt(openNotes(notes.notes, list), note.id, index);
+                patch(note.id, { list, position });
+            }
+            return send(
+                'Could not move the note',
+                () => port.placeNote(root, note.id, list, index),
+                updated,
+            );
         };
+        const setDone = async (note: Note, done: boolean) => {
+            patch(note.id, { done: done ? Date.now() : null });
+            return send(
+                'Could not change the note',
+                () => port.setNoteDone(root, note.id, done),
+                (changed) => updated([changed]),
+            );
+        };
+        /** Puts a note back as it was given, deleted or not. */
         const restore = async (note: Note) => {
             update((notes) => withNotes(notes, [note]));
-            merge(
-                await run('Could not undo', port.restoreNote(root, note)).then((n) =>
-                    n ? [n] : undefined,
-                ),
+            await send(
+                'Could not undo',
+                () => port.restoreNote(root, note),
+                (restored) => update((notes) => withNotes(notes, [restored])),
             );
+        };
+        /** Deletes a note; `undoable`, the toast brings it back as it was. */
+        const remove = async (note: Note, { undoable = true } = {}) => {
+            update((notes) => withoutNote(notes, note.id));
+            const removed = await send('Could not delete the note', () =>
+                port.deleteNote(root, note.id).then(() => true),
+            );
+            if (removed && undoable) {
+                showToast({
+                    title: 'Note deleted',
+                    action: { label: 'Undo', run: () => void restore(note) },
+                });
+            }
         };
 
         return {
-            /** A note on top of a list; the note as stored. */
-            add: async (list: string, text: string) => {
-                const note = await run('Could not add the note', port.addNote(root, list, text));
-                if (note) merge([note]);
-                return note;
-            },
+            /** A note on top of a list; the note as stored, or undefined when it failed. */
+            add: (list: string, text: string) =>
+                send(
+                    'Could not add the note',
+                    () => port.addNote(root, list, text),
+                    (note) => update((notes) => withNotes(notes, [note])),
+                ),
             setText: async (id: string, text: string) => {
-                update((notes) =>
-                    withNotes(
-                        notes,
-                        notes.notes.filter((n) => n.id === id).map((n) => ({ ...n, text })),
-                    ),
+                patch(id, { text });
+                await send(
+                    'Could not save the note',
+                    () => port.setNoteText(root, id, text),
+                    (note) => updated([note]),
                 );
-                const note = await run('Could not save the note', port.setNoteText(root, id, text));
-                if (note) merge([note]);
             },
+            /** Done, with Undo; or open again. */
             setDone: async (note: Note, done: boolean) => {
-                update((notes) => withNotes(notes, [{ ...note, done: done ? Date.now() : null }]));
-                const changed = await run(
-                    'Could not change the note',
-                    port.setNoteDone(root, note.id, done),
-                );
-                if (!changed) return;
-                merge([changed]);
-                if (done) {
+                const changed = await setDone(note, done);
+                if (changed && done) {
                     showToast({
                         title: 'Done',
-                        action: { label: 'Undo', run: () => void restore(note) },
+                        action: { label: 'Undo', run: () => void setDone(changed, false) },
                     });
                 }
             },
-            /** Moves a note to `index` among the open notes of `list`. */
-            place: async (note: Note, list: string, index: number) => {
-                const notes = current();
-                if (notes) {
-                    const position = positionAt(openNotes(notes.notes, list), note.id, index);
-                    update((all) => withNotes(all, [{ ...note, list, position }]));
-                }
-                merge(
-                    await run(
-                        'Could not move the note',
-                        port.placeNote(root, note.id, list, index),
-                    ),
+            place: (note: Note, list: string, index: number) => void place(note, list, index),
+            /** Moves a note on top of another list; Undo takes it back where it was. */
+            moveTo: async (note: Note, list: NoteList) => {
+                const from = openNotes(current()?.notes ?? [], note.list).findIndex(
+                    (open) => open.id === note.id,
                 );
-            },
-            /** Moves a note on top of another list; the toast can bring it back. */
-            moveTo: async (note: Note, list: { id: string; name: string }) => {
-                const notes = current();
-                if (notes) {
-                    const position = positionAt(openNotes(notes.notes, list.id), note.id, 0);
-                    update((all) => withNotes(all, [{ ...note, list: list.id, position }]));
-                }
-                const changed = await run(
-                    'Could not move the note',
-                    port.placeNote(root, note.id, list.id, 0),
-                );
-                if (!changed) return;
-                merge(changed);
+                const moved = await place(note, list.id, 0);
+                if (!moved) return;
                 showToast({
                     title: `Moved to ${list.name}`,
-                    action: { label: 'Undo', run: () => void restore(note) },
+                    action: {
+                        label: 'Undo',
+                        run: () => void place(note, note.list, Math.max(0, from)),
+                    },
                 });
             },
-            remove: async (note: Note, { undoable = true } = {}) => {
-                update((notes) => withoutNote(notes, note.id));
-                const removed = await run(
-                    'Could not delete the note',
-                    port.deleteNote(root, note.id).then(() => true),
-                );
-                if (removed && undoable) {
-                    showToast({
-                        title: 'Note deleted',
-                        action: { label: 'Undo', run: () => void restore(note) },
-                    });
-                }
-            },
-            addList: async (name: string) => {
-                const list = await run('Could not add the list', port.addList(root, name));
-                if (list) {
-                    update((notes) => ({
-                        ...notes,
-                        lists: [...notes.lists, list],
-                        openList: list.id,
-                    }));
-                }
-                return list;
-            },
+            remove,
+            addList: async (name: string) =>
+                send(
+                    'Could not add the list',
+                    () => port.addList(root, name),
+                    (list) =>
+                        update((notes) => ({
+                            ...notes,
+                            lists: [...notes.lists, list],
+                            openList: list.id,
+                        })),
+                ),
             renameList: async (id: string, name: string) => {
-                update((notes) => ({
-                    ...notes,
-                    lists: notes.lists.map((l) => (l.id === id ? { ...l, name } : l)),
-                }));
-                const list = await run(
-                    'Could not rename the list',
-                    port.renameList(root, id, name),
-                );
-                if (list) {
+                const rename = (list: NoteList) =>
                     update((notes) => ({
                         ...notes,
                         lists: notes.lists.map((l) => (l.id === id ? list : l)),
                     }));
-                }
+                rename({ id, name });
+                await send(
+                    'Could not rename the list',
+                    () => port.renameList(root, id, name),
+                    rename,
+                );
             },
             /** Deletes a list with its notes; the toast brings them all back. */
             deleteList: async (id: string) => {
@@ -171,7 +186,9 @@ export function useNoteActions(root: string) {
                     notes: notes.notes.filter((n) => n.list !== id),
                     openList: notes.openList === id ? rest[0].id : notes.openList,
                 }));
-                const deleted = await run('Could not delete the list', port.deleteList(root, id));
+                const deleted = await send('Could not delete the list', () =>
+                    port.deleteList(root, id),
+                );
                 if (!deleted) return;
                 const count = deleted.notes.length;
                 showToast({
@@ -179,19 +196,18 @@ export function useNoteActions(root: string) {
                     description: count ? `${count} ${count === 1 ? 'note' : 'notes'} with it` : '',
                     action: {
                         label: 'Undo',
-                        run: async () => {
-                            const restored = await run(
+                        run: () =>
+                            void send(
                                 'Could not undo',
-                                port.restoreList(root, deleted),
-                            );
-                            if (restored) client.setQueryData(key, restored);
-                        },
+                                () => port.restoreList(root, deleted),
+                                (restored) => client.setQueryData(key, restored),
+                            ),
                     },
                 });
             },
             openList: (id: string) => {
                 update((notes) => ({ ...notes, openList: id }));
-                void run('Could not open the list', port.openList(root, id));
+                void send('Could not open the list', () => port.openList(root, id));
             },
         };
     }, [root, port, client, showToast]);

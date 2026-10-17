@@ -2,6 +2,12 @@ use super::contracts::{ProjectList, TilesLayout};
 use crate::modules::repository::RepositoryInfo;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
+/// A stored layout is the frontend's: panel ids are short words, and a project has a few panels.
+const MAX_PANEL_ID: usize = 32;
+const MAX_MINIMIZED: usize = 8;
+/// The split a stored layout that is not a number takes.
+const EVEN_SPLIT: f64 = 0.5;
+
 impl ProjectList {
     /// A stored list made consistent: no project twice, and an active project whenever there is
     /// one, so a file edited by hand cannot leave the app without a project on screen.
@@ -48,12 +54,12 @@ impl ProjectList {
         self.find(root)?;
         let mut seen = std::collections::HashSet::new();
         let mut minimized = layout.minimized;
-        minimized.retain(|id| id.len() <= 32 && seen.insert(id.clone()));
-        minimized.truncate(8);
+        minimized.retain(|id| id.len() <= MAX_PANEL_ID && seen.insert(id.clone()));
+        minimized.truncate(MAX_MINIMIZED);
         let split = if layout.split.is_finite() {
             layout.split.clamp(0.0, 1.0)
         } else {
-            0.5
+            EVEN_SPLIT
         };
         self.layouts
             .insert(root.to_string(), TilesLayout { minimized, split });
