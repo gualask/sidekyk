@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { notesPanel, notesTarget } from '@/modules/notes';
+import { newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -218,6 +218,10 @@ export function AppShell() {
         toggleSettings,
         togglePalette,
         toggleHelp,
+        // in Notes at the same zoom, its field ready; all projects have no notes to write in
+        newNote: () => {
+            if (level > 0) show(notesPanel.id, newNoteTarget());
+        },
     });
     useZoomGestures({
         // what is under the pointer zooms in as its own control would, so the zoom grows from it

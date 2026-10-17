@@ -2,12 +2,10 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelProps } from '@/shared/panels/panel';
-import { shortcutKey } from '@/shared/platform/shortcut';
-import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useNoteActions, useProjectNotes } from '../application/notes.queries';
-import { notesShownBy } from '../model/targets';
+import { type NotesShown, notesShownBy } from '../model/targets';
 import { ListSwitch } from './ListSwitch';
 import { NoteCards } from './NoteCards';
 import { NoteLists } from './NoteLists';
@@ -20,7 +18,7 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
 /**
  * The Notes panel: a project's notes, plain-text cards in lists by topic. Full screen the lists
  * are on the left; in a tile the header's list name opens them. The cards of the open one fill the
- * rest. `⌘N` writes a new note.
+ * rest. A new note (`⌘N`, the app's key) comes as a target.
  */
 export function NotesWorkspace({ project, header, target, place, selected: hasKeys }: PanelProps) {
     const root = project.root;
@@ -28,39 +26,31 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     const actions = useNoteActions(root);
     // the note picked in reorder mode, or null out of it
     const [reorder, setReorder] = useState<string | null>(null);
-    // a list just made, whose field takes the focus once it shows
+    // a list whose field takes the focus once it shows: one just made, `⌘N`
     const [writeIn, setWriteIn] = useState<string | null>(null);
     // a note to bring into view, as the palette asked
     const [reveal, setReveal] = useState<string | null>(null);
     const revealed = useCallback(() => setReveal(null), []);
 
-    // a list, or a note of it, picked in the palette
-    const showTarget = useEffectEvent((list: string, note: string | null) => {
+    // a list, or a note of it, picked in the palette; or a new note (`⌘N`), its field taking the
+    // focus as it shows (out of reorder mode it is not there yet)
+    const showTarget = useEffectEvent((shown: NotesShown) => {
+        if (!notes) return;
         setReorder(null);
-        actions.openList(list);
-        setReveal(note);
+        const list = shown.list ?? notes.openList;
+        if (list !== notes.openList) actions.openList(list);
+        setReveal(shown.note);
+        if (shown.write) setWriteIn(list);
     });
     // once the notes are read, as opening a list changes them
     const ready = notes !== undefined;
     useEffect(() => {
         const shown = ready && target ? notesShownBy(target) : null;
-        if (shown) showTarget(shown.list, shown.note);
+        if (shown) showTarget(shown);
     }, [target, ready]);
 
     const width = useSidebarWidth('notes', LISTS_WIDTH);
     const listsBox = useRef<HTMLDivElement>(null);
-
-    useWindowKeys(
-        (event) => {
-            if (!hasKeys || event.defaultPrevented || shortcutKey(event) !== 'n') return;
-            event.preventDefault();
-            // through the list's field taking the focus as it shows: out of reorder mode it is
-            // not there yet
-            setReorder(null);
-            if (notes) setWriteIn(notes.openList);
-        },
-        { capture: true },
-    );
 
     if (error) {
         return (

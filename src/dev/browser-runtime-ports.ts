@@ -71,6 +71,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         diffView: 'changes',
         copyTemplate: DEFAULT_COPY_TEMPLATE,
         sidebarWidths: {},
+        noteLines: 'wrap',
     };
     // in `problems`, another app holds the stored shortcut since startup
     const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;

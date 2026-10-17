@@ -1,14 +1,24 @@
 import type { PanelTarget } from '@/shared/panels/panel';
 
-/** What Notes is asked to show: a list, and one of its notes to bring into view, if any. */
+/**
+ * What Notes is asked to show: a list (null: the one open), one of its notes to bring into view,
+ * and whether its field takes the focus, for a new note.
+ */
 export interface NotesShown {
-    list: string;
+    list: string | null;
     note: string | null;
+    write: boolean;
 }
 
 /** Asks Notes to open a list, and to bring one of its notes into view. */
 export function notesTarget(list: string, note: string | null = null): PanelTarget {
-    const shown: NotesShown = { list, note };
+    const shown: NotesShown = { list, note, write: false };
+    return { key: JSON.stringify(shown) };
+}
+
+/** Asks Notes for a new note, in the list open (`⌘N`). */
+export function newNoteTarget(): PanelTarget {
+    const shown: NotesShown = { list: null, note: null, write: true };
     return { key: JSON.stringify(shown) };
 }
 
@@ -17,9 +27,11 @@ function isShown(value: unknown): value is NotesShown {
         typeof value === 'object' &&
         value !== null &&
         'list' in value &&
-        typeof value.list === 'string' &&
+        (value.list === null || typeof value.list === 'string') &&
         'note' in value &&
-        (value.note === null || typeof value.note === 'string')
+        (value.note === null || typeof value.note === 'string') &&
+        'write' in value &&
+        typeof value.write === 'boolean'
     );
 }
 

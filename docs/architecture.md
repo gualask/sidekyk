@@ -62,7 +62,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   skipped one makes the notes read again at the end, a failure too. Answers update notes in place
   (`withUpdated`), only add and restore add one. Undo undoes that change only (done, a move back
   to its place). A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`,
-  a click outside, not the window losing the focus); emptied, it goes (Undo).
+  a click outside, not the window losing the focus); emptied, it goes (Undo). Long lines wrap or
+  scroll (`noteLines`, through `NotesSettingsProvider`; `⌥Z` in a note field, on `code`). `⌘N` is
+  the workspace's (also from a field): `show` to Notes with `newNoteTarget`.
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
 - `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
   `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,

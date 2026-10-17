@@ -22,6 +22,15 @@ pub(crate) enum DiffView {
     File,
 }
 
+/// How a note's long lines show: wrapped at the panel's edge, or on one line, scrolled sideways.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum NoteLines {
+    #[default]
+    Wrap,
+    Scroll,
+}
+
 /// What a copy from a diff puts on the clipboard: `{row}` becomes where the text is
 /// (`src/cart.ts:14`, `src/cart.ts:12-15`) and `{text}` the text copied. The frontend fills it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -82,9 +91,10 @@ pub(crate) struct Settings {
     pub(crate) global_shortcut: GlobalShortcut,
     pub(crate) diff_view: DiffView,
     pub(crate) copy_template: CopyTemplate,
-    /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`); one
-    /// missing takes its default.
+    /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`, `notes`);
+    /// one missing takes its default.
     pub(crate) sidebar_widths: BTreeMap<String, u32>,
+    pub(crate) note_lines: NoteLines,
 }
 
 /// Where the global shortcut stands, as registered. The frontend knows every platform's kinds;
@@ -127,6 +137,7 @@ mod tests {
             diff_view: DiffView::File,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
             sidebar_widths: BTreeMap::from([("files".to_string(), 320)]),
+            note_lines: NoteLines::Scroll,
         };
         let json = serde_json::json!({
             "theme": "light",
@@ -134,6 +145,7 @@ mod tests {
             "diffView": "file",
             "copyTemplate": "Look at {row}:\n{text}",
             "sidebarWidths": { "files": 320 },
+            "noteLines": "scroll",
         });
         assert_eq!(serde_json::to_value(&settings).unwrap(), json);
         assert_eq!(serde_json::from_value::<Settings>(json).unwrap(), settings);
@@ -152,6 +164,7 @@ mod tests {
                 diff_view: DiffView::Changes,
                 copy_template: CopyTemplate::default(),
                 sidebar_widths: BTreeMap::new(),
+                note_lines: NoteLines::Wrap,
             }
         );
     }

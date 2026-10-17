@@ -4,9 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
+import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { noteMeta } from '../model/notes';
 import type { Note, NoteList } from '../model/notes.types';
-import { autosize } from './notes-layout';
+import { autosize, linesClass } from './notes-layout';
 
 /** How long typing pauses before the text is saved; closing the card saves at once. */
 const SAVE_DELAY_MS = 500;
@@ -169,6 +170,7 @@ function NoteEditor({
     onClose: () => void;
 }) {
     const [text, setText] = useState(note.text);
+    const settings = useNotesSettings();
     const field = useRef<HTMLTextAreaElement>(null);
     const timer = useRef<number | undefined>(undefined);
     // what is saved, and the latest text, for the unmount to save what typing left
@@ -209,7 +211,8 @@ function NoteEditor({
             value={text}
             spellCheck={false}
             aria-label="Note text"
-            className="block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text break-words whitespace-pre-wrap outline-none"
+            wrap={settings.lines === 'wrap' ? 'soft' : 'off'}
+            className={`block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text outline-none ${linesClass(settings.lines)}`}
             onChange={(event) => {
                 setText(event.target.value);
                 latest.current = event.target.value;
@@ -224,6 +227,7 @@ function NoteEditor({
                 if (document.hasFocus()) close();
             }}
             onKeyDown={(event) => {
+                if (onNoteFieldKey(event, settings)) return;
                 if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
                     event.preventDefault();
                     event.currentTarget.blur();

@@ -2,12 +2,13 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useMemo, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
-import { NotesProvider } from '@/modules/notes';
+import { NotesProvider, NotesSettingsProvider } from '@/modules/notes';
 import { ProjectsProvider } from '@/modules/projects';
 import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
 import { SettingsProvider, useSettingsWhenRead, useUpdateSettings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import type { NoteLines } from '@/shared/notes/note-lines';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
@@ -36,7 +37,9 @@ export function AppProviders({
                                     <SidebarWidthsBridge>
                                         <SearchProvider value={runtime.search}>
                                             <NotesProvider value={runtime.notes}>
-                                                <ToastsHost>{children}</ToastsHost>
+                                                <NotesSettingsBridge>
+                                                    <ToastsHost>{children}</ToastsHost>
+                                                </NotesSettingsBridge>
                                             </NotesProvider>
                                         </SearchProvider>
                                     </SidebarWidthsBridge>
@@ -65,6 +68,22 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
         [settings],
     );
     return <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>;
+}
+
+/** How Notes shows long lines, from the settings, and how it switches them (`⌥Z`). */
+function NotesSettingsBridge({ children }: { children: ReactNode }) {
+    const settings = useSettingsWhenRead();
+    const { mutate } = useUpdateSettings();
+    const value = useMemo(
+        () => ({
+            lines: settings?.noteLines ?? 'wrap',
+            setLines: (noteLines: NoteLines) => {
+                if (settings) mutate({ ...settings, noteLines });
+            },
+        }),
+        [settings, mutate],
+    );
+    return <NotesSettingsProvider value={value}>{children}</NotesSettingsProvider>;
 }
 
 const NO_WIDTHS: Readonly<Record<string, number>> = {};

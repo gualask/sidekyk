@@ -1,3 +1,5 @@
+import type { NoteLines } from '@/shared/notes/note-lines';
+
 /** Grows a text field with what it holds, up to its CSS max height. */
 export function autosize(field: HTMLTextAreaElement | null) {
     if (!field) return;
@@ -20,4 +22,11 @@ export function fittingListsWidth(names: readonly string[], box: HTMLElement): n
     context.font = `600 13px ${style.fontFamily}`;
     const widest = Math.max(0, ...names.map((name) => context.measureText(name).width));
     return Math.ceil(widest + LIST_ROW_EXTRA);
+}
+
+/** How a note's text field lays out long lines: wrapped, or on one line with a sideways scroll. */
+export function linesClass(lines: NoteLines): string {
+    return lines === 'wrap'
+        ? 'break-words whitespace-pre-wrap'
+        : 'overflow-x-auto [overflow-wrap:normal] whitespace-pre';
 }

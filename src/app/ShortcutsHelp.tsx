@@ -28,6 +28,7 @@ const SHORTCUTS: Shortcut[] = [
     { label: 'Next / previous match, find bar', keys: ['↵', '⇧↵'] },
     { label: 'Files tree, full screen', keys: ['←', '→', '↑', '↓', '↵'] },
     { label: 'New note', keys: [shortcutLabel('N')] },
+    { label: 'Wrap long lines, in a note', keys: [altLabel('Z')] },
     { label: 'Close the note you edit', keys: ['Esc', shortcutLabel('↵')] },
     {
         label: "Reorder notes (from a note's ⋯)",

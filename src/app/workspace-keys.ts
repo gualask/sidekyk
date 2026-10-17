@@ -3,7 +3,7 @@ import { neighbourProject, type ProjectList, useActivateProject } from '@/module
 import type { PaletteMode } from '@/modules/search';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutKey } from '@/shared/platform/shortcut';
-import { isField, isKeyTaken } from '@/shared/ui/keys';
+import { isField, isInOverlay, isKeyTaken } from '@/shared/ui/keys';
 import { panelForKey } from './panels';
 
 /** The palette's keys with `⌘` (`Ctrl`), by what they look for. */
@@ -25,8 +25,9 @@ function isPlain(event: KeyboardEvent): boolean {
  * The workspace's keyboard: `↵` zooms in and `Esc` out (after leaving a field: `Esc` is
  * progressive), `1`-`9` open a panel full screen, `←` and `→` move among a project's tiles, `[`
  * and `]` switch project, `⌘,` (`Ctrl+,`) opens the settings, `⌘K` (`Ctrl+K`) the command palette
- * to go somewhere and `⌘F` (`Ctrl+F`) to find in the files, also from inside the palette, and `?`
- * the shortcuts. Keys a field, a dialog or a menu takes are left to it.
+ * to go somewhere and `⌘F` (`Ctrl+F`) to find in the files, also from inside the palette, `⌘N`
+ * (`Ctrl+N`) a new note, also from a field, and `?` the shortcuts. Keys a field, a dialog or a
+ * menu takes are left to it.
  */
 export function useWorkspaceKeys({
     list,
@@ -37,6 +38,7 @@ export function useWorkspaceKeys({
     toggleSettings,
     togglePalette,
     toggleHelp,
+    newNote,
 }: {
     list: ProjectList | undefined;
     zoomIn: () => void;
@@ -47,6 +49,7 @@ export function useWorkspaceKeys({
     toggleSettings: () => void;
     togglePalette: (mode: PaletteMode) => void;
     toggleHelp: () => void;
+    newNote: () => void;
 }) {
     const activate = useActivateProject();
 
@@ -56,6 +59,11 @@ export function useWorkspaceKeys({
         if (shortcut === ',') {
             event.preventDefault();
             toggleSettings();
+            return;
+        }
+        if (shortcut === 'n' && !isInOverlay(event.target)) {
+            event.preventDefault();
+            newNote();
             return;
         }
         const paletteKey = shortcut === null ? undefined : PALETTE_KEYS[shortcut];

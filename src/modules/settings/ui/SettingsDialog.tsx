@@ -5,6 +5,8 @@ import { IconX } from '@tabler/icons-react';
 import { type ReactNode, type RefObject, useId, useRef } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
+import type { NoteLines } from '@/shared/notes/note-lines';
+import { altLabel } from '@/shared/platform/shortcut';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 import type { Theme } from '../model/settings.types';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
@@ -18,6 +20,11 @@ const THEMES: { value: Theme; label: string }[] = [
 const DIFF_VIEWS: { value: DiffView; label: string }[] = [
     { value: 'changes', label: 'Changes' },
     { value: 'file', label: 'Full file' },
+];
+
+const NOTE_LINES: { value: NoteLines; label: string }[] = [
+    { value: 'wrap', label: 'Wrap' },
+    { value: 'scroll', label: 'Scroll' },
 ];
 
 /**
@@ -91,6 +98,23 @@ export function SettingsDialog({
                             )}
                         </Setting>
                         <CopyTemplateSetting />
+                    </Section>
+                    <Section title="Notes">
+                        <Setting
+                            label="Long lines"
+                            description={`Wrap them at the panel's edge, or keep them on one line and scroll sideways. ${altLabel('Z')} switches it from a note.`}
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={NOTE_LINES}
+                                    value={settings.noteLines}
+                                    onChange={(noteLines) =>
+                                        update.mutate({ ...settings, noteLines })
+                                    }
+                                />
+                            )}
+                        </Setting>
                     </Section>
                     <Section title="Shortcuts">
                         <GlobalShortcutSetting />

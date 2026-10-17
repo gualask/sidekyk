@@ -4,6 +4,7 @@
  */
 
 import type { DiffView } from '@/shared/git/diff-view';
+import type { NoteLines } from '@/shared/notes/note-lines';
 
 /** The app's colors. Dark by default; it no longer follows the system's. */
 export type Theme = 'dark' | 'light';
@@ -27,6 +28,8 @@ export interface Settings {
     copyTemplate: string;
     /** The sidebars' widths in pixels, as last dragged, by sidebar; one missing takes its default. */
     sidebarWidths: Record<string, number>;
+    /** How a note's long lines show. */
+    noteLines: NoteLines;
 }
 
 /** Where the global shortcut stands, as the backend registered it. */
