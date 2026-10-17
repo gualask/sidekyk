@@ -1,4 +1,4 @@
-use super::contracts::ProjectList;
+use super::contracts::{ProjectList, TilesLayout};
 use crate::modules::repository::RepositoryInfo;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
@@ -8,6 +8,9 @@ impl ProjectList {
     pub(crate) fn normalized(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
         self.projects.retain(|p| seen.insert(p.root.clone()));
+        let projects = &self.projects;
+        self.layouts
+            .retain(|root, _| projects.iter().any(|p| &p.root == root));
         if self.active().is_none() {
             self.active = self.projects.first().map(|p| p.root.clone());
         }
@@ -40,6 +43,23 @@ impl ProjectList {
         Ok(())
     }
 
+    /// Keeps how a project lays out its tiles: the split within its bounds, each panel once.
+    pub(crate) fn set_layout(&mut self, root: &str, layout: TilesLayout) -> anyhow::Result<()> {
+        self.find(root)?;
+        let mut seen = std::collections::HashSet::new();
+        let mut minimized = layout.minimized;
+        minimized.retain(|id| id.len() <= 32 && seen.insert(id.clone()));
+        minimized.truncate(8);
+        let split = if layout.split.is_finite() {
+            layout.split.clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        self.layouts
+            .insert(root.to_string(), TilesLayout { minimized, split });
+        Ok(())
+    }
+
     /// Forgets a project; its repository is left as it is. When it was on screen, the one after
     /// it takes its place, or the one before it when it was the last.
     pub(crate) fn remove(&mut self, root: &str) -> anyhow::Result<()> {
@@ -49,6 +69,7 @@ impl ProjectList {
             .position(|p| p.root == root)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
         self.projects.remove(index);
+        self.layouts.remove(root);
         if self.active.as_deref() == Some(root) {
             let next = self.projects.get(index).or(self.projects.last());
             self.active = next.map(|p| p.root.clone());
@@ -73,6 +94,7 @@ mod tests {
         ProjectList {
             projects: roots.iter().map(|r| project(r)).collect(),
             active: active.map(String::from),
+            layouts: Default::default(),
         }
     }
 
@@ -126,5 +148,33 @@ mod tests {
         let stored = list(&["/a", "/b", "/a"], Some("/gone"));
         assert_eq!(stored.normalized(), list(&["/a", "/b"], Some("/a")));
         assert_eq!(list(&[], Some("/gone")).normalized(), list(&[], None));
+    }
+
+    fn layout(split: f64) -> TilesLayout {
+        TilesLayout {
+            minimized: vec!["notes".into(), "notes".into()],
+            split,
+        }
+    }
+
+    #[test]
+    fn a_layout_is_kept_within_bounds_and_goes_with_its_project() {
+        let mut projects = list(&["/a", "/b"], Some("/a"));
+        projects.set_layout("/a", layout(7.0)).unwrap();
+        projects.set_layout("/b", layout(f64::NAN)).unwrap();
+        assert_eq!(projects.layouts["/a"].split, 1.0);
+        assert_eq!(projects.layouts["/a"].minimized, ["notes"]);
+        assert_eq!(projects.layouts["/b"].split, 0.5);
+        assert!(projects.set_layout("/gone", layout(0.5)).is_err());
+
+        projects.remove("/a").unwrap();
+        assert!(!projects.layouts.contains_key("/a"));
+    }
+
+    #[test]
+    fn a_stored_layout_of_no_project_is_dropped() {
+        let mut stored = list(&["/a"], Some("/a"));
+        stored.layouts.insert("/gone".into(), layout(0.5));
+        assert!(stored.normalized().layouts.is_empty());
     }
 }

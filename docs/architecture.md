@@ -76,12 +76,16 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 ### Panels
 
 - `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, optional level 0
-  `summary`. `app/panels.ts` lists them in shortcut order and the level 1 tiles (`TILES`: Changes
-  fills and keeps 560 px, Files is as wide as its tree and gives way first down to 160 px;
-  `tileWidth`, `TILE_GAP`), preloading the tiles' chunks.
+  `summary`. `app/panels.ts` lists them in shortcut order and the level 1 tiles, preloading their
+  chunks: `MAIN_TILE` (Changes, fills, keeps 560 px) and `SIDE_TILES` (Files above Notes) in
+  `SideColumn`: as wide as the tree (`sidebarWidths.files`), at least 320 px with Notes in it
+  (160 px without), giving way first; a splitter between its tiles (`split`, the upper's share).
+  Files and Notes minimize to chips in the top bar (`zoom-panel-*` names: the view transition
+  flies tile and chip into each other); ←/→ skip them, `2`/`3` still open them full screen.
 - `PanelProps`: `project`; `header` (element filled through a portal; in a tile after the panel's
-  icon, full screen shown only when filled); `edge` (in a tile as wide as what it shows, the gap
-  before it, a box the app sizes: where Files portals the splitter that drags its tree); `target` (a request in the panel's terms, a new object
+  icon, full screen shown only when filled); `edge` (for the side column's top tile: the gap
+  before the column and the column, where Files portals the splitter that drags it; without
+  Files the column has its own, fitting its least width); `target` (a request in the panel's terms, a new object
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
@@ -128,6 +132,9 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   served to every module by `shared/ui/sidebar-width.ts` (`useSidebarWidth`, `SidebarSplitter`);
   a drag stores the width the layout allowed.
 - Project list changes run in one mutation scope, in order; the last switch wins.
+- Tiles per project (`ProjectList.layouts`, by root: minimized panels, split; `useProjectLayout`,
+  `set_project_layout`): shown at once (in the same render, for the view transition), stored
+  after; a removed project's layout goes with it.
 - Theme: the backend sets the window theme, the page follows `prefers-color-scheme`; no script.
 - The window is created hidden and shown once the project list is read (`show_window`, first
   call only; backend fallback after 3 s).

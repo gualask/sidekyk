@@ -5,7 +5,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
-use crate::modules::projects::ProjectList;
+use crate::modules::projects::{ProjectList, TilesLayout};
 use crate::shared::error::AppError;
 
 #[tauri::command]
@@ -54,6 +54,20 @@ pub(crate) async fn remove_project(
     blocking("remove_project", app, move |app| {
         app.state::<ProjectsState>()
             .update(app, |list| list.remove(&root))
+    })
+    .await
+}
+
+#[tauri::command]
+/// Keeps how a project lays out its tiles.
+pub(crate) async fn set_project_layout(
+    app: tauri::AppHandle,
+    root: String,
+    layout: TilesLayout,
+) -> Result<ProjectList, AppError> {
+    blocking("set_project_layout", app, move |app| {
+        app.state::<ProjectsState>()
+            .update(app, |list| list.set_layout(&root, layout))
     })
     .await
 }

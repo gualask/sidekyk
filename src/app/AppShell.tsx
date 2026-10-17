@@ -5,13 +5,14 @@ import {
     NoProjects,
     type ProjectList,
     ProjectRail,
+    type TilesLayout,
     useActivateProject,
+    useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
 } from '@/modules/projects';
 import {
     ChangeCount,
-    changesPanel,
     filesPanel,
     fileTarget,
     useRepositoryChangeSubscription,
@@ -28,15 +29,17 @@ import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-tran
 import { PanelTile } from './PanelTile';
 import {
     INITIAL_PANEL,
+    MAIN_TILE,
     PALETTE_PANELS,
     panelById,
+    SIDE_TILES,
     SUMMARIES,
     TILE_GAP,
-    TILES,
     tileBeside,
 } from './panels';
 import { useProblems } from './problems';
 import { useShowWindowWhen } from './providers';
+import { SideColumn } from './SideColumn';
 import { TopBar } from './TopBar';
 import type { ZoomLevel } from './workspace';
 import { useWorkspaceKeys } from './workspace-keys';
@@ -84,6 +87,10 @@ export function AppShell() {
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
+    // how the project lays out its tiles: which wait in the top bar, the side column's split
+    const [layout, changeLayout] = useProjectLayout(project?.root ?? null);
+    // a tile minimized is not selected: Changes is, which is never minimized
+    const selectedTile = layout.minimized.includes(panel.id) ? MAIN_TILE.panel : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell
     useShowWindowWhen(!projects.isPending);
     // what the first paint does not need waits until the window has nothing else to do
@@ -163,10 +170,25 @@ export function AppShell() {
         // as a file picked in the tree: in Files' own viewer when it is full screen, else Changes
         openFile: (path, find) =>
             show(
-                level === 2 && panel === filesPanel ? filesPanel.id : changesPanel.id,
+                level === 2 && panel === filesPanel ? filesPanel.id : MAIN_TILE.panel.id,
                 fileTarget(path, null, find ?? null),
             ),
     };
+
+    // a tile flies to its chip in the top bar, and back
+    const minimize = (tile: PanelDefinition) =>
+        zoomTransition(() => {
+            changeLayout((current) => ({ ...current, minimized: [...current.minimized, tile.id] }));
+            if (panel === tile) setPanel(MAIN_TILE.panel);
+        });
+    const restore = (tile: PanelDefinition) =>
+        zoomTransition(() => {
+            changeLayout((current) => ({
+                ...current,
+                minimized: current.minimized.filter((id) => id !== tile.id),
+            }));
+            setPanel(tile);
+        });
 
     const zoomIn = () => {
         if (level < 2) zoom((level + 1) as ZoomLevel);
@@ -185,7 +207,7 @@ export function AppShell() {
         },
         // the arrows move among the tiles of a project's panels
         moveTile: (step) => {
-            const next = level === 1 ? tileBeside(panel, step) : undefined;
+            const next = level === 1 ? tileBeside(selectedTile, step, layout.minimized) : undefined;
             if (next) setPanel(next);
             return level === 1;
         },
@@ -229,6 +251,12 @@ export function AppShell() {
                 onOpenPalette={() => togglePalette('names')}
                 helpOpen={helpOpen}
                 onToggleHelp={toggleHelp}
+                minimized={
+                    level === 1 && project
+                        ? SIDE_TILES.filter((tile) => layout.minimized.includes(tile.id))
+                        : []
+                }
+                onRestore={restore}
             />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
@@ -240,10 +268,13 @@ export function AppShell() {
                         list={projects.data}
                         project={project}
                         level={level}
-                        panel={panel}
+                        panel={level === 1 ? selectedTile : panel}
                         target={target}
                         zoom={zoom}
                         select={setPanel}
+                        layout={layout}
+                        onSplit={(split) => changeLayout((current) => ({ ...current, split }))}
+                        onMinimize={minimize}
                         show={show}
                         findInFiles={findInFiles}
                         idle={idle}
@@ -280,6 +311,9 @@ export function AppShell() {
     );
 }
 
+/** Changes fills what the side column leaves, keeping its least width while the window allows. */
+const MAIN_SIZE = { flexGrow: 1, flexBasis: 0, minWidth: `min(${MAIN_TILE.minWidth}px, 100%)` };
+
 /** What a panel was asked to show, and which panel. */
 interface Asked {
     panel: string;
@@ -297,6 +331,9 @@ function Workspace({
     show,
     findInFiles,
     idle,
+    layout,
+    onSplit,
+    onMinimize,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
@@ -310,8 +347,13 @@ function Workspace({
     findInFiles: PanelProps['findInFiles'];
     /** The first paint is done: the other projects' counts may load. */
     idle: boolean;
+    layout: TilesLayout;
+    onSplit: (split: number) => void;
+    onMinimize: (panel: PanelDefinition) => void;
 }) {
     const targetOf = (id: string) => (target?.panel === id ? target.target : null);
+    // the side column's tiles not minimized; without them, Changes takes the whole width
+    const side = SIDE_TILES.filter((tile) => !layout.minimized.includes(tile.id));
     // also reached from all projects, once the last project is removed there: the repository
     // added next opens, as from the "+ Add a repository" card
     if (!project) return <NoProjects onOpen={() => zoom(1)} />;
@@ -360,20 +402,40 @@ function Workspace({
                 }}
             />
             <div className="flex min-w-0 flex-1 p-2" style={{ gap: TILE_GAP }}>
-                {TILES.map((tile) => (
-                    <PanelTile
-                        key={tile.panel.id}
-                        panel={tile.panel}
-                        project={project}
-                        target={targetOf(tile.panel.id)}
-                        selected={tile.panel === panel}
-                        show={show}
-                        findInFiles={findInFiles}
-                        tile={tile}
-                        onZoomIn={() => zoom(2, tile.panel)}
-                        onSelect={() => select(tile.panel)}
+                <PanelTile
+                    panel={MAIN_TILE.panel}
+                    project={project}
+                    target={targetOf(MAIN_TILE.panel.id)}
+                    selected={MAIN_TILE.panel === panel}
+                    show={show}
+                    findInFiles={findInFiles}
+                    tile={MAIN_SIZE}
+                    onZoomIn={() => zoom(2, MAIN_TILE.panel)}
+                    onSelect={() => select(MAIN_TILE.panel)}
+                />
+                {side.length > 0 ? (
+                    <SideColumn
+                        panels={side}
+                        split={layout.split}
+                        onSplit={onSplit}
+                        tile={(tile, size, edge) => (
+                            <PanelTile
+                                key={tile.id}
+                                panel={tile}
+                                project={project}
+                                target={targetOf(tile.id)}
+                                selected={tile === panel}
+                                show={show}
+                                findInFiles={findInFiles}
+                                tile={size}
+                                edge={edge}
+                                onZoomIn={() => zoom(2, tile)}
+                                onMinimize={() => onMinimize(tile)}
+                                onSelect={() => select(tile)}
+                            />
+                        )}
                     />
-                ))}
+                ) : null}
             </div>
         </div>
     );

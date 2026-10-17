@@ -9,39 +9,36 @@ import type { PanelDefinition } from '@/shared/panels/panel';
  */
 const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel, notesPanel];
 
-/** The room between tiles, in pixels, where the splitter of a tile as wide as what it shows sits. */
+/** The room between tiles, in pixels, where the splitter of the side column sits. */
 export const TILE_GAP = 8;
 
-/** A tile at a project's panels. */
-export interface Tile {
-    panel: PanelDefinition;
-    /** Takes the width the other tiles leave; else as wide as what it shows. */
-    fills: boolean;
-    /** The least width it keeps, while the window has room for it. */
-    minWidth: number;
+/** Changes, on the left: it fills what the side column leaves, keeping this much. */
+export const MAIN_TILE = { panel: changesPanel, minWidth: 560 };
+
+/**
+ * The side column, top to bottom: Files above Notes, each can be minimized to the top bar. The
+ * column is as wide as Files' tree (one width with full screen), and wider while Notes is in it,
+ * whose cards need the room; it gives way first when the window is narrow.
+ */
+export const SIDE_TILES: readonly PanelDefinition[] = [filesPanel, notesPanel];
+
+/** The side column's least width, with Notes in it or not. */
+export function sideMinWidth(panels: readonly PanelDefinition[]): number {
+    return panels.includes(notesPanel) ? 320 : 160;
 }
 
-/**
- * The tiles of a project's panels: Changes, which shows files, takes what the tree of Files
- * leaves; Files drags its width on the splitter before it, and gives way first when the window is
- * narrow.
- */
-export const TILES: readonly Tile[] = [
-    { panel: changesPanel, fills: true, minWidth: 560 },
-    { panel: filesPanel, fills: false, minWidth: 160 },
-];
+/** The side column's width: its own, bounded by what Changes keeps. */
+export function sideWidth(width: CSSProperties, min: number): CSSProperties {
+    return {
+        ...width,
+        minWidth: min,
+        maxWidth: `max(${min}px, 100% - ${MAIN_TILE.minWidth + TILE_GAP}px)`,
+    };
+}
 
-/**
- * How wide a tile is: one that fills takes what the others leave; one as wide as what it shows
- * leaves the others their least width, as long as the window has room for its own.
- */
-export function tileWidth(tile: Tile): CSSProperties {
-    if (tile.fills) return { flexGrow: 1, flexBasis: 0 };
-    const others = TILES.reduce(
-        (room, other) => (other === tile ? room : room + other.minWidth + TILE_GAP),
-        0,
-    );
-    return { flexBasis: 'auto', maxWidth: `max(${tile.minWidth}px, 100% - ${others}px)` };
+/** The panels shown as tiles, in their order: Changes, then the side column's not minimized. */
+function shownTiles(minimized: readonly string[]): PanelDefinition[] {
+    return [MAIN_TILE.panel, ...SIDE_TILES.filter((panel) => !minimized.includes(panel.id))];
 }
 
 /**
@@ -49,12 +46,17 @@ export function tileWidth(tile: Tile): CSSProperties {
  * with the app, not after the first render.
  */
 export const INITIAL_PANEL = PANELS[0];
-for (const { panel } of TILES) void panel.preload();
+for (const panel of [MAIN_TILE.panel, ...SIDE_TILES]) void panel.preload();
 
-/** The tile next to a panel's, to the left (-1) or the right (1), if any. */
-export function tileBeside(panel: PanelDefinition, step: -1 | 1): PanelDefinition | undefined {
-    const index = TILES.findIndex((tile) => tile.panel === panel);
-    return index < 0 ? undefined : TILES[index + step]?.panel;
+/** The tile shown next to a panel's, before (-1) or after (1) it, if any. */
+export function tileBeside(
+    panel: PanelDefinition,
+    step: -1 | 1,
+    minimized: readonly string[],
+): PanelDefinition | undefined {
+    const tiles = shownTiles(minimized);
+    const index = tiles.indexOf(panel);
+    return index < 0 ? undefined : tiles[index + step];
 }
 
 /** The panels that say something about a project on its card at all projects. */

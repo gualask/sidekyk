@@ -1,7 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import type { ProjectList } from '../model/project.types';
+import type { ProjectList, TilesLayout } from '../model/project.types';
 import { useProjectsPort } from './projects.port';
 
 const projectsKey = ['projects'] as const;
@@ -119,4 +119,49 @@ export function useRemoveProject() {
             showToast(errorToast(`Could not remove ${projectName(queryClient, root)}`, error));
         },
     });
+}
+
+/** A project's tiles until the user changes them. */
+const DEFAULT_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
+
+/**
+ * How a project lays out its tiles, and how to change it: shown at once, stored after. A failure
+ * is a toast; the layout stays as shown for the session.
+ */
+export function useProjectLayout(root: string | null) {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    const showToast = useShowToast();
+    const layout = useQuery({
+        queryKey: projectsKey,
+        queryFn: () => port.getProjects(),
+        select: (list) => (root ? list.layouts[root] : undefined) ?? DEFAULT_LAYOUT,
+    }).data;
+    const { mutate } = useMutation({
+        ...projectsChange,
+        mutationFn: ({ root, layout }: { root: string; layout: TilesLayout }) =>
+            port.setProjectLayout(root, layout),
+        onSuccess: (list) => {
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+        },
+        onError: (error) => {
+            showToast(errorToast('Could not keep the layout', error));
+        },
+    });
+    // shown at once, in the same render: a view transition captures the layout changed
+    const change = useCallback(
+        (next: (current: TilesLayout) => TilesLayout) => {
+            if (!root) return;
+            const list = queryClient.getQueryData<ProjectList>(projectsKey);
+            if (!list) return;
+            const layout = next(list.layouts[root] ?? DEFAULT_LAYOUT);
+            queryClient.setQueryData<ProjectList>(projectsKey, {
+                ...list,
+                layouts: { ...list.layouts, [root]: layout },
+            });
+            mutate({ root, layout });
+        },
+        [root, queryClient, mutate],
+    );
+    return [layout ?? DEFAULT_LAYOUT, change] as const;
 }

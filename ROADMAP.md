@@ -39,6 +39,8 @@ Workspace:
       setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
 - [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
       double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
+- [x] Side column (2026-10-17): Files above Notes, splitter between them, 320 px at least with
+      Notes; Files and Notes minimize to chips in the top bar; tiles kept per project
 
 See what the agent is doing:
 
@@ -82,8 +84,6 @@ Explore and copy:
 
 ## Next
 
-- [ ] Rest of semantic zoom, with Notes: splitter Files/Notes, panels minimized to the top bar,
-      tiles per project
 - [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
 
 ## Notes

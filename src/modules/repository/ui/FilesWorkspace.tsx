@@ -20,7 +20,7 @@ import { ChangeDiffView } from './DiffView';
 import { FileHeader } from './FileHeader';
 import { FileTree } from './FileTree';
 import { TextFileView } from './TextFileView';
-import { fittingWidth } from './tree-layout';
+import { FILES_TREE_WIDTH, fittingWidth } from './tree-layout';
 
 /** The tree of a project, kept for the session. */
 interface TreeState {
@@ -31,9 +31,6 @@ interface TreeState {
 }
 
 const CLOSED: TreeState = { open: new Set(), selected: null };
-
-/** The tree's width by default, the same in a tile and full screen, and the least it takes. */
-const TREE_WIDTH = { initial: 280, min: 160 };
 
 /**
  * The keys the tree takes: in a tile `j`/`k` and `Space`, the arrows moving among tiles and `↵`
@@ -128,7 +125,7 @@ export function FilesWorkspace({
         { capture: true },
     );
 
-    const treeWidth = useSidebarWidth('files', TREE_WIDTH);
+    const treeWidth = useSidebarWidth('files', FILES_TREE_WIDTH);
     const treeBox = useRef<HTMLDivElement>(null);
     // as VS Code's "Collapse Folders in Explorer"; the file shown is revealed again once another
     // is picked
@@ -179,26 +176,40 @@ export function FilesWorkspace({
         </div>
     ) : null;
 
-    // the tree's edge, by the file viewer full screen; in a tile, the gap before it, by Changes
-    const splitter = (place: 'edge' | 'gap') => (
+    // the tree's edge, by the file viewer full screen
+    const splitter = (
         <SidebarSplitter
             width={treeWidth}
             box={treeBox}
-            place={place}
+            place="edge"
             fitting={(box) => fittingWidth(rows, box)}
             what="tree"
         />
     );
 
     if (place === 'tile') {
+        // in a tile, the gap before the side column, by Changes: it drags the column, which the
+        // tree fills (its tile's border taken into account by a fit)
+        const column = edge ? { current: edge.box } : null;
         return (
             <div
                 ref={treeBox}
-                className="flex h-full flex-col bg-ui-surface font-mono text-[12.5px]"
-                // the tile is the tree's box: the app bounds it, the tree fills it
-                style={{ ...treeWidth.style, maxWidth: '100%' }}
+                className="flex h-full w-full flex-col bg-ui-surface font-mono text-[12.5px]"
             >
-                {edge ? createPortal(splitter('gap'), edge) : null}
+                {edge && column
+                    ? createPortal(
+                          <SidebarSplitter
+                              width={treeWidth}
+                              box={column}
+                              place="gap"
+                              fitting={() =>
+                                  treeBox.current ? fittingWidth(rows, treeBox.current) + 2 : 0
+                              }
+                              what="tree"
+                          />,
+                          edge.gap,
+                      )
+                    : null}
                 {collapse}
                 {tooMany}
                 <div className="min-h-0 flex-1">{tree}</div>
@@ -257,7 +268,7 @@ export function FilesWorkspace({
                 >
                     {tree}
                 </div>
-                {splitter('edge')}
+                {splitter}
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">{viewer}</main>
             </div>
         </div>

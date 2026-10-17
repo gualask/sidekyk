@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelProps } from '@/shared/panels/panel';
 import { shortcutKey } from '@/shared/platform/shortcut';
@@ -6,6 +7,7 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useNoteActions, useProjectNotes } from '../application/notes.queries';
+import { ListSwitch } from './ListSwitch';
 import { NoteCards } from './NoteCards';
 import { NoteLists } from './NoteLists';
 import { fittingListsWidth } from './notes-layout';
@@ -16,9 +18,10 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
 
 /**
  * The Notes panel: a project's notes, plain-text cards in lists by topic. Full screen the lists
- * are on the left; the cards of the open one fill the rest. `⌘N` writes a new note.
+ * are on the left; in a tile the header's list name opens them. The cards of the open one fill the
+ * rest. `⌘N` writes a new note.
  */
-export function NotesWorkspace({ project, place, selected: hasKeys }: PanelProps) {
+export function NotesWorkspace({ project, header, place, selected: hasKeys }: PanelProps) {
     const root = project.root;
     const { data: notes, error } = useProjectNotes(root);
     const actions = useNoteActions(root);
@@ -74,8 +77,28 @@ export function NotesWorkspace({ project, place, selected: hasKeys }: PanelProps
             />
         );
 
+    const openList = (id: string, write: boolean) => {
+        setReorder(null);
+        setWriteIn(write ? id : null);
+    };
+
     if (place === 'tile') {
-        return <div className="flex h-full bg-ui-surface font-sans">{cards}</div>;
+        return (
+            <div className="flex h-full bg-ui-surface font-sans">
+                {header
+                    ? createPortal(
+                          <ListSwitch
+                              notes={notes}
+                              list={list}
+                              actions={actions}
+                              onOpen={openList}
+                          />,
+                          header,
+                      )
+                    : null}
+                {cards}
+            </div>
+        );
     }
 
     return (
@@ -85,14 +108,7 @@ export function NotesWorkspace({ project, place, selected: hasKeys }: PanelProps
                 className="shrink-0 overflow-auto border-r border-ui-border"
                 style={width.style}
             >
-                <NoteLists
-                    notes={notes}
-                    actions={actions}
-                    onOpen={(id, write) => {
-                        setReorder(null);
-                        setWriteIn(write ? id : null);
-                    }}
-                />
+                <NoteLists notes={notes} actions={actions} onOpen={openList} />
             </div>
             <SidebarSplitter
                 width={width}

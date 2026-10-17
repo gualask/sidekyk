@@ -4,4 +4,6 @@
 mod contracts;
 mod list;
 
-pub(crate) use contracts::{ProjectList, ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
+pub(crate) use contracts::{
+    ProjectList, ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT,
+};

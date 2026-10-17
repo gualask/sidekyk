@@ -26,3 +26,4 @@ export { fileTarget } from './model/targets';
 export { changesPanel, filesPanel } from './panel';
 export { ChangeCount } from './ui/ChangeCount';
 export { ProjectFacts } from './ui/ProjectFacts';
+export { FILES_TREE_WIDTH } from './ui/tree-layout';

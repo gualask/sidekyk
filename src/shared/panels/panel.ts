@@ -11,6 +11,12 @@ export interface PanelTarget {
     key: string;
 }
 
+/** The gap before the side column, and the column, whose width a splitter in the gap drags. */
+export interface PanelEdge {
+    gap: HTMLElement;
+    box: HTMLElement;
+}
+
 /** Where a panel is: a tile among a project's panels (level 1), or full screen (level 2). */
 type PanelPlace = 'tile' | 'full';
 
@@ -23,11 +29,11 @@ export interface PanelProps {
      */
     header: HTMLElement | null;
     /**
-     * In a tile as wide as what it shows, the gap before it, where the panel puts the splitter that
-     * drags its width, through a portal (`SidebarSplitter`, `place="gap"`); null in any other place
-     * and until it is mounted.
+     * In the side column, for the tile on top: the gap before the column, where the panel puts the
+     * splitter that drags the column's width (`box`) through a portal (`SidebarSplitter`,
+     * `place="gap"`); null in any other place and until it is mounted.
      */
-    edge: HTMLElement | null;
+    edge: PanelEdge | null;
     /** What to show, when the app asks for something; null leaves the panel as the user left it. */
     target: PanelTarget | null;
     place: PanelPlace;

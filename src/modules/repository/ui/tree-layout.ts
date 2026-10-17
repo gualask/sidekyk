@@ -1,5 +1,11 @@
 import type { TreeRow } from '../model/file-tree';
 
+/**
+ * The tree's width by default and the least it takes: one width in a tile (the side column's)
+ * and full screen.
+ */
+export const FILES_TREE_WIDTH = { initial: 280, min: 160 };
+
 /** A row's height, which the virtualized tree lays its rows out with. */
 export const TREE_ROW_HEIGHT = 22;
 

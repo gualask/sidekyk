@@ -1,5 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
-import type { ProjectList } from '../model/project.types';
+import type { ProjectList, TilesLayout } from '../model/project.types';
 
 /** The projects' runtime boundary: the native backend, or a fixture in browser dev mode. */
 export interface ProjectsPort {
@@ -9,6 +9,8 @@ export interface ProjectsPort {
     activateProject(root: string): Promise<ProjectList>;
     /** Forgets a project; its repository is left as it is. */
     removeProject(root: string): Promise<ProjectList>;
+    /** Keeps how a project lays out its tiles. */
+    setProjectLayout(root: string, layout: TilesLayout): Promise<ProjectList>;
     /** The list changed without the frontend asking. Returns a synchronous disposer. */
     onProjectsChanged(listener: () => void): () => void;
 }

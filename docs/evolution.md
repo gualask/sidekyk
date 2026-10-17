@@ -33,9 +33,11 @@ Workspace:
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes left; Files (and Notes)
   right. Splitter between Changes and Files (2026-10-17): it drags the tree's width, the same
   setting as full screen (one value, as VS Code's sidebar), double click fits as the tree's own
-  splitter; Changes keeps 560 px, Files gives way first down to 160 px. *(to build, with Notes)*
-  splitter between Files and Notes; Files and Notes minimize to a chip in the top bar; each
-  project keeps its tiles.
+  splitter; Changes keeps 560 px, Files gives way first down to 160 px. Files above Notes in that
+  column (built 2026-10-17): one width (the tree's), 320 px at least with Notes in it (option b:
+  cards need the room, one width stays); splitter between them, double click evens; Files and
+  Notes minimize to a chip in the top bar; each project keeps its tiles (with the project list,
+  gone with the project).
 - Every sidebar resizes the same way (2026-10-17): Changes' list, Files' tree, Notes' lists. Drag;
   double click fits what it shows, again goes back; the content beside keeps 240 px; one width per
   sidebar, the same in a tile and full screen, stored in the settings (`sidebarWidths`).

@@ -48,3 +48,12 @@ body {
 ::view-transition-new(root) {
     animation-duration: 200ms;
 }
+/* a minimized tile and its chip in the top bar are one element to the eye: they stretch, not fade */
+::view-transition-old(zoom-panel-files),
+::view-transition-new(zoom-panel-files),
+::view-transition-old(zoom-panel-notes),
+::view-transition-new(zoom-panel-notes) {
+    height: 100%;
+    width: 100%;
+    object-fit: fill;
+}

@@ -53,7 +53,7 @@ function failure(code: string) {
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
 export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     const projects = initialProjects(scenario);
-    let list: ProjectList = { projects, active: projects[0]?.root ?? null };
+    let list: ProjectList = { projects, active: projects[0]?.root ?? null, layouts: {} };
     const project = (root: string) => {
         const found = list.projects.find((p) => p.root === root);
         if (!found) throw failure('project_not_found');
@@ -128,6 +128,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     FIXTURE_REPOSITORY;
                 const known = list.projects.some((p) => p.root === added.root);
                 return update({
+                    ...list,
                     projects: known ? list.projects : [...list.projects, added],
                     active: added.root,
                 });
@@ -138,11 +139,15 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 const index = list.projects.indexOf(project(root));
                 const projects = list.projects.filter((p) => p.root !== root);
                 const next = projects[index] ?? projects.at(-1) ?? null;
+                const { [root]: _gone, ...layouts } = list.layouts;
                 return update({
                     projects,
                     active: list.active === root ? (next?.root ?? null) : list.active,
+                    layouts,
                 });
             },
+            setProjectLayout: async (root, layout) =>
+                update({ ...list, layouts: { ...list.layouts, [project(root).root]: layout } }),
             onProjectsChanged: () => () => undefined,
         },
         repository: {

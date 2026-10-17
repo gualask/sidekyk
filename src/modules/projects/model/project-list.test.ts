@@ -5,6 +5,7 @@ const project = (name: string) => ({ root: `/p/${name}`, name });
 const list = (active: string | null, ...names: string[]) => ({
     projects: names.map(project),
     active: active ? `/p/${active}` : null,
+    layouts: {},
 });
 
 describe('activeProject', () => {
