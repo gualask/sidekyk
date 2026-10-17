@@ -178,8 +178,12 @@ paint chunk.
 - Stored at application level in the app data dir (`io.github.gualask.sidekyk` under
   `~/Library/Application Support`, `~/.local/share`, `%APPDATA%`), never in repositories: per
   project its lists and notes (text, list, position, edited, done).
-- Format and granularity at implementation; one file per note is natural and keeps conflicts
-  small.
+- Format (2026-10-17): `notes/<name>-<6 hex>/` per project with `project.json` (root),
+  `lists.json` (order), `state.json` (open list, this machine only) and one `<id>.json` per note:
+  a change writes one file, a sync conflict is one note. Order by a number per note, a move takes
+  the middle of its neighbors (renumbering the list only when no room is left).
+- Removing a project never leaves its notes on disk (2026-10-17): with notes it asks, export to
+  Markdown or delete; a moved repository is relinked (Locate…), its notes follow.
 - Optional Google Drive sync, nothing leaves the machine without an account. Facts checked
   2026-10-11:
   - Scopes: `drive.appdata` (hidden app folder) or `drive.file` (files visible in Drive), both

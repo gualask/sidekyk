@@ -9,6 +9,7 @@ use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
+use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
@@ -18,6 +19,7 @@ use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
+use crate::modules::notes::NotesStore;
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 use crate::modules::settings::Theme;
 
@@ -75,11 +77,13 @@ pub(crate) fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(LocalRepositoryBackend::default())
         .manage(ProjectsState::default())
+        .manage(NotesStore::default())
         .manage(FirstShow::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
+            app.manage(NotesFiles::new(&app.path().app_data_dir()?));
             let settings = settings_store::load_settings(app.handle());
             // before the windows: their pages reach the shortcut's state as they load
             shortcut::start(app.handle(), &settings.global_shortcut);
@@ -117,6 +121,18 @@ pub(crate) fn run() {
             tauri_commands::repository::get_commit_file_diff,
             tauri_commands::repository::get_directory,
             tauri_commands::repository::get_file_content,
+            tauri_commands::notes::get_notes,
+            tauri_commands::notes::add_note,
+            tauri_commands::notes::set_note_text,
+            tauri_commands::notes::set_note_done,
+            tauri_commands::notes::place_note,
+            tauri_commands::notes::restore_note,
+            tauri_commands::notes::delete_note,
+            tauri_commands::notes::add_note_list,
+            tauri_commands::notes::rename_note_list,
+            tauri_commands::notes::delete_note_list,
+            tauri_commands::notes::restore_note_list,
+            tauri_commands::notes::open_note_list,
             tauri_commands::search::search,
             tauri_commands::search::search_contents,
             tauri_commands::search::stop_content_search,

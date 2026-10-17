@@ -132,11 +132,13 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 - `interfaces/tauri/`: commands, tray, window, and `state.rs` (project list, watcher of the project
   on screen, per-project coalesced snapshot/summary/tree reads, the cached tree). Blocking work on
   `spawn_blocking`.
-- `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure): no Tauri.
+- `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
+  (`Book` in memory, `NotesStore` over the `NotesStorage` port): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
   content (`tree.rs`), path checks, ignored-paths filter, contracts. No Tauri; the outside world is
   the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`, `logging.rs`.
+- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`,
+  `notes_files.rs`, `logging.rs`.
 - `shared/`: `AppError` (`{ code, message }`, stable codes), `coalesce.rs` (one run in flight,
   later callers share the next), `sync.rs`.
 
@@ -199,6 +201,16 @@ characters around the first match. Files go through a `Channel` in batches every
 search counts a run: a newer one (or `stop_content_search`) stops it. A complete search is kept
 so a longer text (`narrows`) reads only the files it found, in the same tree; any watcher batch
 drops it.
+
+### Notes
+
+- `<app data>/notes/<folder>/`, layout in `modules/notes/store.rs`; folder by root from each
+  `project.json`, scanned once. The project read last stays in memory; a change writes only the
+  files it touched (written beside, `sync_all`, renamed over; a leftover `.tmp` is removed when
+  read), a failed write drops the memory copy. Nothing is written for a project until its first
+  change. Ids: 16 hex digits, the only names let through to files.
+- A note is at most 1 MiB (`note_too_long`); a broken file is skipped and logged, never removed.
+- `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
 
 ### Tray
 

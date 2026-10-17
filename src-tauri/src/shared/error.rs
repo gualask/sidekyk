@@ -21,6 +21,8 @@ pub(crate) enum UserFacingErrorCode {
     #[cfg(any(target_os = "macos", windows))]
     InvalidShortcut,
     NotARepository,
+    NoteMissing,
+    NoteTooLong,
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
@@ -38,6 +40,8 @@ impl UserFacingErrorCode {
             #[cfg(any(target_os = "macos", windows))]
             Self::InvalidShortcut => "invalid_shortcut",
             Self::NotARepository => "not_a_repository",
+            Self::NoteMissing => "note_missing",
+            Self::NoteTooLong => "note_too_long",
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
@@ -145,6 +149,8 @@ mod tests {
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::InvalidCommit, "invalid_commit"),
             (UserFacingErrorCode::NotARepository, "not_a_repository"),
+            (UserFacingErrorCode::NoteMissing, "note_missing"),
+            (UserFacingErrorCode::NoteTooLong, "note_too_long"),
             (
                 UserFacingErrorCode::PathOutsideRepository,
                 "path_outside_repository",
