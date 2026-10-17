@@ -313,6 +313,37 @@ impl NotesStore {
         self.change(storage, root, |book| Ok((book.snapshot(), Vec::new())))
     }
 
+    /// How many notes a project has, open and done, counted from its files without reading them.
+    pub(crate) fn count(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<usize> {
+        let Some(folder) = self.folder_of(storage, root)? else {
+            return Ok(0);
+        };
+        Ok(storage
+            .files(&folder)?
+            .iter()
+            .filter(|file| file.strip_suffix(".json").is_some_and(is_id))
+            .count())
+    }
+
+    /// Deletes a project's notes, its folder with them: the project goes.
+    pub(crate) fn delete_project(
+        &self,
+        storage: &dyn NotesStorage,
+        root: &str,
+    ) -> anyhow::Result<()> {
+        let mut open = lock(&self.open);
+        if let Some(folder) = self.folder_of(storage, root)? {
+            storage.remove_folder(&folder)?;
+        }
+        if let Some(found) = lock(&self.folders).as_mut() {
+            found.remove(root);
+        }
+        if open.as_ref().is_some_and(|o| o.root == root) {
+            *open = None;
+        }
+        Ok(())
+    }
+
     /// Looks at a project's lists and notes where they are kept, without a copy: the palette
     /// searches them at every key.
     pub(crate) fn with_notes<T>(
@@ -493,6 +524,11 @@ pub(crate) mod tests {
             lock(&self.files).remove(&(folder.into(), file.into()));
             Ok(())
         }
+
+        fn remove_folder(&self, folder: &str) -> anyhow::Result<()> {
+            lock(&self.files).retain(|(f, _), _| f != folder);
+            Ok(())
+        }
     }
 
     impl MemoryStorage {
@@ -617,6 +653,23 @@ pub(crate) mod tests {
 
         let notes = NotesStore::default().notes(&storage, ROOT).unwrap();
         assert_eq!(notes.notes.len(), 1);
+    }
+
+    #[test]
+    fn a_project_deleted_leaves_nothing_and_counts_none() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let list = store.notes(&storage, ROOT).unwrap().open_list;
+        store.add_note(&storage, ROOT, &list, "a".into()).unwrap();
+        store.add_note(&storage, ROOT, &list, "b".into()).unwrap();
+        assert_eq!(store.count(&storage, ROOT).unwrap(), 2);
+        assert_eq!(store.count(&storage, "/dev/other").unwrap(), 0);
+
+        store.delete_project(&storage, ROOT).unwrap();
+        assert!(storage.names().is_empty());
+        assert_eq!(store.count(&storage, ROOT).unwrap(), 0);
+        // added again, it starts with none
+        assert!(store.notes(&storage, ROOT).unwrap().notes.is_empty());
     }
 
     #[test]

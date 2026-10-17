@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { type ProjectList, useRemoveProject } from '@/modules/projects';
+import type { ProjectList } from '@/modules/projects';
 import { useMissingRepositories } from '@/modules/repository';
 import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { MACOS } from '@/shared/platform/macos';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
 export interface Problem {
@@ -18,9 +19,12 @@ export interface Problem {
  * a global shortcut the system turned down at startup, or that macOS uses too, fixed in the
  * settings.
  */
-export function useProblems(list: ProjectList | undefined, openSettings: () => void): Problem[] {
+export function useProblems(
+    list: ProjectList | undefined,
+    openSettings: () => void,
+    removeProject: (project: ProjectInfo) => void,
+): Problem[] {
     const missing = useMissingRepositories();
-    const { mutate: remove } = useRemoveProject();
     const shortcut = useGlobalShortcutStatus().data;
 
     return useMemo(() => {
@@ -30,7 +34,7 @@ export function useProblems(list: ProjectList | undefined, openSettings: () => v
                 id: `missing:${project.root}`,
                 title: `${project.name} was moved or deleted`,
                 detail: `Nothing is left at ${project.root}. Remove it, then add it again from its new folder.`,
-                fix: { label: 'Remove', run: () => remove(project.root) },
+                fix: { label: 'Remove', run: () => removeProject(project) },
             }));
         const shortcutIssue = shortcutProblem(shortcut, MACOS);
         if (shortcutIssue) {
@@ -41,5 +45,5 @@ export function useProblems(list: ProjectList | undefined, openSettings: () => v
             });
         }
         return problems;
-    }, [list, missing, remove, shortcut, openSettings]);
+    }, [list, missing, removeProject, shortcut, openSettings]);
 }

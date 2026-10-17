@@ -4,11 +4,12 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useNoteActions, useProjectNotes } from '../application/notes.queries';
+import { useExportNotes, useNoteActions, useProjectNotes } from '../application/notes.queries';
 import { type NotesShown, notesShownBy } from '../model/targets';
 import { ListSwitch } from './ListSwitch';
 import { NoteCards } from './NoteCards';
 import { NoteLists } from './NoteLists';
+import { NotesMenu } from './NotesMenu';
 import { fittingListsWidth } from './notes-layout';
 import { ReorderNotes } from './ReorderNotes';
 
@@ -24,6 +25,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     const root = project.root;
     const { data: notes, error } = useProjectNotes(root);
     const actions = useNoteActions(root);
+    const exportNotes = useExportNotes(root);
     // the note picked in reorder mode, or null out of it
     const [reorder, setReorder] = useState<string | null>(null);
     // a list whose field takes the focus once it shows: one just made, `⌘N`
@@ -91,20 +93,29 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
         setWriteIn(write ? id : null);
     };
 
+    // the header: in a tile the open list's name, which opens the lists; the panel's menu, right
+    const head = header
+        ? createPortal(
+              <>
+                  {place === 'tile' ? (
+                      <ListSwitch
+                          notes={notes}
+                          list={list}
+                          actions={actions}
+                          onOpen={onListOpened}
+                      />
+                  ) : null}
+                  <span className="flex-1" />
+                  <NotesMenu onExport={() => void exportNotes()} />
+              </>,
+              header,
+          )
+        : null;
+
     if (place === 'tile') {
         return (
             <div className="flex h-full bg-ui-surface font-sans">
-                {header
-                    ? createPortal(
-                          <ListSwitch
-                              notes={notes}
-                              list={list}
-                              actions={actions}
-                              onOpen={onListOpened}
-                          />,
-                          header,
-                      )
-                    : null}
+                {head}
                 {cards}
             </div>
         );
@@ -112,6 +123,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
 
     return (
         <div className="flex h-full bg-ui-surface font-sans">
+            {head}
             <div
                 ref={listsBox}
                 className="shrink-0 overflow-auto border-r border-ui-border"

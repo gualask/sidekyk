@@ -21,6 +21,10 @@ export interface NotesPort {
     restoreList(root: string, deleted: DeletedList): Promise<ProjectNotes>;
     /** Remembers the list open, for the next time the project shows. */
     openList(root: string, id: string): Promise<void>;
+    /** How many notes a project has, open and done: what removing it would delete. */
+    countNotes(root: string): Promise<number>;
+    /** Asks where to save a project's notes as Markdown and saves them; the path, or null. */
+    exportNotes(root: string): Promise<string | null>;
 }
 
 const NotesPortContext = createContext<NotesPort | null>(null);

@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
 import { changeQueue } from './change-queue';
 import { useNotesPort } from './notes.port';
 
-const notesKey = (root: string) => ['notes', root] as const;
+/** Where a project's notes are cached. */
+export const notesKey = (root: string) => ['notes', root] as const;
 
 /**
  * A project's notes, read once: only the app writes them, and every change goes through the
@@ -214,3 +215,33 @@ export function useNoteActions(root: string) {
 }
 
 export type NoteActions = ReturnType<typeof useNoteActions>;
+
+/**
+ * Saves a project's notes as Markdown where the user picks, and says where; the path, or null
+ * when cancelled or failed (a toast says why).
+ */
+export function useExportNotes(root: string) {
+    const port = useNotesPort();
+    const showToast = useShowToast();
+    return useCallback(async () => {
+        try {
+            const path = await port.exportNotes(root);
+            if (path) showToast({ title: 'Notes exported', description: path });
+            return path;
+        } catch (error) {
+            showToast(errorToast('Could not export the notes', error));
+            return null;
+        }
+    }, [root, port, showToast]);
+}
+
+/** How many notes a project has, counted each time it is asked: notes just written count. */
+export function useNotesCount(root: string) {
+    const port = useNotesPort();
+    return useQuery({
+        queryKey: ['notes-count', root],
+        queryFn: () => port.countNotes(root),
+        gcTime: 0,
+        staleTime: 0,
+    });
+}

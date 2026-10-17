@@ -1,12 +1,15 @@
 //! Tauri adapters for a project's notes. Every command names a project of the list.
 
+use std::path::PathBuf;
+
 use tauri::Manager;
+use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
-use crate::infrastructure::notes_files::NotesFiles;
-use crate::modules::notes::{DeletedList, Note, NoteList, NotesStore, ProjectNotes};
-use crate::shared::error::AppError;
+use crate::infrastructure::notes_files::{write_chosen_file, NotesFiles};
+use crate::modules::notes::{to_markdown, DeletedList, Note, NoteList, NotesStore, ProjectNotes};
+use crate::shared::error::{user_facing, AppError, UserFacingErrorCode};
 
 /// Runs `work` on a project's notes, once the project is known to be in the list.
 async fn with_notes<T: Send + 'static>(
@@ -179,6 +182,55 @@ pub(crate) async fn open_note_list(
 ) -> Result<(), AppError> {
     with_notes("open_note_list", app, root, move |store, files, root| {
         store.open_list(files, root, &id)
+    })
+    .await
+}
+
+#[tauri::command]
+/// How many notes a project has, open and done: what removing it would delete.
+pub(crate) async fn count_notes(app: tauri::AppHandle, root: String) -> Result<u32, AppError> {
+    with_notes("count_notes", app, root, |store, files, root| {
+        Ok(store.count(files, root)? as u32)
+    })
+    .await
+}
+
+#[tauri::command]
+/// Asks where to save a project's notes as Markdown and writes them there; the path written, or
+/// `None` when cancelled. Never inside a project's repository: Sidekyk writes in none.
+pub(crate) async fn export_notes(
+    app: tauri::AppHandle,
+    root: String,
+) -> Result<Option<String>, AppError> {
+    blocking("export_notes", app, move |app| {
+        let projects = app.state::<ProjectsState>();
+        let project = projects.project(&root)?;
+        let Some(path) = app
+            .dialog()
+            .file()
+            .set_title("Export notes")
+            .set_file_name(format!("{}-notes.md", project.name))
+            .add_filter("Markdown", &["md"])
+            .blocking_save_file()
+        else {
+            return Ok(None);
+        };
+        let path: PathBuf = path.into_path()?;
+        if projects
+            .list()
+            .projects
+            .iter()
+            .any(|p| path.starts_with(&p.root))
+        {
+            return Err(user_facing(UserFacingErrorCode::ExportInRepository));
+        }
+        let markdown = app.state::<NotesStore>().with_notes(
+            app.state::<NotesFiles>().inner(),
+            &root,
+            |lists, notes| to_markdown(&project.name, lists, notes),
+        )?;
+        write_chosen_file(&path, markdown.as_bytes())?;
+        Ok(Some(path.to_string_lossy().into_owned()))
     })
     .await
 }

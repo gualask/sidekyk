@@ -8,6 +8,11 @@ use anyhow::Context;
 
 use crate::modules::notes::NotesStorage;
 
+/// Writes a file the user chose, such as notes exported, whole.
+pub(crate) fn write_chosen_file(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+    fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
+}
+
 /// What a write writes before it renames over the file.
 const TEMP_SUFFIX: &str = ".tmp";
 
@@ -111,6 +116,16 @@ impl NotesStorage for NotesFiles {
         fs::rename(&temp, &path).with_context(|| format!("replacing {}", path.display()))
     }
 
+    fn remove_folder(&self, folder: &str) -> anyhow::Result<()> {
+        let path = self.path(folder, None)?;
+        match fs::remove_dir_all(&path) {
+            Err(error) if error.kind() != ErrorKind::NotFound => {
+                Err(error).with_context(|| format!("removing {}", path.display()))
+            }
+            _ => Ok(()),
+        }
+    }
+
     fn remove(&self, folder: &str, file: &str) -> anyhow::Result<()> {
         let path = self.path(folder, Some(file))?;
         match fs::remove_file(&path) {
@@ -146,6 +161,11 @@ mod tests {
         notes.remove("shop-123456", "a.json").unwrap();
         notes.remove("shop-123456", "a.json").unwrap();
         assert_eq!(notes.read("shop-123456", "a.json", 3).unwrap(), None);
+
+        notes.write("shop-123456", "b.json", b"x").unwrap();
+        notes.remove_folder("shop-123456").unwrap();
+        notes.remove_folder("shop-123456").unwrap();
+        assert!(notes.folders().unwrap().is_empty());
     }
 
     #[test]

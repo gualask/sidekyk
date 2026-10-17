@@ -149,6 +149,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             // as in `src-tauri/src/modules/projects/list.rs`: the next project shows, else the previous
             removeProject: async (root) => {
                 const index = list.projects.indexOf(project(root));
+                notes.drop(root);
                 const projects = list.projects.filter((p) => p.root !== root);
                 const next = projects[index] ?? projects.at(-1) ?? null;
                 const { [root]: _gone, ...layouts } = list.layouts;

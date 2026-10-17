@@ -4,11 +4,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 
 import { flushSync } from 'react-dom';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
-import {
-    useActivateProject,
-    useAddProject,
-    useRemoveProject,
-} from '../application/projects.queries';
+import { useActivateProject, useAddProject } from '../application/projects.queries';
 import type { ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
 
@@ -44,16 +40,18 @@ function moveInGrid(event: KeyboardEvent<HTMLElement>) {
 export function ProjectsOverview({
     list,
     onOpen,
+    onRemove,
     summary,
 }: {
     list: ProjectList;
     /** A project was picked or added: show it. */
     onOpen: () => void;
+    /** A project's removal asked for: the app asks what to do with what it holds, then removes. */
+    onRemove: (project: ProjectInfo) => void;
     /** What the panels tell about a project, below its name. */
     summary: (project: ProjectInfo) => ReactNode;
 }) {
     const add = useAddProject(onOpen);
-    const remove = useRemoveProject();
     const activate = useActivateProject();
     // the card the zoom grows from: the one being opened, else the project on screen
     const [opening, setOpening] = useState<string | null>(null);
@@ -83,7 +81,7 @@ export function ProjectsOverview({
                             activate(project.root);
                             onOpen();
                         }}
-                        onRemove={() => remove.mutate(project.root)}
+                        onRemove={() => onRemove(project)}
                     >
                         {summary(project)}
                     </ProjectCard>

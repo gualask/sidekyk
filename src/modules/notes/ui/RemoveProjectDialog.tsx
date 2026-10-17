@@ -1,0 +1,90 @@
+import { AlertDialog } from '@base-ui/react/alert-dialog';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useEffectEvent, useState } from 'react';
+import type { ProjectInfo } from '@/shared/projects/project-info';
+import { notesKey, useExportNotes, useNotesCount } from '../application/notes.queries';
+
+/**
+ * Removing a project deletes its notes: with none, it goes at once; with some, this asks first,
+ * to export them (then remove) or to delete them with it. Nothing is left on disk without the
+ * project. Loaded with the first removal.
+ */
+export function RemoveProjectDialog({
+    project,
+    onRemove,
+    onClose,
+}: {
+    project: ProjectInfo;
+    /** Removes the project, its notes with it. */
+    onRemove: () => void;
+    onClose: () => void;
+}) {
+    const client = useQueryClient();
+    const exportNotes = useExportNotes(project.root);
+    const [exporting, setExporting] = useState(false);
+    const count = useNotesCount(project.root);
+
+    const remove = useEffectEvent(() => {
+        // what was read of its notes goes too: added again, it starts with none
+        client.removeQueries({ queryKey: notesKey(project.root) });
+        onRemove();
+        onClose();
+    });
+    // none to lose: it goes at once
+    useEffect(() => {
+        if (count.data === 0) remove();
+    }, [count.data]);
+
+    // asked whenever notes may be lost: counted, or not countable
+    const notes = count.data ?? null;
+    return (
+        <AlertDialog.Root
+            open={(notes !== null && notes > 0) || count.isError}
+            onOpenChange={(open) => {
+                if (!open) onClose();
+            }}
+        >
+            <AlertDialog.Portal>
+                <AlertDialog.Backdrop className="dialog-backdrop" />
+                <AlertDialog.Popup className="dialog-popup top-[22vh] w-[min(440px,calc(100vw-32px))] p-4">
+                    <AlertDialog.Title className="text-[15px] font-bold">
+                        Remove {project.name}?
+                    </AlertDialog.Title>
+                    <AlertDialog.Description className="mt-1.5 text-ui-text-secondary">
+                        {notes === null
+                            ? 'Its notes are'
+                            : notes === 1
+                              ? 'Its note is'
+                              : `Its ${notes} notes are`}{' '}
+                        deleted with it. Export them first to keep them. The repository stays as it
+                        is.
+                    </AlertDialog.Description>
+                    <div className="mt-4 flex flex-wrap justify-end gap-2">
+                        <AlertDialog.Close className="btn-ghost-sm">Cancel</AlertDialog.Close>
+                        <button
+                            type="button"
+                            className="btn-ghost-sm"
+                            disabled={exporting}
+                            onClick={async () => {
+                                setExporting(true);
+                                const path = await exportNotes();
+                                setExporting(false);
+                                if (path) remove();
+                            }}
+                        >
+                            Export notes…
+                        </button>
+                        <button
+                            type="button"
+                            className="btn-ghost-sm text-ui-danger hover:bg-ui-danger-soft hover:text-ui-danger-soft-text"
+                            disabled={exporting}
+                            onClick={remove}
+                        >
+                            Remove and delete notes
+                        </button>
+                    </div>
+                </AlertDialog.Popup>
+            </AlertDialog.Portal>
+        </AlertDialog.Root>
+    );
+}

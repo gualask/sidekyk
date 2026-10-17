@@ -5,6 +5,8 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
+use crate::infrastructure::notes_files::NotesFiles;
+use crate::modules::notes::NotesStore;
 use crate::modules::projects::{ProjectList, TilesLayout};
 use crate::shared::error::AppError;
 
@@ -46,14 +48,18 @@ pub(crate) async fn activate_project(
 }
 
 #[tauri::command]
-/// Forgets a project; its repository is left as it is.
+/// Forgets a project and deletes its notes; its repository is left as it is. The notes go first:
+/// if they cannot, the project stays, so nothing is left on disk without it.
 pub(crate) async fn remove_project(
     app: tauri::AppHandle,
     root: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
-        app.state::<ProjectsState>()
-            .update(app, |list| list.remove(&root))
+        let projects = app.state::<ProjectsState>();
+        projects.project(&root)?;
+        app.state::<NotesStore>()
+            .delete_project(app.state::<NotesFiles>().inner(), &root)?;
+        projects.update(app, |list| list.remove(&root))
     })
     .await
 }

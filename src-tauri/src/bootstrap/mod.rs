@@ -134,6 +134,8 @@ pub(crate) fn run() {
             tauri_commands::notes::delete_note_list,
             tauri_commands::notes::restore_note_list,
             tauri_commands::notes::open_note_list,
+            tauri_commands::notes::count_notes,
+            tauri_commands::notes::export_notes,
             tauri_commands::search::search,
             tauri_commands::search::search_contents,
             tauri_commands::search::stop_content_search,

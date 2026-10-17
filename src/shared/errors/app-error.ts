@@ -5,6 +5,8 @@ interface AppErrorPayload {
 }
 
 const USER_MESSAGES: Record<string, string> = {
+    export_in_repository:
+        'Sidekyk never writes inside a repository: pick a folder outside your projects.',
     file_missing: 'This file is no longer in the repository: it was moved or deleted.',
     git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
     git_timed_out:

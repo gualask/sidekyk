@@ -16,4 +16,7 @@ pub(crate) trait NotesStorage: Send + Sync {
 
     /// Removes a file; one already gone is not an error.
     fn remove(&self, folder: &str, file: &str) -> anyhow::Result<()>;
+
+    /// Removes a folder and what is in it; one already gone is not an error.
+    fn remove_folder(&self, folder: &str) -> anyhow::Result<()>;
 }

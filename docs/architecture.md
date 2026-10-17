@@ -243,6 +243,13 @@ drops it.
 - A note is at most 1 MiB (`note_too_long`); a missing note or list is `note_missing` /
   `note_list_missing`; a broken file is skipped and logged, never removed; a change that changes
   nothing writes nothing. A new folder never takes one in use (two projects of one name).
+- Export (`export_notes`, the header's ⋯): Markdown (`to_markdown`: a section per list, notes
+  between `---`, done ones under `### Done`) where the save dialog says, never inside a project's
+  repository (`export_in_repository`; compared by path components, case as given).
+- Removing a project deletes its notes first (`remove_project`; if they cannot go, the project
+  stays). The frontend asks before (`RemoveProjectDialog`, notes module, lazy, from the overview's
+  ⋯ and the missing-repository problem): no notes (`count_notes`, files counted, nothing read),
+  it goes at once; else export then remove, or remove and delete; a count that fails asks too.
 - `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
 
 ### Tray

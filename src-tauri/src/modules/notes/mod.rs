@@ -3,9 +3,11 @@
 
 mod book;
 mod contracts;
+mod markdown;
 mod ports;
 mod store;
 
 pub(crate) use contracts::{DeletedList, Note, NoteList, ProjectNotes};
+pub(crate) use markdown::to_markdown;
 pub(crate) use ports::NotesStorage;
 pub(crate) use store::NotesStore;

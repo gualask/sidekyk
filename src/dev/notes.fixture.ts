@@ -133,7 +133,7 @@ function largeBook(): Book {
 export function fixtureNotes(
     initial: (root: string) => 'review' | 'large' | 'empty',
     checkRoot: (root: string) => void,
-): NotesPort & { peek: (root: string) => ProjectNotes } {
+): NotesPort & { peek: (root: string) => ProjectNotes; drop: (root: string) => void } {
     const books = new Map<string, Book>();
     const book = (root: string): Book => {
         checkRoot(root);
@@ -168,6 +168,10 @@ export function fixtureNotes(
     return {
         /** The notes as they are, for the palette's search. */
         peek: (root) => snapshot(book(root)),
+        /** A project removed takes its notes, as the backend's `remove_project`. */
+        drop: (root) => {
+            books.delete(root);
+        },
         getNotes: async (root) => snapshot(book(root)),
         addNote: async (root, listId, text) => {
             const b = book(root);
@@ -247,6 +251,12 @@ export function fixtureNotes(
             b.notes.push(...deleted.notes.map((n) => ({ ...n })));
             b.openList = deleted.list.id;
             return snapshot(b);
+        },
+        countNotes: async (root) => book(root).notes.length,
+        // as if saved where the dialog first offers
+        exportNotes: async (root) => {
+            book(root);
+            return `${root.split('/').slice(0, 3).join('/')}/Documents/${root.split('/').pop()}-notes.md`;
         },
         openList: async (root, id) => {
             const b = book(root);

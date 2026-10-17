@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
+import { loadRemoveProjectDialog, newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -11,6 +11,7 @@ import {
     useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
+    useRemoveProject,
 } from '@/modules/projects';
 import {
     ChangeCount,
@@ -49,6 +50,10 @@ import { useZoomGestures } from './zoom-gestures';
 const ProjectsOverview = preloadable(loadProjectsOverview, (module) => module.ProjectsOverview);
 const SettingsDialog = preloadable(loadSettingsDialog, (module) => module.SettingsDialog);
 const CommandPalette = preloadable(loadCommandPalette, (module) => module.CommandPalette);
+const RemoveProjectDialog = preloadable(
+    loadRemoveProjectDialog,
+    (module) => module.RemoveProjectDialog,
+);
 
 /** Loaded when first asked for: the first paint does not show it. */
 const ShortcutsHelp = lazy(() =>
@@ -108,7 +113,10 @@ export function AppShell() {
         setPalette(closePalette);
         setSettingsOpen(true);
     }, []);
-    const problems = useProblems(projects.data, openSettings);
+    // a project to remove, once asked what to do with its notes
+    const [removing, setRemoving] = useState<ProjectInfo | null>(null);
+    const { mutate: removeProject } = useRemoveProject();
+    const problems = useProblems(projects.data, openSettings, setRemoving);
     const activate = useActivateProject();
 
     /**
@@ -286,9 +294,20 @@ export function AppShell() {
                         show={show}
                         findInFiles={findInFiles}
                         idle={idle}
+                        onRemove={setRemoving}
                     />
                 ) : null}
             </main>
+            {removing ? (
+                <Suspense fallback={null}>
+                    <RemoveProjectDialog.Component
+                        key={removing.root}
+                        project={removing}
+                        onRemove={() => removeProject(removing.root)}
+                        onClose={() => setRemoving(null)}
+                    />
+                </Suspense>
+            ) : null}
             {helpOpen ? (
                 <Suspense fallback={null}>
                     <ShortcutsHelp onClose={() => setHelpOpen(false)} />
@@ -345,6 +364,7 @@ function Workspace({
     layout,
     onSplit,
     onMinimize,
+    onRemove,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
@@ -361,6 +381,8 @@ function Workspace({
     layout: TilesLayout;
     onSplit: (split: number) => void;
     onMinimize: (panel: PanelDefinition) => void;
+    /** Asks to remove a project. */
+    onRemove: (project: ProjectInfo) => void;
 }) {
     const targetOf = (id: string) => (target?.panel === id ? target.target : null);
     // the side column's tiles not minimized; without them, Changes takes the whole width
@@ -374,6 +396,7 @@ function Workspace({
                 <ProjectsOverview.Component
                     list={list}
                     onOpen={() => zoom(1)}
+                    onRemove={onRemove}
                     summary={(card) =>
                         SUMMARIES.map(({ id, Component }) => (
                             <Suspense key={id} fallback={null}>
