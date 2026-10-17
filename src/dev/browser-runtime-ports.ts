@@ -184,8 +184,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getSummary: async (root) => snapshot(root).summary,
             getFileDiff: async (root, request) => {
                 readable(root);
-                const diff = large(root) ? largeDiff() : reviewDiff(request);
-                return request.wholeFile ? wholeFileDiff(diff) : diff;
+                if (!large(root)) return reviewDiff(request);
+                return request.wholeFile ? wholeFileDiff(largeDiff()) : largeDiff();
             },
             // every project has the same history, even with a clean working tree
             getRecentCommits: async (root) => {

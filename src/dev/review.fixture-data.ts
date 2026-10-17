@@ -1,6 +1,8 @@
 import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/repository';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
+import { CHECKOUT_TS, type LongFile, ORDERS_TS } from './long.fixture-data';
+import { wholeFileDiff } from './whole-file.fixture';
 
 export const FIXTURE_REPOSITORY: ProjectInfo = {
     root: '/Users/dev/Projects/shop',
@@ -85,7 +87,23 @@ index 0000000..3f2a9c1
 +INSERT INTO coupons (code, percent) VALUES ('VIP25', 25);
 `;
 
-type FixtureFile = ChangedFile & { diff: string };
+/** A file of the fixture, its diff, and the whole file when the fixture has it. */
+type FixtureFile = ChangedFile & { diff: string; whole?: string };
+
+/** A long file of the fixture, changed in several places, in an area. */
+function longChange(path: string, area: 'unstaged' | 'staged', file: LongFile): FixtureFile {
+    return {
+        path,
+        origPath: null,
+        area,
+        kind: 'modified',
+        additions: file.additions,
+        deletions: file.deletions,
+        binary: false,
+        diff: file.diff.text,
+        whole: file.whole.text,
+    };
+}
 
 const FILES: FixtureFile[] = [
     {
@@ -98,6 +116,7 @@ const FILES: FixtureFile[] = [
         binary: false,
         diff: TOTAL_TS,
     },
+    longChange('src/cart/checkout.ts', 'unstaged', CHECKOUT_TS),
     {
         path: 'src/legacy/discounts.ts',
         origPath: null,
@@ -128,6 +147,7 @@ const FILES: FixtureFile[] = [
         binary: false,
         diff: SEED_SQL,
     },
+    longChange('src/api/orders.ts', 'staged', ORDERS_TS),
     {
         path: 'src/utils/money.ts',
         origPath: 'src/money.ts',
@@ -151,7 +171,7 @@ const FILES: FixtureFile[] = [
 ];
 
 export function reviewSnapshot(clean: boolean): RepositorySnapshot {
-    const files = clean ? [] : FILES.map(({ diff: _diff, ...file }) => file);
+    const files = clean ? [] : FILES.map(({ diff: _diff, whole: _whole, ...file }) => file);
     const branch = {
         head: 'feature/coupons',
         commit: 'a1b2c3d',
@@ -162,7 +182,12 @@ export function reviewSnapshot(clean: boolean): RepositorySnapshot {
     return { files, summary: fixtureSummary(branch, files) };
 }
 
-export function reviewDiff(file: Pick<ChangedFile, 'area' | 'path'>): UnifiedDiff {
+/** A file's diff, or its whole file with its changes (`wholeFile`), as the backend answers. */
+export function reviewDiff(
+    file: Pick<ChangedFile, 'area' | 'path'> & { wholeFile: boolean },
+): UnifiedDiff {
     const match = FILES.find((f) => f.area === file.area && f.path === file.path);
-    return { text: match?.diff ?? '', truncated: false };
+    const diff = { text: match?.diff ?? '', truncated: false };
+    if (!file.wholeFile) return diff;
+    return match?.whole ? { text: match.whole, truncated: false } : wholeFileDiff(diff);
 }
