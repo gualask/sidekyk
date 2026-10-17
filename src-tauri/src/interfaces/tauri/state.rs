@@ -12,6 +12,7 @@ use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
+use crate::modules::notes::ProjectNotes;
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
     self, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths, RepositoryBackend,
@@ -159,21 +160,27 @@ impl ProjectsState {
         &self,
         backend: &dyn RepositoryBackend,
         request: &SearchRequest,
+        notes_of: impl FnOnce(&str) -> Option<ProjectNotes>,
     ) -> SearchResults {
         let list = self.list();
-        search::search(request, &list.projects, |root| {
-            let tree = self
+        search::search(
+            request,
+            &list.projects,
+            |root| {
+                let tree = self
                 .file_tree(backend, root)
                 .inspect_err(
                     |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
                 )
                 .ok()?;
-            let changed = lock(&self.changed)
-                .get(root)
-                .cloned()
-                .unwrap_or_else(|| Arc::from([]));
-            Some(ProjectFiles { tree, changed })
-        })
+                let changed = lock(&self.changed)
+                    .get(root)
+                    .cloned()
+                    .unwrap_or_else(|| Arc::from([]));
+                Some(ProjectFiles { tree, changed })
+            },
+            notes_of,
+        )
     }
 
     /// A project's files, read again only when they may have changed, sharing the read in flight.

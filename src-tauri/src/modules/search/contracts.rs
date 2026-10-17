@@ -83,7 +83,42 @@ pub(crate) struct ContentEnd {
     pub(crate) cancelled: bool,
 }
 
-/// The matches, best first in each group. With nothing typed: every project and panel, no files.
+/// A list of notes of the project searched.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ListMatch {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    /// In the name.
+    pub(crate) highlights: Vec<Highlight>,
+}
+
+/// Part of a note around the text found in it, on one line, `…` where cut.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Snippet {
+    pub(crate) text: String,
+    pub(crate) highlights: Vec<Highlight>,
+}
+
+/// A note of the project searched: its first line matched, or it holds the text typed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NoteMatch {
+    pub(crate) id: String,
+    pub(crate) list: String,
+    pub(crate) list_name: String,
+    /// Its first line that is not blank.
+    pub(crate) title: String,
+    /// In the title; none when the note was found by its text.
+    pub(crate) highlights: Vec<Highlight>,
+    /// Where the text typed is in the note, when found that way.
+    pub(crate) snippet: Option<Snippet>,
+    pub(crate) done: bool,
+}
+
+/// The matches, best first in each group. With nothing typed: every project and panel, no files,
+/// lists or notes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SearchResults {
@@ -92,6 +127,8 @@ pub(crate) struct SearchResults {
     pub(crate) files: Vec<FileMatch>,
     /// The files that matched past the ones sent.
     pub(crate) more_files: u32,
+    pub(crate) lists: Vec<ListMatch>,
+    pub(crate) notes: Vec<NoteMatch>,
 }
 
 #[cfg(test)]
@@ -138,6 +175,23 @@ mod tests {
                 },
             ],
             more_files: 2,
+            lists: vec![ListMatch {
+                id: "l1".into(),
+                name: "Release".into(),
+                highlights: vec![[0, 2]],
+            }],
+            notes: vec![NoteMatch {
+                id: "n1".into(),
+                list: "l1".into(),
+                list_name: "Release".into(),
+                title: "Bump version".into(),
+                highlights: vec![],
+                snippet: Some(Snippet {
+                    text: "…the version…".into(),
+                    highlights: vec![[5, 12]],
+                }),
+                done: false,
+            }],
         };
         assert_eq!(
             serde_json::to_value(&results).unwrap(),
@@ -148,7 +202,17 @@ mod tests {
                     { "path": "src/total.ts", "mark": "added", "highlights": [[4, 7]] },
                     { "path": "README.md", "mark": null, "highlights": [] }
                 ],
-                "moreFiles": 2
+                "moreFiles": 2,
+                "lists": [{ "id": "l1", "name": "Release", "highlights": [[0, 2]] }],
+                "notes": [{
+                    "id": "n1",
+                    "list": "l1",
+                    "listName": "Release",
+                    "title": "Bump version",
+                    "highlights": [],
+                    "snippet": { "text": "…the version…", "highlights": [[5, 12]] },
+                    "done": false
+                }]
             })
         );
     }

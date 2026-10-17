@@ -88,7 +88,9 @@ Explore and copy:
 
 ## Notes
 
-- [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes)
+- [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes).
+      Built (2026-10-17): storage, full screen and tile, reorder, Undo toasts, ⌘K by name; left:
+      long lines setting (`⌥Z`), ⌘N from anywhere
 - [ ] Export a project's notes to Markdown from the Notes panel's menu (also offered when removing
       a project with notes)
 - [ ] Removing a project with notes asks: export or delete (nothing left on disk); a moved

@@ -1,3 +1,4 @@
+import type { ProjectNotes } from '@/modules/notes';
 import type { ChangedFile } from '@/modules/repository';
 import type {
     ContentEnd,
@@ -55,9 +56,17 @@ export function fixtureSearch(
     request: SearchRequest,
     projects: readonly ProjectInfo[],
     files: { paths: readonly string[]; changed: readonly ChangedFile[] } | null,
+    notes: ProjectNotes | null,
 ): SearchResults {
     const query = request.query.trim();
-    const results: SearchResults = { projects: [], panels: [], files: [], moreFiles: 0 };
+    const results: SearchResults = {
+        projects: [],
+        panels: [],
+        files: [],
+        moreFiles: 0,
+        lists: [],
+        notes: [],
+    };
     for (const project of projects) {
         const highlights = match(project.name, query);
         if (highlights) results.projects.push({ ...project, highlights });
@@ -66,6 +75,7 @@ export function fixtureSearch(
         const highlights = match(title, query);
         if (highlights) results.panels.push({ index, highlights });
     });
+    if (query && notes) searchNotes(query, notes, results);
     if (!query || !files) return results;
     const marks = marksByPath(files.changed);
     // a deleted file is not in the tree, but Changes lists it
@@ -82,6 +92,63 @@ export function fixtureSearch(
         }
     }
     return results;
+}
+
+/** A note's first line that is not blank. */
+function title(text: string): string {
+    return (
+        text
+            .split('\n')
+            .map((line) => line.trim())
+            .find(Boolean) ?? ''
+    );
+}
+
+/**
+ * As the backend's `search_notes`: lists by name, notes by first line, else by the text typed in
+ * them (two letters at least), with the part around it. No scoring: notes keep their order.
+ */
+function searchNotes(query: string, notes: ProjectNotes, results: SearchResults) {
+    for (const list of notes.lists) {
+        const highlights = match(list.name, query);
+        if (highlights) results.lists.push({ ...list, highlights });
+    }
+    const listName = (id: string) => notes.lists.find((list) => list.id === id)?.name ?? '';
+    // open by place, then done, the last done first
+    const ordered = [...notes.notes].sort((a, b) => {
+        if (a.done === null || b.done === null) {
+            return a.done === b.done ? a.position - b.position : a.done === null ? -1 : 1;
+        }
+        return b.done - a.done;
+    });
+    const byText: SearchResults['notes'] = [];
+    for (const note of ordered) {
+        const found = {
+            id: note.id,
+            list: note.list,
+            listName: listName(note.list),
+            title: title(note.text),
+            done: note.done !== null,
+        };
+        const highlights = match(found.title, query);
+        if (highlights) {
+            results.notes.push({ ...found, highlights, snippet: null });
+            continue;
+        }
+        const at = query.length < 2 ? -1 : note.text.toLowerCase().indexOf(query.toLowerCase());
+        if (at < 0) continue;
+        const start = Math.max(0, at - 24);
+        const before = (start > 0 ? '…' : '') + note.text.slice(start, at).replace(/\s+/g, ' ');
+        const text = `${before}${note.text.slice(at, at + query.length)}${note.text
+            .slice(at + query.length, at + query.length + 48)
+            .replace(/\s+/g, ' ')}…`;
+        byText.push({
+            ...found,
+            highlights: [],
+            snippet: { text, highlights: [[before.length, before.length + query.length]] },
+        });
+    }
+    results.notes.push(...byText);
 }
 
 /** As the backend's `MAX_LINES`. */

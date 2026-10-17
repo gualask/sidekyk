@@ -11,6 +11,8 @@ import { autosize } from './notes-layout';
 
 /** The room between cards, and around them, in pixels. */
 const GAP = 6;
+/** How long a note brought into view stays lit up, as its animation (`.note-flash`). */
+const FLASH_MS = 1200;
 
 type Item = { kind: 'note'; note: Note; index: number } | { kind: 'done'; count: number };
 
@@ -25,6 +27,8 @@ export function NoteCards({
     composer,
     focusComposer,
     onComposerFocused,
+    reveal,
+    onRevealed,
     onReorder,
 }: {
     notes: ProjectNotes;
@@ -35,6 +39,9 @@ export function NoteCards({
     /** The field takes the focus as it shows, for a list just made. */
     focusComposer: boolean;
     onComposerFocused: () => void;
+    /** A note of the list to bring into view, and light up for a moment (one found in the palette). */
+    reveal: string | null;
+    onRevealed: () => void;
     /** Starts reordering the open notes, on one of them. */
     onReorder: (id: string) => void;
 }) {
@@ -69,6 +76,27 @@ export function NoteCards({
         paddingEnd: 12,
         overscan: 6,
     });
+
+    // the note brought into view, lit up for a moment; a done one unfolds its group first
+    const [flash, setFlash] = useState<string | null>(null);
+    useEffect(() => {
+        if (!reveal) return;
+        const index = items.findIndex((item) => item.kind === 'note' && item.note.id === reveal);
+        if (index < 0 && !showDone && done.some((note) => note.id === reveal)) {
+            setShowDone(true);
+            return;
+        }
+        if (index >= 0) {
+            virtualizer.scrollToIndex(index, { align: 'center' });
+            setFlash(reveal);
+        }
+        onRevealed();
+    }, [reveal, items, showDone, done, virtualizer, onRevealed]);
+    useEffect(() => {
+        if (!flash) return;
+        const timer = window.setTimeout(() => setFlash(null), FLASH_MS);
+        return () => window.clearTimeout(timer);
+    }, [flash]);
 
     const empty = open.length === 0 && done.length === 0;
 
@@ -115,6 +143,7 @@ export function NoteCards({
                                 ) : (
                                     <NoteCard
                                         note={item.note}
+                                        flash={flash === item.note.id}
                                         lists={notes.lists}
                                         editing={editing === item.note.id}
                                         onEdit={(on) => setEditing(on ? item.note.id : null)}

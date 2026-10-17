@@ -207,6 +207,13 @@ deleted). Words match independently, case ignored; matched letters return as UTF
 most 500 files, the best picked without sorting the rest. From 20,000 paths scoring runs on up to
 8 threads.
 
+The same project's notes (`modules/search/notes.rs`, read through `NotesStore` if not in memory):
+lists by name; notes by first line (fuzzy), else by the text typed anywhere in them (substring,
+case ignored, 2 characters at least) with the part around it on one line; open before done, at
+most 50. 1,000 notes: 3.5 ms a key. The palette shows lists and notes before files; `↵` opens
+Notes at the same zoom (`notesTarget`: the list, the note scrolled to and lit up, a done one's
+group unfolded), its tile back from the top bar if minimized.
+
 `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
 `open_file` (never through a link), up to 8 threads taking the next file, a fixed buffer each,
 binary skipped at the first NUL, UTF-16 by BOM, the first 2 MiB per file (what the viewer

@@ -11,6 +11,8 @@ describe('paletteRows', () => {
                 panels: [],
                 files: [{ path: 'src/total.ts', mark: 'modified', highlights: [[4, 7]] }],
                 moreFiles: 3,
+                lists: [],
+                notes: [],
             },
             PANELS,
             'shop',
@@ -25,6 +27,53 @@ describe('paletteRows', () => {
         ]);
     });
 
+    it('puts lists and notes before files, a note by its first line or the text found', () => {
+        const { items, rows } = paletteRows(
+            {
+                projects: [],
+                panels: [],
+                files: [{ path: 'notes.md', mark: null, highlights: [] }],
+                moreFiles: 0,
+                lists: [{ id: 'l1', name: 'Release', highlights: [[0, 2]] }],
+                notes: [
+                    {
+                        id: 'n1',
+                        list: 'l1',
+                        listName: 'Release',
+                        title: 'Bump version',
+                        highlights: [[0, 2]],
+                        snippet: null,
+                        done: false,
+                    },
+                    {
+                        id: 'n2',
+                        list: 'l1',
+                        listName: 'Release',
+                        title: 'Smoke test',
+                        highlights: [],
+                        snippet: { text: '…the downloads…', highlights: [[5, 14]] },
+                        done: true,
+                    },
+                ],
+            },
+            PANELS,
+            'shop',
+        );
+        expect(rows.flatMap((row) => (row.kind === 'group' ? [row.label] : []))).toEqual([
+            'Note lists in shop',
+            'Notes in shop',
+            'Files in shop',
+        ]);
+        expect(items[2]).toEqual({
+            kind: 'note',
+            id: 'n2',
+            list: 'l1',
+            hint: 'Release · done',
+            label: '…the downloads…',
+            highlights: [[5, 14]],
+        });
+    });
+
     it('names a panel by its definition and skips one it does not know', () => {
         const { items } = paletteRows(
             {
@@ -35,6 +84,8 @@ describe('paletteRows', () => {
                 ],
                 files: [],
                 moreFiles: 0,
+                lists: [],
+                notes: [],
             },
             PANELS,
             'shop',

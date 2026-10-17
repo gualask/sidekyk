@@ -40,13 +40,46 @@ interface FileMatch {
     highlights: Highlight[];
 }
 
-/** The matches, best first in each group. With nothing typed: every project and panel, no files. */
+/** A list of notes of the project searched. */
+interface ListMatch {
+    id: string;
+    name: string;
+    /** In the name. */
+    highlights: Highlight[];
+}
+
+/** Part of a note around the text found in it, on one line, `…` where cut. */
+interface Snippet {
+    text: string;
+    highlights: Highlight[];
+}
+
+/** A note of the project searched: its first line matched, or it holds the text typed. */
+interface NoteMatch {
+    id: string;
+    list: string;
+    listName: string;
+    /** Its first line that is not blank. */
+    title: string;
+    /** In the title; none when the note was found by its text. */
+    highlights: Highlight[];
+    /** Where the text typed is in the note, when found that way. */
+    snippet: Snippet | null;
+    done: boolean;
+}
+
+/**
+ * The matches, best first in each group. With nothing typed: every project and panel, no files,
+ * lists or notes.
+ */
 export interface SearchResults {
     projects: ProjectMatch[];
     panels: PanelMatch[];
     files: FileMatch[];
     /** The files that matched past the ones sent. */
     moreFiles: number;
+    lists: ListMatch[];
+    notes: NoteMatch[];
 }
 
 /** A line where the text searched is: its number, its text (cut around the first match when long,

@@ -204,6 +204,18 @@ mod tests {
                     .unwrap();
             })
         );
+        // the palette over every note, as at each key typed: a word in no first line, read in all
+        let request: crate::modules::search::SearchRequest = serde_json::from_value(
+            serde_json::json!({ "query": "zzqx", "panels": [], "root": root }),
+        )
+        .unwrap();
+        let snapshot = store.notes(&files, root).unwrap();
+        println!(
+            "palette over 1,000 notes: {:?}",
+            median(50, || {
+                crate::modules::search::search(&request, &[], |_| None, |_| Some(snapshot.clone()));
+            })
+        );
         println!(
             "move a note: {:?}",
             median(50, || {

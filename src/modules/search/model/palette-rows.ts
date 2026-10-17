@@ -20,6 +20,17 @@ export type PaletteItem =
           label: string;
           highlights: Highlight[];
       }
+    | { kind: 'list'; id: string; label: string; highlights: Highlight[] }
+    | {
+          kind: 'note';
+          id: string;
+          list: string;
+          /** Its list, and whether it is done: the row's hint. */
+          hint: string;
+          /** Its first line, or the part of it where the text typed is. */
+          label: string;
+          highlights: Highlight[];
+      }
     | {
           kind: 'line';
           path: string;
@@ -68,6 +79,27 @@ export function paletteRows(
                       ]
                     : [];
             }),
+        },
+        // before the files, which a few letters match by the hundred
+        {
+            label: projectName ? `Note lists in ${projectName}` : 'Note lists',
+            items: results.lists.map((list) => ({
+                kind: 'list',
+                id: list.id,
+                label: list.name,
+                highlights: list.highlights,
+            })),
+        },
+        {
+            label: projectName ? `Notes in ${projectName}` : 'Notes',
+            items: results.notes.map((note) => ({
+                kind: 'note',
+                id: note.id,
+                list: note.list,
+                hint: note.done ? `${note.listName} · done` : note.listName,
+                label: note.snippet?.text ?? note.title,
+                highlights: note.snippet?.highlights ?? note.highlights,
+            })),
         },
         {
             label: projectName ? `Files in ${projectName}` : 'Files',

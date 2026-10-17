@@ -109,4 +109,20 @@
             animation: none;
         }
     }
+
+    /* Something brought into view, such as a note found in the palette: a ring that fades. */
+    .note-flash {
+        animation: note-flash 1200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    @keyframes note-flash {
+        from {
+            box-shadow: 0 0 0 3px var(--ui-accent);
+        }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .note-flash {
+            animation: none;
+            border-color: var(--ui-accent);
+        }
+    }
 }

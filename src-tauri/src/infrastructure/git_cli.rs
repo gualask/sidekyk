@@ -899,12 +899,17 @@ mod tests {
             "search over {} files: {}",
             tree.files().len(),
             time(20, || {
-                search(&palette, std::slice::from_ref(&repo.info), |_| {
-                    Some(ProjectFiles {
-                        tree: tree.clone(),
-                        changed: changed.clone(),
-                    })
-                });
+                search(
+                    &palette,
+                    std::slice::from_ref(&repo.info),
+                    |_| {
+                        Some(ProjectFiles {
+                            tree: tree.clone(),
+                            changed: changed.clone(),
+                        })
+                    },
+                    |_| None,
+                );
             })
         );
 

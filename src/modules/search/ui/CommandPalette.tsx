@@ -40,6 +40,8 @@ export interface PaletteActions {
     openPanel: (id: string) => void;
     /** A file, or a line of it where a text was found, to look through in the viewer. */
     openFile: (path: string, find?: { query: string; line: number }) => void;
+    /** A list of notes, and one of its notes to bring into view, if any. */
+    openNotes: (list: string, note: string | null) => void;
 }
 
 /**
@@ -98,6 +100,8 @@ export function CommandPalette({
                             if (item.kind === 'project') actions.openProject(item.root);
                             else if (item.kind === 'panel') actions.openPanel(item.id);
                             else if (item.kind === 'file') actions.openFile(item.path);
+                            else if (item.kind === 'list') actions.openNotes(item.id, null);
+                            else if (item.kind === 'note') actions.openNotes(item.list, item.id);
                             else actions.openFile(item.path, { query, line: item.number });
                         }}
                     />
@@ -392,9 +396,13 @@ function Row({
     );
 }
 
-/** What a row says on its right: a panel's key, how a file changed; nothing for a project. */
+/**
+ * What a row says on its right: a panel's key, how a file changed, a note's list; nothing for a
+ * project or a list.
+ */
 function hint(item: PaletteItem) {
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
+    if (item.kind === 'note') return item.hint;
     if (item.kind !== 'file' || !item.mark) return null;
     return <span className={CHANGE_MARK_TONE[item.mark]}>{CHANGE_MARK_WORD[item.mark]}</span>;
 }

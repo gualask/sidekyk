@@ -125,7 +125,7 @@ function largeBook(): Book {
 export function fixtureNotes(
     initial: (root: string) => 'review' | 'large' | 'empty',
     checkRoot: (root: string) => void,
-): NotesPort {
+): NotesPort & { peek: (root: string) => ProjectNotes } {
     const books = new Map<string, Book>();
     const book = (root: string): Book => {
         checkRoot(root);
@@ -163,6 +163,8 @@ export function fixtureNotes(
             .sort((x, y) => x.position - y.position);
 
     return {
+        /** The notes as they are, for the palette's search. */
+        peek: (root) => snapshot(book(root)),
         getNotes: async (root) => snapshot(book(root)),
         addNote: async (root, listId, text) => {
             const b = book(root);

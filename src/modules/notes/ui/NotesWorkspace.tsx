@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { PanelProps } from '@/shared/panels/panel';
@@ -7,6 +7,7 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useNoteActions, useProjectNotes } from '../application/notes.queries';
+import { notesShownBy } from '../model/targets';
 import { ListSwitch } from './ListSwitch';
 import { NoteCards } from './NoteCards';
 import { NoteLists } from './NoteLists';
@@ -21,7 +22,7 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
  * are on the left; in a tile the header's list name opens them. The cards of the open one fill the
  * rest. `⌘N` writes a new note.
  */
-export function NotesWorkspace({ project, header, place, selected: hasKeys }: PanelProps) {
+export function NotesWorkspace({ project, header, target, place, selected: hasKeys }: PanelProps) {
     const root = project.root;
     const { data: notes, error } = useProjectNotes(root);
     const actions = useNoteActions(root);
@@ -30,6 +31,22 @@ export function NotesWorkspace({ project, header, place, selected: hasKeys }: Pa
     const [reorder, setReorder] = useState<string | null>(null);
     // a list just made, whose field takes the focus once it shows
     const [writeIn, setWriteIn] = useState<string | null>(null);
+    // a note to bring into view, as the palette asked
+    const [reveal, setReveal] = useState<string | null>(null);
+    const revealed = useCallback(() => setReveal(null), []);
+
+    // a list, or a note of it, picked in the palette
+    const showTarget = useEffectEvent((list: string, note: string | null) => {
+        setReorder(null);
+        actions.openList(list);
+        setReveal(note);
+    });
+    // once the notes are read, as opening a list changes them
+    const ready = notes !== undefined;
+    useEffect(() => {
+        const shown = ready && target ? notesShownBy(target) : null;
+        if (shown) showTarget(shown.list, shown.note);
+    }, [target, ready]);
 
     const width = useSidebarWidth('notes', LISTS_WIDTH);
     const listsBox = useRef<HTMLDivElement>(null);
@@ -73,6 +90,8 @@ export function NotesWorkspace({ project, header, place, selected: hasKeys }: Pa
                 composer={composer}
                 focusComposer={writeIn === list.id}
                 onComposerFocused={() => setWriteIn(null)}
+                reveal={reveal}
+                onRevealed={revealed}
                 onReorder={setReorder}
             />
         );

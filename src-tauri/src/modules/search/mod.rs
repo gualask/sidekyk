@@ -1,9 +1,10 @@
 //! The command palette's search: what was typed, ranked against the projects, the panels and the
-//! files of the project on screen (`⌘K`), or looked for in those files' contents (`⌘F`). Names are
+//! files, note lists and notes of the project on screen (`⌘K`), or looked for in those files' contents (`⌘F`). Names are
 //! ranked from what the caller hands over; contents are read through the repository's port.
 
 mod contents;
 mod contracts;
+mod notes;
 mod rank;
 
 pub(crate) use contents::{narrows, search_contents, ContentSearch};
@@ -15,6 +16,7 @@ use std::sync::Arc;
 use contracts::{ChangeMark, FileMatch, PanelMatch, ProjectMatch};
 use rank::{Ranker, Texts};
 
+use crate::modules::notes::ProjectNotes;
 use crate::modules::repository::{ChangeKind, ChangedFile, FileTree, RepositoryInfo};
 
 /// At most this many files go back: the palette shows the best, the rest are counted.
@@ -35,13 +37,15 @@ pub(crate) struct ProjectFiles {
     pub(crate) changed: Arc<[ChangedFile]>,
 }
 
-/// Ranks the projects, the panels and the files of the project the request names against the
-/// query. With nothing typed, every project and panel in their order and no file: the palette
-/// opens on where to go. `files_of` is asked only then, as listing a project's files may run git.
+/// Ranks the projects, the panels and the files, lists and notes of the project the request names
+/// against the query. With nothing typed, every project and panel in their order and nothing of
+/// the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
+/// something is typed, as listing a project's files may run git and its notes be read from disk.
 pub(crate) fn search(
     request: &SearchRequest,
     projects: &[RepositoryInfo],
     files_of: impl FnOnce(&str) -> Option<ProjectFiles>,
+    notes_of: impl FnOnce(&str) -> Option<ProjectNotes>,
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
 
@@ -66,19 +70,23 @@ pub(crate) fn search(
         })
         .collect();
 
-    let files = match request.root.as_deref() {
-        Some(root) if !names.is_empty() => files_of(root),
-        _ => None,
-    };
-    let (files, more_files) = files.map_or((Vec::new(), 0), |files| {
+    let root = request.root.as_deref().filter(|_| !names.is_empty());
+    let (files, more_files) = root.and_then(files_of).map_or((Vec::new(), 0), |files| {
         search_files(&request.query, &files)
     });
+    let (lists, notes) = root
+        .and_then(notes_of)
+        .map_or((Vec::new(), Vec::new()), |notes| {
+            notes::search_notes(&request.query, &notes)
+        });
 
     SearchResults {
         projects,
         panels,
         files,
         more_files,
+        lists,
+        notes,
     }
 }
 
@@ -176,9 +184,12 @@ mod tests {
 
     #[test]
     fn nothing_typed_lists_projects_and_panels_but_no_files() {
-        let results = search(&request(" "), &[project("shop"), project("docs")], |_| {
-            panic!("nothing typed lists no file")
-        });
+        let results = search(
+            &request(" "),
+            &[project("shop"), project("docs")],
+            |_| panic!("nothing typed lists no file"),
+            |_| panic!("nothing typed reads no note"),
+        );
         let names: Vec<_> = results.projects.iter().map(|p| p.name.as_str()).collect();
         assert_eq!(names, vec!["shop", "docs"]);
         assert_eq!(results.panels.len(), 2);
@@ -195,6 +206,7 @@ mod tests {
                 assert_eq!(root, "/dev/shop");
                 Some(files(&["src/cart/checkout.ts", "README.md"], &[]))
             },
+            |_| None,
         );
         assert_eq!(results.projects.len(), 1);
         assert_eq!(results.projects[0].name, "cache-hub");
@@ -216,9 +228,12 @@ mod tests {
             change("back.ts", ChangeArea::Staged, ChangeKind::Deleted),
             change("back.ts", ChangeArea::Untracked, ChangeKind::Untracked),
         ];
-        let results = search(&request("ts"), &[], |_| {
-            Some(files(&["a.ts", "b.ts", "c.ts", "back.ts"], &changed))
-        });
+        let results = search(
+            &request("ts"),
+            &[],
+            |_| Some(files(&["a.ts", "b.ts", "c.ts", "back.ts"], &changed)),
+            |_| None,
+        );
         let found: HashMap<&str, Option<ChangeMark>> = results
             .files
             .iter()
@@ -236,10 +251,17 @@ mod tests {
     fn without_a_project_no_file_is_searched() {
         let mut all = request("ts");
         all.root = None;
-        let results = search(&all, &[project("shop")], |_| panic!("no project to list"));
+        let results = search(
+            &all,
+            &[project("shop")],
+            |_| panic!("no project to list"),
+            |_| panic!("no project to read"),
+        );
         assert!(results.files.is_empty());
         // a project whose files cannot be read offers none
-        assert!(search(&request("ts"), &[], |_| None).files.is_empty());
+        assert!(search(&request("ts"), &[], |_| None, |_| None)
+            .files
+            .is_empty());
     }
 
     #[test]
@@ -248,7 +270,12 @@ mod tests {
             .map(|i| format!("src/file{i}.ts"))
             .collect();
         let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
-        let results = search(&request("file"), &[], |_| Some(files(&paths, &[])));
+        let results = search(
+            &request("file"),
+            &[],
+            |_| Some(files(&paths, &[])),
+            |_| None,
+        );
         assert_eq!(results.files.len(), FILE_LIMIT);
         assert_eq!(results.more_files, 7);
     }

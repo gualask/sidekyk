@@ -18,6 +18,7 @@ const SAVE_DELAY_MS = 500;
  */
 export function NoteCard({
     note,
+    flash,
     lists,
     editing,
     onEdit,
@@ -27,6 +28,8 @@ export function NoteCard({
     order,
 }: {
     note: Note;
+    /** Lit up for a moment: brought into view from the palette. */
+    flash: boolean;
     lists: readonly NoteList[];
     editing: boolean;
     onEdit: (editing: boolean) => void;
@@ -43,7 +46,7 @@ export function NoteCard({
         <article
             className={`group/card relative grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-2.5 gap-y-0.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
                 editing ? 'border-ui-accent' : 'border-ui-border hover:border-ui-border-hover'
-            }`}
+            } ${flash ? 'note-flash' : ''}`}
             aria-label="Note"
         >
             <button

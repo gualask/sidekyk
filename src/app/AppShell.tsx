@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { notesPanel, notesTarget } from '@/modules/notes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -173,6 +174,11 @@ export function AppShell() {
                 level === 2 && panel === filesPanel ? filesPanel.id : MAIN_TILE.panel.id,
                 fileTarget(path, null, find ?? null),
             ),
+        // in Notes, at the same zoom: its tile, back from the top bar if it waited there
+        openNotes: (list, note) => {
+            if (level === 1 && layout.minimized.includes(notesPanel.id)) restore(notesPanel);
+            show(notesPanel.id, notesTarget(list, note));
+        },
     };
 
     // a tile flies to its chip in the top bar, and back

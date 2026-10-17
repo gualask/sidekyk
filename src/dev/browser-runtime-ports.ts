@@ -113,11 +113,22 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         }
     };
 
+    const notes = fixtureNotes(
+        (root) => (!scenarioData(root) ? 'empty' : large(root) ? 'large' : 'review'),
+        readable,
+    );
+    // as the backend, the palette searches the notes of the project on screen
+    const searchedNotes = (root: string | null) => {
+        if (!root) return null;
+        try {
+            return notes.peek(root);
+        } catch {
+            return null;
+        }
+    };
+
     return {
-        notes: fixtureNotes(
-            (root) => (!scenarioData(root) ? 'empty' : large(root) ? 'large' : 'review'),
-            readable,
-        ),
+        notes,
         projects: {
             getProjects: async () => list,
             addProject: async () => {
@@ -182,7 +193,12 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         },
         search: {
             search: async (request) =>
-                fixtureSearch(request, list.projects, searchedFiles(request.root)),
+                fixtureSearch(
+                    request,
+                    list.projects,
+                    searchedFiles(request.root),
+                    searchedNotes(request.root),
+                ),
             searchContents: async (root, query, onFiles) => {
                 const { files, end } = fixtureContentSearch(tree(root).files, query, (path) => {
                     const content = fixtureFileContent(path);
