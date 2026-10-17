@@ -323,7 +323,10 @@ impl NotesStore {
         storage: &dyn NotesStorage,
         root: &str,
     ) -> anyhow::Result<NotesSummary> {
-        if let Some(open) = lock(&self.open).as_ref().filter(|o| o.root == root) {
+        // held throughout, as a change holds it: a summary read meanwhile could keep notes older
+        // than the change that cleared it
+        let open = lock(&self.open);
+        if let Some(open) = open.as_ref().filter(|o| o.root == root) {
             return Ok(open.book.summary());
         }
         if let Some(summary) = lock(&self.summaries).get(root) {
@@ -399,6 +402,8 @@ impl NotesStore {
             let mut touched = target.book.absorb(source.book);
             touched.append(&mut target.pending);
             self.write(storage, &mut target, touched)?;
+            // a failure here leaves the notes in both folders: harmless, as a note is its id, and
+            // the next relink or removal of the old root clears it
             storage.remove_folder(&from_folder)?;
         }
         if let Some(found) = lock(&self.folders).as_mut() {
@@ -409,6 +414,22 @@ impl NotesStore {
         summaries.remove(from);
         summaries.remove(to);
         Ok(())
+    }
+
+    /// Looks at a project's lists and notes without making them the ones kept in memory: those of
+    /// the project on screen stay (an export from all projects).
+    pub(crate) fn read_notes<T>(
+        &self,
+        storage: &dyn NotesStorage,
+        root: &str,
+        look: impl FnOnce(&[NoteList], &[Note]) -> T,
+    ) -> anyhow::Result<T> {
+        let open = lock(&self.open);
+        if let Some(open) = open.as_ref().filter(|o| o.root == root) {
+            return Ok(look(&open.book.lists, &open.book.notes));
+        }
+        let other = self.load(storage, root)?;
+        Ok(look(&other.book.lists, &other.book.notes))
     }
 
     /// Looks at a project's lists and notes where they are kept, without a copy: the palette

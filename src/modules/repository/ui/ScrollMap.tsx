@@ -1,133 +1,24 @@
-import {
-    type CSSProperties,
-    type PointerEvent,
-    type RefObject,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
+import { type CSSProperties, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
-import { trackDrag } from '@/shared/ui/pointer-drag';
 import type { DiffRow } from '../model/diff-rows';
 import { changeMarks, type DiffLayout, trackMarks } from './diff-layout';
+import { dragThumb } from './scrollbars';
 
 /** The map's width, narrow or wide (a setting), in pixels; and under the pointer, over the rows. */
 const MAP_WIDTH: Record<DiffScrollbar, number> = { narrow: 12, wide: 20 };
 const MAP_OPEN_WIDTH: Record<DiffScrollbar, number> = { narrow: 36, wide: 48 };
-/** The least a thumb shows of its track, so it can always be grabbed. */
-const MIN_THUMB = 0.04;
-
-type Axis = 'vertical' | 'horizontal';
-
-/**
- * Calls `onChange` whenever the element or what it holds changes size, or what it holds changes:
- * how far it scrolls may have.
- */
-function observeContent(element: HTMLElement, onChange: () => void): () => void {
-    const resizes = new ResizeObserver(onChange);
-    const observeAll = () => {
-        resizes.disconnect();
-        resizes.observe(element);
-        for (const child of element.children) resizes.observe(child);
-    };
-    const children = new MutationObserver(() => {
-        observeAll();
-        onChange();
-    });
-    observeAll();
-    children.observe(element, { childList: true });
-    return () => {
-        resizes.disconnect();
-        children.disconnect();
-    };
-}
-
-/**
- * Keeps a thumb on its scroll element's position along an axis, with no render: its size is what
- * shows of the content, its place where that is; hidden while everything shows. Follows scrolls,
- * and what changes how far the element scrolls.
- */
-function useThumb(scrollElement: HTMLElement, thumb: RefObject<HTMLDivElement | null>, axis: Axis) {
-    useEffect(() => {
-        const sync = () => {
-            const element = thumb.current;
-            if (!element) return;
-            const [shown, total, at] =
-                axis === 'vertical'
-                    ? [
-                          scrollElement.clientHeight,
-                          scrollElement.scrollHeight,
-                          scrollElement.scrollTop,
-                      ]
-                    : [
-                          scrollElement.clientWidth,
-                          scrollElement.scrollWidth,
-                          scrollElement.scrollLeft,
-                      ];
-            const ratio = total > 0 ? shown / total : 1;
-            element.style.display = ratio >= 1 ? 'none' : '';
-            const size = Math.max(ratio, MIN_THUMB);
-            const place = total > shown ? (at / (total - shown)) * (1 - size) : 0;
-            if (axis === 'vertical') {
-                element.style.height = `${size * 100}%`;
-                element.style.top = `${place * 100}%`;
-            } else {
-                element.style.width = `${size * 100}%`;
-                element.style.left = `${place * 100}%`;
-            }
-        };
-        sync();
-        scrollElement.addEventListener('scroll', sync, { passive: true });
-        const stop = observeContent(scrollElement, sync);
-        return () => {
-            scrollElement.removeEventListener('scroll', sync);
-            stop();
-        };
-    }, [scrollElement, thumb, axis]);
-}
-
-/**
- * Scrolls the element by a thumb's drag along `axis`: the whole track is the whole content.
- * `onClick` follows a press that did not move.
- */
-function dragThumb(
-    event: PointerEvent<HTMLElement>,
-    scrollElement: HTMLElement,
-    track: HTMLElement,
-    axis: Axis,
-    onClick: () => void = () => undefined,
-) {
-    const vertical = axis === 'vertical';
-    const from = vertical ? event.clientY : event.clientX;
-    const start = vertical ? scrollElement.scrollTop : scrollElement.scrollLeft;
-    const scale = vertical
-        ? scrollElement.scrollHeight / track.clientHeight
-        : scrollElement.scrollWidth / track.clientWidth;
-    trackDrag(
-        event,
-        (pointer) => {
-            const moved = ((vertical ? pointer.clientY : pointer.clientX) - from) * scale;
-            if (vertical) scrollElement.scrollTop = start + moved;
-            else scrollElement.scrollLeft = start + moved;
-        },
-        (moved) => {
-            if (!moved) onClick();
-        },
-    );
-}
-
 /**
  * The viewer's vertical scrollbar, as a map of the changes, as VS Code's: one mark per hunk where
  * its changed lines are (added, deleted, both), in the diff's own soft colors, under a translucent
  * thumb. A click on a mark (on at least 12 pixels around it, under the thumb too) goes to that
  * change, a click elsewhere on the track centers that point, the thumb drags. Under the pointer it
- * widens. A click on
- * a mark goes to that change, a click elsewhere on the track centers that point, the thumb drags.
- * Without changes (a file's text) it is the thumb alone.
+ * widens. Without changes (a file's text) it is the thumb alone. Keyboards go through the changes
+ * with `n`/`p`: the marks take no tab stop.
  */
 export function ChangeMap({
     scrollElement,
+    thumb,
+    contentHeight,
     layout,
     rows,
     topSpace,
@@ -135,6 +26,9 @@ export function ChangeMap({
     onGoTo,
 }: {
     scrollElement: HTMLElement;
+    thumb: RefObject<HTMLDivElement | null>;
+    /** How tall what scrolls is, all of it: the one scale of marks and thumb. */
+    contentHeight: number;
     layout: DiffLayout;
     rows: readonly DiffRow[];
     /** Room above the rows (the find bar's), part of what scrolls. */
@@ -142,10 +36,8 @@ export function ChangeMap({
     width: DiffScrollbar;
     onGoTo: (hunk: number) => void;
 }) {
-    const thumb = useRef<HTMLDivElement>(null);
     const track = useRef<HTMLDivElement>(null);
-    useThumb(scrollElement, thumb, 'vertical');
-    // the track's height: marks closer than a couple of its pixels show as one
+    // the track's height: marks share it, each with room for a click
     const [height, setHeight] = useState(0);
     useEffect(() => {
         const element = track.current;
@@ -159,10 +51,10 @@ export function ChangeMap({
         () =>
             trackMarks(
                 changes.map((mark) => ({ ...mark, top: mark.top + topSpace })),
-                topSpace + layout.total,
+                contentHeight,
                 height,
             ),
-        [changes, topSpace, layout.total, height],
+        [changes, topSpace, contentHeight, height],
     );
 
     return (
@@ -186,6 +78,7 @@ export function ChangeMap({
                     <button
                         key={mark.hunk}
                         type="button"
+                        tabIndex={-1}
                         aria-label={`Go to change ${mark.hunk + 1}`}
                         className="absolute inset-x-0"
                         style={{ top: mark.hitTop, height: mark.hitHeight }}
@@ -231,26 +124,18 @@ const MARK_COLOR = {
 } as const;
 
 /**
- * The viewer's horizontal scrollbar, under its rows while they run past its right edge: a thumb
- * that drags, a track whose click jumps there. The trackpad and `⇧`+wheel scroll as always.
+ * The viewer's horizontal scrollbar, under its rows while they run past its right edge (the viewer
+ * shows it then): a thumb that drags, a track whose click jumps there. The trackpad and
+ * `⇧`+wheel scroll as always.
  */
-export function SideScrollbar({ scrollElement }: { scrollElement: HTMLElement }) {
-    const [needed, setNeeded] = useState(false);
-    useEffect(
-        () =>
-            observeContent(scrollElement, () =>
-                setNeeded(scrollElement.scrollWidth > scrollElement.clientWidth),
-            ),
-        [scrollElement],
-    );
-    if (!needed) return null;
-    return <SideTrack scrollElement={scrollElement} />;
-}
-
-function SideTrack({ scrollElement }: { scrollElement: HTMLElement }) {
-    const thumb = useRef<HTMLDivElement>(null);
+export function SideScrollbar({
+    scrollElement,
+    thumb,
+}: {
+    scrollElement: HTMLElement;
+    thumb: RefObject<HTMLDivElement | null>;
+}) {
     const track = useRef<HTMLDivElement>(null);
-    useThumb(scrollElement, thumb, 'horizontal');
     return (
         <div
             ref={track}

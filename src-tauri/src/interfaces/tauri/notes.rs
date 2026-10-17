@@ -7,7 +7,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
-use crate::infrastructure::notes_files::{write_chosen_file, NotesFiles};
+use crate::infrastructure::notes_files::{resolved_path, write_chosen_file, NotesFiles};
 use crate::modules::notes::{
     to_markdown, DeletedList, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
 };
@@ -230,15 +230,11 @@ pub(crate) async fn export_notes(
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
-        if projects
-            .list()
-            .projects
-            .iter()
-            .any(|p| path.starts_with(&p.root))
-        {
+        let ignore_case = cfg!(any(target_os = "macos", windows));
+        if projects.list().holds(&path, resolved_path, ignore_case) {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
         }
-        let markdown = app.state::<NotesStore>().with_notes(
+        let markdown = app.state::<NotesStore>().read_notes(
             app.state::<NotesFiles>().inner(),
             &root,
             |lists, notes| to_markdown(&project.name, lists, notes),

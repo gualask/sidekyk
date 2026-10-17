@@ -7,7 +7,7 @@ export interface ProjectsPort {
     /** Asks for a folder, adds its repository and shows it. null when the user cancels. */
     addProject(): Promise<ProjectList | null>;
     activateProject(root: string): Promise<ProjectList>;
-    /** Forgets a project; its repository is left as it is. */
+    /** Forgets a project and deletes its notes; its repository is left as it is. */
     removeProject(root: string): Promise<ProjectList>;
     /**
      * Asks for the folder a moved repository is in now and puts the project there (into the

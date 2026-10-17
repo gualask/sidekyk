@@ -28,6 +28,11 @@ const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
 /** In a tile the arrows move among tiles: the list takes `j`/`k` only. */
 const ARROWS = new Set(['ArrowDown', 'ArrowUp']);
+/** What names a commit's file shown, as a working tree file's key does. */
+function commitFileKey(sha: string, path: string): string {
+    return `${sha}:${path}`;
+}
+
 /** The list's width by default, the same in a tile and full screen, and the least it takes. */
 const LIST_WIDTH = { initial: 288, min: 200 };
 
@@ -65,7 +70,7 @@ export function ChangesWorkspace({
     // the file shown: of the commit viewed, or of the working tree
     const shownKey = viewed
         ? commitFile
-            ? `${viewed.sha}:${commitFile.path}`
+            ? commitFileKey(viewed.sha, commitFile.path)
             : null
         : selected
           ? fileKey(selected)
@@ -126,7 +131,7 @@ export function ChangesWorkspace({
             const next = commitView.neighbour(step);
             if (next) {
                 commitView.open(next);
-                openAt(`${viewed.sha}:${next.path}`, hunk);
+                openAt(commitFileKey(viewed.sha, next.path), hunk);
                 return;
             }
         } else {

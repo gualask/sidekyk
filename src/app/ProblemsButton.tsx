@@ -4,8 +4,7 @@ import type { Problem } from './problems';
 
 /**
  * The top bar's warning: how many problems last, and their list with their fixes, the usual one
- * first. Loaded with the
- * first problem, with Base UI's popover.
+ * first. Loaded with the first problem, with Base UI's popover.
  */
 export function ProblemsButton({ problems }: { problems: Problem[] }) {
     const count = problems.length;

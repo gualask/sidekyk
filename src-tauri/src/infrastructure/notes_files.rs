@@ -8,6 +8,20 @@ use anyhow::Context;
 
 use crate::modules::notes::NotesStorage;
 
+/// A path as the file system names it, links resolved; a file not written yet, by its folder; as
+/// given when neither exists.
+pub(crate) fn resolved_path(path: &Path) -> PathBuf {
+    if let Ok(resolved) = fs::canonicalize(path) {
+        return resolved;
+    }
+    match (path.parent(), path.file_name()) {
+        (Some(folder), Some(name)) => fs::canonicalize(folder)
+            .map(|folder| folder.join(name))
+            .unwrap_or_else(|_| path.to_path_buf()),
+        _ => path.to_path_buf(),
+    }
+}
+
 /// Writes a file the user chose, such as notes exported, whole.
 pub(crate) fn write_chosen_file(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
     fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
@@ -176,6 +190,20 @@ mod tests {
         std::fs::write(data.path().join("notes/shop-123456/b.json.tmp"), b"half").unwrap();
         assert_eq!(notes.files("shop-123456").unwrap(), ["a.json"]);
         assert!(!data.path().join("notes/shop-123456/b.json.tmp").exists());
+    }
+
+    #[test]
+    fn a_path_resolves_through_links_and_a_file_not_written_by_its_folder() {
+        let data = tempfile::tempdir().unwrap();
+        let real = resolved_path(data.path());
+        let missing = resolved_path(&data.path().join("notes.md"));
+        assert_eq!(missing, real.join("notes.md"));
+        #[cfg(unix)]
+        {
+            let link = data.path().join("link");
+            std::os::unix::fs::symlink(&real, &link).unwrap();
+            assert_eq!(resolved_path(&link.join("notes.md")), real.join("notes.md"));
+        }
     }
 
     #[test]

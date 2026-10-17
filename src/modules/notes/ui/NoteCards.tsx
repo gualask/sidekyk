@@ -1,6 +1,6 @@
 import { IconChevronDown } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
@@ -8,7 +8,7 @@ import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings'
 import { doneNotes, openNotes } from '../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
 import { NoteCard } from './NoteCard';
-import { autosize, linesClass } from './notes-layout';
+import { autosize, fitLines, linesClass } from './notes-layout';
 
 /** The room between cards, and around them, in pixels. */
 const GAP = 6;
@@ -194,6 +194,8 @@ function Composer({
     const [text, setText] = useState('');
     const field = useRef<HTMLTextAreaElement>(null);
     const settings = useNotesSettings();
+    // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
+    useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     useEffect(() => {
         if (!focus) return;
         field.current?.focus();
@@ -225,7 +227,6 @@ function Composer({
                 spellCheck={false}
                 placeholder={`Write or paste a note in ${list.name}…  ${shortcutLabel('N')}`}
                 aria-label={`New note in ${list.name}`}
-                wrap={settings.lines === 'wrap' ? 'soft' : 'off'}
                 className={`block max-h-[132px] w-full resize-none rounded-lg border border-ui-border bg-ui-surface-subtle px-2.5 py-[7px] text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${linesClass(settings.lines)}`}
                 onChange={(event) => {
                     setText(event.target.value);

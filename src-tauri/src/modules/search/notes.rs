@@ -8,6 +8,7 @@ use crate::modules::notes::{note_title as title, Note, NoteList};
 
 /// At most this many notes go back.
 pub(super) const NOTE_LIMIT: usize = 50;
+/// Around the text found in a note, the characters shown before and after it.
 const BEFORE: usize = 24;
 const AFTER: usize = 48;
 /// The least text looked for inside notes: one letter is in every note.

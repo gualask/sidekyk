@@ -6,7 +6,7 @@ import { NotesProvider, NotesSettingsProvider } from '@/modules/notes';
 import { ProjectsProvider } from '@/modules/projects';
 import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
-import { SettingsProvider, useSettingsWhenRead, useUpdateSettings } from '@/modules/settings';
+import { SettingsProvider, useChangeSettings, useSettingsWhenRead } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
@@ -73,16 +73,14 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
 
 /** How Notes shows long lines, from the settings, and how it switches them (`⌥Z`). */
 function NotesSettingsBridge({ children }: { children: ReactNode }) {
-    const settings = useSettingsWhenRead();
-    const { mutate } = useUpdateSettings();
+    const lines = useSettingsWhenRead()?.noteLines ?? 'wrap';
+    const change = useChangeSettings();
     const value = useMemo(
         () => ({
-            lines: settings?.noteLines ?? 'wrap',
-            setLines: (noteLines: NoteLines) => {
-                if (settings) mutate({ ...settings, noteLines });
-            },
+            lines,
+            setLines: (noteLines: NoteLines) => change((settings) => ({ ...settings, noteLines })),
         }),
-        [settings, mutate],
+        [lines, change],
     );
     return <NotesSettingsProvider value={value}>{children}</NotesSettingsProvider>;
 }
@@ -91,23 +89,24 @@ const NO_WIDTHS: Readonly<Record<string, number>> = {};
 
 /**
  * Every panel's sidebar widths, from the settings: the defaults until they are read; a width
- * stored before then is dropped, as the settings it would go into are not known yet.
+ * stored before then is dropped, as the settings it would go into are not known yet. Each change
+ * starts from the settings as they are then.
  */
 function SidebarWidthsBridge({ children }: { children: ReactNode }) {
-    const settings = useSettingsWhenRead();
-    const { mutate } = useUpdateSettings();
+    const widths = useSettingsWhenRead()?.sidebarWidths ?? NO_WIDTHS;
+    const change = useChangeSettings();
     const value = useMemo(
         () => ({
-            widths: settings?.sidebarWidths ?? NO_WIDTHS,
-            store: (sidebar: string, width: number | null) => {
-                if (!settings) return;
-                const sidebarWidths = { ...settings.sidebarWidths };
-                if (width === null) delete sidebarWidths[sidebar];
-                else sidebarWidths[sidebar] = width;
-                mutate({ ...settings, sidebarWidths });
-            },
+            widths,
+            store: (sidebar: string, width: number | null) =>
+                change((settings) => {
+                    const sidebarWidths = { ...settings.sidebarWidths };
+                    if (width === null) delete sidebarWidths[sidebar];
+                    else sidebarWidths[sidebar] = width;
+                    return { ...settings, sidebarWidths };
+                }),
         }),
-        [settings, mutate],
+        [widths, change],
     );
     return <SidebarWidthsProvider value={value}>{children}</SidebarWidthsProvider>;
 }

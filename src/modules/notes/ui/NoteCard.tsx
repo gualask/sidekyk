@@ -1,13 +1,13 @@
 import { Menu } from '@base-ui/react/menu';
 import { IconCheck, IconDots, IconTrash } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
 import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { noteMeta } from '../model/notes';
 import type { Note, NoteList } from '../model/notes.types';
-import { autosize, linesClass } from './notes-layout';
+import { autosize, fitLines, linesClass } from './notes-layout';
 
 /** How long typing pauses before the text is saved; closing the card saves at once. */
 const SAVE_DELAY_MS = 500;
@@ -171,6 +171,8 @@ function NoteEditor({
 }) {
     const [text, setText] = useState(note.text);
     const settings = useNotesSettings();
+    // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
+    useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     const field = useRef<HTMLTextAreaElement>(null);
     const timer = useRef<number | undefined>(undefined);
     // what is saved, and the latest text, for the unmount to save what typing left
@@ -211,7 +213,6 @@ function NoteEditor({
             value={text}
             spellCheck={false}
             aria-label="Note text"
-            wrap={settings.lines === 'wrap' ? 'soft' : 'off'}
             className={`block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text outline-none ${linesClass(settings.lines)}`}
             onChange={(event) => {
                 setText(event.target.value);

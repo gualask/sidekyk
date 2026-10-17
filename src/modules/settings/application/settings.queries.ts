@@ -76,3 +76,22 @@ export function useShortcutRecording() {
         [port],
     );
 }
+
+/**
+ * Changes the settings from what is on screen now, not from what a render saw: two changes in a
+ * row (two `⌥Z`, a drag ending as another lands) each keep the other's. Shown at once, then sent.
+ */
+export function useChangeSettings() {
+    const queryClient = useQueryClient();
+    const { mutate } = useUpdateSettings();
+    return useCallback(
+        (change: (settings: Settings) => Settings) => {
+            const current = queryClient.getQueryData<Settings>(settingsKey);
+            if (!current) return;
+            const next = change(current);
+            queryClient.setQueryData(settingsKey, next);
+            mutate(next);
+        },
+        [queryClient, mutate],
+    );
+}

@@ -397,6 +397,12 @@ impl Book {
                 }
             }
         }
+        // each list's bottom, found once, then moved down by each note put there
+        let mut bottoms: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+        for note in self.notes.iter().filter(|n| n.done.is_none()) {
+            let bottom = bottoms.entry(note.list.clone()).or_insert(note.position);
+            *bottom = bottom.max(note.position);
+        }
         let mut notes = other.notes;
         notes.sort_by(|a, b| a.position.total_cmp(&b.position));
         for mut note in notes {
@@ -405,10 +411,9 @@ impl Book {
                 .cloned()
                 .unwrap_or_else(|| self.lists[0].id.clone());
             if note.done.is_none() {
-                note.position = self
-                    .open_notes(&note.list, "")
-                    .last()
-                    .map_or(0.0, |bottom| bottom.position + 1.0);
+                let bottom = bottoms.get(&note.list).map_or(-1.0, |b| *b);
+                note.position = bottom + 1.0;
+                bottoms.insert(note.list.clone(), note.position);
             }
             self.notes.retain(|n| n.id != note.id);
             touched.push(Touched::Note(note.id.clone()));

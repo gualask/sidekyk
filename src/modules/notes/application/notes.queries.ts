@@ -6,8 +6,14 @@ import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
 import { changeQueue } from './change-queue';
 import { useNotesPort } from './notes.port';
 
-/** Where a project's notes are cached. */
+/**
+ * Where a project's notes are cached, and below the same key what is told of them (its card's
+ * summary, the count before a removal): one family, so reading a project's notes again, or
+ * forgetting them, takes all of it.
+ */
 export const notesKey = (root: string) => ['notes', root] as const;
+const summaryKey = (root: string) => [...notesKey(root), 'summary'] as const;
+const countKey = (root: string) => [...notesKey(root), 'count'] as const;
 
 /**
  * A project's notes, read once: only the app writes them, and every change goes through the
@@ -58,6 +64,8 @@ export function useNoteActions(root: string) {
                 const answer = await queue.run(call);
                 if (answer.kind === 'apply') shown(answer.value);
                 else if (answer.kind === 'reread') reread();
+                // the card's summary is read again when it shows
+                void client.invalidateQueries({ queryKey: summaryKey(root) });
                 return answer.value;
             } catch (error) {
                 showToast(errorToast(what, error));
@@ -239,7 +247,7 @@ export function useExportNotes(root: string) {
 export function useNotesCount(root: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: ['notes-count', root],
+        queryKey: countKey(root),
         queryFn: () => port.countNotes(root),
         gcTime: 0,
         staleTime: 0,
@@ -262,7 +270,7 @@ export function useRereadNotes() {
 export function useNotesSummary(root: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: ['notes-summary', root],
+        queryKey: summaryKey(root),
         queryFn: () => port.notesSummary(root),
         staleTime: 0,
     });

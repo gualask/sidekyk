@@ -6,7 +6,7 @@ export function isField(target: EventTarget | null): target is HTMLElement {
     );
 }
 
-/** Whether the target is in a dialog, a menu or a toast over the page, which keep their keys. */
+/** Whether the target is in a dialog or a menu over the page, which keep their keys. */
 export function isInOverlay(target: EventTarget | null): boolean {
     return (
         target instanceof Element &&
@@ -16,7 +16,7 @@ export function isInOverlay(target: EventTarget | null): boolean {
 
 /**
  * Whether a key belongs to what has the focus rather than to the app's shortcuts: a field, or a
- * dialog, a menu or a toast over the page, which handle their own keys (`Esc` included).
+ * dialog or a menu over the page, which handle their own keys (`Esc` included).
  */
 export function isKeyTaken(target: EventTarget | null): boolean {
     return isField(target) || isInOverlay(target);

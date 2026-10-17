@@ -14,6 +14,7 @@ import { DiffList, type HunkReader } from './DiffList';
 import { diffLayout, FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
 import { ChangeMap, SideScrollbar } from './ScrollMap';
+import { useScrollbars } from './scrollbars';
 
 /** What the viewer says instead of, or after, the lines: loading, a failure, a cut. */
 export function Notice({ children }: { children: ReactNode }) {
@@ -106,6 +107,7 @@ export function Pane({
     // state, not a ref: React attaches a parent's ref after its children's effects, so lines
     // mounted with it, from a file already read, would find no element to scroll
     const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+    const bars = useScrollbars(scrollElement);
     const reader = useRef<HunkReader | null>(null);
     const { copied, copy } = useCopyToClipboard();
     const pane = useMemo<PaneHeader>(
@@ -135,7 +137,7 @@ export function Pane({
         const at = lineOf(rows, matches[index]) ?? line;
         setReading({ matches, index, line: at, asked: find.line });
     }
-    const step = (by: -1 | 1) => {
+    const stepMatch = (by: -1 | 1) => {
         if (!find || matches.length === 0) return;
         const next = (index + by + matches.length) % matches.length;
         setReading({ matches, index: next, line: lineOf(rows, matches[next]), asked: find.line });
@@ -155,10 +157,10 @@ export function Pane({
                 return;
             }
             if (!isOwnKey(event)) return;
-            const step = event.key === 'n' ? 1 : event.key === 'p' ? -1 : 0;
-            if (step !== 0 && onPastEnd) {
+            const change = event.key === 'n' ? 1 : event.key === 'p' ? -1 : 0;
+            if (change !== 0 && onPastEnd) {
                 event.preventDefault();
-                if (!reader.current?.step(step)) onPastEnd(step);
+                if (!reader.current?.step(change)) onPastEnd(change);
                 return;
             }
             if (!find || event.key !== 'Escape') return;
@@ -180,7 +182,7 @@ export function Pane({
                         count={matches.length}
                         current={index}
                         onQuery={find.onQuery}
-                        onStep={step}
+                        onStep={stepMatch}
                         onClose={find.onClose}
                         onFindInFiles={() => finder.findInFiles(find.query)}
                     />
@@ -211,11 +213,15 @@ export function Pane({
                     ) : null}
                     {children}
                 </div>
-                {scrollElement ? <SideScrollbar scrollElement={scrollElement} /> : null}
+                {scrollElement && bars.wide ? (
+                    <SideScrollbar scrollElement={scrollElement} thumb={bars.horizontal} />
+                ) : null}
             </div>
             {scrollElement ? (
                 <ChangeMap
                     scrollElement={scrollElement}
+                    thumb={bars.vertical}
+                    contentHeight={bars.height}
                     layout={layout}
                     rows={rows}
                     topSpace={topSpace}

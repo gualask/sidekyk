@@ -63,7 +63,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   (`withUpdated`), only add and restore add one. Undo undoes that change only (done, a move back
   to its place). A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`,
   a click outside, not the window losing the focus); emptied, it goes (Undo). Long lines wrap or
-  scroll (`noteLines`, through `NotesSettingsProvider`; `⌥Z` in a note field, on `code`). `⌘N` is
+  scroll (`noteLines`, through `NotesSettingsProvider`; `⌥Z` in a note field: the key's letter,
+  else its place when `⌥` types a symbol; the field's height follows). `⌘N` is
   the workspace's (also from a field): `show` to Notes with `newNoteTarget`.
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
 - `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
@@ -98,7 +99,9 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
-- The viewer's scrollbars are ours (`ScrollMap.tsx`): `ChangeMap` beside the rows (`changeMarks`
+- The viewer's scrollbars are ours (`ScrollMap.tsx`, kept by `useScrollbars` in `scrollbars.ts`:
+  one observer of the scroll element; thumbs follow scrolls with no render; the content's height
+  is the one scale of marks and thumb): `ChangeMap` beside the rows (`changeMarks`
   per hunk; `trackMarks` gives each a click room of 12 px at least and joins those whose rooms
   overlap; a click on the thumb that does not drag goes to the mark under it; widens under the
   pointer, over the rows; thumb and marks follow scrolls and
@@ -145,6 +148,9 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 
 - No client store: projects, snapshots, summaries, diffs, tree folders and settings are TanStack
   Query caches, repository keys starting with the root. A snapshot writes its summary's cache.
+- Settings changed from the app's bridges (sidebar widths, note lines) go through
+  `useChangeSettings`: each change starts from the settings as they are then, so two in a row
+  both stay.
 - UI state: zoom level and selected tile (`AppShell`); the shared selection, the tree's open
   folders and row (session, per project); the viewed commit (Changes). Sidebar widths are one
   setting (`sidebarWidths`, by sidebar: `changes`, `files`, `notes`), the same in a tile and full screen,
@@ -255,7 +261,9 @@ drops it.
   nothing writes nothing. A new folder never takes one in use (two projects of one name).
 - Export (`export_notes`, the header's ⋯): Markdown (`to_markdown`: a section per list, notes
   between `---`, done ones under `### Done`) where the save dialog says, never inside a project's
-  repository (`export_in_repository`; compared by path components, case as given).
+  repository (`export_in_repository`; `ProjectList::holds`: paths resolved by the file system,
+  links included, compared without case on macOS and Windows). The export reads the notes
+  without replacing those in memory (`read_notes`).
 - Removing a project deletes its notes first (`remove_project`; if they cannot go, the project
   stays). The frontend asks before (`RemoveProjectDialog`, notes module, lazy, from the overview's
   ⋯ and the missing-repository problem): no notes (`count_notes`, files counted, nothing read),
@@ -265,6 +273,10 @@ drops it.
   project's notes when it is one: lists of one name join, open notes go below, the old folder
   goes), then the list (`relocate`: same place, layout, on screen). The same folder changes
   nothing. Problems carry several fixes (Locate…, Remove).
+- Frontend caches of a project's notes are one family: `['notes', root]`, its card's summary and
+  its count below it; every change makes the summary stale, rereading or forgetting a project's
+  notes takes all three. The backend's summary cache is read and filled under the same lock as
+  changes.
 - `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
 
 ### Tray

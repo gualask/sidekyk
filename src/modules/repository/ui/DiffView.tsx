@@ -78,7 +78,8 @@ function DiffPane({
             openOn={openOn}
             linesAbove={whole ? LINES_ABOVE : 0}
             finder={finder}
-            onPastEnd={onPastEnd}
+            // until the diff is read there are no changes to go through: the keys wait
+            onPastEnd={diff.isPending ? undefined : onPastEnd}
         >
             {diff.isPending ? <Notice>Loading diff…</Notice> : null}
             {diff.isError ? (

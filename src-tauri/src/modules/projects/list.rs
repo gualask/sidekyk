@@ -1,3 +1,5 @@
+use std::path::{Path, PathBuf};
+
 use super::contracts::{ProjectList, TilesLayout};
 use crate::modules::repository::RepositoryInfo;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
@@ -64,6 +66,34 @@ impl ProjectList {
         self.layouts
             .insert(root.to_string(), TilesLayout { minimized, split });
         Ok(())
+    }
+
+    /// Whether `path` is inside a project's repository. `canonical` names a path as the file system
+    /// does (links resolved); `ignore_case` compares letters without case, as macOS and Windows
+    /// do by default.
+    pub(crate) fn holds(
+        &self,
+        path: &Path,
+        canonical: impl Fn(&Path) -> PathBuf,
+        ignore_case: bool,
+    ) -> bool {
+        let fold = |path: &Path| -> Vec<String> {
+            canonical(path)
+                .components()
+                .map(|part| {
+                    let part = part.as_os_str().to_string_lossy();
+                    if ignore_case {
+                        part.to_lowercase()
+                    } else {
+                        part.into_owned()
+                    }
+                })
+                .collect()
+        };
+        let path = fold(path);
+        self.projects
+            .iter()
+            .any(|p| path.starts_with(&fold(Path::new(&p.root))))
     }
 
     /// A project found again at `found` (its repository moved): it takes the new root in its
@@ -210,6 +240,20 @@ mod tests {
         let mut stored = list(&["/a"], Some("/a"));
         stored.layouts.insert("/gone".into(), layout(0.5));
         assert!(stored.normalized().layouts.is_empty());
+    }
+
+    #[test]
+    fn a_path_inside_a_repository_is_found_however_it_is_written() {
+        let projects = list(&["/Dev/Shop"], Some("/Dev/Shop"));
+        let same = |path: &Path| path.to_path_buf();
+        assert!(projects.holds(Path::new("/Dev/Shop/notes.md"), same, false));
+        assert!(!projects.holds(Path::new("/Dev/Shopping/notes.md"), same, false));
+        assert!(!projects.holds(Path::new("/dev/shop/notes.md"), same, false));
+        assert!(projects.holds(Path::new("/dev/shop/notes.md"), same, true));
+        // a link to the repository, as the file system resolves it
+        let resolved =
+            |path: &Path| PathBuf::from(path.to_string_lossy().replace("/link", "/Dev/Shop"));
+        assert!(projects.holds(Path::new("/link/notes.md"), resolved, false));
     }
 
     #[test]
