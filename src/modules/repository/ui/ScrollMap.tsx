@@ -171,7 +171,7 @@ export function ChangeMap({
         <div className="group/map relative shrink-0" style={{ width: MAP_WIDTH[width] }}>
             <div
                 ref={track}
-                className="absolute inset-y-0 right-0 z-10 w-full cursor-pointer border-l border-ui-border bg-ui-surface transition-[width] duration-150 group-hover/map:w-(--map-open) group-hover/map:delay-200 motion-reduce:transition-none"
+                className="absolute inset-y-0 right-0 z-10 w-full border-l border-ui-border bg-ui-surface transition-[width] duration-150 group-hover/map:w-(--map-open) group-hover/map:delay-200 motion-reduce:transition-none"
                 style={{ '--map-open': `${MAP_OPEN_WIDTH[width]}px` } as CSSProperties}
                 onPointerDown={(event) => {
                     if (event.target !== event.currentTarget || event.button !== 0) return;
@@ -204,7 +204,7 @@ export function ChangeMap({
                 <div
                     ref={thumb}
                     aria-hidden
-                    className="absolute inset-x-0 z-[1] cursor-grab bg-ui-text/14 hover:bg-ui-text/22 active:cursor-grabbing active:bg-ui-text/22"
+                    className="absolute inset-x-0 z-[1] bg-ui-text/14 hover:bg-ui-text/22 active:bg-ui-text/22"
                     onPointerDown={(event) => {
                         const element = track.current;
                         if (!element) return;
@@ -266,7 +266,7 @@ function SideTrack({ scrollElement }: { scrollElement: HTMLElement }) {
         >
             <div
                 ref={thumb}
-                className="absolute inset-y-0.5 cursor-grab rounded-[3px] bg-ui-text/16 hover:bg-ui-text/26 active:cursor-grabbing active:bg-ui-text/26"
+                className="absolute inset-y-0.5 rounded-[3px] bg-ui-text/16 hover:bg-ui-text/26 active:bg-ui-text/26"
                 onPointerDown={(event) => {
                     if (track.current) dragThumb(event, scrollElement, track.current, 'horizontal');
                 }}
