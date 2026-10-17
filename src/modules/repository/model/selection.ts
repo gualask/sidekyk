@@ -1,6 +1,5 @@
 import { changeOf, fileKey } from './file-groups';
 import type { ChangedFile } from './repository.types';
-import type { Shown } from './targets';
 
 /**
  * The file shown of a project, one for both panels: the Changes list selects it, the tree reveals
@@ -15,10 +14,9 @@ export type Selection =
 export const FIRST_CHANGE: Selection = { kind: 'change', key: null };
 
 /** The selection after a panel asks for a file. */
-export function selectionOf(shown: Shown, current: Selection): Selection {
-    if (shown.kind === 'change') return { kind: 'change', key: shown.key };
+export function selectionOf(path: string, current: Selection): Selection {
     const back = current.kind === 'path' ? current.back : current.key;
-    return { kind: 'path', path: shown.path, back };
+    return { kind: 'path', path, back };
 }
 
 /**
@@ -31,7 +29,8 @@ export function selectedFile(
     ordered: readonly ChangedFile[],
 ): { change: ChangedFile | null; path: string | null } {
     if (selection.kind === 'path') {
-        return { change: changeOf(ordered, selection.path), path: selection.path };
+        const change = changeOf(ordered, selection.path);
+        return { change, path: change?.kind === 'deleted' ? null : selection.path };
     }
     const change = ordered.find((file) => fileKey(file) === selection.key) ?? ordered[0] ?? null;
     return { change, path: change && change.kind !== 'deleted' ? change.path : null };

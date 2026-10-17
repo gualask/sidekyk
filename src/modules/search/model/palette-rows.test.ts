@@ -9,7 +9,7 @@ describe('paletteRows', () => {
             {
                 projects: [{ root: '/dev/shop', name: 'shop', highlights: [] }],
                 panels: [],
-                files: [{ path: 'src/total.ts', area: 'staged', highlights: [[4, 7]] }],
+                files: [{ path: 'src/total.ts', mark: 'modified', highlights: [[4, 7]] }],
                 moreFiles: 3,
             },
             PANELS,
@@ -19,7 +19,7 @@ describe('paletteRows', () => {
         expect(rows).toEqual([
             { kind: 'group', label: 'Projects' },
             { kind: 'item', item: items[0], index: 0 },
-            { kind: 'group', label: 'Changed files in shop' },
+            { kind: 'group', label: 'Files in shop' },
             { kind: 'item', item: items[1], index: 1 },
             { kind: 'more', count: 3 },
         ]);

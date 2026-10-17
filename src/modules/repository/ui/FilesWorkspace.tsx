@@ -89,7 +89,7 @@ export function FilesWorkspace({
     }, [file]);
 
     const openFile = (path: string, hunk: number | null = null) => {
-        setSelection((current) => selectionOf({ kind: 'path', path, hunk }, current));
+        setSelection((current) => selectionOf(path, current));
         setOpenOn(hunk === null ? null : { file: path, hunk });
     };
     const toggle = (path: string) => {
@@ -103,7 +103,6 @@ export function FilesWorkspace({
     // a file asked for from Changes, at the hunk being read there; revealed again even when it is
     // the file shown already, as the keyboard may have left it
     useShownTarget(target, (shown) => {
-        if (shown.kind !== 'path') return;
         openFile(shown.path, shown.hunk);
         reveal(shown.path);
     });
@@ -190,32 +189,33 @@ export function FilesWorkspace({
         );
     }
 
-    const viewer = !file ? (
+    // the change shown, a deleted file too though the tree does not have it; else the file
+    const viewer = change ? (
+        <ChangeDiffView
+            key={`${change.area}:${change.path}`}
+            root={root}
+            file={change}
+            view="file"
+            openOn={openOn?.file === change.path ? openOn.hunk : null}
+            header={header}
+            renderHeader={(pane) => (
+                <FileHeader
+                    path={change.path}
+                    badge={{ label: CHANGE_AREA_LABEL[change.area] }}
+                    counts={change}
+                    showIn={{
+                        panel: 'changes',
+                        onShow: () => show('changes', fileTarget(change.path, pane.currentHunk())),
+                    }}
+                />
+            )}
+        />
+    ) : !file ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ui-text-muted">
             <IconFileText size={32} stroke={1.5} />
             <p className="text-sm">Pick a file.</p>
             <p className="text-xs">Read only: edits happen in your editor.</p>
         </div>
-    ) : change ? (
-        <ChangeDiffView
-            key={`${change.area}:${file}`}
-            root={root}
-            file={change}
-            view="file"
-            openOn={openOn?.file === file ? openOn.hunk : null}
-            header={header}
-            renderHeader={(pane) => (
-                <FileHeader
-                    path={file}
-                    badge={{ label: CHANGE_AREA_LABEL[change.area] }}
-                    counts={change}
-                    showIn={{
-                        panel: 'changes',
-                        onShow: () => show('changes', fileTarget(file, pane.currentHunk())),
-                    }}
-                />
-            )}
-        />
     ) : !snapshot.isSuccess ? null : (
         <TextFileView
             key={file}

@@ -101,12 +101,14 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         return found;
     };
 
-    // as the backend, the palette searches the files of the last snapshot: none when it failed
-    const snapshotFiles = (root: string) => {
+    // as the backend, the palette searches the files of the tree, as the last snapshot found them
+    // changed: none when they cannot be read
+    const searchedFiles = (root: string | null) => {
+        if (!root) return null;
         try {
-            return snapshot(root).files;
+            return { paths: tree(root).files, changed: snapshot(root).files };
         } catch {
-            return [];
+            return null;
         }
     };
 
@@ -169,10 +171,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             setWindowVisible: async () => null,
         },
         search: {
-            search: async (request) => {
-                const files = list.active ? snapshotFiles(list.active) : [];
-                return fixtureSearch(request, list.projects, files);
-            },
+            search: async (request) =>
+                fixtureSearch(request, list.projects, searchedFiles(request.root)),
         },
         settings: {
             getSettings: async () => settings,

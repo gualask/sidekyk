@@ -1,3 +1,4 @@
+import type { ChangeMark } from '@/shared/git/change-mark';
 import type { ChangedFile, ChangeKind, Directory } from './repository.types';
 
 /**
@@ -54,15 +55,13 @@ export function foldersAbove(path: string): string[] {
     return parts.slice(0, -1).map((_, index) => parts.slice(0, index + 1).join('/'));
 }
 
-/** How a change colors a name in the tree, as VS Code's explorer: amber, or green for new. */
-export type ChangeMark = 'modified' | 'added';
-
 const NEW_KINDS: ReadonlySet<ChangeKind> = new Set(['untracked', 'added', 'renamed', 'copied']);
 
 /**
  * The mark of every changed file, and of every folder above one: a folder takes the strongest
  * change inside it, an edit over a new file. A deleted file is not in the tree, and marks
- * nothing.
+ * nothing. The palette's marks follow the same rule (`marks_by_path` in
+ * `src-tauri/src/modules/search/mod.rs`: change both together).
  */
 export function changeMarks(files: readonly ChangedFile[]): ReadonlyMap<string, ChangeMark> {
     const marks = new Map<string, ChangeMark>();

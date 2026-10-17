@@ -60,11 +60,13 @@ Explore and copy:
       auto-reveal). Tree width dragged and stored (`filesTreeWidth`)
 - [x] File view (`get_file_content`): files of the tree only, first 2 MiB, binary/link/submodule
       notices, links never followed; same rows and copy as diffs
+- [x] Search by name in `⌘K` (2026-10-17): every file of the project on screen (the tree kept in
+      Rust, plus deleted files), none at level 0; change marked by a word; `↵` goes through the
+      shared selection. Scoring on threads from 20,000 paths (Zed's 4,366: 0.37 ms; 200,000
+      synthetic: 80 → 14 ms)
 
 ## Next
 
-- [ ] Search by name in `⌘K`, active project first; opening one reveals it in the tree. Needs
-      every project's path list in the backend (the ranking exists)
 - [ ] Search in contents in `⌘K` (mode), in the backend (`git grep` or ripgrep crates), streaming,
       cancellable
 - [ ] Rest of semantic zoom: splitters, panels minimized to the top bar (with Notes)

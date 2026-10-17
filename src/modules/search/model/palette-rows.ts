@@ -1,4 +1,4 @@
-import type { ChangeArea } from '@/shared/git/change-area';
+import type { ChangeMark } from '@/shared/git/change-mark';
 import type { Highlight, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
@@ -13,7 +13,13 @@ export interface PalettePanel {
 export type PaletteItem =
     | { kind: 'project'; root: string; label: string; highlights: Highlight[] }
     | { kind: 'panel'; id: string; shortcut: string; label: string; highlights: Highlight[] }
-    | { kind: 'file'; path: string; area: ChangeArea; label: string; highlights: Highlight[] };
+    | {
+          kind: 'file';
+          path: string;
+          mark: ChangeMark | null;
+          label: string;
+          highlights: Highlight[];
+      };
 
 /** The list as one flat run of rows, so only the rows on screen are rendered. */
 export type PaletteRow =
@@ -55,11 +61,11 @@ export function paletteRows(
             }),
         },
         {
-            label: projectName ? `Changed files in ${projectName}` : 'Changed files',
+            label: projectName ? `Files in ${projectName}` : 'Files',
             items: results.files.map((file) => ({
                 kind: 'file',
                 path: file.path,
-                area: file.area,
+                mark: file.mark,
                 label: file.path,
                 highlights: file.highlights,
             })),

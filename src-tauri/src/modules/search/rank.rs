@@ -4,7 +4,17 @@
 use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
 
+use std::cmp::Reverse;
+use std::num::NonZero;
+
 use super::contracts::Highlight;
+
+/// From this many texts, scoring is split over threads: a large repository's every file is scored
+/// at each key typed (200,000 paths: ~80 ms on one thread).
+const PARALLEL_FROM: usize = 20_000;
+
+/// Threads scoring at most, so a key typed never takes the whole machine.
+const MAX_THREADS: usize = 8;
 
 /// What the texts ranked are: names, or paths with `/` between their parts.
 #[derive(Clone, Copy)]
@@ -25,6 +35,7 @@ pub(crate) struct Ranked {
 /// its accented forms.
 pub(crate) struct Ranker {
     pattern: Pattern,
+    config: Config,
     matcher: Matcher,
     chars: Vec<char>,
 }
@@ -42,7 +53,8 @@ impl Ranker {
                 Normalization::Smart,
                 AtomKind::Fuzzy,
             ),
-            matcher: Matcher::new(config),
+            matcher: Matcher::new(config.clone()),
+            config,
             chars: Vec::new(),
         }
     }
@@ -55,19 +67,15 @@ impl Ranker {
     /// The best `limit` texts that match, best first (ties keep the texts' order), and how many
     /// matched in all. Only the texts kept get their highlights.
     pub(crate) fn rank(&mut self, texts: &[&str], limit: usize) -> (Vec<Ranked>, usize) {
-        let mut scored: Vec<(u32, usize)> = texts
-            .iter()
-            .enumerate()
-            .filter_map(|(index, text)| {
-                let haystack = Utf32Str::new(text, &mut self.chars);
-                let score = self.pattern.score(haystack, &mut self.matcher)?;
-                Some((score, index))
-            })
-            .collect();
+        let mut scored = self.scores(texts);
         let total = scored.len();
-        // stable: equal scores keep the texts' order
-        scored.sort_by_key(|&(score, _)| std::cmp::Reverse(score));
-        scored.truncate(limit);
+        // the best first, equal scores in the texts' order; only the ones kept are sorted
+        let order = |&(score, index): &(u32, usize)| (Reverse(score), index);
+        if limit < scored.len() {
+            scored.select_nth_unstable_by_key(limit, order);
+            scored.truncate(limit);
+        }
+        scored.sort_unstable_by_key(order);
 
         let mut indices = Vec::new();
         let ranked = scored
@@ -85,6 +93,53 @@ impl Ranker {
             .collect();
         (ranked, total)
     }
+
+    /// The score of every text that matches, with its position, in the texts' order.
+    fn scores(&mut self, texts: &[&str]) -> Vec<(u32, usize)> {
+        let threads = std::thread::available_parallelism()
+            .map_or(1, NonZero::get)
+            .min(MAX_THREADS);
+        if texts.len() < PARALLEL_FROM || threads == 1 {
+            return score(&self.pattern, &mut self.matcher, &mut self.chars, texts, 0);
+        }
+        let size = texts.len().div_ceil(threads);
+        let pattern = &self.pattern;
+        std::thread::scope(|scope| {
+            let parts: Vec<_> = texts
+                .chunks(size)
+                .enumerate()
+                .map(|(part, chunk)| {
+                    let config = self.config.clone();
+                    scope.spawn(move || {
+                        let mut matcher = Matcher::new(config);
+                        score(pattern, &mut matcher, &mut Vec::new(), chunk, part * size)
+                    })
+                })
+                .collect();
+            parts
+                .into_iter()
+                .flat_map(|part| part.join().expect("scoring does not panic"))
+                .collect()
+        })
+    }
+}
+
+/// The score of each text of `texts` that matches, with its position plus `offset`.
+fn score(
+    pattern: &Pattern,
+    matcher: &mut Matcher,
+    chars: &mut Vec<char>,
+    texts: &[&str],
+    offset: usize,
+) -> Vec<(u32, usize)> {
+    texts
+        .iter()
+        .enumerate()
+        .filter_map(|(index, text)| {
+            let score = pattern.score(Utf32Str::new(text, chars), matcher)?;
+            Some((score, offset + index))
+        })
+        .collect()
 }
 
 /// Turns the code points that matched into runs of UTF-16 offsets, as JavaScript counts them.
@@ -180,6 +235,25 @@ mod tests {
         assert_eq!(total, 3);
         assert_eq!(ranked.len(), 2);
         assert_eq!(ranked[0].index, 2);
+    }
+
+    #[test]
+    fn many_texts_score_on_threads_as_on_one() {
+        let texts: Vec<String> = (0..PARALLEL_FROM * 2 + 3)
+            .map(|i| format!("src/part{}/file{i}.ts", i % 7))
+            .collect();
+        let texts: Vec<&str> = texts.iter().map(String::as_str).collect();
+        let mut ranker = Ranker::new("part3 file", Texts::Paths);
+        let threaded = ranker.scores(&texts);
+        let one = score(
+            &ranker.pattern,
+            &mut ranker.matcher,
+            &mut Vec::new(),
+            &texts,
+            0,
+        );
+        assert!(!one.is_empty());
+        assert_eq!(threaded, one);
     }
 
     #[test]

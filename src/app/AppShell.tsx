@@ -12,7 +12,8 @@ import {
 import {
     ChangeCount,
     changesPanel,
-    changesTarget,
+    filesPanel,
+    fileTarget,
     useRepositoryChangeSubscription,
 } from '@/modules/repository';
 import { loadCommandPalette, type PaletteActions } from '@/modules/search';
@@ -119,7 +120,12 @@ export function AppShell() {
             const next = panelById(id);
             if (next) zoom(2, next);
         },
-        openFile: (file) => zoom(2, changesPanel, changesTarget(file)),
+        // as a file picked in the tree: in Files' own viewer when it is full screen, else Changes
+        openFile: (path) =>
+            show(
+                level === 2 && panel === filesPanel ? filesPanel.id : changesPanel.id,
+                fileTarget(path),
+            ),
     };
 
     const zoomIn = () => {
@@ -211,6 +217,7 @@ export function AppShell() {
                         open={paletteOpen}
                         onOpenChange={setPaletteOpen}
                         projectName={project?.name ?? null}
+                        root={level > 0 ? (project?.root ?? null) : null}
                         panels={project ? PALETTE_PANELS : NO_PANELS}
                         actions={paletteActions}
                     />

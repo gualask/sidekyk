@@ -75,14 +75,17 @@ describe('file groups', () => {
 });
 
 describe('changeOf', () => {
-    it('finds the change a path shows first, and never a deleted file', () => {
+    it('finds the change a path shows first, a deletion only when it is the only one', () => {
         const ordered = orderedFiles([
             file('a.ts', 'staged'),
             file('a.ts', 'unstaged'),
             { ...file('gone.ts', 'unstaged'), kind: 'deleted' },
+            { ...file('back.ts', 'staged'), kind: 'deleted' },
+            file('back.ts', 'untracked'),
         ]);
         expect(changeOf(ordered, 'a.ts')?.area).toBe('unstaged');
-        expect(changeOf(ordered, 'gone.ts')).toBeNull();
+        expect(changeOf(ordered, 'gone.ts')?.kind).toBe('deleted');
+        expect(changeOf(ordered, 'back.ts')?.area).toBe('untracked');
         expect(changeOf(ordered, 'other.ts')).toBeNull();
     });
 });

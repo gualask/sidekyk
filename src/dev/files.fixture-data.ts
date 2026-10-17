@@ -42,10 +42,13 @@ function largePaths(): string[] {
 /** The folder entries a list of paths makes, as `src-tauri/src/modules/repository/tree.rs`. */
 class FixtureTree {
     private readonly folders = new Map<string, { folders: Set<string>; files: string[] }>();
+    /** Every file's path, sorted: the palette searches them. */
+    readonly files: readonly string[];
 
     constructor(paths: Iterable<string>) {
+        this.files = [...new Set(paths)].sort();
         this.folder('');
-        for (const path of paths) {
+        for (const path of this.files) {
             const parts = path.split('/');
             for (let i = 0; i < parts.length - 1; i++) {
                 this.folder(parts.slice(0, i).join('/')).folders.add(parts[i] ?? '');

@@ -21,7 +21,7 @@ export {
     type TreeEntry,
     type UnifiedDiff,
 } from './model/repository.types';
-export { changesTarget } from './model/targets';
+export { fileTarget } from './model/targets';
 export { changesPanel, filesPanel } from './panel';
 export { ChangeCount } from './ui/ChangeCount';
 export { ProjectFacts } from './ui/ProjectFacts';

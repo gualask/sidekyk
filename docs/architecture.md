@@ -167,9 +167,12 @@ killed and output is `truncated` (cut records dropped, diffs cut at a whole line
 
 ### Search
 
-`search` runs at every key: projects, panel titles (sent by the frontend) and the changed paths of
-the project on screen from its last snapshot; no git. Words match independently, case ignored;
-matched letters return as UTF-16 offsets; at most 500 files.
+`search` runs at every key: projects, panel titles (sent by the frontend) and, once something is
+typed, the files of the project the request names (the one on screen; none at level 0): the cached
+tree (read if missing) plus deleted files, each marked from the last snapshot (modified > added >
+deleted). Words match independently, case ignored; matched letters return as UTF-16 offsets; at
+most 500 files, the best picked without sorting the rest. From 20,000 paths scoring runs on up to
+8 threads.
 
 ### Tray
 

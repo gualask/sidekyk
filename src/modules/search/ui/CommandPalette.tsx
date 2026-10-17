@@ -3,7 +3,7 @@ import { Dialog } from '@base-ui/react/dialog';
 import { IconSearch } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMemo, useRef, useState } from 'react';
-import { CHANGE_AREA_LABEL, type ChangeArea } from '@/shared/git/change-area';
+import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { useSearch } from '../application/search.queries';
 import {
     highlightParts,
@@ -20,12 +20,12 @@ const ROW_HEIGHT = { group: 28, item: 34, more: 30 } as const;
 export interface PaletteActions {
     openProject: (root: string) => void;
     openPanel: (id: string) => void;
-    openFile: (file: { path: string; area: ChangeArea }) => void;
+    openFile: (path: string) => void;
 }
 
 /**
  * The command palette (`⌘K`): one field to go to a project, a panel of the project on screen or
- * one of its changed files. What is typed is ranked in the backend; the list shows the best
+ * one of its files. What is typed is ranked in the backend; the list shows the best
  * first, virtualized. `↑`/`↓` move, `↵` opens, `Esc` empties the field, then closes. Loaded with
  * Base UI's dialog and autocomplete once the window is idle after the first paint.
  */
@@ -33,6 +33,7 @@ export function CommandPalette({
     open,
     onOpenChange,
     projectName,
+    root,
     panels,
     actions,
 }: {
@@ -40,6 +41,8 @@ export function CommandPalette({
     onOpenChange: (open: boolean) => void;
     /** The project on screen, whose panels and files are offered; null when there is none. */
     projectName: string | null;
+    /** The project whose files are searched; null when all projects show. */
+    root: string | null;
     panels: readonly PalettePanel[];
     actions: PaletteActions;
 }) {
@@ -53,12 +56,13 @@ export function CommandPalette({
                 >
                     <Palette
                         projectName={projectName}
+                        root={root}
                         panels={panels}
                         onOpen={(item) => {
                             onOpenChange(false);
                             if (item.kind === 'project') actions.openProject(item.root);
                             else if (item.kind === 'panel') actions.openPanel(item.id);
-                            else actions.openFile({ path: item.path, area: item.area });
+                            else actions.openFile(item.path);
                         }}
                     />
                 </Dialog.Popup>
@@ -70,16 +74,18 @@ export function CommandPalette({
 /** The field and its list, mounted while the palette is open: each opening starts empty. */
 function Palette({
     projectName,
+    root,
     panels,
     onOpen,
 }: {
     projectName: string | null;
+    root: string | null;
     panels: readonly PalettePanel[];
     onOpen: (item: PaletteItem) => void;
 }) {
     const [query, setQuery] = useState('');
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
-    const search = useSearch(query, titles);
+    const search = useSearch(query, titles, root);
     const { items, rows } = useMemo(
         () =>
             search.data ? paletteRows(search.data, panels, projectName) : { items: [], rows: [] },
@@ -123,7 +129,7 @@ function Palette({
                 <IconSearch size={16} className="shrink-0 text-ui-text-muted" aria-hidden />
                 <Autocomplete.Input
                     aria-label="Go to"
-                    placeholder="Go to project, panel or changed file…"
+                    placeholder={root ? 'Go to project, panel or file…' : 'Go to project or panel…'}
                     spellCheck={false}
                     autoComplete="off"
                     className="h-[50px] w-full border-0 bg-transparent text-[15px] text-ui-text outline-none placeholder:text-ui-text-muted"
@@ -245,11 +251,11 @@ function Row({
     );
 }
 
-/** What a row says on its right: a panel's key, a file's area; nothing for a project. */
+/** What a row says on its right: a panel's key, how a file changed; nothing for a project. */
 function hint(item: PaletteItem) {
-    if (item.kind === 'project') return null;
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
-    return CHANGE_AREA_LABEL[item.area];
+    if (item.kind !== 'file' || !item.mark) return null;
+    return <span className={CHANGE_MARK_TONE[item.mark]}>{CHANGE_MARK_WORD[item.mark]}</span>;
 }
 
 /** The item's text, with the letters the query matched in bold. */

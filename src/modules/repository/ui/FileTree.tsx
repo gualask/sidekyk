@@ -1,5 +1,6 @@
 import { IconChevronRight } from '@tabler/icons-react';
-import type { ChangeMark, TreeRow } from '../model/file-tree';
+import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
+import type { TreeRow } from '../model/file-tree';
 import {
     TREE_INDENT,
     TREE_PADDING_LEFT,
@@ -10,16 +11,11 @@ import {
 import { useVirtualRows } from './use-virtual-rows';
 import { VirtualItems } from './VirtualItems';
 
-const MARK_TONE: Record<ChangeMark, string> = {
-    modified: 'text-ui-warning',
-    added: 'text-ui-success',
-};
-
-const MARK_WORD: Record<ChangeMark, string> = { modified: 'Modified', added: 'New' };
-
 function tooltip(row: Exclude<TreeRow, { kind: 'more' }>, mark: ChangeMark | undefined): string {
     if (!mark) return row.path;
-    return row.kind === 'folder' ? `${row.path} · has changes` : `${row.path} · ${MARK_WORD[mark]}`;
+    return row.kind === 'folder'
+        ? `${row.path} · has changes`
+        : `${row.path} · ${CHANGE_MARK_WORD[mark]}`;
 }
 
 /** A name of the tree; a folder sharing its row with the folders inside it shows their `/`. */
@@ -89,7 +85,7 @@ export function FileTree({
                     }
                     const mark = marks.get(row.path);
                     const tone = mark
-                        ? MARK_TONE[mark]
+                        ? CHANGE_MARK_TONE[mark]
                         : row.kind === 'file'
                           ? 'text-ui-text-secondary'
                           : '';

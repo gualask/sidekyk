@@ -44,18 +44,11 @@ describe('selection', () => {
     });
 
     it('remembers the change to go back to across files of the tree', () => {
-        const first = selectionOf(
-            { kind: 'path', path: 'x', hunk: null },
-            { kind: 'change', key: 'unstaged:a.ts' },
-        );
-        expect(selectionOf({ kind: 'path', path: 'y', hunk: null }, first)).toEqual({
+        const first = selectionOf('x', { kind: 'change', key: 'unstaged:a.ts' });
+        expect(selectionOf('y', first)).toEqual({
             kind: 'path',
             path: 'y',
             back: 'unstaged:a.ts',
-        });
-        expect(selectionOf({ kind: 'change', key: 'k', hunk: 1 }, first)).toEqual({
-            kind: 'change',
-            key: 'k',
         });
     });
 });

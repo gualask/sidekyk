@@ -286,10 +286,10 @@ mod tests {
     use crate::modules::repository::{
         load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
         load_file_tree, load_recent_commits, load_snapshot, load_summary, resolve_repository,
-        ChangeArea, ChangeKind, ChangedFile, Commit, CommitFileDiffRequest, CommitRequest,
-        FileContent, FileDiffRequest, IgnoredPaths, RepositorySnapshot, Visible,
+        ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest,
+        IgnoredPaths, RepositorySnapshot, Visible,
     };
-    use crate::modules::search::{search, SearchRequest};
+    use crate::modules::search::{search, ProjectFiles, SearchRequest};
     use serde_json::json;
 
     fn git(root: &Path, args: &[&str]) {
@@ -794,7 +794,7 @@ mod tests {
         )
     }
 
-    /// Times the snapshot, the summary, the palette's search over every tracked path, the recent
+    /// Times the snapshot, the summary, the file tree, the palette's search over it, the recent
     /// commits with the files of the newest, and the diff of the largest changed file on a real
     /// repository:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
@@ -818,45 +818,39 @@ mod tests {
             })
         );
 
-        // the palette over every tracked path, as many as it will search once the explorer
-        // lists them all
-        let listed = backend
-            .git(Path::new(&repo.info.root), &["ls-files", "-z"], usize::MAX)
-            .unwrap();
-        let tracked: Vec<ChangedFile> = String::from_utf8_lossy(&listed.stdout)
-            .split('\0')
-            .filter(|path| !path.is_empty())
-            .map(|path| ChangedFile {
-                path: path.to_string(),
-                orig_path: None,
-                area: ChangeArea::Unstaged,
-                kind: ChangeKind::Modified,
-                additions: None,
-                deletions: None,
-                binary: false,
-            })
-            .collect();
-        let palette: SearchRequest =
-            serde_json::from_value(json!({ "query": "srcmod", "panels": ["Changes"] })).unwrap();
-        println!(
-            "search over {} paths: {}",
-            tracked.len(),
-            time(20, || {
-                search(&palette, std::slice::from_ref(&repo.info), &tracked);
-            })
-        );
-
         println!(
             "file tree: {}",
             time(20, || {
                 load_file_tree(&backend, &repo.info).unwrap();
             })
         );
-        let tree = load_file_tree(&backend, &repo.info).unwrap();
+        let tree = std::sync::Arc::new(load_file_tree(&backend, &repo.info).unwrap());
         println!(
             "root folder: {}",
             time(20, || {
                 tree.directory("");
+            })
+        );
+
+        // the palette over every file of the tree, as at each key typed
+        let changed: std::sync::Arc<[_]> =
+            load_snapshot(&backend, &repo.info).unwrap().files.into();
+        let palette: SearchRequest = serde_json::from_value(json!({
+            "query": "srcmod",
+            "panels": ["Changes", "Files"],
+            "root": repo.info.root,
+        }))
+        .unwrap();
+        println!(
+            "search over {} files: {}",
+            tree.files().len(),
+            time(20, || {
+                search(&palette, std::slice::from_ref(&repo.info), |_| {
+                    Some(ProjectFiles {
+                        tree: tree.clone(),
+                        changed: changed.clone(),
+                    })
+                });
             })
         );
 

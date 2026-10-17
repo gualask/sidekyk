@@ -49,11 +49,16 @@ export function fileListRows(files: readonly ChangedFile[]): FileListRow[] {
 
 /**
  * The change of a path that a panel shows, in the order the list has them (the working tree's
- * edits first): its hunks are then the same in Changes and in Files. A deleted file is not on
- * disk, nor in the tree.
+ * edits first): its hunks are then the same in Changes and in Files. A deletion only when it is
+ * the path's one change (the palette finds deleted files): a file deleted from the index and
+ * written again shows as written.
  */
 export function changeOf(ordered: readonly ChangedFile[], path: string): ChangedFile | null {
-    return ordered.find((file) => file.path === path && file.kind !== 'deleted') ?? null;
+    return (
+        ordered.find((file) => file.path === path && file.kind !== 'deleted') ??
+        ordered.find((file) => file.path === path) ??
+        null
+    );
 }
 
 export function fileKey(file: Pick<ChangedFile, 'area' | 'path'>): string {

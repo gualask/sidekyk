@@ -32,7 +32,8 @@ struct Folder {
 pub(crate) struct FileTree {
     /// By path, `""` for the root.
     folders: HashMap<String, Folder>,
-    files: HashSet<String>,
+    /// Every file's path, sorted by its bytes: the palette searches them in this order.
+    files: Vec<String>,
     /// git listed more files than `MAX_TREE_PATHS`: the tree stops there.
     truncated: bool,
 }
@@ -41,15 +42,18 @@ impl FileTree {
     /// The tree of these paths, relative to the root with `/` between names. The same path may
     /// come more than once (a conflict lists each stage).
     pub(crate) fn from_paths<'a>(paths: impl IntoIterator<Item = &'a str>) -> Self {
+        let mut files: Vec<String> = paths
+            .into_iter()
+            .filter(|path| !path.is_empty())
+            .map(str::to_string)
+            .collect();
+        files.sort_unstable();
+        files.dedup();
         let mut folders: HashMap<String, Folder> = HashMap::new();
         folders.insert(String::new(), Folder::default());
-        let mut files = HashSet::new();
         // the folders a path brings, each with the folder above it, filled in once they exist
         let mut new_folders = Vec::new();
-        for path in paths {
-            if path.is_empty() || !files.insert(path.to_string()) {
-                continue;
-            }
+        for path in &files {
             let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
             let mut folder = parent;
             while !folders.contains_key(folder) {
@@ -76,13 +80,20 @@ impl FileTree {
         }
     }
 
+    /// Every file's path, sorted by its bytes.
+    pub(crate) fn files(&self) -> &[String] {
+        &self.files
+    }
+
     pub(crate) fn contains_file(&self, path: &str) -> bool {
-        self.files.contains(path)
+        self.files
+            .binary_search_by(|file| file.as_str().cmp(path))
+            .is_ok()
     }
 
     /// Whether the tree has this file or folder.
     pub(crate) fn contains(&self, path: &str) -> bool {
-        self.files.contains(path) || self.folders.contains_key(path)
+        self.contains_file(path) || self.folders.contains_key(path)
     }
 
     /// Whether these changed paths (relative to `root`, not ignored) may have added or removed a
@@ -321,6 +332,17 @@ mod tests {
         assert!(tree.contains_file("src/main.ts"));
         assert!(!tree.contains_file("src"));
         assert!(tree.contains("src/modules"));
+        assert_eq!(
+            tree.files(),
+            [
+                ".github/ci.yml",
+                "README.md",
+                "docs/deep/only/x.md",
+                "src/main.ts",
+                "src/modules/changes/a.ts",
+                "src/modules/changes/b.ts",
+            ]
+        );
     }
 
     #[test]

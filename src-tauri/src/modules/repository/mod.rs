@@ -14,13 +14,13 @@ mod status;
 mod tree;
 
 pub(crate) use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
+#[cfg(test)]
+pub(crate) use contracts::{ChangeArea, Commit};
 pub(crate) use contracts::{
-    ChangeArea, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory,
+    ChangeKind, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory,
     FileContent, FileDiffRequest, RecentCommits, RepositoryChangedEvent, RepositoryInfo,
     RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
 };
-#[cfg(test)]
-pub(crate) use contracts::{ChangeKind, Commit};
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::{IgnoredPaths, Visible};
 pub(crate) use open::{repository_name, resolve_repository};

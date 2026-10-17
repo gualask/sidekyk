@@ -17,7 +17,7 @@ use crate::modules::repository::{
     RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, Visible,
     REPOSITORY_CHANGED_EVENT,
 };
-use crate::modules::search::{self, SearchRequest, SearchResults};
+use crate::modules::search::{self, ProjectFiles, SearchRequest, SearchResults};
 use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -136,15 +136,28 @@ impl ProjectsState {
         })
     }
 
-    /// The palette's matches: the projects, the panels the frontend names, and the changed
-    /// files of the project on screen as its last snapshot found them.
-    pub(crate) fn search(&self, request: &SearchRequest) -> SearchResults {
+    /// The palette's matches: the projects, the panels the frontend names, and the files of the
+    /// project asked for, as its tree lists them (read if not yet) and its last snapshot found
+    /// them changed. A project whose files cannot be read offers none.
+    pub(crate) fn search(
+        &self,
+        backend: &dyn RepositoryBackend,
+        request: &SearchRequest,
+    ) -> SearchResults {
         let list = self.list();
-        let files = list
-            .active()
-            .and_then(|active| lock(&self.changed).get(&active.root).cloned())
-            .unwrap_or_else(|| Arc::from([]));
-        search::search(request, &list.projects, &files)
+        search::search(request, &list.projects, |root| {
+            let tree = self
+                .file_tree(backend, root)
+                .inspect_err(
+                    |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
+                )
+                .ok()?;
+            let changed = lock(&self.changed)
+                .get(root)
+                .cloned()
+                .unwrap_or_else(|| Arc::from([]));
+            Some(ProjectFiles { tree, changed })
+        })
     }
 
     /// A project's files, read again only when they may have changed, sharing the read in flight.

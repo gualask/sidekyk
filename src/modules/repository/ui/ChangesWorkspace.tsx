@@ -62,9 +62,9 @@ export function ChangesWorkspace({
           : unchanged;
     const { choice: diffView, openAt } = useDiffViewChoice(shownKey);
 
-    // a file asked for from outside: the palette (`changesTarget`), Files (`fileTarget`)
+    // a file asked for from outside: the palette, Files
     useShownTarget(target, (shown) => {
-        const next = selectionOf(shown, selection);
+        const next = selectionOf(shown.path, selection);
         setSelection(next);
         commitView.leave();
         const { change } = selectedFile(next, files);
@@ -198,7 +198,12 @@ export function ChangesWorkspace({
                                     path={selected.path}
                                     origPath={selected.origPath}
                                     view={viewSwitch(pane.currentHunk)}
-                                    showIn={showInFiles(selected.path, pane.currentHunk)}
+                                    showIn={
+                                        // a deleted file is not in the tree
+                                        selected.kind === 'deleted'
+                                            ? undefined
+                                            : showInFiles(selected.path, pane.currentHunk)
+                                    }
                                     copyDiff={{ copied: pane.fileCopied, onCopy: pane.copyFile }}
                                 />
                             )}

@@ -2,8 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::modules::repository::ChangeArea;
-
 /// What the command palette asks for, at every key typed.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -11,6 +9,8 @@ pub(crate) struct SearchRequest {
     pub(crate) query: String,
     /// The panels' titles, in their order: the frontend defines the panels.
     pub(crate) panels: Vec<String>,
+    /// The project whose files are searched: the one on screen, none when all projects show.
+    pub(crate) root: Option<String>,
 }
 
 /// Where the query's letters are in a text: UTF-16 offsets `[start, end)`, as JavaScript counts.
@@ -34,12 +34,23 @@ pub(crate) struct PanelMatch {
     pub(crate) highlights: Vec<Highlight>,
 }
 
-/// A changed file of the project on screen, in one area, as the Changes panel lists it.
+/// How a file found changed, as the Files panel colors it; the strongest when it changed in both
+/// areas.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum ChangeMark {
+    Deleted,
+    Added,
+    Modified,
+}
+
+/// A file of the project searched: one git lists, or one deleted that Changes lists.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct FileMatch {
     pub(crate) path: String,
-    pub(crate) area: ChangeArea,
+    /// None when it did not change.
+    pub(crate) mark: Option<ChangeMark>,
     /// In the path.
     pub(crate) highlights: Vec<Highlight>,
 }
@@ -61,14 +72,18 @@ mod tests {
 
     #[test]
     fn request_and_results_use_the_frontend_field_names() {
-        let request: SearchRequest =
-            serde_json::from_value(serde_json::json!({ "query": "tot", "panels": ["Changes"] }))
-                .unwrap();
+        let request: SearchRequest = serde_json::from_value(serde_json::json!({
+            "query": "tot",
+            "panels": ["Changes"],
+            "root": "/r"
+        }))
+        .unwrap();
         assert_eq!(
             request,
             SearchRequest {
                 query: "tot".into(),
                 panels: vec!["Changes".into()],
+                root: Some("/r".into()),
             }
         );
 
@@ -82,11 +97,18 @@ mod tests {
                 index: 0,
                 highlights: vec![],
             }],
-            files: vec![FileMatch {
-                path: "src/total.ts".into(),
-                area: ChangeArea::Unstaged,
-                highlights: vec![[4, 7]],
-            }],
+            files: vec![
+                FileMatch {
+                    path: "src/total.ts".into(),
+                    mark: Some(ChangeMark::Added),
+                    highlights: vec![[4, 7]],
+                },
+                FileMatch {
+                    path: "README.md".into(),
+                    mark: None,
+                    highlights: vec![],
+                },
+            ],
             more_files: 2,
         };
         assert_eq!(
@@ -94,7 +116,10 @@ mod tests {
             serde_json::json!({
                 "projects": [{ "root": "/r", "name": "r", "highlights": [[0, 1]] }],
                 "panels": [{ "index": 0, "highlights": [] }],
-                "files": [{ "path": "src/total.ts", "area": "unstaged", "highlights": [[4, 7]] }],
+                "files": [
+                    { "path": "src/total.ts", "mark": "added", "highlights": [[4, 7]] },
+                    { "path": "README.md", "mark": null, "highlights": [] }
+                ],
                 "moreFiles": 2
             })
         );

@@ -136,8 +136,10 @@ paint chunk.
   them). Read-only tree on the virtualizer, no tree library.
 - 2026-10-17: the backend keeps the list and serves open folders, so the payload is what is open.
   Files is the second panel of the repository module (once `changes`), sharing its viewer.
-- Search by name in `⌘K` with `nucleo-matcher`; search in contents in `⌘K` as a mode, in the
-  backend, streaming and cancellable.
+- Search by name in `⌘K` (built 2026-10-17): the project on screen only, never other projects'
+  files (switching project is searching its name); none at level 0, which would mean every
+  project. Change shown as a quiet word, not a colored name. Search in contents: `⌘K` mode, in
+  the backend, streaming and cancellable.
 - Libraries chosen at implementation time with pros and cons (`AGENTS.md`).
 
 ## Notes storage and sync
