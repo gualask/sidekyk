@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
-use crate::modules::repository::{GitOutput, RepositoryBackend};
+use crate::modules::repository::{GitOutput, RepositoryBackend, WorktreeEntry};
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
 
 /// No git call takes longer: past it git is killed and the call fails with `git_timed_out`, so a
@@ -247,6 +247,35 @@ impl RepositoryBackend for LocalRepositoryBackend {
         }
         std::fs::read(path).ok()
     }
+
+    fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry> {
+        // every folder on the way is a real one, so a link cannot lead out of the repository
+        let mut folder = root.to_path_buf();
+        for name in path.parent()?.components() {
+            folder.push(name);
+            let meta = std::fs::symlink_metadata(&folder).ok()?;
+            if !meta.is_dir() {
+                return None;
+            }
+        }
+        let full = root.join(path);
+        let meta = std::fs::symlink_metadata(&full).ok()?;
+        if meta.is_symlink() {
+            return std::fs::read_link(&full).ok().map(WorktreeEntry::Link);
+        }
+        if meta.is_dir() {
+            return Some(WorktreeEntry::Folder);
+        }
+        let mut head = Vec::new();
+        let read = std::fs::File::open(&full)
+            .ok()?
+            .take(limit as u64 + 1)
+            .read_to_end(&mut head)
+            .ok()?;
+        let truncated = read > limit;
+        head.truncate(limit);
+        Some(WorktreeEntry::File { head, truncated })
+    }
 }
 
 #[cfg(test)]
@@ -255,10 +284,10 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_commit_file_diff, load_commit_files, load_file_diff, load_recent_commits,
-        load_snapshot, load_summary, resolve_repository, ChangeArea, ChangeKind, ChangedFile,
-        Commit, CommitFileDiffRequest, CommitRequest, FileDiffRequest, IgnoredPaths,
-        RepositorySnapshot,
+        load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
+        load_file_tree, load_recent_commits, load_snapshot, load_summary, resolve_repository,
+        ChangeArea, ChangeKind, ChangedFile, Commit, CommitFileDiffRequest, CommitRequest,
+        FileContent, FileDiffRequest, IgnoredPaths, RepositorySnapshot, Visible,
     };
     use crate::modules::search::{search, SearchRequest};
     use serde_json::json;
@@ -562,6 +591,68 @@ mod tests {
     }
 
     #[test]
+    fn the_tree_lists_what_git_shows_and_files_read_without_following_links() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, ".gitignore", "/target/\n");
+        write(root, "target/a.o", "");
+        write(root, "src/new.ts", "n\n");
+        write(root, "logo.png", "PNG\0data");
+        write(root, "big.txt", &"line\n".repeat(500_000));
+        std::fs::remove_file(root.join("README.md")).unwrap();
+
+        let tree = load_file_tree(&backend, &repo.info).unwrap();
+        let top: Vec<String> = tree
+            .directory("")
+            .entries
+            .into_iter()
+            .map(|e| e.path)
+            .collect();
+        assert_eq!(top, ["src", ".gitignore", "big.txt", "logo.png"]);
+        let src: Vec<String> = tree
+            .directory("src")
+            .entries
+            .into_iter()
+            .map(|e| e.path)
+            .collect();
+        assert_eq!(src, ["src/cart.ts", "src/new.ts"]);
+
+        let content = |path: &str| load_file_content(&backend, &repo.info, path);
+        assert_eq!(
+            content("src/cart.ts").unwrap(),
+            FileContent::Text {
+                text: "a\nb\nc\n".into(),
+                truncated: false
+            }
+        );
+        assert_eq!(content("logo.png").unwrap(), FileContent::Binary);
+        let FileContent::Text { text, truncated } = content("big.txt").unwrap() else {
+            panic!("text");
+        };
+        assert!(truncated);
+        assert!(text.len() <= 2 * 1024 * 1024 && text.ends_with("line\n"));
+        assert!(content("README.md").is_err(), "deleted");
+        assert!(content("../outside").is_err());
+
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            write(outside.path(), "secret.txt", "s\n");
+            std::os::unix::fs::symlink(outside.path(), root.join("linked")).unwrap();
+            std::os::unix::fs::symlink("src/cart.ts", root.join("alias.ts")).unwrap();
+            assert_eq!(
+                content("alias.ts").unwrap(),
+                FileContent::Link {
+                    target: "src/cart.ts".into()
+                }
+            );
+            assert!(content("linked/secret.txt").is_err(), "through a link");
+        }
+    }
+
+    #[test]
     fn changes_git_ignores_do_not_count_unless_the_file_is_tracked() {
         let dir = scratch_repo();
         let backend = LocalRepositoryBackend::default();
@@ -576,12 +667,20 @@ mod tests {
 
         let mut ignored = IgnoredPaths::new(root.to_path_buf());
         let changed = |rels: &[&str]| rels.iter().map(|rel| root.join(rel)).collect::<Vec<_>>();
-        assert!(!ignored.any_visible(
-            &backend,
-            &changed(&["target/debug/a.o", "src/debug.log", "vendor/new.js"])
-        ));
-        assert!(ignored.any_visible(&backend, &changed(&["vendor/kept.js"])));
-        assert!(ignored.any_visible(&backend, &changed(&["target/a.o", "src/cart.ts"])));
+        assert!(!ignored
+            .visible(
+                &backend,
+                &changed(&["target/debug/a.o", "src/debug.log", "vendor/new.js"])
+            )
+            .any());
+        assert!(ignored
+            .visible(&backend, &changed(&["vendor/kept.js"]))
+            .any());
+        let mixed = changed(&["target/a.o", "src/cart.ts"]);
+        let Visible::Paths(visible) = ignored.visible(&backend, &mixed) else {
+            panic!("git answers");
+        };
+        assert_eq!(visible, [Path::new("src/cart.ts")]);
     }
 
     // the hook is a shell script, made executable
@@ -744,6 +843,20 @@ mod tests {
             tracked.len(),
             time(20, || {
                 search(&palette, std::slice::from_ref(&repo.info), &tracked);
+            })
+        );
+
+        println!(
+            "file tree: {}",
+            time(20, || {
+                load_file_tree(&backend, &repo.info).unwrap();
+            })
+        );
+        let tree = load_file_tree(&backend, &repo.info).unwrap();
+        println!(
+            "root folder: {}",
+            time(20, || {
+                tree.directory("");
             })
         );
 

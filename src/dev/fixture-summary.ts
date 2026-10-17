@@ -1,4 +1,4 @@
-import type { ChangedFile, RepositorySummary } from '@/modules/changes';
+import type { ChangedFile, RepositorySummary } from '@/modules/repository';
 
 type Branch = RepositorySummary['branch'];
 

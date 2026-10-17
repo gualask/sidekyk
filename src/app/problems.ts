@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { useMissingRepositories } from '@/modules/changes';
 import { type ProjectList, useRemoveProject } from '@/modules/projects';
+import { useMissingRepositories } from '@/modules/repository';
 import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { MACOS } from '@/shared/platform/macos';
 

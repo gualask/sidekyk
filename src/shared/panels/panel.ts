@@ -11,6 +11,9 @@ export interface PanelTarget {
     key: string;
 }
 
+/** Where a panel is: a tile among a project's panels (level 1), or full screen (level 2). */
+type PanelPlace = 'tile' | 'full';
+
 export interface PanelProps {
     project: ProjectInfo;
     /**
@@ -21,6 +24,17 @@ export interface PanelProps {
     header: HTMLElement | null;
     /** What to show, when the app asks for something; null leaves the panel as the user left it. */
     target: PanelTarget | null;
+    place: PanelPlace;
+    /**
+     * The panel takes the keys: full screen, or the selected tile. In a tile the arrows move among
+     * tiles, so a panel there takes letters only (`j`/`k`, `Space`).
+     */
+    selected: boolean;
+    /**
+     * Shows something in another panel of the project, at the same zoom: in its tile, which is
+     * selected, or full screen in place of this one. The target is in that panel's terms.
+     */
+    show: (panel: string, target: PanelTarget) => void;
 }
 
 /** What a panel's summary gets: the project of the card it is on. */

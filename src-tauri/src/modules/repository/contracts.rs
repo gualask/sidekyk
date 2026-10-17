@@ -1,4 +1,4 @@
-//! Wire contracts shared with the frontend (`src/modules/changes/model/repository.types.ts`).
+//! Wire contracts shared with the frontend (`src/modules/repository/model/repository.types.ts`).
 
 use serde::{Deserialize, Serialize};
 
@@ -204,6 +204,47 @@ pub(crate) struct CommitFileDiffRequest {
     pub(crate) whole_file: bool,
 }
 
+/// One entry of a folder in the Files panel's tree.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct TreeEntry {
+    /// The name shown: a folder holding only one folder shares its entry with it, so a folder's
+    /// name may be several ("modules/changes").
+    pub(crate) name: String,
+    /// From the root, with `/` between names; for a shared entry, the deepest folder's.
+    pub(crate) path: String,
+    pub(crate) folder: bool,
+}
+
+/// What a folder holds, folders first, each in the order of VS Code's explorer.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Directory {
+    pub(crate) entries: Vec<TreeEntry>,
+    /// Entries past the most a folder lists.
+    pub(crate) more: u32,
+    /// The repository has more files than the tree shows (`MAX_TREE_PATHS`).
+    pub(crate) truncated: bool,
+}
+
+/// A file as the Files panel shows it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum FileContent {
+    Text {
+        text: String,
+        /// Larger than `MAX_FILE_BYTES`: cut at its last whole line.
+        truncated: bool,
+    },
+    Binary,
+    /// A symbolic link, not followed: where it points, as git stores it.
+    Link {
+        target: String,
+    },
+    /// A folder git lists as one entry: a submodule.
+    Folder,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -366,6 +407,47 @@ mod tests {
             serde_json::to_value(diff).unwrap(),
             serde_json::json!({ "text": "@@", "truncated": true })
         );
+    }
+
+    #[test]
+    fn the_tree_and_its_files_serialize_with_the_frontend_field_names() {
+        let directory = Directory {
+            entries: vec![TreeEntry {
+                name: "modules/changes".into(),
+                path: "src/modules/changes".into(),
+                folder: true,
+            }],
+            more: 2,
+            truncated: false,
+        };
+        assert_eq!(
+            serde_json::to_value(directory).unwrap(),
+            serde_json::json!({
+                "entries": [{ "name": "modules/changes", "path": "src/modules/changes", "folder": true }],
+                "more": 2,
+                "truncated": false
+            })
+        );
+        let cases = [
+            (
+                FileContent::Text {
+                    text: "a\n".into(),
+                    truncated: true,
+                },
+                serde_json::json!({ "kind": "text", "text": "a\n", "truncated": true }),
+            ),
+            (FileContent::Binary, serde_json::json!({ "kind": "binary" })),
+            (
+                FileContent::Link {
+                    target: "../x".into(),
+                },
+                serde_json::json!({ "kind": "link", "target": "../x" }),
+            ),
+            (FileContent::Folder, serde_json::json!({ "kind": "folder" })),
+        ];
+        for (content, json) in cases {
+            assert_eq!(serde_json::to_value(content).unwrap(), json);
+        }
     }
 
     #[test]

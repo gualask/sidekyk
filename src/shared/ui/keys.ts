@@ -17,3 +17,11 @@ export function isKeyTaken(target: EventTarget | null): boolean {
             target.closest('[role="dialog"], [role="alertdialog"], [role="menu"]') !== null)
     );
 }
+
+/**
+ * Whether a key is the page's to handle: typed with no modifier, and not taken by a field, a
+ * dialog or a menu.
+ */
+export function isOwnKey(event: KeyboardEvent): boolean {
+    return !event.metaKey && !event.ctrlKey && !event.altKey && !isKeyTaken(event.target);
+}

@@ -7,8 +7,9 @@ use super::state::ProjectsState;
 use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::modules::repository::{
-    self, CommitFileDiffRequest, CommitFiles, CommitRequest, FileDiffRequest, RecentCommits,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    self, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
+    FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+    UnifiedDiff,
 };
 use crate::shared::error::AppError;
 
@@ -105,6 +106,38 @@ pub(crate) async fn get_commit_file_diff(
 ) -> Result<UnifiedDiff, AppError> {
     on_project("get_commit_file_diff", app, root, move |backend, info| {
         repository::load_commit_file_diff(backend, info, &request)
+    })
+    .await
+}
+
+#[tauri::command]
+/// What a folder of a project holds, for the Files panel's tree; `""` is the root.
+pub(crate) async fn get_directory(
+    app: tauri::AppHandle,
+    root: String,
+    path: String,
+) -> Result<Directory, AppError> {
+    blocking("get_directory", app, move |app| {
+        let backend = app.state::<LocalRepositoryBackend>();
+        let tree = app
+            .state::<ProjectsState>()
+            .file_tree(backend.inner(), &root)?;
+        Ok(tree.directory(&path))
+    })
+    .await
+}
+
+#[tauri::command]
+/// One file of a project's tree, as the viewer shows it.
+pub(crate) async fn get_file_content(
+    app: tauri::AppHandle,
+    root: String,
+    path: String,
+) -> Result<FileContent, AppError> {
+    blocking("get_file_content", app, move |app| {
+        let backend = app.state::<LocalRepositoryBackend>();
+        app.state::<ProjectsState>()
+            .file_content(backend.inner(), &root, &path)
     })
     .await
 }

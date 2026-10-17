@@ -4,7 +4,7 @@ import {
     REPOSITORY_CHANGED_EVENT,
     type RepositoryChangedEvent,
     type RepositoryPort,
-} from '@/modules/changes';
+} from '@/modules/repository';
 import { onTauriEvent } from './events';
 
 /**
@@ -18,6 +18,8 @@ export const tauriRepository: RepositoryPort = {
     getRecentCommits: (root) => invoke('get_recent_commits', { root }),
     getCommitFiles: (root, commit) => invoke('get_commit_files', { root, commit }),
     getCommitFileDiff: (root, request) => invoke('get_commit_file_diff', { root, request }),
+    getDirectory: (root, path) => invoke('get_directory', { root, path }),
+    getFileContent: (root, path) => invoke('get_file_content', { root, path }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),
     setWindowVisible: (visible) =>

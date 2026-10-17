@@ -67,7 +67,8 @@ what needs measuring before deciding waits in **Performance review**, at the end
       file per icon by `vite.config.ts`): the mock's glyphs and SVGs (chevron, minimize, zoom,
       settings, overview, close, more, trash, folder, compare, open in editor) are placeholders.
       Copy is `IconCopy`, then `IconCheck` for a moment, as `DiffRows.tsx` already does. The
-      shell's are in (overview, zoom, more, trash, add); the rest come with their features
+      shell's are in (overview, zoom, more, trash, add), and Files' (folder, compare, chevron);
+      the rest come with their features
 - [x] Base UI for palette, menus, selects and tooltips (decided on 2026-10-12, see
       docs/evolution.md, UI components), loaded with the code that first needs it, never in the
       first paint
@@ -137,8 +138,10 @@ what needs measuring before deciding waits in **Performance review**, at the end
       pointer, with the wheel listened to only while the modifier is held, so scrolling never
       waits for it. A trackpad pinch zooms through WebKit's gesture events on macOS; on Linux and
       Windows it would need a wheel listener on every scroll, so it does not zoom there. To check
-      in the packaged app: the pinch in WKWebView. The arrows among tiles at level 1 come with
-      Files and Notes. +2.6 kB on the first paint's chunk (1 kB gzip)
+      in the packaged app: the pinch in WKWebView. At level 1 the tile clicked, or reached with
+      `←`/`→`, is selected (an accent border): `↵` zooms into it and it takes `j`/`k`, the arrows
+      moving among tiles as in the mock (`PanelProps.place` and `selected`); full screen a panel
+      takes the arrows too. +2.6 kB on the first paint's chunk (1 kB gzip)
 
 ## Next: see what the agent is doing
 
@@ -244,11 +247,40 @@ Before the explorer adds more git reads, so they all share the same limits.
       three-line one, and weighs 491 KB against 3 KB; in the fixtures, a 50,000-line file switches
       view in about 140 ms (dev build). Costs nothing hidden or idle; shown, the whole-file diff
       only while that view is on. The Files panel shows changed files on it
-- [ ] Files panel: tree from `git ls-files` plus untracked files, virtualized, with a bounded
-      payload; keyboard, compact folders, change colors and adjustable width as in the approved
-      mock
-- [ ] File view through the backend, size-limited, on the virtualized rows of the diff view; a
-      changed file shows the diff view's whole file with its changes, and links to Changes
+- [x] Files panel (decided with the maintainer on 2026-10-17): at level 1 a tile with the tree
+      alone, right of Changes and as wide as the tree; a file picked there shows in Changes, the
+      viewer (a file that did not change as its text, badged "Unchanged", until `Esc` or a click
+      in the list goes back), and the tree keeps the keys. `2` shows it full screen, the tree
+      with the file next to it. The backend lists the files once (`git ls-files
+      --cached --others --exclude-standard`, without `--deleted`; at most 200,000 files, 32 MiB)
+      and keeps the list of the project on screen; the frontend asks for each open folder that
+      shows (`get_directory`, at most 10,000 entries, the rest counted), so the payload is what is
+      open. The backend resolves compact folders ("modules/changes") and sorts as VS Code's
+      explorer (folders first, case ignored, numbers by value). The list is read again only when a
+      watcher batch has a path not ignored that appeared or disappeared (a `stat` of the batch's
+      paths against the list), when the git dir changed, or after the window was hidden with a
+      mark; an edit to a file reads nothing, and the open folders are answered from memory.
+      Changes color the names (amber, green for new; a folder its strongest), with no mark; the
+      tooltip says it. Keys: `j`/`k` and `Space` (opens a folder) in the tile, where `j`/`k` also
+      show a file in Changes; `←→↑↓↵` full screen. The file shown is one for both panels, as in
+      VS Code: picked in Changes it is revealed in the tree, picked in the tree it is selected in
+      Changes' list when it changed. It and the open folders are kept per project for the session; the tree's width is dragged
+      and stored in the settings (`filesTreeWidth`), a double click fits every open row, a second
+      goes back, the file view keeps 240 px. "Show in Files" in Changes' header and "Show in
+      Changes" in Files' go to the other panel at the hunk being read (`PanelProps.show`). The
+      Changes panel now keeps its selected file across zooms too. One viewer and one header serve
+      both panels (`Pane`, `FileHeader`). Measured on Zed's clone: the
+      list 48 ms (the snapshot 57 ms), a folder 3 µs. Costs nothing hidden or idle; shown, one
+      `git ls-files` when the tree is first shown and after a file is added or removed. +3.9 kB on
+      the first paint's chunk (1.4 kB gzip), +3.2 kB in the vendor chunk (TanStack's
+      `useQueries`), and the panel's chunk (fetched with the app, as its tile shows at level 1)
+- [x] File view through the backend (`get_file_content`): only a file of the tree, never one git
+      ignores, its first 2 MiB cut at a whole line, binary when a NUL comes in the first 8 KiB, a
+      link shown with its target and never followed (nor any folder on the way), a submodule said
+      so. Its text is on the rows of the diff view, which copy a line or a selection with a click
+      as in Changes. A changed file shows whole with its changes marked, the diff of the area
+      Changes lists first, so its hunks are those of Changes. Costs nothing hidden or idle; shown,
+      the open file read again with each change on disk, as the open diff is
 - [ ] Search by name (fuzzy) in `⌘K`, the active project's files first; opening one shows it
       in the tree. No filter in the panel. The ranking is there already (`modules/search`): it
       needs the path list of every project, kept by the backend

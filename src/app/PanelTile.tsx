@@ -1,6 +1,6 @@
 import { IconArrowsMaximize } from '@tabler/icons-react';
 import { Suspense, useState } from 'react';
-import type { PanelDefinition, PanelTarget } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -18,15 +18,26 @@ const HEADER =
 export function PanelTile({
     panel,
     project,
-    target = null,
+    target,
+    selected,
+    show,
+    grow = 1,
     onZoomIn,
+    onSelect,
 }: {
     panel: PanelDefinition;
     project: ProjectInfo;
     /** What the panel is asked to show, if anything. */
-    target?: PanelTarget | null;
+    target: PanelTarget | null;
+    /** The panel takes the keys: full screen, or the selected tile. */
+    selected: boolean;
+    show: PanelProps['show'];
+    /** A tile's share of the width; 0 for the width of what it shows. */
+    grow?: number;
     /** Shows the panel as a tile, whose header zooms into it; without it, the panel is full screen. */
     onZoomIn?: () => void;
+    /** Selects the tile, which then takes the keys. */
+    onSelect?: () => void;
 }) {
     const shortcut = panelShortcut(panel);
     const [header, setHeader] = useState<HTMLElement | null>(null);
@@ -37,11 +48,19 @@ export function PanelTile({
             data-panel={panel.id}
             // a tile zooms in on itself under the pointer (⌘+scroll), and grows to full screen
             data-zoom={onZoomIn ? '' : undefined}
-            style={{ viewTransitionName: ZOOM_NAMES.panel(panel.id) }}
-            className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-ui-surface ${
-                onZoomIn
-                    ? 'rounded-xl border border-ui-border shadow-[0_1px_2px_var(--ui-shadow-soft)]'
-                    : ''
+            style={{
+                viewTransitionName: ZOOM_NAMES.panel(panel.id),
+                flexGrow: grow,
+                flexBasis: grow > 0 ? 0 : 'auto',
+            }}
+            // the tile clicked is the one the keys go to
+            onPointerDownCapture={onSelect}
+            className={`flex min-h-0 min-w-0 shrink-0 flex-col overflow-hidden bg-ui-surface ${
+                !onZoomIn
+                    ? ''
+                    : selected
+                      ? 'rounded-xl border border-ui-accent shadow-[0_0_0_3px_var(--ui-accent-soft)]'
+                      : 'rounded-xl border border-ui-border shadow-[0_1px_2px_var(--ui-shadow-soft)]'
             }`}
         >
             {onZoomIn ? (
@@ -73,6 +92,9 @@ export function PanelTile({
                         project={project}
                         header={header}
                         target={target}
+                        place={onZoomIn ? 'tile' : 'full'}
+                        selected={selected}
+                        show={show}
                     />
                 </Suspense>
             </div>

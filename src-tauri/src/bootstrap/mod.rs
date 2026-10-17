@@ -115,6 +115,8 @@ pub(crate) fn run() {
             tauri_commands::repository::get_recent_commits,
             tauri_commands::repository::get_commit_files,
             tauri_commands::repository::get_commit_file_diff,
+            tauri_commands::repository::get_directory,
+            tauri_commands::repository::get_file_content,
             tauri_commands::search::search,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,

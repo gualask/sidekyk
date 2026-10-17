@@ -1,5 +1,9 @@
 export { type SettingsPort, SettingsProvider } from './application/settings.port';
-export { useGlobalShortcutStatus, useSettingsWhenRead } from './application/settings.queries';
+export {
+    useGlobalShortcutStatus,
+    useSettingsWhenRead,
+    useUpdateSettings,
+} from './application/settings.queries';
 export type { GlobalShortcutStatus, Settings } from './model/settings.types';
 export { shortcutProblem } from './model/shortcut-problem';
 

@@ -1,6 +1,6 @@
 import { IconSearch, IconSettings } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
-import { ProjectFacts } from '@/modules/changes';
+import { ProjectFacts } from '@/modules/repository';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import type { ProjectInfo } from '@/shared/projects/project-info';

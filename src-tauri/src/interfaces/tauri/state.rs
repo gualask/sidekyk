@@ -13,12 +13,13 @@ use crate::infrastructure::settings_store;
 use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
-    self, resolve_repository, ChangedFile, IgnoredPaths, RepositoryBackend, RepositoryChangedEvent,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, REPOSITORY_CHANGED_EVENT,
+    self, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths, RepositoryBackend,
+    RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, Visible,
+    REPOSITORY_CHANGED_EVENT,
 };
 use crate::modules::search::{self, SearchRequest, SearchResults};
 use crate::shared::coalesce::Coalesced;
-use crate::shared::error::unshare;
+use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
 /// A result shared by every caller that waited for it.
@@ -61,6 +62,14 @@ struct WindowState {
     missed: Option<String>,
 }
 
+/// A project's files, as the Files panel shows them.
+#[derive(Default)]
+struct CachedTree {
+    tree: Option<Arc<FileTree>>,
+    /// Counts the times the files may have changed, so a tree read meanwhile is not kept.
+    changes: u64,
+}
+
 struct Watched {
     root: String,
     /// `None` when the watcher could not start, such as a repository moved away.
@@ -82,6 +91,10 @@ pub(crate) struct ProjectsState {
     /// The changed files of each project's last snapshot, which the palette searches without
     /// running git. Only the project on screen has snapshots.
     changed: Mutex<HashMap<String, Arc<[ChangedFile]>>>,
+    /// The files of the project on screen: read when first asked for, and again only after its
+    /// watcher saw a file added or removed, or the git dir change.
+    trees: Mutex<HashMap<String, CachedTree>>,
+    tree_reads: PerProject<Arc<FileTree>>,
 }
 
 impl ProjectsState {
@@ -134,6 +147,71 @@ impl ProjectsState {
         search::search(request, &list.projects, &files)
     }
 
+    /// A project's files, read again only when they may have changed, sharing the read in flight.
+    pub(crate) fn file_tree(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+    ) -> anyhow::Result<Arc<FileTree>> {
+        let project = self.project(root)?;
+        let cached = || lock(&self.trees).get(root).and_then(|c| c.tree.clone());
+        if let Some(tree) = cached() {
+            return Ok(tree);
+        }
+        self.tree_reads.run(root, || {
+            // the read this one waited for may have left a tree
+            if let Some(tree) = cached() {
+                return Ok(tree);
+            }
+            let before = lock(&self.trees)
+                .entry(root.to_string())
+                .or_default()
+                .changes;
+            let tree = Arc::new(repository::load_file_tree(backend, &project)?);
+            let mut trees = lock(&self.trees);
+            let entry = trees.entry(root.to_string()).or_default();
+            if entry.changes == before {
+                entry.tree = Some(tree.clone());
+            }
+            Ok(tree)
+        })
+    }
+
+    /// One file of a project's tree. Only a file of the tree is read, so never one git ignores.
+    pub(crate) fn file_content(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+        path: &str,
+    ) -> anyhow::Result<FileContent> {
+        if !self.file_tree(backend, root)?.contains_file(path) {
+            return Err(user_facing(UserFacingErrorCode::FileMissing));
+        }
+        repository::load_file_content(backend, &self.project(root)?, path)
+    }
+
+    /// The files of a project may have changed: its tree is read again when next asked for.
+    fn forget_tree(&self, root: &str) {
+        let mut trees = lock(&self.trees);
+        let entry = trees.entry(root.to_string()).or_default();
+        entry.tree = None;
+        entry.changes += 1;
+    }
+
+    /// Whether a batch of the watcher may have added or removed a file of the tree read.
+    fn batch_changes_tree(&self, root: &str, git_dir: bool, visible: &Visible) -> bool {
+        let trees = lock(&self.trees);
+        let Some(tree) = trees.get(root).and_then(|c| c.tree.as_ref()) else {
+            // nothing read, nothing to read again
+            return false;
+        };
+        git_dir
+            || match visible {
+                Visible::Unknown => true,
+                Visible::Paths(paths) => tree.may_have_changed(Path::new(root), paths),
+            }
+    }
+
     /// A project's summary, sharing the one in flight.
     pub(crate) fn summary(
         &self,
@@ -177,6 +255,7 @@ impl ProjectsState {
         };
         self.snapshots.retain(&list);
         self.summaries.retain(&list);
+        self.tree_reads.retain(&list);
         lock(&self.changed).retain(|root, _| list.find(root).is_ok());
         watch_active(app);
         Ok(list)
@@ -200,6 +279,8 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     *watched = None;
     // a project put on screen is read in full anyway, and its first snapshot fills the tray
     lock(&state.window).missed = None;
+    // what the previous watcher saw is gone with it: the files are read again when asked for
+    lock(&state.trees).clear();
     tray::clear(app);
     let watcher = match start_watcher(app, &active.root) {
         Ok(watcher) => {
@@ -242,6 +323,7 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
             let marked = changes.git_dir || ignored.any_maybe_visible(&changes.worktree);
             if marked {
                 window.missed = Some(watched_root.clone());
+                state.forget_tree(&watched_root);
             }
             tracing::debug!(
                 git_dir = changes.git_dir,
@@ -253,11 +335,17 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
         }
         drop(window);
         let backend = emitter.state::<LocalRepositoryBackend>();
-        let visible = changes.git_dir || ignored.any_visible(backend.inner(), &changes.worktree);
+        let worktree = ignored.visible(backend.inner(), &changes.worktree);
+        let visible = changes.git_dir || worktree.any();
+        let files = state.batch_changes_tree(&watched_root, changes.git_dir, &worktree);
+        if files {
+            state.forget_tree(&watched_root);
+        }
         tracing::debug!(
             git_dir = changes.git_dir,
             worktree_paths = changes.worktree.len(),
             visible,
+            files,
             "watcher batch"
         );
         if visible {

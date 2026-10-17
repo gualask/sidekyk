@@ -2,7 +2,7 @@ import { IconCheck, IconCopy, IconCopyOff } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import { useChangesSettings } from '../application/changes-settings';
+import { useRepositorySettings } from '../application/repository-settings';
 import {
     type Copied,
     type CopySource,
@@ -64,7 +64,7 @@ export function DiffList({
     linesAbove: number;
     currentHunk: RefObject<(() => number) | null>;
 }) {
-    const { copyTemplate } = useChangesSettings();
+    const { copyTemplate } = useRepositorySettings();
     const listRef = useRef<HTMLDivElement>(null);
     const layout = useMemo(() => diffLayout(rows), [rows]);
     const virtualizer = useVirtualizer({

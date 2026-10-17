@@ -1,4 +1,4 @@
-import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/changes';
+import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/repository';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
 

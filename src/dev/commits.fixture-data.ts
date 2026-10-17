@@ -6,7 +6,7 @@ import type {
     FileChange,
     RecentCommits,
     UnifiedDiff,
-} from '@/modules/changes';
+} from '@/modules/repository';
 
 /** The fixture's clock: commits are dated back from when the page loaded. */
 const NOW = Math.floor(Date.now() / 1000);

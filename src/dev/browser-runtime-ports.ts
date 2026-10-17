@@ -4,6 +4,7 @@ import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
+import { fixtureFileContent, fixtureTree } from './files.fixture-data';
 import { fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
@@ -68,6 +69,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
         diffView: 'changes',
         copyTemplate: DEFAULT_COPY_TEMPLATE,
+        filesTreeWidth: null,
     };
     // in `problems`, another app holds the stored shortcut since startup
     const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;
@@ -85,6 +87,18 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         readable(root);
         if (large(root)) return largeSnapshot();
         return reviewSnapshot(!scenarioData(root));
+    };
+
+    // as the backend, the tree is built once and kept: the fixtures never change on disk
+    const trees = new Map<string, ReturnType<typeof fixtureTree>>();
+    const tree = (root: string) => {
+        readable(root);
+        let found = trees.get(root);
+        if (!found) {
+            found = fixtureTree(large(root), snapshot(root).files);
+            trees.set(root, found);
+        }
+        return found;
     };
 
     // as the backend, the palette searches the files of the last snapshot: none when it failed
@@ -145,6 +159,11 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 readable(root);
                 const diff = commitFileDiff(large(root), request);
                 return request.wholeFile ? wholeFileDiff(diff) : diff;
+            },
+            getDirectory: async (root, path) => tree(root).directory(path),
+            getFileContent: async (root, path) => {
+                if (!tree(root).has(path)) throw failure('file_missing');
+                return fixtureFileContent(path);
             },
             onRepositoryChanged: () => () => undefined,
             setWindowVisible: async () => null,

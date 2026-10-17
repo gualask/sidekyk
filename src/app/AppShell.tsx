@@ -1,11 +1,5 @@
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import {
-    ChangeCount,
-    changesPanel,
-    changesTarget,
-    useRepositoryChangeSubscription,
-} from '@/modules/changes';
-import {
     activeProject,
     loadProjectsOverview,
     NoProjects,
@@ -15,16 +9,22 @@ import {
     useProjects,
     useProjectsChangeSubscription,
 } from '@/modules/projects';
+import {
+    ChangeCount,
+    changesPanel,
+    changesTarget,
+    useRepositoryChangeSubscription,
+} from '@/modules/repository';
 import { loadCommandPalette, type PaletteActions } from '@/modules/search';
 import { loadSettingsDialog } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
-import type { PanelDefinition, PanelTarget } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
 import { PanelTile } from './PanelTile';
-import { INITIAL_PANEL, PALETTE_PANELS, panelById, SUMMARIES } from './panels';
+import { INITIAL_PANEL, PALETTE_PANELS, panelById, SUMMARIES, TILES, tileBeside } from './panels';
 import { useProblems } from './problems';
 import { useShowWindowWhen } from './providers';
 import { TopBar } from './TopBar';
@@ -49,10 +49,10 @@ export function AppShell() {
     const projects = useProjects();
     // the app opens on the project it showed last, with its panels
     const [level, setLevel] = useState<ZoomLevel>(1);
-    // the panel full screen at level 2
+    // the panel full screen at level 2, and the tile selected at level 1
     const [panel, setPanel] = useState(INITIAL_PANEL);
     // what that panel was asked to show, such as a file picked in the palette
-    const [target, setTarget] = useState<PanelTarget | null>(null);
+    const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
     // the window, created hidden, shows with the workspace laid out, not an empty shell
     useShowWindowWhen(!projects.isPending);
@@ -74,15 +74,29 @@ export function AppShell() {
      * asks the panel full screen to show something; any other move leaves the panels as they are.
      */
     const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
+        const asked = nextTarget ? { panel: nextPanel.id, target: nextTarget } : null;
         if (next === level && nextPanel === panel) {
-            if (nextTarget) setTarget(nextTarget);
+            if (asked) setTarget(asked);
             return;
         }
         zoomTransition(() => {
             setLevel(next);
             setPanel(nextPanel);
-            setTarget(nextTarget);
+            setTarget(asked);
         });
+    };
+
+    // a panel shows something in another: the other tile, selected, or full screen in place of
+    // the first
+    const show: PanelProps['show'] = (id, nextTarget) => {
+        const next = panelById(id);
+        if (!next) return;
+        if (level === 2) {
+            zoom(2, next, nextTarget);
+            return;
+        }
+        setPanel(next);
+        setTarget({ panel: next.id, target: nextTarget });
     };
 
     // one dialog at a time: the palette and the settings close each other
@@ -122,6 +136,12 @@ export function AppShell() {
         // full screen, from a project's panels or another panel
         openPanel: (next) => {
             if (level > 0) zoom(2, next);
+        },
+        // the arrows move among the tiles of a project's panels
+        moveTile: (step) => {
+            const next = level === 1 ? tileBeside(panel, step) : undefined;
+            if (next) setPanel(next);
+            return level === 1;
         },
         toggleSettings,
         togglePalette,
@@ -174,6 +194,8 @@ export function AppShell() {
                         panel={panel}
                         target={target}
                         zoom={zoom}
+                        select={setPanel}
+                        show={show}
                         idle={idle}
                     />
                 ) : null}
@@ -198,6 +220,12 @@ export function AppShell() {
     );
 }
 
+/** What a panel was asked to show, and which panel. */
+interface Asked {
+    panel: string;
+    target: PanelTarget;
+}
+
 function Workspace({
     list,
     project,
@@ -205,17 +233,23 @@ function Workspace({
     panel,
     target,
     zoom,
+    select,
+    show,
     idle,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
     level: ZoomLevel;
+    /** Full screen at level 2, the selected tile at level 1. */
     panel: PanelDefinition;
-    target: PanelTarget | null;
+    target: Asked | null;
     zoom: (level: ZoomLevel, panel?: PanelDefinition) => void;
+    select: (panel: PanelDefinition) => void;
+    show: PanelProps['show'];
     /** The first paint is done: the other projects' counts may load. */
     idle: boolean;
 }) {
+    const targetOf = (id: string) => (target?.panel === id ? target.target : null);
     // also reached from all projects, once the last project is removed there: the repository
     // added next opens, as from the "+ Add a repository" card
     if (!project) return <NoProjects onOpen={() => zoom(1)} />;
@@ -239,7 +273,13 @@ function Workspace({
     if (level === 2) {
         return (
             <div className="flex h-full" style={PROJECT_ZOOM}>
-                <PanelTile panel={panel} project={project} target={target} />
+                <PanelTile
+                    panel={panel}
+                    project={project}
+                    target={targetOf(panel.id)}
+                    selected
+                    show={show}
+                />
             </div>
         );
     }
@@ -256,12 +296,20 @@ function Workspace({
                     ) : null;
                 }}
             />
-            <div className="flex min-w-0 flex-1 p-2">
-                <PanelTile
-                    panel={INITIAL_PANEL}
-                    project={project}
-                    onZoomIn={() => zoom(2, INITIAL_PANEL)}
-                />
+            <div className="flex min-w-0 flex-1 gap-2 p-2">
+                {TILES.map(({ panel: tile, grow }) => (
+                    <PanelTile
+                        key={tile.id}
+                        panel={tile}
+                        project={project}
+                        target={targetOf(tile.id)}
+                        selected={tile === panel}
+                        show={show}
+                        grow={grow}
+                        onZoomIn={() => zoom(2, tile)}
+                        onSelect={() => select(tile)}
+                    />
+                ))}
             </div>
         </div>
     );

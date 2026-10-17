@@ -34,18 +34,43 @@ function columns(text: string): number {
     return width;
 }
 
+/** The widest of these lines, or `widest` if none is wider, in monospace columns. */
+function widestOf(lines: readonly DiffLine[], widest = 0): number {
+    let found = widest;
+    for (const line of lines) {
+        // most lines are short: skip the tab-aware count when it cannot win
+        if (line.text.length * TAB_SIZE > found) found = Math.max(found, columns(line.text));
+    }
+    return found;
+}
+
 /**
  * The widest line or hunk header, in monospace columns. Rows are positioned absolutely, so the
  * list sets its own width from this instead of growing with its content.
  */
 export function widestLine(hunks: readonly DiffHunk[]): number {
     let widest = 0;
-    for (const hunk of hunks) {
-        widest = Math.max(widest, columns(hunk.header));
-        for (const line of hunk.lines) {
-            // most lines are short: skip the tab-aware count when it cannot win
-            if (line.text.length * TAB_SIZE > widest) widest = Math.max(widest, columns(line.text));
-        }
-    }
+    for (const hunk of hunks) widest = widestOf(hunk.lines, Math.max(widest, columns(hunk.header)));
     return widest;
+}
+
+/** A file's text as lines of a diff that changes none, numbered from 1, for the same viewer. */
+export function textLines(text: string): DiffLine[] {
+    const lines = text.split('\n');
+    if (lines.at(-1) === '') lines.pop();
+    return lines.map((line, index) => ({
+        id: index,
+        kind: 'context',
+        text: line,
+        oldNumber: index + 1,
+        newNumber: index + 1,
+    }));
+}
+
+/** A file's lines as rows outside every hunk, with the widest of them. */
+export function textRows(lines: readonly DiffLine[]): { rows: DiffRow[]; widest: number } {
+    return {
+        rows: lines.map((line) => ({ kind: 'line', line, hunkIndex: -1 })),
+        widest: widestOf(lines),
+    };
 }

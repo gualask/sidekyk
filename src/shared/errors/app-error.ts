@@ -5,6 +5,7 @@ interface AppErrorPayload {
 }
 
 const USER_MESSAGES: Record<string, string> = {
+    file_missing: 'This file is no longer in the repository: it was moved or deleted.',
     git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
     git_timed_out:
         'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',

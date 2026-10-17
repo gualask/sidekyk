@@ -80,6 +80,8 @@ pub(crate) struct Settings {
     pub(crate) global_shortcut: GlobalShortcut,
     pub(crate) diff_view: DiffView,
     pub(crate) copy_template: CopyTemplate,
+    /// The Files panel's tree, in pixels, as last dragged; `None` for its default.
+    pub(crate) files_tree_width: Option<u32>,
 }
 
 /// Where the global shortcut stands, as registered. The frontend knows every platform's kinds;
@@ -121,12 +123,14 @@ mod tests {
             },
             diff_view: DiffView::File,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
+            files_tree_width: Some(320),
         };
         let json = serde_json::json!({
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "diffView": "file",
             "copyTemplate": "Look at {row}:\n{text}",
+            "filesTreeWidth": 320,
         });
         assert_eq!(serde_json::to_value(&settings).unwrap(), json);
         assert_eq!(serde_json::from_value::<Settings>(json).unwrap(), settings);
@@ -144,6 +148,7 @@ mod tests {
                 },
                 diff_view: DiffView::Changes,
                 copy_template: CopyTemplate::default(),
+                files_tree_width: None,
             }
         );
     }

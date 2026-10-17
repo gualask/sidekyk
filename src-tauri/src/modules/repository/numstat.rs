@@ -68,10 +68,14 @@ pub(super) fn parse_numstat_z(bytes: &[u8]) -> Vec<LineCounts> {
     counts
 }
 
-/// How many lines a new file adds, or `None` when it looks binary (a NUL in its first 8 KiB,
-/// the heuristic git uses).
+/// A NUL in the first 8 KiB: the heuristic git uses to call a file binary.
+pub(super) fn looks_binary(bytes: &[u8]) -> bool {
+    bytes[..bytes.len().min(8000)].contains(&0)
+}
+
+/// How many lines a new file adds, or `None` when it looks binary.
 pub(super) fn count_text_lines(bytes: &[u8]) -> Option<u32> {
-    if bytes[..bytes.len().min(8000)].contains(&0) {
+    if looks_binary(bytes) {
         return None;
     }
     let newlines = bytes.iter().filter(|&&b| b == b'\n').count();

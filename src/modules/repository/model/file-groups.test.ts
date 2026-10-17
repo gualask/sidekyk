@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { fileKey, fileListRows, groupFiles, orderedFiles, splitPath } from './file-groups';
+import {
+    changeOf,
+    fileKey,
+    fileListRows,
+    groupFiles,
+    orderedFiles,
+    splitPath,
+} from './file-groups';
 import type { ChangedFile } from './repository.types';
 
 function file(path: string, area: ChangedFile['area']): ChangedFile {
@@ -64,5 +71,18 @@ describe('file groups', () => {
     it('splits a path into name and folder', () => {
         expect(splitPath('src/app/App.tsx')).toEqual({ name: 'App.tsx', dir: 'src/app' });
         expect(splitPath('README.md')).toEqual({ name: 'README.md', dir: '' });
+    });
+});
+
+describe('changeOf', () => {
+    it('finds the change a path shows first, and never a deleted file', () => {
+        const ordered = orderedFiles([
+            file('a.ts', 'staged'),
+            file('a.ts', 'unstaged'),
+            { ...file('gone.ts', 'unstaged'), kind: 'deleted' },
+        ]);
+        expect(changeOf(ordered, 'a.ts')?.area).toBe('unstaged');
+        expect(changeOf(ordered, 'gone.ts')).toBeNull();
+        expect(changeOf(ordered, 'other.ts')).toBeNull();
     });
 });

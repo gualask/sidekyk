@@ -1,4 +1,4 @@
-import type { ChangedFile } from '@/modules/changes';
+import type { ChangedFile } from '@/modules/repository';
 import type { Highlight, SearchRequest, SearchResults } from '@/modules/search';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 

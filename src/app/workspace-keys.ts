@@ -19,7 +19,8 @@ function isPlain(event: KeyboardEvent): boolean {
 
 /**
  * The workspace's keyboard: `↵` zooms in and `Esc` out (after leaving a field: `Esc` is
- * progressive), `1`-`9` open a panel full screen, `[` and `]` switch project, `⌘,` (`Ctrl+,`)
+ * progressive), `1`-`9` open a panel full screen, `←` and `→` move among a project's tiles, `[`
+ * and `]` switch project, `⌘,` (`Ctrl+,`)
  * opens the settings and `⌘K` (`Ctrl+K`) the command palette. Keys a field, a dialog or a menu
  * takes are left to it.
  */
@@ -28,6 +29,7 @@ export function useWorkspaceKeys({
     zoomIn,
     zoomOut,
     openPanel,
+    moveTile,
     toggleSettings,
     togglePalette,
 }: {
@@ -35,6 +37,8 @@ export function useWorkspaceKeys({
     zoomIn: () => void;
     zoomOut: () => void;
     openPanel: (panel: PanelDefinition) => void;
+    /** Selects the tile beside the selected one; false where there are no tiles. */
+    moveTile: (step: -1 | 1) => boolean;
     toggleSettings: () => void;
     togglePalette: () => void;
 }) {
@@ -63,6 +67,8 @@ export function useWorkspaceKeys({
         } else if (event.key === 'Enter') {
             if (event.target instanceof Element && event.target.closest(PRESSABLE)) return;
             zoomIn();
+        } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+            if (!moveTile(event.key === 'ArrowRight' ? 1 : -1)) return;
         } else if (event.key === '[' || event.key === ']') {
             const next = list ? neighbourProject(list, event.key === ']' ? 1 : -1) : null;
             if (!next) return;

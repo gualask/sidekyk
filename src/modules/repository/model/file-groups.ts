@@ -47,6 +47,15 @@ export function fileListRows(files: readonly ChangedFile[]): FileListRow[] {
     ]);
 }
 
+/**
+ * The change of a path that a panel shows, in the order the list has them (the working tree's
+ * edits first): its hunks are then the same in Changes and in Files. A deleted file is not on
+ * disk, nor in the tree.
+ */
+export function changeOf(ordered: readonly ChangedFile[], path: string): ChangedFile | null {
+    return ordered.find((file) => file.path === path && file.kind !== 'deleted') ?? null;
+}
+
 export function fileKey(file: Pick<ChangedFile, 'area' | 'path'>): string {
     return `${file.area}:${file.path}`;
 }

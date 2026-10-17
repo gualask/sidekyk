@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub(crate) struct GitOutput {
     /// -1 when git was killed: it wrote more than the call reads, or did not end in time.
@@ -28,6 +28,22 @@ pub(crate) trait RepositoryBackend: Send + Sync {
 
     /// Reads a working-tree file, or `None` when it is missing or larger than `limit` bytes.
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>>;
+
+    /// What is at `path` (relative) under `root`, without following a link, or `None` when
+    /// nothing is there or a folder on the way is a link: a file's first `limit` bytes, a link's
+    /// target, or a folder (a submodule).
+    fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry>;
+}
+
+/// A path of the working tree, as `read_entry` finds it.
+pub(crate) enum WorktreeEntry {
+    File {
+        head: Vec<u8>,
+        /// The file is longer than `head`.
+        truncated: bool,
+    },
+    Link(PathBuf),
+    Folder,
 }
 
 /// Runs `git` and fails unless it exits with one of `ok_codes`. Output cut at `max_stdout` comes
@@ -51,4 +67,13 @@ pub(super) fn git_checked(
         if detail.is_empty() { "" } else { ": " },
         detail
     )
+}
+
+/// The result of git run on a thread of its own, or a failure if the thread panicked.
+pub(super) fn joined<T>(
+    handle: std::thread::ScopedJoinHandle<'_, anyhow::Result<T>>,
+) -> anyhow::Result<T> {
+    handle
+        .join()
+        .unwrap_or_else(|_| Err(anyhow::anyhow!("git thread panicked")))
 }

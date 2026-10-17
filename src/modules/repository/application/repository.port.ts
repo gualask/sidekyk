@@ -3,6 +3,8 @@ import type {
     CommitFileDiffRequest,
     CommitFiles,
     CommitRequest,
+    Directory,
+    FileContent,
     FileDiffRequest,
     RecentCommits,
     RepositoryChangedEvent,
@@ -24,6 +26,10 @@ export interface RepositoryPort {
     getRecentCommits(root: string): Promise<RecentCommits>;
     getCommitFiles(root: string, commit: CommitRequest): Promise<CommitFiles>;
     getCommitFileDiff(root: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
+    /** What a folder holds, `''` for the root: read from the backend's list, no git. */
+    getDirectory(root: string, path: string): Promise<Directory>;
+    /** A file of the tree, as the Files panel shows it. */
+    getFileContent(root: string, path: string): Promise<FileContent>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
     /**

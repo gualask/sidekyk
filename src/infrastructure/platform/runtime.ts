@@ -1,5 +1,5 @@
-import type { RepositoryPort } from '@/modules/changes';
 import type { ProjectsPort } from '@/modules/projects';
+import type { RepositoryPort } from '@/modules/repository';
 import type { SearchPort } from '@/modules/search';
 import type { SettingsPort } from '@/modules/settings';
 import type { TitleBarPort } from '@/shared/platform/title-bar';

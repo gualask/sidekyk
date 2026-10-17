@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseUnifiedDiff } from './diff-parser';
-import { diffRows, widestLine } from './diff-rows';
+import { diffRows, textLines, textRows, widestLine } from './diff-rows';
 
 const DIFF = `@@ -1,2 +1,2 @@
  keep
@@ -29,5 +29,18 @@ describe('diff rows', () => {
             widestLine(parseUnifiedDiff('@@ -1 +1 @@ a much longer section name\n-a\n+b\n').hunks),
         ).toBe('@@ -1 +1 @@ a much longer section name'.length);
         expect(widestLine([])).toBe(0);
+    });
+
+    it("numbers a file's lines as a diff that changes none", () => {
+        const lines = textLines('a\n\tbb\n');
+        expect(lines.map((line) => [line.newNumber, line.oldNumber, line.text])).toEqual([
+            [1, 1, 'a'],
+            [2, 2, '\tbb'],
+        ]);
+        expect(textLines('last')).toHaveLength(1);
+        expect(textLines('')).toEqual([]);
+        const { rows, widest } = textRows(lines);
+        expect(rows.every((row) => row.hunkIndex === -1)).toBe(true);
+        expect(widest).toBe(10);
     });
 });

@@ -3,6 +3,24 @@ use std::path::{Path, PathBuf};
 
 use super::ports::RepositoryBackend;
 
+/// The changes of a batch that git does not ignore.
+pub(crate) enum Visible<'a> {
+    /// Every change counts: git could not answer, or a change may alter what it ignores (a
+    /// `.gitignore`, the root itself).
+    Unknown,
+    /// These paths, relative to the root.
+    Paths(Vec<&'a Path>),
+}
+
+impl Visible<'_> {
+    pub(crate) fn any(&self) -> bool {
+        match self {
+            Self::Unknown => true,
+            Self::Paths(paths) => !paths.is_empty(),
+        }
+    }
+}
+
 /// Tells changes that can alter what Sidekyk shows from changes git ignores, such as a build
 /// writing to `target/` or an install filling `node_modules/`.
 ///
@@ -29,18 +47,18 @@ impl IgnoredPaths {
         self.ignored_dirs.clear();
     }
 
-    /// Whether any of these changed paths (absolute) is one git does not ignore. When git cannot
-    /// answer, the change counts: a needless refresh is better than a missed one.
-    pub(crate) fn any_visible(
+    /// Which of these changed paths (absolute) git does not ignore. When git cannot answer, every
+    /// change counts: a needless refresh is better than a missed one.
+    pub(crate) fn visible<'a>(
         &mut self,
         backend: &dyn RepositoryBackend,
-        changed: &[PathBuf],
-    ) -> bool {
+        changed: &'a [PathBuf],
+    ) -> Visible<'a> {
         let Some(candidates) = self.unsettled(changed) else {
-            return true;
+            return Visible::Unknown;
         };
         if candidates.is_empty() {
-            return false;
+            return Visible::Paths(candidates);
         }
 
         // Each path with its parent directories, so the next change under an ignored directory
@@ -51,7 +69,7 @@ impl IgnoredPaths {
             .filter(|path| !path.as_os_str().is_empty())
             .collect();
         let Some(ignored) = check_ignore(backend, &self.root, &asked) else {
-            return true;
+            return Visible::Unknown;
         };
 
         for rel in &candidates {
@@ -61,7 +79,12 @@ impl IgnoredPaths {
                 }
             }
         }
-        candidates.iter().any(|rel| !ignored.contains(*rel))
+        Visible::Paths(
+            candidates
+                .into_iter()
+                .filter(|rel| !ignored.contains(*rel))
+                .collect(),
+        )
     }
 
     /// Whether any of these changed paths may be one git does not ignore, from what was already
@@ -98,7 +121,7 @@ impl IgnoredPaths {
 }
 
 /// A relative path as git writes it, with `/` on every platform. `None` when it is not UTF-8.
-fn git_path(path: &Path) -> Option<String> {
+pub(super) fn git_path(path: &Path) -> Option<String> {
     let parts: Option<Vec<&str>> = path.components().map(|c| c.as_os_str().to_str()).collect();
     Some(parts?.join("/"))
 }
@@ -141,7 +164,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::GitOutput;
+    use crate::modules::repository::{GitOutput, WorktreeEntry};
 
     /// Ignores `target/` and `*.log` and records every question.
     #[derive(Default)]
@@ -181,6 +204,10 @@ mod tests {
             })
         }
 
+        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
+            unreachable!()
+        }
+
         fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
             unreachable!()
         }
@@ -195,9 +222,13 @@ mod tests {
         let git = FakeGit::default();
         let mut ignored = IgnoredPaths::new("/r".into());
 
-        assert!(!ignored.any_visible(&git, &paths(&["target/debug/a.o", "src/app.log"])));
-        assert!(!ignored.any_visible(&git, &paths(&["target/release/b.o"])));
-        assert!(ignored.any_visible(&git, &paths(&["target/c.o", "src/main.rs"])));
+        assert!(!ignored
+            .visible(&git, &paths(&["target/debug/a.o", "src/app.log"]))
+            .any());
+        assert!(!ignored.visible(&git, &paths(&["target/release/b.o"])).any());
+        assert!(ignored
+            .visible(&git, &paths(&["target/c.o", "src/main.rs"]))
+            .any());
 
         let asked = git.asked.lock().unwrap();
         assert_eq!(asked.len(), 2, "the second batch is answered from memory");
@@ -218,10 +249,10 @@ mod tests {
     fn a_gitignore_change_counts_and_forgets_what_was_learned() {
         let git = FakeGit::default();
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(!ignored.any_visible(&git, &paths(&["target/a.o"])));
+        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
 
-        assert!(ignored.any_visible(&git, &paths(&["sub/.gitignore"])));
-        assert!(!ignored.any_visible(&git, &paths(&["target/a.o"])));
+        assert!(ignored.visible(&git, &paths(&["sub/.gitignore"])).any());
+        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
         assert_eq!(git.asked.lock().unwrap().len(), 2);
     }
 
@@ -231,7 +262,7 @@ mod tests {
         let mut ignored = IgnoredPaths::new("/r".into());
         assert!(ignored.any_maybe_visible(&paths(&["target/a.o"])));
 
-        assert!(!ignored.any_visible(&git, &paths(&["target/a.o"])));
+        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
         assert!(!ignored.any_maybe_visible(&paths(&["target/debug/b.o"])));
         assert!(ignored.any_maybe_visible(&paths(&["target/c.o", "dist/app.js"])));
         assert!(ignored.any_maybe_visible(&paths(&[".gitignore"])));
@@ -249,7 +280,9 @@ mod tests {
             ..FakeGit::default()
         };
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(ignored.any_visible(&git, &paths(&["target/a.o"])));
-        assert!(ignored.any_visible(&git, &[PathBuf::from("/elsewhere/a.ts")]));
+        assert!(ignored.visible(&git, &paths(&["target/a.o"])).any());
+        assert!(ignored
+            .visible(&git, &[PathBuf::from("/elsewhere/a.ts")])
+            .any());
     }
 }

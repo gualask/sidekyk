@@ -14,6 +14,7 @@ pub(crate) enum AppError {
 /// Stable codes understood by the frontend's user-facing error formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UserFacingErrorCode {
+    FileMissing,
     GitNotFound,
     GitTimedOut,
     InvalidCommit,
@@ -30,6 +31,7 @@ pub(crate) enum UserFacingErrorCode {
 impl UserFacingErrorCode {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
+            Self::FileMissing => "file_missing",
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
             Self::InvalidCommit => "invalid_commit",
@@ -138,6 +140,7 @@ mod tests {
     #[test]
     fn user_facing_error_codes_keep_the_wire_contract() {
         let cases = [
+            (UserFacingErrorCode::FileMissing, "file_missing"),
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::InvalidCommit, "invalid_commit"),

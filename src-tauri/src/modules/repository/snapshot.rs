@@ -8,7 +8,7 @@ use super::contracts::{
 use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
 use super::numstat::{count_text_lines, parse_numstat_z, Counts, LineCounts};
 use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend};
+use super::ports::{git_checked, joined, RepositoryBackend};
 use super::status::{parse_porcelain_v2, StatusEntry, StatusReport};
 
 /// Untracked files are read to count their lines, within these limits per snapshot. Past them a
@@ -78,12 +78,6 @@ fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Status
     report.truncated = out.truncated || report.entries.len() > MAX_CHANGED_PATHS;
     report.entries.truncate(MAX_CHANGED_PATHS);
     Ok(report)
-}
-
-fn join<T>(handle: std::thread::ScopedJoinHandle<'_, anyhow::Result<T>>) -> anyhow::Result<T> {
-    handle
-        .join()
-        .unwrap_or_else(|_| Err(anyhow::anyhow!("git thread panicked")))
 }
 
 /// The line counts of one numstat, by path.
@@ -229,7 +223,12 @@ pub(crate) fn load_snapshot(
         let staged = scope.spawn(|| numstat(backend, root, &["--cached"]));
         let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
         let status = status(backend, root);
-        (status, join(unstaged), join(staged), join(against_head))
+        (
+            status,
+            joined(unstaged),
+            joined(staged),
+            joined(against_head),
+        )
     });
     let status = status?;
     let unstaged = unstaged?;
@@ -287,7 +286,7 @@ pub(crate) fn load_summary(
     let root = existing_root(repository)?;
     let (status, against_head) = std::thread::scope(|scope| {
         let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
-        (status(backend, root), join(against_head))
+        (status(backend, root), joined(against_head))
     });
     let status = status?;
     let tracked = if status.branch.commit.is_some() {
@@ -305,7 +304,7 @@ pub(crate) fn load_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::GitOutput;
+    use crate::modules::repository::{GitOutput, WorktreeEntry};
 
     /// Files of `size` bytes of text, one line each, except `logo.png` which is binary.
     struct FakeFiles {
@@ -324,6 +323,10 @@ mod tests {
             _input: &[u8],
             _max: usize,
         ) -> anyhow::Result<GitOutput> {
+            unreachable!()
+        }
+
+        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
             unreachable!()
         }
 
@@ -387,6 +390,10 @@ mod tests {
             _input: &[u8],
             _max: usize,
         ) -> anyhow::Result<GitOutput> {
+            unreachable!()
+        }
+
+        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
             unreachable!()
         }
 

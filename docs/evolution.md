@@ -120,10 +120,12 @@ Tabler's. What it settles:
 - **A changed file** shows the whole file with its changes marked, on the viewer of Changes (the
   same rows, scrollbar marks and hunk copy), starting at its first change; other files show their
   text. One viewer, not two.
-- **Changes and Files are not kept in sync**: moving through changes would drag the tree away from
-  where it was, and with tiles the same file would show twice. Each header links to the other
-  instead, at the same change: "Show in Changes" in Files, "Show in Files" in Changes (the file
-  revealed in the tree). An opt-in setting to follow the selection can come later, if missed.
+- **Changes and Files share the file shown** (revised with the maintainer on 2026-10-17; the mock
+  kept them apart): one selection per project, as VS Code's explorer follows the editor. A file
+  picked in Changes is revealed in the tree, its folders opened; one picked in the tree is
+  selected in Changes' list when it changed, and shows there as its text when it did not. A file
+  of a commit is not in the working tree and leaves the tree as it is. Each header also links to
+  the other panel, at the same change: "Show in Changes" in Files, "Show in Files" in Changes.
 
 ### Notes
 
@@ -343,6 +345,16 @@ paint, so `⌘K` and the first hover are still instant.
   or ripgrep's crates, streaming results and cancellable when the query changes.
 - Each library is chosen at implementation time with pros and cons, per the dependency rule in
   `AGENTS.md`.
+- **Decided on 2026-10-17**, building the tree and the file view: the backend keeps the list of
+  files and the frontend asks for each open folder, so the payload is what is open, never the
+  whole list; Files is a second panel of the module that has the diff viewer (`modules/repository`,
+  once `modules/changes`), so a file shows on the same rows; the tile clicked or reached with
+  `←`/`→` takes `j`/`k`;
+  open folders and selection are kept for the session, the tree's width in the settings. Revised
+  the same day after use: one viewer, Changes. At level 1 the Files tile is the tree alone, as
+  wide as the tree, and a file picked there shows in Changes (an unchanged one as its text, until
+  `Esc` or the list goes back); the tree takes `j`/`k`, which show files, and `Space` for
+  folders. Full screen, Files has the tree with the file next to it.
 
 ## Notes
 

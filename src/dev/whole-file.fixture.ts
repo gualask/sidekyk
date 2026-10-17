@@ -1,4 +1,4 @@
-import type { UnifiedDiff } from '@/modules/changes';
+import type { UnifiedDiff } from '@/modules/repository';
 
 /** Unchanged lines the fixtures' files have after their last change. */
 const LINES_AFTER = 40;

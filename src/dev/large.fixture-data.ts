@@ -1,4 +1,4 @@
-import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/changes';
+import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/repository';
 import { fixtureSummary } from './fixture-summary';
 
 /** Enough files and lines that rendering them all would be slow: checks the virtualized lists. */

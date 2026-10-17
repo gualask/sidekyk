@@ -2,10 +2,10 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useMemo, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
-import { ChangesSettingsProvider, RepositoryProvider } from '@/modules/changes';
 import { ProjectsProvider } from '@/modules/projects';
+import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
-import { SettingsProvider, useSettingsWhenRead } from '@/modules/settings';
+import { SettingsProvider, useSettingsWhenRead, useUpdateSettings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
@@ -30,11 +30,11 @@ export function AppProviders({
                     <SettingsProvider value={runtime.settings}>
                         <ProjectsProvider value={runtime.projects}>
                             <RepositoryProvider value={runtime.repository}>
-                                <ChangesSettingsBridge>
+                                <RepositorySettingsBridge>
                                     <SearchProvider value={runtime.search}>
                                         <ToastsHost>{children}</ToastsHost>
                                     </SearchProvider>
-                                </ChangesSettingsBridge>
+                                </RepositorySettingsBridge>
                             </RepositoryProvider>
                         </ProjectsProvider>
                     </SettingsProvider>
@@ -45,19 +45,26 @@ export function AppProviders({
 }
 
 /**
- * What the Changes panel takes from the settings, which it cannot import: the view a diff opens
- * in and the copy template, the default until the settings are read.
- * Read at startup alongside the projects, from the backend's memory, so the first diff asks for
- * the right view.
+ * What the Changes and Files panels take from the settings, which they cannot import: the view a
+ * diff opens in, the copy template and the tree's width, the defaults until the settings are
+ * read. Read at startup alongside the projects, from the backend's memory, so the first diff asks
+ * for the right view.
  */
-function ChangesSettingsBridge({ children }: { children: ReactNode }) {
+function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
+    const { mutate } = useUpdateSettings();
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
             copyTemplate: settings?.copyTemplate ?? DEFAULT_COPY_TEMPLATE,
+            filesTreeWidth: settings?.filesTreeWidth ?? null,
+            setFilesTreeWidth: (width: number | null) => {
+                if (settings && settings.filesTreeWidth !== width) {
+                    mutate({ ...settings, filesTreeWidth: width });
+                }
+            },
         }),
-        [settings],
+        [settings, mutate],
     );
-    return <ChangesSettingsProvider value={value}>{children}</ChangesSettingsProvider>;
+    return <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>;
 }

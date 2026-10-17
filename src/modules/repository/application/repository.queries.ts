@@ -1,11 +1,20 @@
-import { type QueryCache, type QueryState, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+    type QueryCache,
+    type QueryState,
+    type UseQueryResult,
+    useQueries,
+    useQuery,
+    useQueryClient,
+} from '@tanstack/react-query';
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import { commitRequest } from '../model/commits';
+import { foldersToRead } from '../model/file-tree';
 import type {
     Commit,
     CommitFileDiffRequest,
     CommitRequest,
+    Directory,
     FileDiffRequest,
 } from '../model/repository.types';
 import { useRepositoryPort } from './repository.port';
@@ -26,6 +35,9 @@ const repositoryKeys = {
             request.wholeFile,
         ] as const,
     commits: (root: string) => [...repositoryKeys.of(root), 'commits'] as const,
+    directory: (root: string, path: string) =>
+        [...repositoryKeys.of(root), 'directory', path] as const,
+    file: (root: string, path: string) => [...repositoryKeys.of(root), 'file', path] as const,
 };
 
 /**
@@ -105,6 +117,52 @@ export function useFileDiff(root: string, request: FileDiffRequest | null) {
             : [...repositoryKeys.of(root), 'none'],
         queryFn: () => (request ? port.getFileDiff(root, request) : null),
         enabled: request !== null,
+    });
+}
+
+/** The data of each directory query, kept the same while none changed. */
+function directoriesRead(results: readonly UseQueryResult<Directory>[]) {
+    return {
+        data: results.map((result) => result.data),
+        error: results.find((result) => result.isError)?.error ?? null,
+    };
+}
+
+/**
+ * What the open folders of the tree hold, those that show: the root, and each open folder inside
+ * an open folder, once that one is read. Each folder is read on its own, so opening one reads only
+ * it. The backend keeps the list of files: a change on disk asks again, and only a file added or
+ * removed makes it read the list again.
+ */
+export function useTreeDirectories(root: string, open: ReadonlySet<string>) {
+    const port = useRepositoryPort();
+    const queryClient = useQueryClient();
+    // the folders read so far say which open folders show: one read brings the next
+    const paths = foldersToRead(open, (path) =>
+        queryClient.getQueryData<Directory>(repositoryKeys.directory(root, path)),
+    );
+    const { data, error } = useQueries({
+        queries: paths.map((path) => ({
+            queryKey: repositoryKeys.directory(root, path),
+            queryFn: () => port.getDirectory(root, path),
+        })),
+        combine: directoriesRead,
+    });
+    const key = paths.join('\0');
+    const read = useMemo(() => {
+        const byPath = new Map(key.split('\0').map((path, index) => [path, data[index]]));
+        return (path: string) => byPath.get(path);
+    }, [key, data]);
+    return { read, error };
+}
+
+/** A file of the tree that did not change, as the Files panel shows it. */
+export function useFileContent(root: string, path: string | null) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: path ? repositoryKeys.file(root, path) : [...repositoryKeys.of(root), 'none'],
+        queryFn: () => (path ? port.getFileContent(root, path) : null),
+        enabled: path !== null,
     });
 }
 

@@ -135,6 +135,37 @@ export interface CommitFileDiffRequest {
     wholeFile: boolean;
 }
 
+/** One entry of a folder in the Files panel's tree. */
+export interface TreeEntry {
+    /**
+     * The name shown: a folder holding only one folder shares its entry with it, so a folder's
+     * name may be several (`modules/changes`).
+     */
+    name: string;
+    /** From the root, with `/` between names; for a shared entry, the deepest folder's. */
+    path: string;
+    folder: boolean;
+}
+
+/** What a folder holds, folders first, each in the order of VS Code's explorer. */
+export interface Directory {
+    entries: TreeEntry[];
+    /** Entries past the most a folder lists (10,000). */
+    more: number;
+    /** The repository has more files than the tree shows (200,000). */
+    truncated: boolean;
+}
+
+/** A file as the Files panel shows it. */
+export type FileContent =
+    /** `truncated`: larger than 2 MiB, cut at its last whole line. */
+    | { kind: 'text'; text: string; truncated: boolean }
+    | { kind: 'binary' }
+    /** A symbolic link, not followed: where it points, as git stores it. */
+    | { kind: 'link'; target: string }
+    /** A folder git lists as one entry: a submodule. */
+    | { kind: 'folder' };
+
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {

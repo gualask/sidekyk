@@ -18,7 +18,10 @@ agent edits files ─▶ notify watcher of the project on screen (250 ms quiet p
                                     ├─▶ get_repository_summary(root)   (only when no snapshot
                                     │                                   brings it: level 0)
                                     ├─▶ get_file_diff(root, …)         (one file, one area)
-                                    └─▶ get_recent_commits(root)       (only while unfolded)
+                                    ├─▶ get_recent_commits(root)       (only while unfolded)
+                                    ├─▶ get_directory(root, path)      (each open folder, from
+                                    │                                   the backend's file list)
+                                    └─▶ get_file_content(root, path)   (the file open in Files)
 ```
 
 The files a commit changed and their diffs (`get_commit_files`, `get_commit_file_diff`) are read
@@ -64,17 +67,30 @@ when switching back and forth with the agent's terminal, nothing runs.
   the rows it shows (`model/palette-rows.ts`), and the palette (a chunk of its own with Base UI's
   dialog and autocomplete, fetched once the window is idle after the first paint). What it opens,
   the app decides (`PaletteActions`).
-- `src/modules/changes/` — the review workflow, shown as the Changes panel (`panel.ts`).
-  - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping.
-  - `application/` — `RepositoryPort` (context-provided), the TanStack Query hooks, and the
-    commit looked at in place of the working tree (`useCommitView`).
-  - `ui/` — the panel (`ChangesWorkspace`), file list, the recent commits (`RecentCommits`) and a
-    commit's files (`CommitFileList`) on the same virtualized rows (`useVirtualRows`), diff view and
-    rows, the open file in the panel's header; the summary's views: the project's facts in the
+- `src/modules/repository/` — the repository on screen, shown as two panels (`panel.ts`):
+  Changes, the review workflow and the viewer of any file, and Files, the project's files as a
+  tree. In a tile Files is the tree alone and shows the file picked in Changes; full screen it has
+  the viewer too.
+  - `model/` — pure logic and wire types: unified-diff parser, agent snippet format, file grouping,
+    the tree's rows, change colors and keys (`file-tree.ts`), and what one panel asks the other to
+    show (`targets.ts`).
+  - `application/` — `RepositoryPort` (context-provided), the TanStack Query hooks, the commit
+    looked at in place of the working tree (`useCommitView`), and what the panels keep of a project
+    for the session (`useSessionState`, a store every component on the same key reads live): the
+    file shown, one selection for both panels (`useSelectedFile`, `model/selection.ts`), and the
+    tree's open folders and row; what a panel is asked to show (`useShownTarget`); and the
+    settings the app passes to both panels (`RepositorySettings`); a panel is mounted again for each project and each zoom, and
+    comes back as it was.
+  - `ui/` — the Changes panel (`ChangesWorkspace`), file list, the recent commits
+    (`RecentCommits`) and a commit's files (`CommitFileList`) on the same virtualized rows
+    (`useVirtualRows`); the viewer (`Pane`: the rows, their copy, the hunk being read), with a
+    diff on it (`ChangeDiffView`, `CommitDiffView`) or a file's text (`TextFileView`), and the open
+    file in the panel's header (`FileHeader`, one for every file both panels show); the Files
+    panel (`FilesWorkspace`) and its tree (`FileTree`, laid out by `tree-layout.ts`); the summary's views: the project's facts in the
     breadcrumb, the change count on the rail, the level 0 card's part (a chunk of its own, loaded
-    with level 0). The file list and the diff are virtualized (`@tanstack/react-virtual`): they are
-    flat lists of fixed-height rows (`fileListRows`, `diffRows`) and only the rows on screen are in
-    the DOM.
+    with level 0). The lists, the tree and the diff are virtualized (`@tanstack/react-virtual`):
+    they are flat lists of fixed-height rows (`fileListRows`, `treeRows`, `diffRows`) and only the
+    rows on screen are in the DOM.
 - `src/infrastructure/platform/` — Tauri adapters (`invoke`, `listen`, the window) implementing
   the ports, including the title bar's (`TitleBarPort` in `shared/platform`: whether macOS's
   traffic lights overlay the top bar, which full screen turns off).
@@ -112,7 +128,13 @@ in it. A panel may also give a `summary`: its part of a project's card at level 
 own fetched with level 0. The app can ask a panel to show something (`PanelProps.target`, a key in
 the panel's own terms that its module builds, such as `changesTarget` for a changed file): the
 command palette opens a file this way. Each request is a new object; without one, the panel stays
-as the user left it.
+as the user left it. A panel asks the app to show something in another (`PanelProps.show`, with
+that panel's target): Changes and Files show each other's file, at the hunk being read, and the
+Files tile shows the file picked in Changes, leaving the keys to the tree (`select: false`). At
+level 1 the panels are tiles side by side (`TILES`: Changes takes the room the tree of Files
+leaves), and one is selected: the one clicked, or reached with `←`/`→`. A panel knows where it is
+(`place`, a tile or full screen) and whether it takes the keys (`selected`): in a tile only
+letters (`j`/`k`, `Space`), full screen every key of its own.
 
 ### Zoom and keyboard
 
@@ -123,9 +145,11 @@ grows one into the other. Level 0, the settings dialog and the panels are `prelo
 (`shared/ui/preloadable.ts`): once their chunk is loaded they render at once, where `lazy` would
 suspend for a frame and the transition would capture an empty screen.
 
-The keys are one listener (`app/workspace-keys.ts`): `↵`/`Esc` zoom, `1`-`9` panels, `[`/`]`
-projects, `⌘,` settings. A key that a field, a dialog or a menu takes is left to it
-(`shared/ui/keys.ts`, which the Changes panel's `j`/`k` use too). `⌘`/`Ctrl`+scroll and the pinch
+The keys are one listener (`app/workspace-keys.ts`): `↵`/`Esc` zoom, `1`-`9` panels, `←`/`→`
+tiles at level 1, `[`/`]` projects, `⌘,` settings. A key that a field, a dialog or a menu takes is
+left to it (`shared/ui/keys.ts`; the panels listen with `useWindowKeys` and keep only
+`isOwnKey`s). A panel that takes `↵` or `Esc`
+listens while capturing, so it comes first, and the workspace skips a key already handled. `⌘`/`Ctrl`+scroll and the pinch
 are `app/zoom-gestures.ts`: the wheel listener exists only while the modifier is held, since a
 wheel listener that may cancel makes every scroll wait for the main thread.
 
@@ -147,9 +171,12 @@ by removing its project. The warning and its popover are a chunk loaded with the
 There is no client store. Git is the state: the project list, the snapshots, the summaries and
 the diffs are TanStack Query caches, the last three keyed by repository root first, so a change on
 disk refetches only that repository. A snapshot stores its summary in the summary's cache, and the
-project in the Changes panel never fetches a summary of its own. UI state is the zoom level
-(`AppShell`), and in `ChangesWorkspace` the selected file and the commit looked at, if any, with
-its file open. Switching project updates the cached list
+project in the Changes panel never fetches a summary of its own. UI state is the zoom level and
+the selected tile (`AppShell`); the file shown of each project, shared by both panels (a changed
+file, or a path of the tree, shown as a change while it is one), which Changes selects in its list
+and Files reveals in its tree; in `ChangesWorkspace` the commit looked at, if any, with its file
+open; in `FilesWorkspace` the open folders and the row the keyboard is on. They are kept per
+project for the session, not on disk; the tree's width is a setting. Switching project updates the cached list
 at once and the backend catches up; changes to the list run one at a time, in the user's order
 (one TanStack mutation scope), so quick switches end on the last project clicked; the list a change
 returns is shown only when no later change waits, so the screen never steps back through them.
@@ -189,7 +216,8 @@ the page never calls it (a script that failed to load), the backend shows the wi
 - `modules/search/` — the command palette's ranking (`rank.rs`, over `nucleo-matcher`) and its
   wire contracts. Pure: it gets what to search. No Tauri.
 - `modules/repository/` — porcelain v2 and numstat parsers, snapshot assembly, diff loading, the
-  recent commits (`commits.rs`), path validation, the ignored-paths filter for watcher events, wire
+  recent commits (`commits.rs`), the files as a tree and a file's text (`tree.rs`), path
+  validation, the ignored-paths filter for watcher events, wire
   contracts. A repository moved or deleted after it was added fails its snapshot and diffs with
   `repository_missing`, before git runs. No Tauri; the outside world is the `RepositoryBackend`
   port.
@@ -281,6 +309,31 @@ at most 10,000) and a file's diff (`git diff-tree -p`) compare it with that pare
 nothing for a root commit (`--root`), so a merge shows what it brought to its branch, as in VS
 Code. The ids come from the frontend and must be hashes (`invalid_commit` otherwise), so they can
 never be read as an option. Every call has the limits of the others (see Git limits).
+
+### Files
+
+The Files panel's tree comes from one list of files: `git ls-files -z --cached --others
+--exclude-standard`, with `git ls-files -z --deleted` in parallel to leave out the tracked files
+deleted from disk (the Changes panel lists them), so the tree holds what `git status` sees and
+nothing git ignores. At most 200,000 files, from 32 MiB of output: past them the tree says so.
+`FileTree` keeps it as folders, each sorted as VS Code's explorer (folders first, case ignored,
+numbers by value), and `get_directory` answers what one folder holds from memory, at most 10,000
+entries and the rest counted; a folder holding only one folder shares its entry with it, down to
+one that holds more ("modules/changes").
+
+`state.rs` keeps the tree of the project on screen only, read when first asked for. A watcher
+batch drops it when the git dir changed, or when one of its paths not ignored was added or removed
+(`FileTree::may_have_changed`: on disk and not in the tree, or the other way round): an edit to a
+file keeps it. The batch's event refetches the open folders, and the first one reads the list
+again; a read under way when the files changed is not kept. While the window is hidden a marked
+batch drops the tree too, and switching project drops it, since its watcher's events are gone.
+
+`get_file_content` reads only a file of the tree (`ProjectsState::file_content`), through the
+backend port (`read_entry`): its
+first 2 MiB, cut at the last whole line, or binary with a NUL in its first 8 KiB as git decides. A
+link is never followed: its target comes back as text. A folder on the way that is a link reads
+nothing, so no path leaves the repository. A folder git lists as a file is a submodule.
+`backend_timings` measures the list and a folder.
 
 ### Diffs
 
