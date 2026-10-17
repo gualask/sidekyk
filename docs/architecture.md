@@ -98,6 +98,11 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
+- The viewer's scrollbars are ours (`ScrollMap.tsx`): `ChangeMap` beside the rows (`changeMarks`
+  per hunk, `trackMarks` merges those within 2 px of track; thumb and marks follow scrolls and
+  content resizes with no render, `observeContent`) and `SideScrollbar` below them while lines
+  run past the edge. `Pane` owns the layout and the hunk gone to (`stepped`, else the one opened
+  on), shared by the list and the map.
 - `n`/`p` (`Pane` with `onPastEnd`, Changes only): `DiffList`'s `HunkReader` steps from the hunk
   gone to while on screen, else from the line read (`hunkStepped`); past either end Changes
   opens the next or previous file (`openAt`, `-1` the last hunk), or says it is the last.
@@ -106,7 +111,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   or a tree path shown as a change while it is one. Changes selects it in its list; Files reveals
   it (opens the folders above). Targets (`fileTarget`) carry the path, the hunk to open on and a
   text to find from a line (opens the find bar: on that file only, until closed; `Esc` closes it
-  first). The bar floats over the viewer's top right (`FindBar`, 300 px); while open the list
+  first). The bar floats over the viewer's top right, by the map (`FindBar`, 300 px); while open the list
   leaves `FIND_BAR_SPACE` above its rows (virtualizer `scrollMargin`, scroll kept steady, browser
   scroll anchoring off) and a match under the bar counts as off screen (`rowWithin`). `⌘F` over
   a viewer (`Pane`, capture) opens its bar empty from the top, or comes back to it; in the bar's

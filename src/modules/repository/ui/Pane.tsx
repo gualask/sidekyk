@@ -1,4 +1,4 @@
-import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { type CopyState, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
@@ -11,8 +11,9 @@ import type { DiffHunk } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
 import { DiffList, type HunkReader } from './DiffList';
-import { FIND_BAR_SPACE } from './diff-layout';
+import { diffLayout, FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
+import { ChangeMap, SideScrollbar } from './ScrollMap';
 
 /** What the viewer says instead of, or after, the lines: loading, a failure, a cut. */
 export function Notice({ children }: { children: ReactNode }) {
@@ -43,21 +44,10 @@ interface Reading {
     asked: number | null;
 }
 
-/**
- * The width of an element's vertical scrollbar while `active`, measured again as one comes or goes
- * (its content box changes): 0 for an overlay scrollbar, as macOS's.
- */
-function useScrollbarWidth(element: HTMLElement | null, active: boolean): number {
-    const [width, setWidth] = useState(0);
-    useLayoutEffect(() => {
-        if (!element || !active) return;
-        const measure = () => setWidth(element.offsetWidth - element.clientWidth);
-        measure();
-        const observer = new ResizeObserver(measure);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [element, active]);
-    return width;
+/** The hunk a viewer opens on, as an index: null opens on the first, unmarked. */
+function openedOn(openOn: number | null, count: number): number | null {
+    if (openOn === null || count === 0) return null;
+    return openOn < 0 ? Math.max(0, count + openOn) : Math.min(openOn, count - 1);
 }
 
 /** The number in the file now of the line a match is on. */
@@ -108,7 +98,11 @@ export function Pane({
     onPastEnd?: (step: 1 | -1) => void;
     children: ReactNode;
 }) {
-    const { copyTemplate } = useRepositorySettings();
+    const { copyTemplate, scrollbar } = useRepositorySettings();
+    const layout = useMemo(() => diffLayout(rows), [rows]);
+    // the hunk gone to (`n`/`p`, a mark of the map), else the one opened on
+    const [stepped, setStepped] = useState<number | null>(null);
+    const current = stepped ?? openedOn(openOn, hunks.length);
     // state, not a ref: React attaches a parent's ref after its children's effects, so lines
     // mounted with it, from a file already read, would find no element to scroll
     const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
@@ -149,7 +143,6 @@ export function Pane({
     // before the workspace's keys: `⌘F` opens the bar, or comes back to it (in its field the bar
     // takes it); `Esc` closes the bar first, wherever the focus is in the panel
     const field = useRef<HTMLInputElement>(null);
-    const scrollbar = useScrollbarWidth(scrollElement, find !== null);
     useWindowKeys(
         (event) => {
             if (event.defaultPrevented || isKeyTaken(event.target)) return;
@@ -175,44 +168,62 @@ export function Pane({
         { capture: true },
     );
 
+    const topSpace = find ? FIND_BAR_SPACE : 0;
     return (
-        <div className="relative flex h-full flex-col">
+        <div className="flex h-full">
             {header ? createPortal(renderHeader(pane), header) : null}
-            {find ? (
-                <FindBar
-                    field={field}
-                    right={scrollbar}
-                    query={find.query}
-                    count={matches.length}
-                    current={index}
-                    onQuery={find.onQuery}
-                    onStep={step}
-                    onClose={find.onClose}
-                    onFindInFiles={() => finder.findInFiles(find.query)}
-                />
-            ) : null}
-            {/* the list keeps its rows in place itself as the room above it changes: no browser
-                scroll anchoring (Chromium's) on top of it */}
-            <div
-                ref={setScrollElement}
-                className="min-h-0 flex-1 overflow-auto [overflow-anchor:none]"
-            >
-                {scrollElement && rows.length > 0 ? (
-                    <DiffList
-                        source={source}
-                        rows={rows}
-                        hunks={hunks}
-                        widest={widest}
-                        scrollElement={scrollElement}
-                        openOn={openOn}
-                        linesAbove={linesAbove}
-                        reader={reader}
-                        found={find && matches.length > 0 ? { matches, current: index } : null}
-                        topSpace={find ? FIND_BAR_SPACE : 0}
+            <div className="relative flex min-w-0 flex-1 flex-col">
+                {find ? (
+                    <FindBar
+                        field={field}
+                        query={find.query}
+                        count={matches.length}
+                        current={index}
+                        onQuery={find.onQuery}
+                        onStep={step}
+                        onClose={find.onClose}
+                        onFindInFiles={() => finder.findInFiles(find.query)}
                     />
                 ) : null}
-                {children}
+                {/* the list keeps its rows in place itself as the room above it changes: no
+                    browser scroll anchoring (Chromium's) on top of it. Its own scrollbars are the
+                    map beside it and the bar below */}
+                <div
+                    ref={setScrollElement}
+                    className="min-h-0 flex-1 overflow-auto [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                    {scrollElement && rows.length > 0 ? (
+                        <DiffList
+                            source={source}
+                            rows={rows}
+                            layout={layout}
+                            hunks={hunks}
+                            widest={widest}
+                            scrollElement={scrollElement}
+                            openOn={openOn}
+                            linesAbove={linesAbove}
+                            reader={reader}
+                            current={current}
+                            onCurrent={setStepped}
+                            found={find && matches.length > 0 ? { matches, current: index } : null}
+                            topSpace={topSpace}
+                        />
+                    ) : null}
+                    {children}
+                </div>
+                {scrollElement ? <SideScrollbar scrollElement={scrollElement} /> : null}
             </div>
+            {scrollElement ? (
+                <ChangeMap
+                    scrollElement={scrollElement}
+                    layout={layout}
+                    rows={rows}
+                    topSpace={topSpace}
+                    current={current}
+                    width={scrollbar}
+                    onGoTo={(hunk) => reader.current?.goTo(hunk)}
+                />
+            ) : null}
         </div>
     );
 }

@@ -13,14 +13,13 @@ const ICON_BUTTON = 'btn-icon h-[24px] w-[24px]';
 
 /**
  * The text looked for in the file shown, as VS Code's find widget: a card floating over the
- * viewer's top right corner (`right` past its scrollbar), with where the match being read is among
+ * viewer's top right corner (its scrollbar, the map, is beside it), with where the match being read is among
  * them all and the way through them. `↵` goes to the next, `⇧↵` to the previous, `Esc` closes
  * the bar; the text can be changed in place, or looked for in all the project's files (`⌘F`,
  * or its icon).
  */
 export function FindBar({
     field,
-    right,
     query,
     count,
     current,
@@ -31,8 +30,6 @@ export function FindBar({
 }: {
     /** The field, which `⌘F` comes back to. */
     field: RefObject<HTMLInputElement | null>;
-    /** Where the viewer's scrollbar starts, from its right edge. */
-    right: number;
     query: string;
     count: number;
     /** The match being read, from 0. */
@@ -50,7 +47,7 @@ export function FindBar({
             className="absolute z-10 flex w-[300px] max-w-[calc(100%-16px)] items-center gap-1 rounded-lg border border-ui-border-hover bg-ui-surface pr-1 pl-2.5 shadow-[0_6px_20px_var(--ui-shadow-soft)]"
             style={{
                 top: FIND_BAR_INSET,
-                right: right + FIND_BAR_INSET,
+                right: FIND_BAR_INSET,
                 height: FIND_BAR_HEIGHT,
             }}
         >

@@ -18,7 +18,7 @@ import type { FindMatch } from '../model/find';
 import { DiffLineRow, HunkHeaderRow, type LineFound } from './DiffRows';
 import {
     BRACKET_WIDTH,
-    diffLayout,
+    type DiffLayout,
     hunkFrom,
     hunkStepped,
     hunksBetween,
@@ -39,6 +39,8 @@ export interface HunkReader {
     current: () => number;
     /** Goes to the next (1) or previous (-1) hunk; false when there is none that way. */
     step: (step: 1 | -1) => boolean;
+    /** Goes to a hunk, as its mark on the map does. */
+    goTo: (hunk: number) => void;
 }
 
 /** A copy's confirmation: its rows, what it took, and how far the list runs right of the screen. */
@@ -60,17 +62,22 @@ type Flash = Span & { label: string; right: number; key: number };
 export function DiffList({
     source,
     rows,
+    layout,
     hunks,
     widest,
     scrollElement,
     openOn,
     linesAbove,
     reader,
+    current,
+    onCurrent,
     found,
     topSpace,
 }: {
     source: CopySource;
     rows: readonly DiffRow[];
+    /** Where the rows are (`diffLayout`), which the viewer's map shares. */
+    layout: DiffLayout;
     hunks: readonly DiffHunk[];
     /** The widest line, in monospace columns. */
     widest: number;
@@ -78,13 +85,15 @@ export function DiffList({
     openOn: number | null;
     linesAbove: number;
     reader: RefObject<HunkReader | null>;
+    /** The hunk gone to (`n`/`p`, the map, the one opened on): marked, and where steps start. */
+    current: number | null;
+    onCurrent: (hunk: number) => void;
     found: { matches: readonly FindMatch[]; current: number } | null;
     /** Room above the first row, in pixels: none without the find bar. */
     topSpace: number;
 }) {
     const { copyTemplate } = useRepositorySettings();
     const listRef = useRef<HTMLDivElement>(null);
-    const layout = useMemo(() => diffLayout(rows), [rows]);
     const virtualizer = useVirtualizer({
         count: rows.length,
         getScrollElement: () => scrollElement,
@@ -96,21 +105,14 @@ export function DiffList({
         initialOffset: () => openingOffset(layout, openOn, linesAbove),
     });
 
-    // the hunk gone to (`n`/`p`, the one opened on): marked, and where the next step starts from,
-    // even when the list cannot scroll to it (a short diff)
-    const [current, setCurrent] = useState<number | null>(() =>
-        openOn === null || layout.hunks.length === 0
-            ? null
-            : openOn < 0
-              ? layout.hunks.length + openOn
-              : Math.min(openOn, layout.hunks.length - 1),
-    );
+    // the hunk gone to is where the next step starts from, even when the list cannot scroll to it
+    // (a short diff)
     useEffect(() => {
         // the line being read: `linesAbove` lines below the top, as a hunk opens
         const reading = () =>
             Math.max(0, scrollElement.scrollTop - topSpace + linesAbove * LINE_ROW_HEIGHT);
         const goTo = (hunk: number) => {
-            setCurrent(hunk);
+            onCurrent(hunk);
             scrollElement.scrollTop = openingOffset(layout, hunk, linesAbove) + topSpace;
         };
         // the hunk gone to, while on screen: scrolled away from it, the line read counts
@@ -137,11 +139,12 @@ export function DiffList({
                 goTo(hunk);
                 return true;
             },
+            goTo,
         };
         return () => {
             reader.current = null;
         };
-    }, [reader, scrollElement, layout, rows, linesAbove, topSpace, current]);
+    }, [reader, scrollElement, layout, rows, linesAbove, topSpace, current, onCurrent]);
 
     // the room above comes and goes without moving the rows on screen, but at the top, where it
     // shows

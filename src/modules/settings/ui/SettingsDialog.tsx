@@ -4,6 +4,7 @@ import { RadioGroup } from '@base-ui/react/radio-group';
 import { IconX } from '@tabler/icons-react';
 import { type ReactNode, type RefObject, useId, useRef } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { altLabel } from '@/shared/platform/shortcut';
@@ -20,6 +21,11 @@ const THEMES: { value: Theme; label: string }[] = [
 const DIFF_VIEWS: { value: DiffView; label: string }[] = [
     { value: 'changes', label: 'Changes' },
     { value: 'file', label: 'Full file' },
+];
+
+const DIFF_SCROLLBARS: { value: DiffScrollbar; label: string }[] = [
+    { value: 'narrow', label: 'Narrow' },
+    { value: 'wide', label: 'Wide' },
 ];
 
 const NOTE_LINES: { value: NoteLines; label: string }[] = [
@@ -93,6 +99,21 @@ export function SettingsDialog({
                                     value={settings.diffView}
                                     onChange={(diffView) =>
                                         update.mutate({ ...settings, diffView })
+                                    }
+                                />
+                            )}
+                        </Setting>
+                        <Setting
+                            label="Scrollbar"
+                            description="Beside a diff, a map of its changes: a click on a mark goes to that change. Wide is easier to click."
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={DIFF_SCROLLBARS}
+                                    value={settings.diffScrollbar}
+                                    onChange={(diffScrollbar) =>
+                                        update.mutate({ ...settings, diffScrollbar })
                                     }
                                 />
                             )}

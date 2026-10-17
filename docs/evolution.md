@@ -59,8 +59,10 @@ Workspace:
 Changes:
 
 - Diff in either view, copy with a click through the user's template (built).
-- *(to build)* Scrollbar as a map: one mark per hunk (added/removed/both) under a translucent
-  thumb; click a mark to go there. Narrow or wide in settings.
+- Scrollbar as a map (built 2026-10-17): one mark per hunk (added/removed/both) over a
+  translucent thumb (marks stay clickable); click a mark to go there. Narrow or wide in settings.
+  Native scrollbars hidden in the viewer on every engine (`scrollbar-width` cannot hide one axis
+  only), so a thin horizontal bar of our own shows while lines run past the edge.
 - `n`/`p` next/previous change, across files (built 2026-10-17): the first `n` on a file marks
   its first change; past the last, the next file opens on its first (`p`: the previous on its
   last).

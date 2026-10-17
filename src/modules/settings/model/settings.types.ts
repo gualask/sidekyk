@@ -3,6 +3,7 @@
  * Change both sides together.
  */
 
+import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { NoteLines } from '@/shared/notes/note-lines';
 
@@ -24,6 +25,8 @@ export interface Settings {
     globalShortcut: GlobalShortcut;
     /** The view a diff opens in. */
     diffView: DiffView;
+    /** How wide the scrollbar beside a diff, the map of its changes, is. */
+    diffScrollbar: DiffScrollbar;
     /** What a copy from a diff puts on the clipboard (`shared/copy/copy-template.ts`). */
     copyTemplate: string;
     /** The sidebars' widths in pixels, as last dragged, by sidebar; one missing takes its default. */

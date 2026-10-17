@@ -39,9 +39,15 @@ Workspace:
       setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
 - [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
       double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
+- [x] Scrollbar as a map of the changes (2026-10-17): a mark per hunk where its changed lines are
+      (added, deleted, both; the one gone to ringed), marks closer than 2 px of track are one, a
+      translucent thumb that drags, a click on the track centers there; `diffScrollbar` narrow
+      (12 px) or wide (20 px). The viewer's native scrollbars are hidden, a thin horizontal bar
+      shows while lines run past the edge
 - [x] `n`/`p`: next/previous change across the files of the list (or of the commit viewed); the
       change gone to is marked (accent bar) and steps go on from it while on screen; a word at
       either end
+- [x] Mock icons from Tabler: all in; open in editor's comes with that feature
 - [x] Level 0 cards tell the notes waiting and the newest (`notes_summary`, kept in memory once
       read, until they change)
 - [x] Side column (2026-10-17): Files above Notes, splitter between them, 320 px at least with
@@ -89,7 +95,7 @@ Explore and copy:
 
 ## Next
 
-- [x] Mock icons from Tabler: all in (2026-10-17); open in editor's comes with that feature
+Nothing queued: the mock frozen for the MVP is built (2026-10-17).
 
 ## Notes
 
@@ -113,7 +119,6 @@ Explore and copy:
 ## Then
 
 - [ ] Collect several hunks with a comment each, copy as one batch
-- [ ] Scrollbar as a map of the changes (marks per hunk, click to go; narrow/wide setting)
 - [ ] Syntax highlighting: lazy, rows on screen only, skipped above a size limit
 - [ ] Side-by-side view; collapse unchanged regions with expand on demand
 - [ ] Open a file in the editor at the hunk's line

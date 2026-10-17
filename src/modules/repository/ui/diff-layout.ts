@@ -151,3 +151,71 @@ export function hunkStepped(layout: DiffLayout, reading: number, step: 1 | -1): 
     const previous = starts.findLastIndex((start) => start < reading - 1);
     return previous < 0 ? null : previous;
 }
+
+/** A change on the scrollbar's map: a hunk's changed lines, where they sit in the list. */
+export interface ChangeMark {
+    hunk: number;
+    top: number;
+    height: number;
+    kind: 'add' | 'del' | 'mixed';
+}
+
+/** The marks of a diff's changes: one per hunk, from its first changed line to its last. */
+export function changeMarks(layout: DiffLayout, rows: readonly DiffRow[]): ChangeMark[] {
+    const marks: ChangeMark[] = [];
+    rows.forEach((row, index) => {
+        if (row.kind !== 'line' || (row.line.kind !== 'add' && row.line.kind !== 'del')) return;
+        const top = layout.starts[index] ?? 0;
+        const bottom = top + rowHeight(row);
+        const kind = row.line.kind;
+        const mark = marks.at(-1);
+        if (mark?.hunk === row.hunkIndex) {
+            mark.height = bottom - mark.top;
+            if (mark.kind !== kind) mark.kind = 'mixed';
+        } else {
+            marks.push({ hunk: row.hunkIndex, top, height: bottom - top, kind });
+        }
+    });
+    return marks;
+}
+
+/** Marks closer than this on the track, in pixels, show as one: a track holds a mark per pixel. */
+const MARK_GAP = 2;
+
+/** A mark on the track, in pixels: one change, or several too close to tell apart. */
+export interface TrackMark {
+    /** The first change it stands for, where a click goes. */
+    hunk: number;
+    /** How many changes it stands for. */
+    count: number;
+    top: number;
+    height: number;
+    kind: ChangeMark['kind'];
+}
+
+/**
+ * The marks as a track `height` pixels tall shows them, for `total` pixels of content: those
+ * closer than a couple of pixels are one, so there are never more marks than pixels.
+ */
+export function trackMarks(
+    marks: readonly ChangeMark[],
+    total: number,
+    height: number,
+): TrackMark[] {
+    if (total <= 0 || height <= 0) return [];
+    const scale = height / total;
+    const shown: TrackMark[] = [];
+    for (const mark of marks) {
+        const top = mark.top * scale;
+        const bottom = top + mark.height * scale;
+        const last = shown.at(-1);
+        if (last && top <= last.top + last.height + MARK_GAP) {
+            last.height = Math.max(last.height, bottom - last.top);
+            last.count += 1;
+            if (last.kind !== mark.kind) last.kind = 'mixed';
+        } else {
+            shown.push({ hunk: mark.hunk, count: 1, top, height: bottom - top, kind: mark.kind });
+        }
+    }
+    return shown;
+}

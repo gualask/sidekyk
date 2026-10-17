@@ -1,4 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
+import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 
 /** What the Changes and Files panels take from the settings, which the app reads for them. */
@@ -7,6 +8,8 @@ export interface RepositorySettings {
     diffView: DiffView | null;
     /** What a copy from a diff puts on the clipboard. */
     copyTemplate: string;
+    /** How wide the scrollbar beside a diff is. */
+    scrollbar: DiffScrollbar;
 }
 
 const RepositorySettingsContext = createContext<RepositorySettings | null>(null);

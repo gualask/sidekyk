@@ -22,6 +22,15 @@ pub(crate) enum DiffView {
     File,
 }
 
+/// How wide the scrollbar beside a diff is, the map of its changes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum DiffScrollbar {
+    #[default]
+    Narrow,
+    Wide,
+}
+
 /// How a note's long lines show: wrapped at the panel's edge, or on one line, scrolled sideways.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,6 +99,7 @@ pub(crate) struct Settings {
     pub(crate) theme: Theme,
     pub(crate) global_shortcut: GlobalShortcut,
     pub(crate) diff_view: DiffView,
+    pub(crate) diff_scrollbar: DiffScrollbar,
     pub(crate) copy_template: CopyTemplate,
     /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`, `notes`);
     /// one missing takes its default.
@@ -135,6 +145,7 @@ mod tests {
                 keys: "Super+Shift+KeyK".to_string(),
             },
             diff_view: DiffView::File,
+            diff_scrollbar: DiffScrollbar::Wide,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
             sidebar_widths: BTreeMap::from([("files".to_string(), 320)]),
             note_lines: NoteLines::Scroll,
@@ -143,6 +154,7 @@ mod tests {
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "diffView": "file",
+            "diffScrollbar": "wide",
             "copyTemplate": "Look at {row}:\n{text}",
             "sidebarWidths": { "files": 320 },
             "noteLines": "scroll",
@@ -162,6 +174,7 @@ mod tests {
                     keys: DEFAULT_GLOBAL_SHORTCUT.to_string(),
                 },
                 diff_view: DiffView::Changes,
+                diff_scrollbar: DiffScrollbar::Narrow,
                 copy_template: CopyTemplate::default(),
                 sidebar_widths: BTreeMap::new(),
                 note_lines: NoteLines::Wrap,

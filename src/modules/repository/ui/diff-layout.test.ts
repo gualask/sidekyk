@@ -3,6 +3,7 @@ import { parseUnifiedDiff } from '../model/diff-parser';
 import { diffRows, wholeFileRows } from '../model/diff-rows';
 import { wholeFile } from '../model/whole-file';
 import {
+    changeMarks,
     diffLayout,
     HUNK_ROW_HEIGHT,
     hunkFrom,
@@ -13,6 +14,7 @@ import {
     rowAt,
     rowWithin,
     spanBox,
+    trackMarks,
 } from './diff-layout';
 
 // two hunks of three lines each, under their headers: rows 0-3 and 4-7
@@ -77,6 +79,35 @@ describe('diff layout', () => {
         // above every hunk of the whole file: the first is next, not skipped
         const file = diffLayout(WHOLE);
         expect(hunkStepped(file, 0, 1)).toBe(0);
+    });
+
+    it('marks each hunk where its changed lines are, by what they did', () => {
+        // the first hunk adds row 2, the second deletes row 6
+        const layout = diffLayout(CHANGES);
+        expect(changeMarks(layout, CHANGES)).toEqual([
+            { hunk: 0, top: layout.starts[2], height: LINE_ROW_HEIGHT, kind: 'add' },
+            { hunk: 1, top: layout.starts[6], height: LINE_ROW_HEIGHT, kind: 'del' },
+        ]);
+        const mixed = diffRows(
+            parseUnifiedDiff(['@@ -1,3 +1,3 @@', ' a', '-b', '+B', ' c'].join('\n')).hunks,
+        );
+        expect(changeMarks(diffLayout(mixed), mixed)).toEqual([
+            { hunk: 0, top: 44, height: 2 * LINE_ROW_HEIGHT, kind: 'mixed' },
+        ]);
+    });
+
+    it('shows marks too close on the track as one, going to its first change', () => {
+        const marks = [
+            { hunk: 0, top: 0, height: 20, kind: 'add' as const },
+            { hunk: 1, top: 100, height: 20, kind: 'del' as const },
+            { hunk: 2, top: 5000, height: 20, kind: 'add' as const },
+        ];
+        // 10,000 pixels on a 100-pixel track: the first two are a pixel apart
+        expect(trackMarks(marks, 10_000, 100)).toEqual([
+            { hunk: 0, count: 2, top: 0, height: 1.2, kind: 'mixed' },
+            { hunk: 2, count: 1, top: 50, height: expect.closeTo(0.2), kind: 'add' },
+        ]);
+        expect(trackMarks(marks, 0, 100)).toEqual([]);
     });
 
     it('tells the hunk being read at any offset', () => {
