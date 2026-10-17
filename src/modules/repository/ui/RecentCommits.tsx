@@ -1,7 +1,8 @@
 import { IconChevronRight } from '@tabler/icons-react';
 import { errorMessage } from '@/shared/errors/app-error';
+import { relativeTime } from '@/shared/time/relative-time';
 import { useRecentCommits } from '../application/repository.queries';
-import { commitDate, relativeTime, shortSha } from '../model/commits';
+import { commitDate, shortSha } from '../model/commits';
 import type { Commit } from '../model/repository.types';
 import { LIST_HEADING } from './list-heading';
 import { useVirtualRows } from './use-virtual-rows';

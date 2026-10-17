@@ -47,15 +47,21 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
     keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`),
     matches of the find bar (`find.ts`).
   - `application/`: `RepositoryPort`, TanStack Query hooks, commit view, session state
-    (`useSessionState`, a live store by key; `useSelectedFile` for the shared selection),
+    (`useSelectedFile` for the shared selection),
     `useShownTarget`, `useFileFind` (the find bar's text, per project), `RepositorySettings`
     (what the app passes from the settings).
   - `ui/`: `ChangesWorkspace`, `FilesWorkspace`, `FileTree` (+ `tree-layout.ts`), the viewer
     `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`, `TextFileView`,
     one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count, level 0 card).
     Lists, tree and diff are virtualized flat lists of fixed-height rows.
+- `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu): lists on
+  the left full screen, cards of the open list (virtualized, measured heights), reorder mode.
+  `useProjectNotes` reads a project once (`['notes', root]`, never stale: only the app writes);
+  `useNoteActions` changes the cache at once, then takes the backend's answer, a failure reads
+  again. A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`, a click
+  outside); emptied, it goes.
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
-- `shared/`: tokens, primitives, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
+- `shared/`: tokens, primitives, session state (`useSessionState`), `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
   `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type, change
   areas, panel contract.
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
@@ -108,6 +114,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 
 - Toasts (`useShowToast`) for failures nothing on screen waits for; Base UI toaster loaded with the
   first one, earlier ones queued. Dialogs show their own errors.
+- A toast may carry an action (Undo: done, moved, deleted notes and lists): its own toast, 6 s.
 - Problems (`app/problems.ts`) are derived from caches, never fetched (`repository_missing`, a
   refused global shortcut); popover loaded with the first problem.
 
@@ -117,7 +124,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   Query caches, repository keys starting with the root. A snapshot writes its summary's cache.
 - UI state: zoom level and selected tile (`AppShell`); the shared selection, the tree's open
   folders and row (session, per project); the viewed commit (Changes). Sidebar widths are one
-  setting (`sidebarWidths`, by sidebar: `changes`, `files`), the same in a tile and full screen,
+  setting (`sidebarWidths`, by sidebar: `changes`, `files`, `notes`), the same in a tile and full screen,
   served to every module by `shared/ui/sidebar-width.ts` (`useSidebarWidth`, `SidebarSplitter`);
   a drag stores the width the layout allowed.
 - Project list changes run in one mutation scope, in order; the last switch wins.

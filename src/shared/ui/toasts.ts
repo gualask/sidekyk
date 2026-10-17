@@ -7,6 +7,8 @@ export interface ToastRequest {
     description?: string;
     /** An error stays until closed; anything else leaves by itself. */
     kind?: 'info' | 'error';
+    /** What the toast offers to do, such as undoing what it tells: a button that closes it. */
+    action?: { label: string; run: () => void };
 }
 
 /** A failure, told by what failed and why. */

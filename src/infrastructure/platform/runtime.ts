@@ -1,9 +1,11 @@
+import type { NotesPort } from '@/modules/notes';
 import type { ProjectsPort } from '@/modules/projects';
 import type { RepositoryPort } from '@/modules/repository';
 import type { SearchPort } from '@/modules/search';
 import type { SettingsPort } from '@/modules/settings';
 import type { TitleBarPort } from '@/shared/platform/title-bar';
 import { reportFrontendError } from './tauri-diagnostics';
+import { tauriNotes } from './tauri-notes';
 import { tauriProjects } from './tauri-projects';
 import { tauriRepository } from './tauri-repository';
 import { tauriSearch } from './tauri-search';
@@ -13,6 +15,7 @@ import { showWindow } from './tauri-window';
 
 /** All runtime boundaries composed by the app shell. Each field remains a focused port. */
 export type RuntimePorts = {
+    notes: NotesPort;
     projects: ProjectsPort;
     repository: RepositoryPort;
     search: SearchPort;
@@ -25,6 +28,7 @@ export type RuntimePorts = {
 };
 
 export const tauriRuntimePorts: RuntimePorts = {
+    notes: tauriNotes,
     projects: tauriProjects,
     repository: tauriRepository,
     search: tauriSearch,

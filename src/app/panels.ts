@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react';
+import { notesPanel } from '@/modules/notes';
 import { changesPanel, filesPanel } from '@/modules/repository';
 import type { PanelDefinition } from '@/shared/panels/panel';
 
@@ -6,7 +7,7 @@ import type { PanelDefinition } from '@/shared/panels/panel';
  * Every panel, in the order of their shortcuts (`1`, `2`, …), which is also their order as tiles
  * at a project's panels (level 1), left to right.
  */
-const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel];
+const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel, notesPanel];
 
 /** The room between tiles, in pixels, where the splitter of a tile as wide as what it shows sits. */
 export const TILE_GAP = 8;

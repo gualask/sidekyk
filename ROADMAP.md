@@ -89,6 +89,10 @@ Explore and copy:
 ## Notes
 
 - [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes)
+- [ ] Export a project's notes to Markdown from the Notes panel's menu (also offered when removing
+      a project with notes)
+- [ ] Removing a project with notes asks: export or delete (nothing left on disk); a moved
+      repository is relinked with Locate…, notes follow (merged into a project already there)
 - [ ] Optional Google Drive sync/backup (OAuth loopback + PKCE, tokens in the OS credential store,
       local first, conflicts keep both); nothing runs until an account is connected
 

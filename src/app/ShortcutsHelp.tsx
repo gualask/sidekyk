@@ -27,6 +27,12 @@ const SHORTCUTS: Shortcut[] = [
     { label: 'Find in files', keys: [shortcutLabel('F')], also: 'again, from the find bar' },
     { label: 'Next / previous match, find bar', keys: ['↵', '⇧↵'] },
     { label: 'Files tree, full screen', keys: ['←', '→', '↑', '↓', '↵'] },
+    { label: 'New note', keys: [shortcutLabel('N')] },
+    { label: 'Close the note you edit', keys: ['Esc', shortcutLabel('↵')] },
+    {
+        label: "Reorder notes (from a note's ⋯)",
+        keys: MACOS ? ['⌥↑', '⌥↓'] : ['Alt+↑', 'Alt+↓'],
+    },
     { label: 'Settings', keys: [shortcutLabel(',')] },
     { label: 'Show or hide this', keys: ['?'] },
 ];

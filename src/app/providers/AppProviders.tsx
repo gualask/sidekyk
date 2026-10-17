@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useMemo, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
+import { NotesProvider } from '@/modules/notes';
 import { ProjectsProvider } from '@/modules/projects';
 import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
@@ -34,7 +35,9 @@ export function AppProviders({
                                 <RepositorySettingsBridge>
                                     <SidebarWidthsBridge>
                                         <SearchProvider value={runtime.search}>
-                                            <ToastsHost>{children}</ToastsHost>
+                                            <NotesProvider value={runtime.notes}>
+                                                <ToastsHost>{children}</ToastsHost>
+                                            </NotesProvider>
                                         </SearchProvider>
                                     </SidebarWidthsBridge>
                                 </RepositorySettingsBridge>

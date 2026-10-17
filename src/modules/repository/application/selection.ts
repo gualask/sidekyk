@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
+import { useSessionState } from '@/shared/ui/session-state';
 import { orderedFiles } from '../model/file-groups';
 import { FIRST_CHANGE, type Selection, selectedFile } from '../model/selection';
 import { useRepositorySnapshot, useSnapshotOf } from './repository.queries';
-import { useSessionState } from './session-state';
 
 const selectionKey = (root: string) => `selection:${root}`;
 

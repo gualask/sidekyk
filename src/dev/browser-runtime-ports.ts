@@ -7,6 +7,7 @@ import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-da
 import { fixtureFileContent, fixtureTree } from './files.fixture-data';
 import { fixtureContentSearch, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
+import { fixtureNotes } from './notes.fixture';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
 import { wholeFileDiff } from './whole-file.fixture';
 
@@ -113,6 +114,10 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     };
 
     return {
+        notes: fixtureNotes(
+            (root) => (!scenarioData(root) ? 'empty' : large(root) ? 'large' : 'review'),
+            readable,
+        ),
         projects: {
             getProjects: async () => list,
             addProject: async () => {

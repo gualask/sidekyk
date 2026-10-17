@@ -1,6 +1,6 @@
 import { type SetStateAction, useEffect, useState } from 'react';
+import { useSessionState } from '@/shared/ui/session-state';
 import type { FileFindAt } from '../model/targets';
-import { useSessionState } from './session-state';
 
 /** A text looked for in one file, from one of its lines or from its top: the viewer's find bar. */
 interface FileFind {

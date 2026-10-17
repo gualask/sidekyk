@@ -6,6 +6,11 @@ import type { ToastQueue } from './toast-queue';
 
 /** How long information stays; the timer pauses while the pointer or the focus is on a toast. */
 const INFO_TIMEOUT_MS = 4000;
+/** How long a toast with an action (Undo) stays, to give time to reach it. */
+const ACTION_TIMEOUT_MS = 6000;
+
+/** Each toast with an action is a toast of its own: two undos never merge into one. */
+let actionSeq = 0;
 
 /**
  * Toasts for passing events, bottom center, at most three on screen: information leaves by
@@ -27,23 +32,34 @@ export function Toaster({ queue }: { queue: ToastQueue }) {
 
 function QueueFeed({ queue }: { queue: ToastQueue }) {
     // stable: the provider's store
-    const { add } = Toast.useToastManager();
+    const { add, close } = Toast.useToastManager();
     useEffect(
         () =>
-            queue.drain(({ title, description, kind = 'info' }: ToastRequest) => {
+            queue.drain(({ title, description, kind = 'info', action }: ToastRequest) => {
                 const error = kind === 'error';
+                // the same message again refreshes the toast on screen instead of stacking a copy
+                const id = action
+                    ? `action\0${++actionSeq}`
+                    : `${kind}\0${title}\0${description ?? ''}`;
                 add({
-                    // the same message again refreshes the toast on screen instead of stacking
-                    // a copy
-                    id: `${kind}\0${title}\0${description ?? ''}`,
+                    id,
                     title,
                     description,
                     type: kind,
-                    timeout: error ? 0 : INFO_TIMEOUT_MS,
+                    timeout: error ? 0 : action ? ACTION_TIMEOUT_MS : INFO_TIMEOUT_MS,
                     priority: error ? 'high' : 'low',
+                    actionProps: action
+                        ? {
+                              children: action.label,
+                              onClick: () => {
+                                  close(id);
+                                  action.run();
+                              },
+                          }
+                        : undefined,
                 });
             }),
-        [queue, add],
+        [queue, add, close],
     );
     return null;
 }
@@ -67,6 +83,9 @@ function ToastList() {
                         <Toast.Description className="mt-0.5 font-medium text-ui-text-muted" />
                     ) : null}
                 </div>
+                {toast.actionProps ? (
+                    <Toast.Action className="btn-ghost-sm min-h-[26px] px-2 font-semibold" />
+                ) : null}
                 {error ? (
                     <Toast.Close className="btn-icon h-[22px] w-[22px]" aria-label="Dismiss">
                         <IconX size={12} />
