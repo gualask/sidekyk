@@ -103,9 +103,10 @@ function dragThumb(
 }
 
 /**
- * The viewer's vertical scrollbar, as a map of the changes: one mark per hunk where its changed
- * lines are (added, deleted, both), the hunk gone to ringed, over a translucent thumb (a mark is
- * always clickable; the thumb drags from anywhere else). A click on
+ * The viewer's vertical scrollbar, as a map of the changes, as VS Code's: one mark per hunk where
+ * its changed lines are (added, deleted, both), in the diff's own soft colors, the hunk gone to
+ * outlined, under a translucent thumb. A click on a mark goes to that change, a click elsewhere
+ * on the track centers that point, the thumb drags. A click on
  * a mark goes to that change, a click elsewhere on the track centers that point, the thumb drags.
  * Without changes (a file's text) it is the thumb alone.
  */
@@ -174,10 +175,10 @@ export function ChangeMap({
                             : `Change ${mark.hunk + 1} of ${layout.hunks.length}`
                     }
                     aria-label={`Go to change ${mark.hunk + 1}`}
-                    className={`absolute inset-x-0.5 z-[2] min-h-[3px] rounded-[2px] ${
+                    className={`absolute inset-x-0 min-h-[3px] ${
                         current !== null && current >= mark.hunk && current < mark.hunk + mark.count
-                            ? 'shadow-[0_0_0_2px_var(--ui-accent)]'
-                            : 'hover:shadow-[0_0_0_2px_var(--ui-accent)]'
+                            ? 'shadow-[inset_0_0_0_1px_var(--ui-accent)]'
+                            : 'hover:shadow-[inset_0_0_0_1px_var(--ui-accent-muted)]'
                     }`}
                     style={{
                         top: mark.top,
@@ -190,7 +191,7 @@ export function ChangeMap({
             <div
                 ref={thumb}
                 aria-hidden
-                className="absolute inset-x-0 z-[1] cursor-grab rounded-[3px] bg-ui-text/16 hover:bg-ui-text/26 active:cursor-grabbing active:bg-ui-text/26"
+                className="absolute inset-x-0 z-[1] cursor-grab bg-ui-text/14 hover:bg-ui-text/26 active:cursor-grabbing active:bg-ui-text/26"
                 onPointerDown={(event) => {
                     if (track.current) dragThumb(event, scrollElement, track.current, 'vertical');
                 }}
@@ -199,10 +200,11 @@ export function ChangeMap({
     );
 }
 
+/** The marks take the colors of the changed lines' gutters: the map is the diff, small. */
 const MARK_COLOR = {
-    add: 'var(--ui-diff-add-mark)',
-    del: 'var(--ui-diff-del-mark)',
-    mixed: 'linear-gradient(var(--ui-diff-del-mark) 50%, var(--ui-diff-add-mark) 50%)',
+    add: 'var(--ui-diff-add-gutter)',
+    del: 'var(--ui-diff-del-gutter)',
+    mixed: 'linear-gradient(var(--ui-diff-del-gutter) 50%, var(--ui-diff-add-gutter) 50%)',
 } as const;
 
 /**

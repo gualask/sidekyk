@@ -59,8 +59,9 @@ Workspace:
 Changes:
 
 - Diff in either view, copy with a click through the user's template (built).
-- Scrollbar as a map (built 2026-10-17): one mark per hunk (added/removed/both) over a
-  translucent thumb (marks stay clickable); click a mark to go there. Narrow or wide in settings.
+- Scrollbar as a map (built 2026-10-17): one mark per hunk (added/removed/both) in the diff's
+  gutter colors, full width, under a translucent thumb as VS Code's (2026-10-17: the marks'
+  strong colors were too loud); click a mark to go there. Narrow or wide in settings.
   Native scrollbars hidden in the viewer on every engine (`scrollbar-width` cannot hide one axis
   only), so a thin horizontal bar of our own shows while lines run past the edge.
 - `n`/`p` next/previous change, across files (built 2026-10-17): the first `n` on a file marks
