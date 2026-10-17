@@ -10,6 +10,11 @@ export const NUMBER_WIDTH = 56;
 export const SIGN_WIDTH = 20;
 export const TEXT_PADDING_LEFT = 4;
 export const TEXT_PADDING_RIGHT = 24;
+/** How far the find bar floats from the viewer's top and right edges, and its height. */
+export const FIND_BAR_INSET = 8;
+export const FIND_BAR_HEIGHT = 34;
+/** The room the viewer leaves above its rows while the find bar floats over them. */
+export const FIND_BAR_SPACE = FIND_BAR_INSET + FIND_BAR_HEIGHT + FIND_BAR_INSET;
 
 /** The gutter and padding around a line's text. */
 export const LINE_CHROME_WIDTH =
@@ -82,6 +87,18 @@ function firstPast(values: readonly number[], value: number): number {
 /** The row at `offset` from the top of the list. */
 export function rowAt({ starts }: DiffLayout, offset: number): number {
     return Math.max(0, firstPast(starts, offset) - 1);
+}
+
+/** Whether row `row` shows whole between offsets `top` and `bottom` of the list. */
+export function rowWithin(
+    layout: DiffLayout,
+    rows: readonly DiffRow[],
+    row: number,
+    top: number,
+    bottom: number,
+): boolean {
+    const start = layout.starts[row] ?? 0;
+    return start >= top && start + rowHeight(rows[row]) <= bottom;
 }
 
 /**

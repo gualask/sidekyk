@@ -71,10 +71,13 @@ Explore and copy:
       first; a longer text reads only the files the last complete search found (43-50 ms on
       Zed's clone, ~5 MB). `↵` opens the file with a find bar at the line (`3/12`, `↵`/`⇧↵`,
       `Esc`)
+- [x] `⌘F` with a file open (2026-10-17): the find bar on it, empty, from the top (a commit's
+      file too); `⌘F` in the bar, or its icon, opens the palette's search in contents with its
+      text; with no file open, the palette as before. The bar floats top right as VS Code's find
+      widget, with room left above the rows and the match being read never under it
 
 ## Next
 
-- [ ] `⌘F` with a file open: the find bar directly, the palette for the project from there
 - [ ] Rest of semantic zoom: splitters, panels minimized to the top bar (with Notes)
 - [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
 

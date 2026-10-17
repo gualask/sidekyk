@@ -38,13 +38,28 @@ const ProjectsOverview = preloadable(loadProjectsOverview, (module) => module.Pr
 const SettingsDialog = preloadable(loadSettingsDialog, (module) => module.SettingsDialog);
 const CommandPalette = preloadable(loadCommandPalette, (module) => module.CommandPalette);
 
-/** Without a project, the palette offers no panel. */
 /** Loaded when first asked for: the first paint does not show it. */
 const ShortcutsHelp = lazy(() =>
     import('./ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
 );
 
+/** Without a project, the palette offers no panel. */
 const NO_PANELS: typeof PALETTE_PANELS = [];
+
+/** The command palette: whether it is open, what it looks for, and the text it opens with. */
+interface PaletteState {
+    /** Null until first opened; then it stays mounted, to give the focus back as it closes. */
+    open: boolean | null;
+    mode: PaletteMode;
+    /** Empty, or a find bar's text taken to the project's files. */
+    text: string;
+}
+
+const PALETTE_UNOPENED: PaletteState = { open: null, mode: 'names', text: '' };
+
+/** The palette closed, if it was open, as the settings open in its place. */
+const closePalette = (palette: PaletteState): PaletteState =>
+    palette.open ? { ...palette, open: false } : palette;
 
 /** A project and its panels, at level 1 or full screen: the zoom carries it to and from its card. */
 const PROJECT_ZOOM = { viewTransitionName: ZOOM_NAMES.project };
@@ -67,15 +82,14 @@ export function AppShell() {
     const [idle, setIdle] = useState(false);
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
-    const [paletteOpen, setPaletteOpen] = useState<boolean | null>(null);
-    const [paletteMode, setPaletteMode] = useState<PaletteMode>('names');
+    const [palette, setPalette] = useState(PALETTE_UNOPENED);
     const [helpOpen, setHelpOpen] = useState(false);
     const toggleHelp = () => setHelpOpen((open) => !open);
     // the file shown, whose lines found come first: worked out only while the palette is open
     const shownFile = useShownFile(level > 0 ? (project?.root ?? null) : null);
     // a problem's fix in the settings: they open in place of the palette
     const openSettings = useCallback(() => {
-        setPaletteOpen((open) => (open ? false : open));
+        setPalette(closePalette);
         setSettingsOpen(true);
     }, []);
     const problems = useProblems(projects.data, openSettings);
@@ -115,11 +129,16 @@ export function AppShell() {
     // key switches what it looks for, its own key closes it
     const togglePalette = (mode: PaletteMode) => {
         setSettingsOpen((open) => (open ? false : open));
-        setPaletteMode(mode);
-        setPaletteOpen((open) => !(open && paletteMode === mode));
+        setPalette((current) => ({
+            open: !(current.open && current.mode === mode),
+            mode,
+            text: '',
+        }));
     };
+    // a file's find bar looks further, in all the project's files
+    const findInFiles = (text: string) => setPalette({ open: true, mode: 'contents', text });
     const toggleSettings = () => {
-        setPaletteOpen((open) => (open ? false : open));
+        setPalette(closePalette);
         setSettingsOpen((open) => !open);
     };
 
@@ -218,6 +237,7 @@ export function AppShell() {
                         zoom={zoom}
                         select={setPanel}
                         show={show}
+                        findInFiles={findInFiles}
                         idle={idle}
                     />
                 ) : null}
@@ -232,16 +252,17 @@ export function AppShell() {
                     <SettingsDialog.Component open={settingsOpen} onOpenChange={setSettingsOpen} />
                 </Suspense>
             )}
-            {paletteOpen === null ? null : (
+            {palette.open === null ? null : (
                 <Suspense fallback={null}>
                     <CommandPalette.Component
-                        open={paletteOpen}
-                        onOpenChange={setPaletteOpen}
-                        mode={paletteMode}
-                        onModeChange={setPaletteMode}
+                        open={palette.open}
+                        onOpenChange={(open) => setPalette((current) => ({ ...current, open }))}
+                        mode={palette.mode}
+                        onModeChange={(mode) => setPalette((current) => ({ ...current, mode }))}
+                        initialText={palette.text}
                         projectName={project?.name ?? null}
                         root={level > 0 ? (project?.root ?? null) : null}
-                        currentFile={paletteOpen ? shownFile() : null}
+                        currentFile={palette.open ? shownFile() : null}
                         panels={project ? PALETTE_PANELS : NO_PANELS}
                         actions={paletteActions}
                     />
@@ -266,6 +287,7 @@ function Workspace({
     zoom,
     select,
     show,
+    findInFiles,
     idle,
 }: {
     list: ProjectList;
@@ -277,6 +299,7 @@ function Workspace({
     zoom: (level: ZoomLevel, panel?: PanelDefinition) => void;
     select: (panel: PanelDefinition) => void;
     show: PanelProps['show'];
+    findInFiles: PanelProps['findInFiles'];
     /** The first paint is done: the other projects' counts may load. */
     idle: boolean;
 }) {
@@ -310,6 +333,7 @@ function Workspace({
                     target={targetOf(panel.id)}
                     selected
                     show={show}
+                    findInFiles={findInFiles}
                 />
             </div>
         );
@@ -336,6 +360,7 @@ function Workspace({
                         target={targetOf(tile.id)}
                         selected={tile === panel}
                         show={show}
+                        findInFiles={findInFiles}
                         grow={grow}
                         onZoomIn={() => zoom(2, tile)}
                         onSelect={() => select(tile)}

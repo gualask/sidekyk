@@ -3,7 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
-import type { FindBarState } from '../application/find';
+import type { FileFinder } from '../application/find';
 import { useCommitFileDiff, useFileDiff } from '../application/repository.queries';
 import { commitRequest, shortSha } from '../model/commits';
 import { parseUnifiedDiff } from '../model/diff-parser';
@@ -23,8 +23,8 @@ interface DiffShown {
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
     renderHeader: (pane: PaneHeader) => ReactNode;
-    /** A text looked for in the file, if any. */
-    find?: FindBarState | null;
+    /** What the file is looked through with. */
+    finder: FileFinder;
 }
 
 /** A diff, in either view. */
@@ -36,7 +36,7 @@ function DiffPane({
     openOn,
     header,
     renderHeader,
-    find,
+    finder,
 }: DiffShown & {
     diff: UseQueryResult<UnifiedDiff | null>;
     file: FileChange;
@@ -74,7 +74,7 @@ function DiffPane({
             widest={widest}
             openOn={openOn}
             linesAbove={whole ? LINES_ABOVE : 0}
-            find={find}
+            finder={finder}
         >
             {diff.isPending ? <Notice>Loading diff…</Notice> : null}
             {diff.isError ? (

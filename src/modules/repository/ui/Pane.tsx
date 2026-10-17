@@ -1,15 +1,17 @@
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { shortcutKey } from '@/shared/platform/shortcut';
 import { type CopyState, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
-import { isOwnKey } from '@/shared/ui/keys';
-import type { FindBarState } from '../application/find';
+import { isKeyTaken, isOwnKey } from '@/shared/ui/keys';
+import type { FileFinder } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
 import { type CopySource, fileText } from '../model/copied';
 import type { DiffHunk } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
 import { DiffList } from './DiffList';
+import { FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
 
 /** What the viewer says instead of, or after, the lines: loading, a failure, a cut. */
@@ -41,6 +43,23 @@ interface Reading {
     asked: number | null;
 }
 
+/**
+ * The width of an element's vertical scrollbar while `active`, measured again as one comes or goes
+ * (its content box changes): 0 for an overlay scrollbar, as macOS's.
+ */
+function useScrollbarWidth(element: HTMLElement | null, active: boolean): number {
+    const [width, setWidth] = useState(0);
+    useLayoutEffect(() => {
+        if (!element || !active) return;
+        const measure = () => setWidth(element.offsetWidth - element.clientWidth);
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, [element, active]);
+    return width;
+}
+
 /** The number in the file now of the line a match is on. */
 function lineOf(rows: readonly DiffRow[], match: FindMatch | undefined): number | null {
     const row = match ? rows[match.row] : undefined;
@@ -50,8 +69,9 @@ function lineOf(rows: readonly DiffRow[], match: FindMatch | undefined): number 
 /**
  * The viewer, the same for a diff, a whole file with its changes and a file's text: its rows, of
  * which only those on screen render, then what it has to say (`children`), and in the panel's
- * header what `renderHeader` puts there. With `find`, a bar over the rows goes through the text
- * looked for, `Esc` closing it before anything else.
+ * header what `renderHeader` puts there. `⌘F` opens a bar over the rows that goes through a text
+ * in the file, from its top; `⌘F` again, in the bar, looks for it in all the project's files.
+ * `Esc` closes the bar before anything else.
  */
 export function Pane({
     header,
@@ -62,7 +82,7 @@ export function Pane({
     widest,
     openOn,
     linesAbove,
-    find = null,
+    finder,
     children,
 }: {
     /** The panel's header, where the open file goes (see `PanelProps`). */
@@ -78,7 +98,7 @@ export function Pane({
     openOn: number | null;
     /** Lines left above that hunk, so it shows where it sits. */
     linesAbove: number;
-    find?: FindBarState | null;
+    finder: FileFinder;
     children: ReactNode;
 }) {
     const { copyTemplate } = useRepositorySettings();
@@ -101,6 +121,7 @@ export function Pane({
 
     // the matches of the text looked for; a new text, or the file read again, starts from the
     // line of the match being read, the first time from the line asked for
+    const find = finder.bar;
     const query = find?.query ?? '';
     const matches = useMemo(() => findMatches(rows, query), [rows, query]);
     const [reading, setReading] = useState<Reading | null>(null);
@@ -118,12 +139,22 @@ export function Pane({
         const next = (index + by + matches.length) % matches.length;
         setReading({ matches, index: next, line: lineOf(rows, matches[next]), asked: find.line });
     };
-    // `Esc` closes the bar first, wherever the focus is in the panel
+    // before the workspace's keys: `⌘F` opens the bar, or comes back to it (in its field the bar
+    // takes it); `Esc` closes the bar first, wherever the focus is in the panel
+    const field = useRef<HTMLInputElement>(null);
+    const scrollbar = useScrollbarWidth(scrollElement, find !== null);
     useWindowKeys(
         (event) => {
-            if (!find || event.key !== 'Escape' || event.defaultPrevented || !isOwnKey(event)) {
+            if (event.defaultPrevented || isKeyTaken(event.target)) return;
+            if (shortcutKey(event) === 'f') {
+                event.preventDefault();
+                if (find) {
+                    field.current?.focus();
+                    field.current?.select();
+                } else finder.open();
                 return;
             }
+            if (!find || event.key !== 'Escape' || !isOwnKey(event)) return;
             event.preventDefault();
             find.onClose();
         },
@@ -131,19 +162,27 @@ export function Pane({
     );
 
     return (
-        <div className="flex h-full flex-col">
+        <div className="relative flex h-full flex-col">
             {header ? createPortal(renderHeader(pane), header) : null}
             {find ? (
                 <FindBar
+                    field={field}
+                    right={scrollbar}
                     query={find.query}
                     count={matches.length}
                     current={index}
                     onQuery={find.onQuery}
                     onStep={step}
                     onClose={find.onClose}
+                    onFindInFiles={() => finder.findInFiles(find.query)}
                 />
             ) : null}
-            <div ref={setScrollElement} className="min-h-0 flex-1 overflow-auto">
+            {/* the list keeps its rows in place itself as the room above it changes: no browser
+                scroll anchoring (Chromium's) on top of it */}
+            <div
+                ref={setScrollElement}
+                className="min-h-0 flex-1 overflow-auto [overflow-anchor:none]"
+            >
                 {scrollElement && rows.length > 0 ? (
                     <DiffList
                         source={source}
@@ -155,6 +194,7 @@ export function Pane({
                         linesAbove={linesAbove}
                         currentHunk={currentHunk}
                         found={find && matches.length > 0 ? { matches, current: index } : null}
+                        topSpace={find ? FIND_BAR_SPACE : 0}
                     />
                 ) : null}
                 {children}

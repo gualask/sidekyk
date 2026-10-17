@@ -35,6 +35,8 @@ export interface PanelProps {
      * selected, or full screen in place of this one. The target is in that panel's terms.
      */
     show: (panel: string, target: PanelTarget) => void;
+    /** Looks for a text in all the project's files, as `⌘F` does from where no file is open. */
+    findInFiles: (query: string) => void;
 }
 
 /** What a panel's summary gets: the project of the card it is on. */

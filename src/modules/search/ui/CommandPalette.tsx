@@ -55,6 +55,7 @@ export function CommandPalette({
     onOpenChange,
     mode,
     onModeChange,
+    initialText,
     projectName,
     root,
     currentFile,
@@ -65,6 +66,8 @@ export function CommandPalette({
     onOpenChange: (open: boolean) => void;
     mode: PaletteMode;
     onModeChange: (mode: PaletteMode) => void;
+    /** What the field holds as the palette opens: empty, or a text from a file's find bar. */
+    initialText: string;
     /** The project on screen, whose panels and files are offered; null when there is none. */
     projectName: string | null;
     /** The project whose files are searched; null when all projects show. */
@@ -85,6 +88,7 @@ export function CommandPalette({
                     <Palette
                         mode={mode}
                         onModeChange={onModeChange}
+                        initialText={initialText}
                         projectName={projectName}
                         root={root}
                         currentFile={currentFile}
@@ -103,10 +107,14 @@ export function CommandPalette({
     );
 }
 
-/** The field and its list, mounted while the palette is open: each opening starts empty. */
+/**
+ * The field and its list, mounted while the palette is open: each opening starts from
+ * `initialText`.
+ */
 function Palette({
     mode,
     onModeChange,
+    initialText,
     projectName,
     root,
     currentFile,
@@ -115,13 +123,14 @@ function Palette({
 }: {
     mode: PaletteMode;
     onModeChange: (mode: PaletteMode) => void;
+    initialText: string;
     projectName: string | null;
     root: string | null;
     currentFile: string | null;
     panels: readonly PalettePanel[];
     onOpen: (item: PaletteItem, query: string) => void;
 }) {
-    const [query, setQuery] = useState('');
+    const [query, setQuery] = useState(initialText);
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
     const contents = mode === 'contents';
     const names = useSearch(query, titles, root, !contents);

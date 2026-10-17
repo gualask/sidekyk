@@ -6,7 +6,7 @@ import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { useCommitView } from '../application/commit-view';
-import { useFileFind } from '../application/find';
+import { useCommitFileFind, useFileFind } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
@@ -38,6 +38,7 @@ export function ChangesWorkspace({
     place,
     selected: hasKeys,
     show,
+    findInFiles,
 }: PanelProps) {
     // the file shown, one for both panels: the tree of Files reveals it
     const {
@@ -49,9 +50,9 @@ export function ChangesWorkspace({
         path: selectedPath,
     } = useSelectedFile(project.root);
     const commitView = useCommitView(project.root);
-    // the file shown, whose find bar goes when another shows
-    const find = useFileFind(project.root, selected?.path ?? selectedPath);
     const { commit: viewed, file: commitFile } = commitView;
+    // the file shown, whose find bar goes when another shows
+    const find = useFileFind(project.root, selected?.path ?? selectedPath, findInFiles);
     const selectedIndex = selected ? files.indexOf(selected) : -1;
     // a file of the tree that did not change, once the list says so
     const unchanged = !selected && snapshot.isSuccess ? selectedPath : null;
@@ -64,6 +65,8 @@ export function ChangesWorkspace({
           ? fileKey(selected)
           : unchanged;
     const { choice: diffView, openAt } = useDiffViewChoice(shownKey);
+    // a commit's file has a find bar of its own, which goes as the commit is left
+    const commitFind = useCommitFileFind(viewed ? shownKey : null, findInFiles);
 
     // a file asked for from outside: the palette, Files
     useShownTarget(target, (shown) => {
@@ -161,13 +164,17 @@ export function ChangesWorkspace({
                         open={commitView.listOpen}
                         onOpenChange={commitView.setListOpen}
                         viewed={viewed}
-                        onView={commitView.view}
+                        onView={(commit) => {
+                            // a commit's files have their own bar
+                            commitView.view(commit);
+                            find.close();
+                        }}
                     />
                 </aside>
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {/* until the settings say which view a diff opens in, no diff is asked for */}
                     {!diffView ? null : viewed ? (
-                        commitFile ? (
+                        commitFile && commitFind ? (
                             <CommitDiffView
                                 key={`${shownKey}:${diffView.view}`}
                                 root={project.root}
@@ -176,6 +183,7 @@ export function ChangesWorkspace({
                                 view={diffView.view}
                                 openOn={diffView.openOn}
                                 header={header}
+                                finder={commitFind}
                                 renderHeader={(pane) => (
                                     <FileHeader
                                         path={commitFile.path}
@@ -197,7 +205,7 @@ export function ChangesWorkspace({
                             view={diffView.view}
                             openOn={diffView.openOn}
                             header={header}
-                            find={find.barFor(selected.path)}
+                            finder={find.finderFor(selected.path)}
                             renderHeader={(pane) => (
                                 <FileHeader
                                     path={selected.path}
@@ -219,7 +227,7 @@ export function ChangesWorkspace({
                             root={project.root}
                             path={unchanged}
                             header={header}
-                            find={find.barFor(unchanged)}
+                            finder={find.finderFor(unchanged)}
                             renderHeader={() => (
                                 <FileHeader
                                     path={unchanged}

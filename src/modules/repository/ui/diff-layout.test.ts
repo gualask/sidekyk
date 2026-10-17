@@ -10,6 +10,7 @@ import {
     LINE_ROW_HEIGHT,
     openingOffset,
     rowAt,
+    rowWithin,
     spanBox,
 } from './diff-layout';
 
@@ -70,5 +71,14 @@ describe('diff layout', () => {
         // above the hunk: the next one; below the last: the last
         expect(hunkFrom(file, WHOLE, 0)).toBe(0);
         expect(hunkFrom(file, WHOLE, 11)).toBe(0);
+    });
+
+    it('tells a row shown whole between two offsets, as the find bar leaves them to read', () => {
+        const layout = diffLayout(CHANGES);
+        // row 2 runs from 44 to 64
+        expect(rowWithin(layout, CHANGES, 2, 40, 70)).toBe(true);
+        expect(rowWithin(layout, CHANGES, 2, 44, 64)).toBe(true);
+        expect(rowWithin(layout, CHANGES, 2, 50, 100)).toBe(false);
+        expect(rowWithin(layout, CHANGES, 2, 0, 60)).toBe(false);
     });
 });

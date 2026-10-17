@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent } from 'react';
 import { neighbourProject, type ProjectList, useActivateProject } from '@/modules/projects';
 import type { PaletteMode } from '@/modules/search';
 import type { PanelDefinition } from '@/shared/panels/panel';
-import { hasShortcutModifier } from '@/shared/platform/shortcut';
+import { shortcutKey } from '@/shared/platform/shortcut';
 import { isField, isKeyTaken } from '@/shared/ui/keys';
 import { panelForKey } from './panels';
 
@@ -52,13 +52,14 @@ export function useWorkspaceKeys({
 
     const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
         if (event.defaultPrevented) return;
-        if (hasShortcutModifier(event) && !event.altKey && event.key === ',') {
+        const shortcut = shortcutKey(event);
+        if (shortcut === ',') {
             event.preventDefault();
             toggleSettings();
             return;
         }
-        const paletteKey = PALETTE_KEYS[event.key.toLowerCase()];
-        if (hasShortcutModifier(event) && !event.altKey && paletteKey) {
+        const paletteKey = shortcut === null ? undefined : PALETTE_KEYS[shortcut];
+        if (paletteKey) {
             event.preventDefault();
             togglePalette(paletteKey);
             return;

@@ -12,3 +12,16 @@ export function shortcutLabel(key: string): string {
 export function hasShortcutModifier(event: { metaKey: boolean; ctrlKey: boolean }): boolean {
     return MACOS ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
 }
+
+/**
+ * The key of a shortcut made with the platform's modifier and no `⌥` (`Alt`), lowercased, as
+ * shortcuts are named (`k` for `⌘K`); null for any other key.
+ */
+export function shortcutKey(event: {
+    metaKey: boolean;
+    ctrlKey: boolean;
+    altKey: boolean;
+    key: string;
+}): string | null {
+    return hasShortcutModifier(event) && !event.altKey ? event.key.toLowerCase() : null;
+}

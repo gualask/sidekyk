@@ -21,6 +21,7 @@ export function PanelTile({
     target,
     selected,
     show,
+    findInFiles,
     grow = 1,
     onZoomIn,
     onSelect,
@@ -32,6 +33,7 @@ export function PanelTile({
     /** The panel takes the keys: full screen, or the selected tile. */
     selected: boolean;
     show: PanelProps['show'];
+    findInFiles: PanelProps['findInFiles'];
     /** A tile's share of the width; 0 for the width of what it shows. */
     grow?: number;
     /** Shows the panel as a tile, whose header zooms into it; without it, the panel is full screen. */
@@ -101,6 +103,7 @@ export function PanelTile({
                         place={onZoomIn ? 'tile' : 'full'}
                         selected={selected}
                         show={show}
+                        findInFiles={findInFiles}
                     />
                 </Suspense>
             </div>

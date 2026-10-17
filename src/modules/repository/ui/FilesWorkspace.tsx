@@ -65,13 +65,14 @@ export function FilesWorkspace({
     place,
     selected: hasKeys,
     show,
+    findInFiles,
 }: PanelProps) {
     const root = project.root;
     const [state, setState] = useSessionState<TreeState>(`tree:${root}`, CLOSED);
     const { open, selected } = state;
     // the file shown, one for both panels: Changes selects it in its list
     const { snapshot, files, setSelection, change, path: file } = useSelectedFile(root);
-    const find = useFileFind(root, change?.path ?? file);
+    const find = useFileFind(root, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
     const marks = useMemo(() => changeMarks(files), [files]);
@@ -201,7 +202,7 @@ export function FilesWorkspace({
             view="file"
             openOn={openOn?.file === change.path ? openOn.hunk : null}
             header={header}
-            find={find.barFor(change.path)}
+            finder={find.finderFor(change.path)}
             renderHeader={(pane) => (
                 <FileHeader
                     path={change.path}
@@ -226,7 +227,7 @@ export function FilesWorkspace({
             root={root}
             path={file}
             header={header}
-            find={find.barFor(file)}
+            finder={find.finderFor(file)}
             renderHeader={() => <FileHeader path={file} />}
         />
     );

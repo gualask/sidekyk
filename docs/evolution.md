@@ -41,7 +41,8 @@ Workspace:
 - The palette is the only search; panels have no filter. `⌘K` goes by name (projects, panels, the
   project's files, notes, note lists), `⌘F` finds in the project's files, its open file first
   (2026-10-17: one key for "find" rather than an editor's in-file `⌘F` plus project `⌘⇧F`; the
-  find bar over the viewer covers the in-file case).
+  find bar over the viewer covers the in-file case). With a file open `⌘F` opens its find bar,
+  empty, matches from the top; `⌘F` again from the bar takes its text to the palette.
 - Toasts for passing events (bottom center, max three; errors stay); lasting problems in the top
   bar with their fix.
 - Theme dark by default, light in settings; no system following.

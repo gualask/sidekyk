@@ -55,7 +55,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
     one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count, level 0 card).
     Lists, tree and diff are virtualized flat lists of fixed-height rows.
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
-- `shared/`: tokens, primitives, clipboard, errors, shortcut labels, keys (`isKeyTaken`,
+- `shared/`: tokens, primitives, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
   `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type, change
   areas, panel contract.
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
@@ -76,13 +76,19 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   icon, full screen shown only when filled); `target` (a request in the panel's terms, a new object
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
-  tile, or replaces the full-screen panel).
+  tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
 - A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
 - Changes and Files share one selection per project (`model/selection.ts`): a changed file by key,
   or a tree path shown as a change while it is one. Changes selects it in its list; Files reveals
   it (opens the folders above). Targets (`fileTarget`) carry the path, the hunk to open on and a
   text to find from a line (opens the find bar: on that file only, until closed; `Esc` closes it
-  first).
+  first). The bar floats over the viewer's top right (`FindBar`, 300 px); while open the list
+  leaves `FIND_BAR_SPACE` above its rows (virtualizer `scrollMargin`, scroll kept steady, browser
+  scroll anchoring off) and a match under the bar counts as off screen (`rowWithin`). `⌘F` over
+  a viewer (`Pane`, capture) opens its bar empty from the top, or comes back to it; in the bar's
+  field `FindBar` takes it, as its icon, and calls `PanelProps.findInFiles`: the palette in
+  contents with the bar's text. A commit's file has its own bar (`useCommitFileFind`); opening a
+  commit closes the working tree's (`useFileFind().close`).
 
 ### Zoom and keyboard
 
@@ -90,7 +96,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   change goes through `zoom` inside a view transition. `preloadable` parts render at once when
   their chunk is loaded, so a transition never captures an empty frame.
 - `app/workspace-keys.ts`: `↵`/`Esc`, `1`-`9`, `←`/`→` (tiles), `[`/`]`, `⌘,`, `⌘K`, `⌘F` (also
-  inside the palette, to switch mode), `?` (`ShortcutsHelp`, lazy; list kept by hand: a new
+  inside the palette, to switch mode; a viewer takes it first), `?` (`ShortcutsHelp`, lazy; list kept by hand: a new
   shortcut adds its line). Keys a field,
   dialog or menu takes are theirs. Panels listen with `useWindowKeys`; a panel taking `↵`/`Esc`
   listens while capturing and the workspace skips handled keys.
