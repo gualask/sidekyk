@@ -10,7 +10,7 @@ import { type CopySource, fileText } from '../model/copied';
 import type { DiffHunk } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
-import { DiffList } from './DiffList';
+import { DiffList, type HunkReader } from './DiffList';
 import { FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
 
@@ -71,7 +71,8 @@ function lineOf(rows: readonly DiffRow[], match: FindMatch | undefined): number 
  * which only those on screen render, then what it has to say (`children`), and in the panel's
  * header what `renderHeader` puts there. `⌘F` opens a bar over the rows that goes through a text
  * in the file, from its top; `⌘F` again, in the bar, looks for it in all the project's files.
- * `Esc` closes the bar before anything else.
+ * `Esc` closes the bar before anything else. With `onPastEnd`, `n`/`p` go to the next or previous
+ * change.
  */
 export function Pane({
     header,
@@ -83,6 +84,7 @@ export function Pane({
     openOn,
     linesAbove,
     finder,
+    onPastEnd,
     children,
 }: {
     /** The panel's header, where the open file goes (see `PanelProps`). */
@@ -99,13 +101,18 @@ export function Pane({
     /** Lines left above that hunk, so it shows where it sits. */
     linesAbove: number;
     finder: FileFinder;
+    /**
+     * `n`/`p` go through the changes, and past the last or the first go on here (the next or
+     * previous file); without it, the pane takes no `n`/`p`.
+     */
+    onPastEnd?: (step: 1 | -1) => void;
     children: ReactNode;
 }) {
     const { copyTemplate } = useRepositorySettings();
     // state, not a ref: React attaches a parent's ref after its children's effects, so lines
     // mounted with it, from a file already read, would find no element to scroll
     const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
-    const currentHunk = useRef<(() => number) | null>(null);
+    const reader = useRef<HunkReader | null>(null);
     const { copied, copy } = useCopyToClipboard();
     const pane = useMemo<PaneHeader>(
         () => ({
@@ -114,7 +121,7 @@ export function Pane({
                     ? () => void copy('file', fileText(copyTemplate, source, hunks))
                     : null,
             fileCopied: copied?.id === 'file' ? copied : null,
-            currentHunk: () => currentHunk.current?.() ?? 0,
+            currentHunk: () => reader.current?.current() ?? 0,
         }),
         [hunks, copy, copyTemplate, source, copied],
     );
@@ -154,7 +161,14 @@ export function Pane({
                 } else finder.open();
                 return;
             }
-            if (!find || event.key !== 'Escape' || !isOwnKey(event)) return;
+            if (!isOwnKey(event)) return;
+            const step = event.key === 'n' ? 1 : event.key === 'p' ? -1 : 0;
+            if (step !== 0 && onPastEnd) {
+                event.preventDefault();
+                if (!reader.current?.step(step)) onPastEnd(step);
+                return;
+            }
+            if (!find || event.key !== 'Escape') return;
             event.preventDefault();
             find.onClose();
         },
@@ -192,7 +206,7 @@ export function Pane({
                         scrollElement={scrollElement}
                         openOn={openOn}
                         linesAbove={linesAbove}
-                        currentHunk={currentHunk}
+                        reader={reader}
                         found={find && matches.length > 0 ? { matches, current: index } : null}
                         topSpace={find ? FIND_BAR_SPACE : 0}
                     />

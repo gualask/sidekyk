@@ -123,7 +123,9 @@ export function hunksBetween(
 
 /** Where the list opens on hunk `hunk` (the first if null), `linesAbove` lines above it. */
 export function openingOffset(layout: DiffLayout, hunk: number | null, linesAbove: number): number {
-    const span = layout.hunks[hunk ?? 0];
+    // a hunk counted from the end (-1, the last): `p` goes into a file from its bottom
+    const index = hunk === null ? 0 : hunk < 0 ? layout.hunks.length + hunk : hunk;
+    const span = layout.hunks[index];
     if (!span) return 0;
     return Math.max(0, (layout.starts[span.first] ?? 0) - linesAbove * LINE_ROW_HEIGHT);
 }
@@ -133,4 +135,19 @@ export function hunkFrom(layout: DiffLayout, rows: readonly DiffRow[], row: numb
     const at = rows[row]?.hunkIndex ?? -1;
     if (at >= 0) return at;
     return Math.min(firstPast(layout.hunkFirsts, row), layout.hunks.length - 1);
+}
+
+/**
+ * The hunk `n` (`step` 1) or `p` (-1) goes to from the line being read, at offset `reading`, when
+ * none was gone to yet: the first starting on it or below (a file just opened: its first change,
+ * marked), or the last starting above it; null when there is none that way.
+ */
+export function hunkStepped(layout: DiffLayout, reading: number, step: 1 | -1): number | null {
+    const starts = layout.hunks.map((span) => layout.starts[span.first] ?? 0);
+    if (step > 0) {
+        const next = starts.findIndex((start) => start >= reading - 1);
+        return next < 0 ? null : next;
+    }
+    const previous = starts.findLastIndex((start) => start < reading - 1);
+    return previous < 0 ? null : previous;
 }

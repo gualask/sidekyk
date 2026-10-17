@@ -7,6 +7,7 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
+import { useShowToast } from '@/shared/ui/toasts';
 import { useCommitView } from '../application/commit-view';
 import { useCommitFileFind, useFileFind } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
@@ -116,6 +117,29 @@ export function ChangesWorkspace({
         { capture: true },
     );
 
+    // `n`/`p` past a file's last or first change: the next or previous file of the list, on its
+    // first change or its last; at either end of the list, a word says so
+    const showToast = useShowToast();
+    const stepFile = (step: 1 | -1) => {
+        const hunk = step > 0 ? 0 : -1;
+        if (viewed) {
+            const next = commitView.neighbour(step);
+            if (next) {
+                commitView.open(next);
+                openAt(`${viewed.sha}:${next.path}`, hunk);
+                return;
+            }
+        } else {
+            const next = files[selectedIndex + step];
+            if (next) {
+                setSelection({ kind: 'change', key: fileKey(next) });
+                openAt(fileKey(next), hunk);
+                return;
+            }
+        }
+        showToast({ title: step > 0 ? 'Last change' : 'First change' });
+    };
+
     // the file in the tree, and in Files full screen at the hunk being read
     const showInFiles = (path: string, hunk: () => number | null) => ({
         panel: 'files' as const,
@@ -210,6 +234,7 @@ export function ChangesWorkspace({
                                 openOn={diffView.openOn}
                                 header={header}
                                 finder={commitFind}
+                                onPastEnd={stepFile}
                                 renderHeader={(pane) => (
                                     <FileHeader
                                         path={commitFile.path}
@@ -232,6 +257,7 @@ export function ChangesWorkspace({
                             openOn={diffView.openOn}
                             header={header}
                             finder={find.finderFor(selected.path)}
+                            onPastEnd={stepFile}
                             renderHeader={(pane) => (
                                 <FileHeader
                                     path={selected.path}

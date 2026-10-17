@@ -61,7 +61,9 @@ Changes:
 - Diff in either view, copy with a click through the user's template (built).
 - *(to build)* Scrollbar as a map: one mark per hunk (added/removed/both) under a translucent
   thumb; click a mark to go there. Narrow or wide in settings.
-- *(to build)* `n`/`p` next/previous change, across files.
+- `n`/`p` next/previous change, across files (built 2026-10-17): the first `n` on a file marks
+  its first change; past the last, the next file opens on its first (`p`: the previous on its
+  last).
 
 Files (built 2026-10-17):
 

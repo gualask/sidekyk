@@ -17,6 +17,7 @@ const SHORTCUTS: Shortcut[] = [
     { label: 'Zoom in / out', keys: ['↵', 'Esc'], also: MACOS ? '⌘+scroll, pinch' : 'Ctrl+scroll' },
     { label: 'Move among tiles', keys: ['←', '→'] },
     { label: 'Move in a list', keys: ['j', 'k'], also: 'arrows full screen' },
+    { label: 'Next / previous change, across files', keys: ['n', 'p'] },
     {
         label: PALETTE_PANELS.map((panel) => panel.title).join(', '),
         keys: PALETTE_PANELS.map((panel) => panel.shortcut),

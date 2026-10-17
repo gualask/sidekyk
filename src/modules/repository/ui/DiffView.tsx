@@ -25,6 +25,8 @@ interface DiffShown {
     renderHeader: (pane: PaneHeader) => ReactNode;
     /** What the file is looked through with. */
     finder: FileFinder;
+    /** Where `n`/`p` go past the last or the first change (see `Pane`). */
+    onPastEnd?: (step: 1 | -1) => void;
 }
 
 /** A diff, in either view. */
@@ -37,6 +39,7 @@ function DiffPane({
     header,
     renderHeader,
     finder,
+    onPastEnd,
 }: DiffShown & {
     diff: UseQueryResult<UnifiedDiff | null>;
     file: FileChange;
@@ -75,6 +78,7 @@ function DiffPane({
             openOn={openOn}
             linesAbove={whole ? LINES_ABOVE : 0}
             finder={finder}
+            onPastEnd={onPastEnd}
         >
             {diff.isPending ? <Notice>Loading diff…</Notice> : null}
             {diff.isError ? (

@@ -6,6 +6,7 @@ import {
     diffLayout,
     HUNK_ROW_HEIGHT,
     hunkFrom,
+    hunkStepped,
     hunksBetween,
     LINE_ROW_HEIGHT,
     openingOffset,
@@ -57,9 +58,25 @@ describe('diff layout', () => {
     it('opens on a hunk, with lines above it in the whole file', () => {
         expect(openingOffset(diffLayout(CHANGES), 1, 0)).toBe(84);
         expect(openingOffset(diffLayout(CHANGES), null, 0)).toBe(0);
+        // counted from the end: the last
+        expect(openingOffset(diffLayout(CHANGES), -1, 0)).toBe(84);
         // the hunk starts on row 2: three lines above it are cut at the top
         expect(openingOffset(diffLayout(WHOLE), 0, 3)).toBe(0);
         expect(openingOffset(diffLayout(WHOLE), 5, 3)).toBe(0);
+    });
+
+    it('steps to the next hunk below the line read, or the previous above it', () => {
+        const layout = diffLayout(CHANGES);
+        // a file just opened: its first change is gone to, none before
+        expect(hunkStepped(layout, 0, 1)).toBe(0);
+        expect(hunkStepped(layout, 0, -1)).toBeNull();
+        // reading inside the first: the second is next; at the second, the first is before
+        expect(hunkStepped(layout, 30, 1)).toBe(1);
+        expect(hunkStepped(layout, 84, -1)).toBe(0);
+        expect(hunkStepped(layout, 90, 1)).toBeNull();
+        // above every hunk of the whole file: the first is next, not skipped
+        const file = diffLayout(WHOLE);
+        expect(hunkStepped(file, 0, 1)).toBe(0);
     });
 
     it('tells the hunk being read at any offset', () => {

@@ -39,6 +39,9 @@ Workspace:
       setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
 - [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
       double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
+- [x] `n`/`p`: next/previous change across the files of the list (or of the commit viewed); the
+      change gone to is marked (accent bar) and steps go on from it while on screen; a word at
+      either end
 - [x] Level 0 cards tell the notes waiting and the newest (`notes_summary`, kept in memory once
       read, until they change)
 - [x] Side column (2026-10-17): Files above Notes, splitter between them, 320 px at least with
@@ -111,7 +114,6 @@ Explore and copy:
 
 - [ ] Collect several hunks with a comment each, copy as one batch
 - [ ] Scrollbar as a map of the changes (marks per hunk, click to go; narrow/wide setting)
-- [ ] `n`/`p`: next/previous change, across files
 - [ ] Syntax highlighting: lazy, rows on screen only, skipped above a size limit
 - [ ] Side-by-side view; collapse unchanged regions with expand on demand
 - [ ] Open a file in the editor at the hunk's line

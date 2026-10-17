@@ -98,6 +98,9 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
+- `n`/`p` (`Pane` with `onPastEnd`, Changes only): `DiffList`'s `HunkReader` steps from the hunk
+  gone to while on screen, else from the line read (`hunkStepped`); past either end Changes
+  opens the next or previous file (`openAt`, `-1` the last hunk), or says it is the last.
 - A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
 - Changes and Files share one selection per project (`model/selection.ts`): a changed file by key,
   or a tree path shown as a change while it is one. Changes selects it in its list; Files reveals

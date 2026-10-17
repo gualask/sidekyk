@@ -20,6 +20,7 @@ import {
     BRACKET_WIDTH,
     diffLayout,
     hunkFrom,
+    hunkStepped,
     hunksBetween,
     LINE_CHROME_WIDTH,
     LINE_ROW_HEIGHT,
@@ -33,6 +34,13 @@ import {
 import { type Target, targetSpan } from './diff-target';
 import { useDiffPointer } from './use-diff-pointer';
 
+/** What the viewer reads: the hunk being read, and a step to the next or previous one. */
+export interface HunkReader {
+    current: () => number;
+    /** Goes to the next (1) or previous (-1) hunk; false when there is none that way. */
+    step: (step: 1 | -1) => boolean;
+}
+
 /** A copy's confirmation: its rows, what it took, and how far the list runs right of the screen. */
 type Flash = Span & { label: string; right: number; key: number };
 
@@ -43,8 +51,9 @@ type Flash = Span & { label: string; right: number; key: number };
  * the button comes up. What a click would copy lights up under the pointer, and once copied
  * flashes and says what it was at its top right.
  *
- * It opens on hunk `openOn` (the first if null), `linesAbove` lines above it; `currentHunk` tells
- * which hunk is being read meanwhile, as many lines below the top, for the other view to open on.
+ * It opens on hunk `openOn` (the first if null, counted from the end if negative), `linesAbove`
+ * lines above it; `reader` tells which hunk is being read meanwhile, as many lines below the top,
+ * for the other view to open on, and steps to the next or previous one (`n`/`p`).
  * `found` marks the text looked for, and brings the match being read on screen. `topSpace` leaves
  * room above the first row, under the find bar floating over the list, as VS Code does.
  */
@@ -56,7 +65,7 @@ export function DiffList({
     scrollElement,
     openOn,
     linesAbove,
-    currentHunk,
+    reader,
     found,
     topSpace,
 }: {
@@ -68,7 +77,7 @@ export function DiffList({
     scrollElement: HTMLDivElement;
     openOn: number | null;
     linesAbove: number;
-    currentHunk: RefObject<(() => number) | null>;
+    reader: RefObject<HunkReader | null>;
     found: { matches: readonly FindMatch[]; current: number } | null;
     /** Room above the first row, in pixels: none without the find bar. */
     topSpace: number;
@@ -87,18 +96,52 @@ export function DiffList({
         initialOffset: () => openingOffset(layout, openOn, linesAbove),
     });
 
+    // the hunk gone to (`n`/`p`, the one opened on): marked, and where the next step starts from,
+    // even when the list cannot scroll to it (a short diff)
+    const [current, setCurrent] = useState<number | null>(() =>
+        openOn === null || layout.hunks.length === 0
+            ? null
+            : openOn < 0
+              ? layout.hunks.length + openOn
+              : Math.min(openOn, layout.hunks.length - 1),
+    );
     useEffect(() => {
-        currentHunk.current = () => {
-            const top = Math.max(
-                0,
-                (virtualizer.scrollOffset ?? 0) - topSpace + linesAbove * LINE_ROW_HEIGHT,
-            );
-            return hunkFrom(layout, rows, rowAt(layout, top));
+        // the line being read: `linesAbove` lines below the top, as a hunk opens
+        const reading = () =>
+            Math.max(0, scrollElement.scrollTop - topSpace + linesAbove * LINE_ROW_HEIGHT);
+        const goTo = (hunk: number) => {
+            setCurrent(hunk);
+            scrollElement.scrollTop = openingOffset(layout, hunk, linesAbove) + topSpace;
+        };
+        // the hunk gone to, while on screen: scrolled away from it, the line read counts
+        const shown = () => {
+            const span = current === null ? undefined : layout.hunks[current];
+            if (!span) return null;
+            const { top, height } = spanBox(layout, rows, span);
+            const screen = scrollElement.scrollTop - topSpace;
+            return top < screen + scrollElement.clientHeight && top + height > screen
+                ? current
+                : null;
+        };
+        reader.current = {
+            current: () => shown() ?? hunkFrom(layout, rows, rowAt(layout, reading())),
+            step: (step) => {
+                const from = shown();
+                const hunk =
+                    from === null
+                        ? hunkStepped(layout, reading(), step)
+                        : layout.hunks[from + step]
+                          ? from + step
+                          : null;
+                if (hunk === null) return false;
+                goTo(hunk);
+                return true;
+            },
         };
         return () => {
-            currentHunk.current = null;
+            reader.current = null;
         };
-    }, [currentHunk, virtualizer, layout, rows, linesAbove, topSpace]);
+    }, [reader, scrollElement, layout, rows, linesAbove, topSpace, current]);
 
     // the room above comes and goes without moving the rows on screen, but at the top, where it
     // shows
@@ -231,6 +274,14 @@ export function DiffList({
                         ) : null}
                     </div>
                 ))}
+                {current !== null && layout.hunks[current] ? (
+                    // the hunk gone to: a bar along its left edge
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute left-0 w-[3px] bg-ui-accent"
+                        style={spanBox(layout, rows, layout.hunks[current])}
+                    />
+                ) : null}
                 {hoveredSpan ? (
                     // as a button would: what a click copies, lightly
                     <div
