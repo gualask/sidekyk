@@ -25,8 +25,8 @@ export interface Settings {
     diffView: DiffView;
     /** What a copy from a diff puts on the clipboard (`shared/copy/copy-template.ts`). */
     copyTemplate: string;
-    /** The Files panel's tree, in pixels, as last dragged; null for its default. */
-    filesTreeWidth: number | null;
+    /** The sidebars' widths in pixels, as last dragged, by sidebar; one missing takes its default. */
+    sidebarWidths: Record<string, number>;
 }
 
 /** Where the global shortcut stands, as the backend registered it. */

@@ -35,6 +35,10 @@ Workspace:
       (selected tile takes `j`/`k`), `⌘`+scroll and pinch (macOS) zoom; `?` (and the top bar's
       `?`) shows the shortcuts in a card, bottom right, as the mock
 - [x] Tiles show the panel's icon, title and key in its tooltip (2026-10-17)
+- [x] Splitter between the Changes and Files tiles (2026-10-17): drags the tree's width (one
+      setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
+- [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
+      double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
 
 See what the agent is doing:
 
@@ -58,7 +62,7 @@ Explore and copy:
       order and change colors; collapse-all; read again only when a path is added/removed or the
       git dir changes (48 ms on Zed's clone, a folder 3 µs). In a tile the tree alone, Changes
       being the viewer; full screen tree + viewer. One shared selection (VS Code-style
-      auto-reveal). Tree width dragged and stored (`filesTreeWidth`)
+      auto-reveal). Tree width dragged and stored (`sidebarWidths.files`)
 - [x] File view (`get_file_content`): files of the tree only, first 2 MiB, binary/link/submodule
       notices, links never followed; same rows and copy as diffs
 - [x] Search by name in `⌘K` (2026-10-17): every file of the project on screen (the tree kept in
@@ -78,7 +82,8 @@ Explore and copy:
 
 ## Next
 
-- [ ] Rest of semantic zoom: splitters, panels minimized to the top bar (with Notes)
+- [ ] Rest of semantic zoom, with Notes: splitter Files/Notes, panels minimized to the top bar,
+      tiles per project
 - [ ] Remaining mock icons from Tabler as features land (minimize, open in editor, …)
 
 ## Notes
@@ -144,6 +149,8 @@ Measure first; the first three give the numbers the rest are judged on.
 - [ ] Prefetch neighbouring diffs, if switching shows a wait; highlighting and fuzzy search off
       the main thread, if timings say so
 - [ ] Bundle and binary size budgets in CI
+- [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
+      written, shortcut status read again): a lighter path for layout-only settings?
 
 ## Out of scope
 

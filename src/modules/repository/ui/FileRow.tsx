@@ -6,7 +6,10 @@ import { LineCounts } from './LineCounts';
 /** A file row's height, which the virtualized lists lay their rows out with. */
 export const FILE_ROW_HEIGHT = 32;
 
-/** One file in a list: its change, its name and folder, its line counts. */
+/**
+ * One file in a list: its change, its name and folder, its line counts. Its parts are marked for
+ * `fittingRowsWidth`, which reads their room and fonts.
+ */
 export function FileRow({
     file,
     selected,
@@ -28,11 +31,16 @@ export function FileRow({
             }`}
         >
             <KindBadge kind={file.kind} />
-            <span className="min-w-0 flex-1 truncate">
-                <span className="font-medium">{name}</span>
-                {dir ? <span className="ml-1.5 text-xs text-ui-text-muted">{dir}</span> : null}
+            <span data-file-text className="min-w-0 flex-1 truncate">
+                <span data-file-name className="font-medium">
+                    {name}
+                </span>
+                {/* there with no folder too, for its font to be read */}
+                <span data-file-dir className="ml-1.5 text-xs text-ui-text-muted empty:hidden">
+                    {dir}
+                </span>
             </span>
-            <span className="shrink-0 text-[11px]">
+            <span data-file-counts className="shrink-0 text-[11px]">
                 <LineCounts
                     additions={file.additions}
                     deletions={file.deletions}

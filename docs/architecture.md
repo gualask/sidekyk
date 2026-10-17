@@ -71,9 +71,11 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 
 - `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, optional level 0
   `summary`. `app/panels.ts` lists them in shortcut order and the level 1 tiles (`TILES`: Changes
-  grows, Files is as wide as its tree), preloading the tiles' chunks.
+  fills and keeps 560 px, Files is as wide as its tree and gives way first down to 160 px;
+  `tileWidth`, `TILE_GAP`), preloading the tiles' chunks.
 - `PanelProps`: `project`; `header` (element filled through a portal; in a tile after the panel's
-  icon, full screen shown only when filled); `target` (a request in the panel's terms, a new object
+  icon, full screen shown only when filled); `edge` (in a tile as wide as what it shows, the gap
+  before it, a box the app sizes: where Files portals the splitter that drags its tree); `target` (a request in the panel's terms, a new object
   each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
@@ -114,8 +116,10 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 - No client store: projects, snapshots, summaries, diffs, tree folders and settings are TanStack
   Query caches, repository keys starting with the root. A snapshot writes its summary's cache.
 - UI state: zoom level and selected tile (`AppShell`); the shared selection, the tree's open
-  folders and row (session, per project); the viewed commit (Changes). The tree width is a
-  setting.
+  folders and row (session, per project); the viewed commit (Changes). Sidebar widths are one
+  setting (`sidebarWidths`, by sidebar: `changes`, `files`), the same in a tile and full screen,
+  served to every module by `shared/ui/sidebar-width.ts` (`useSidebarWidth`, `SidebarSplitter`);
+  a drag stores the width the layout allowed.
 - Project list changes run in one mutation scope, in order; the last switch wins.
 - Theme: the backend sets the window theme, the page follows `prefers-color-scheme`; no script.
 - The window is created hidden and shown once the project list is read (`show_window`, first

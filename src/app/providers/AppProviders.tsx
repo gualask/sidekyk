@@ -7,6 +7,7 @@ import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/reposi
 import { SearchProvider } from '@/modules/search';
 import { SettingsProvider, useSettingsWhenRead, useUpdateSettings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
 import { ShowWindowProvider } from './show-window';
@@ -31,9 +32,11 @@ export function AppProviders({
                         <ProjectsProvider value={runtime.projects}>
                             <RepositoryProvider value={runtime.repository}>
                                 <RepositorySettingsBridge>
-                                    <SearchProvider value={runtime.search}>
-                                        <ToastsHost>{children}</ToastsHost>
-                                    </SearchProvider>
+                                    <SidebarWidthsBridge>
+                                        <SearchProvider value={runtime.search}>
+                                            <ToastsHost>{children}</ToastsHost>
+                                        </SearchProvider>
+                                    </SidebarWidthsBridge>
                                 </RepositorySettingsBridge>
                             </RepositoryProvider>
                         </ProjectsProvider>
@@ -46,25 +49,42 @@ export function AppProviders({
 
 /**
  * What the Changes and Files panels take from the settings, which they cannot import: the view a
- * diff opens in, the copy template and the tree's width, the defaults until the settings are
- * read. Read at startup alongside the projects, from the backend's memory, so the first diff asks
- * for the right view.
+ * diff opens in and the copy template, the defaults until the settings are read. Read at startup
+ * alongside the projects, from the backend's memory, so the first diff asks for the right view.
  */
 function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
-    const { mutate } = useUpdateSettings();
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
             copyTemplate: settings?.copyTemplate ?? DEFAULT_COPY_TEMPLATE,
-            filesTreeWidth: settings?.filesTreeWidth ?? null,
-            setFilesTreeWidth: (width: number | null) => {
-                if (settings && settings.filesTreeWidth !== width) {
-                    mutate({ ...settings, filesTreeWidth: width });
-                }
+        }),
+        [settings],
+    );
+    return <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>;
+}
+
+const NO_WIDTHS: Readonly<Record<string, number>> = {};
+
+/**
+ * Every panel's sidebar widths, from the settings: the defaults until they are read; a width
+ * stored before then is dropped, as the settings it would go into are not known yet.
+ */
+function SidebarWidthsBridge({ children }: { children: ReactNode }) {
+    const settings = useSettingsWhenRead();
+    const { mutate } = useUpdateSettings();
+    const value = useMemo(
+        () => ({
+            widths: settings?.sidebarWidths ?? NO_WIDTHS,
+            store: (sidebar: string, width: number | null) => {
+                if (!settings) return;
+                const sidebarWidths = { ...settings.sidebarWidths };
+                if (width === null) delete sidebarWidths[sidebar];
+                else sidebarWidths[sidebar] = width;
+                mutate({ ...settings, sidebarWidths });
             },
         }),
         [settings, mutate],
     );
-    return <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>;
+    return <SidebarWidthsProvider value={value}>{children}</SidebarWidthsProvider>;
 }

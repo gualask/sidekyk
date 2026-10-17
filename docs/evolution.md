@@ -31,8 +31,14 @@ Workspace:
   project (repository untouched). Once notes exist, removing must not lose them silently (undo,
   or keep until re-added).
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes left; Files (and Notes)
-  right. *(to build)* Splitters drag, double click resets; Files and Notes minimize to a chip in
-  the top bar; each project keeps its tiles.
+  right. Splitter between Changes and Files (2026-10-17): it drags the tree's width, the same
+  setting as full screen (one value, as VS Code's sidebar), double click fits as the tree's own
+  splitter; Changes keeps 560 px, Files gives way first down to 160 px. *(to build, with Notes)*
+  splitter between Files and Notes; Files and Notes minimize to a chip in the top bar; each
+  project keeps its tiles.
+- Every sidebar resizes the same way (2026-10-17): Changes' list, Files' tree, Notes' lists. Drag;
+  double click fits what it shows, again goes back; the content beside keeps 240 px; one width per
+  sidebar, the same in a tile and full screen, stored in the settings (`sidebarWidths`).
 - Panel headers: icon in a tile (title and key in the tooltip; 2026-10-17, the title repeated
   what the panel shows), what is open, icon actions. No header full screen when empty.
 - Copy is one icon everywhere, its tooltip says what it copies, a check once done.
@@ -64,7 +70,7 @@ Files (built 2026-10-17):
   screen, tree + viewer.
 - One selection for both panels, as VS Code's explorer follows the editor (revised 2026-10-17; the
   mock kept them apart). A commit's file leaves the tree alone.
-- Tree width dragged and kept; double click fits open rows, again goes back; viewer keeps 240 px.
+- Tree width as every sidebar's (Workspace); the fit takes the open rows.
 
 Notes *(to build)*:
 

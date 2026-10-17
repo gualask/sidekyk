@@ -7,10 +7,6 @@ export interface RepositorySettings {
     diffView: DiffView | null;
     /** What a copy from a diff puts on the clipboard. */
     copyTemplate: string;
-    /** The Files panel's tree, in pixels, as last dragged; null for its default. */
-    filesTreeWidth: number | null;
-    /** Stores the tree's width; null goes back to the default. */
-    setFilesTreeWidth: (width: number | null) => void;
 }
 
 const RepositorySettingsContext = createContext<RepositorySettings | null>(null);

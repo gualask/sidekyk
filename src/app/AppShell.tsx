@@ -26,7 +26,15 @@ import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
 import { PanelTile } from './PanelTile';
-import { INITIAL_PANEL, PALETTE_PANELS, panelById, SUMMARIES, TILES, tileBeside } from './panels';
+import {
+    INITIAL_PANEL,
+    PALETTE_PANELS,
+    panelById,
+    SUMMARIES,
+    TILE_GAP,
+    TILES,
+    tileBeside,
+} from './panels';
 import { useProblems } from './problems';
 import { useShowWindowWhen } from './providers';
 import { TopBar } from './TopBar';
@@ -351,19 +359,19 @@ function Workspace({
                     ) : null;
                 }}
             />
-            <div className="flex min-w-0 flex-1 gap-2 p-2">
-                {TILES.map(({ panel: tile, grow }) => (
+            <div className="flex min-w-0 flex-1 p-2" style={{ gap: TILE_GAP }}>
+                {TILES.map((tile) => (
                     <PanelTile
-                        key={tile.id}
-                        panel={tile}
+                        key={tile.panel.id}
+                        panel={tile.panel}
                         project={project}
-                        target={targetOf(tile.id)}
-                        selected={tile === panel}
+                        target={targetOf(tile.panel.id)}
+                        selected={tile.panel === panel}
                         show={show}
                         findInFiles={findInFiles}
-                        grow={grow}
-                        onZoomIn={() => zoom(2, tile)}
-                        onSelect={() => select(tile)}
+                        tile={tile}
+                        onZoomIn={() => zoom(2, tile.panel)}
+                        onSelect={() => select(tile.panel)}
                     />
                 ))}
             </div>

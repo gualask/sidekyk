@@ -1,10 +1,12 @@
 import { IconCircleCheck } from '@tabler/icons-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
+import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
+import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useCommitView } from '../application/commit-view';
 import { useCommitFileFind, useFileFind } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
@@ -17,6 +19,7 @@ import { CommitFileList } from './CommitFileList';
 import { ChangeDiffView, CommitDiffView } from './DiffView';
 import { FileHeader } from './FileHeader';
 import { FileList } from './FileList';
+import { fittingRowsWidth } from './list-layout';
 import { RecentCommits } from './RecentCommits';
 import { TextFileView } from './TextFileView';
 
@@ -24,6 +27,8 @@ const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
 /** In a tile the arrows move among tiles: the list takes `j`/`k` only. */
 const ARROWS = new Set(['ArrowDown', 'ArrowUp']);
+/** The list's width by default, the same in a tile and full screen, and the least it takes. */
+const LIST_WIDTH = { initial: 288, min: 200 };
 
 /**
  * The Changes panel, the viewer of the project's files: what changed in its working tree, file by
@@ -124,6 +129,9 @@ export function ChangesWorkspace({
               }
             : null;
 
+    const listWidth = useSidebarWidth('changes', LIST_WIDTH);
+    const listBox = useRef<HTMLElement>(null);
+
     return (
         <div className="flex h-full flex-col">
             {snapshot.isError ? (
@@ -139,7 +147,11 @@ export function ChangesWorkspace({
                 </div>
             ) : null}
             <div className="flex min-h-0 flex-1">
-                <aside className="flex w-72 shrink-0 flex-col border-r border-ui-border bg-ui-surface">
+                <aside
+                    ref={listBox}
+                    className="flex shrink-0 flex-col border-r border-ui-border bg-ui-surface"
+                    style={listWidth.style}
+                >
                     <div className="min-h-0 flex-1">
                         {viewed ? (
                             <CommitFileList
@@ -171,6 +183,20 @@ export function ChangesWorkspace({
                         }}
                     />
                 </aside>
+                <SidebarSplitter
+                    width={listWidth}
+                    box={listBox}
+                    place="edge"
+                    fitting={(box) =>
+                        fittingRowsWidth(
+                            viewed
+                                ? (commitView.files.data?.files ?? [])
+                                : (snapshot.data?.files ?? []),
+                            box,
+                        )
+                    }
+                    what="list"
+                />
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {/* until the settings say which view a diff opens in, no diff is asked for */}
                     {!diffView ? null : viewed ? (

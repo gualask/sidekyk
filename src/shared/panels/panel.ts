@@ -22,6 +22,12 @@ export interface PanelProps {
      * in it. Laid out as a row; null until it is mounted.
      */
     header: HTMLElement | null;
+    /**
+     * In a tile as wide as what it shows, the gap before it, where the panel puts the splitter that
+     * drags its width, through a portal (`SidebarSplitter`, `place="gap"`); null in any other place
+     * and until it is mounted.
+     */
+    edge: HTMLElement | null;
     /** What to show, when the app asks for something; null leaves the panel as the user left it. */
     target: PanelTarget | null;
     place: PanelPlace;

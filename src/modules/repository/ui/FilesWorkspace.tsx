@@ -1,14 +1,15 @@
 import { IconCopyMinus, IconFileText } from '@tabler/icons-react';
-import { type PointerEvent, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
+import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
+import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useFileFind } from '../application/find';
 import { useTreeDirectories } from '../application/repository.queries';
-import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useSessionState } from '../application/session-state';
 import { useShownTarget } from '../application/shown-target';
@@ -32,10 +33,7 @@ interface TreeState {
 const CLOSED: TreeState = { open: new Set(), selected: null };
 
 /** The tree's width by default, the same in a tile and full screen, and the least it takes. */
-const TREE_WIDTH = 280;
-const TREE_MIN_WIDTH = 160;
-/** The file view keeps at least this much: the tree never takes it. */
-const VIEWER_MIN_WIDTH = 240;
+const TREE_WIDTH = { initial: 280, min: 160 };
 
 /**
  * The keys the tree takes: in a tile `j`/`k` and `Space`, the arrows moving among tiles and `↵`
@@ -61,6 +59,7 @@ const FULL_KEYS = new Set([
 export function FilesWorkspace({
     project,
     header,
+    edge,
     target,
     place,
     selected: hasKeys,
@@ -129,7 +128,7 @@ export function FilesWorkspace({
         { capture: true },
     );
 
-    const width = useTreeWidth();
+    const treeWidth = useSidebarWidth('files', TREE_WIDTH);
     const treeBox = useRef<HTMLDivElement>(null);
     // as VS Code's "Collapse Folders in Explorer"; the file shown is revealed again once another
     // is picked
@@ -180,12 +179,26 @@ export function FilesWorkspace({
         </div>
     ) : null;
 
+    // the tree's edge, by the file viewer full screen; in a tile, the gap before it, by Changes
+    const splitter = (place: 'edge' | 'gap') => (
+        <SidebarSplitter
+            width={treeWidth}
+            box={treeBox}
+            place={place}
+            fitting={(box) => fittingWidth(rows, box)}
+            what="tree"
+        />
+    );
+
     if (place === 'tile') {
         return (
             <div
+                ref={treeBox}
                 className="flex h-full flex-col bg-ui-surface font-mono text-[12.5px]"
-                style={{ width: width.value }}
+                // the tile is the tree's box: the app bounds it, the tree fills it
+                style={{ ...treeWidth.style, maxWidth: '100%' }}
             >
+                {edge ? createPortal(splitter('gap'), edge) : null}
                 {collapse}
                 {tooMany}
                 <div className="min-h-0 flex-1">{tree}</div>
@@ -240,87 +253,13 @@ export function FilesWorkspace({
                 <div
                     ref={treeBox}
                     className="shrink-0 border-r border-ui-border bg-ui-surface font-mono text-[12.5px]"
-                    style={{
-                        width: width.value,
-                        maxWidth: `calc(100% - ${VIEWER_MIN_WIDTH}px)`,
-                    }}
+                    style={treeWidth.style}
                 >
                     {tree}
                 </div>
-                <div
-                    aria-hidden
-                    title="Drag to resize; double click to fit the whole tree, again to go back"
-                    className="group relative z-[2] -ml-1 w-2 shrink-0 cursor-col-resize"
-                    onPointerDown={(event) => {
-                        if (treeBox.current) width.drag(event, treeBox.current);
-                    }}
-                    onDoubleClick={() => {
-                        if (treeBox.current) {
-                            width.fit(fittingWidth(rows, treeBox.current), treeBox.current);
-                        }
-                    }}
-                >
-                    <span className="absolute inset-y-1/4 left-[3px] w-0.5 rounded-sm group-hover:bg-ui-accent" />
-                </div>
+                {splitter('edge')}
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">{viewer}</main>
             </div>
         </div>
     );
-}
-
-/**
- * The tree's width, in a tile and full screen: the settings' once dragged, else the default. A drag moves the tree's edge
- * itself, with no render, and is stored when the button comes up; a double click fits every open
- * row, a second one goes back.
- */
-function useTreeWidth() {
-    const { filesTreeWidth, setFilesTreeWidth } = useRepositorySettings();
-    // the width a drag ended on, shown until the settings change from the one it was dragged over
-    const [dragged, setDragged] = useState<{ width: number; over: number | null } | null>(null);
-    // the width before a fit, for the next double click to go back to
-    const beforeFit = useRef<number | null | undefined>(undefined);
-    const value = dragged?.over === filesTreeWidth ? dragged.width : (filesTreeWidth ?? TREE_WIDTH);
-
-    const bounded = (width: number, box: HTMLElement) => {
-        const room = (box.parentElement?.clientWidth ?? width) - VIEWER_MIN_WIDTH;
-        return Math.round(Math.max(TREE_MIN_WIDTH, Math.min(room, width)));
-    };
-
-    return {
-        value,
-        drag: (event: PointerEvent<HTMLElement>, box: HTMLElement) => {
-            if (event.button !== 0) return;
-            event.preventDefault();
-            const bar = event.currentTarget;
-            const left = box.getBoundingClientRect().left;
-            let last = value;
-            bar.setPointerCapture(event.pointerId);
-            const move = (moved: globalThis.PointerEvent) => {
-                last = bounded(moved.clientX - left, box);
-                box.style.width = `${last}px`;
-            };
-            const end = () => {
-                bar.removeEventListener('pointermove', move);
-                bar.removeEventListener('pointerup', end);
-                bar.removeEventListener('pointercancel', end);
-                beforeFit.current = undefined;
-                setDragged({ width: last, over: filesTreeWidth });
-                setFilesTreeWidth(last);
-            };
-            bar.addEventListener('pointermove', move);
-            bar.addEventListener('pointerup', end);
-            bar.addEventListener('pointercancel', end);
-        },
-        fit: (fitting: number, box: HTMLElement) => {
-            if (beforeFit.current !== undefined) {
-                setFilesTreeWidth(beforeFit.current);
-                beforeFit.current = undefined;
-                return;
-            }
-            const target = bounded(fitting, box);
-            if (target <= box.clientWidth + 1) return;
-            beforeFit.current = filesTreeWidth;
-            setFilesTreeWidth(target);
-        },
-    };
 }

@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { changesPanel, filesPanel } from '@/modules/repository';
 import type { PanelDefinition } from '@/shared/panels/panel';
 
@@ -7,14 +8,40 @@ import type { PanelDefinition } from '@/shared/panels/panel';
  */
 const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel];
 
+/** The room between tiles, in pixels, where the splitter of a tile as wide as what it shows sits. */
+export const TILE_GAP = 8;
+
+/** A tile at a project's panels. */
+export interface Tile {
+    panel: PanelDefinition;
+    /** Takes the width the other tiles leave; else as wide as what it shows. */
+    fills: boolean;
+    /** The least width it keeps, while the window has room for it. */
+    minWidth: number;
+}
+
 /**
- * The tiles of a project's panels, each with its share of the width: Changes, which shows files,
- * takes what the tree of Files leaves.
+ * The tiles of a project's panels: Changes, which shows files, takes what the tree of Files
+ * leaves; Files drags its width on the splitter before it, and gives way first when the window is
+ * narrow.
  */
-export const TILES: readonly { panel: PanelDefinition; grow: number }[] = [
-    { panel: changesPanel, grow: 1 },
-    { panel: filesPanel, grow: 0 },
+export const TILES: readonly Tile[] = [
+    { panel: changesPanel, fills: true, minWidth: 560 },
+    { panel: filesPanel, fills: false, minWidth: 160 },
 ];
+
+/**
+ * How wide a tile is: one that fills takes what the others leave; one as wide as what it shows
+ * leaves the others their least width, as long as the window has room for its own.
+ */
+export function tileWidth(tile: Tile): CSSProperties {
+    if (tile.fills) return { flexGrow: 1, flexBasis: 0 };
+    const others = TILES.reduce(
+        (room, other) => (other === tile ? room : room + other.minWidth + TILE_GAP),
+        0,
+    );
+    return { flexBasis: 'auto', maxWidth: `max(${tile.minWidth}px, 100% - ${others}px)` };
+}
 
 /**
  * The panel selected at startup, among the tiles the app opens on. Their chunks start loading
