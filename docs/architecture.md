@@ -99,12 +99,14 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
   tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
 - The viewer's scrollbars are ours (`ScrollMap.tsx`): `ChangeMap` beside the rows (`changeMarks`
-  per hunk, `trackMarks` merges those within 2 px of track; thumb and marks follow scrolls and
+  per hunk; `trackMarks` gives each a click room of 12 px at least and joins those whose rooms
+  overlap; a click on the thumb that does not drag goes to the mark under it; widens under the
+  pointer, over the rows; thumb and marks follow scrolls and
   content resizes with no render, `observeContent`) and `SideScrollbar` below them while lines
   run past the edge. `Pane` owns the layout and the hunk gone to (`stepped`, else the one opened
   on), shared by the list and the map.
 - `n`/`p` (`Pane` with `onPastEnd`, Changes only): `DiffList`'s `HunkReader` steps from the hunk
-  gone to while on screen, else from the line read (`hunkStepped`); past either end Changes
+  gone to (not marked: 2026-10-17, too much) while on screen, else from the line read (`hunkStepped`); past either end Changes
   opens the next or previous file (`openAt`, `-1` the last hunk), or says it is the last.
 - A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
 - Changes and Files share one selection per project (`model/selection.ts`): a changed file by key,

@@ -96,17 +96,23 @@ describe('diff layout', () => {
         ]);
     });
 
-    it('shows marks too close on the track as one, going to its first change', () => {
+    it('gives thin marks room to be clicked, and joins those whose rooms overlap', () => {
         const marks = [
             { hunk: 0, top: 0, height: 20, kind: 'add' as const },
-            { hunk: 1, top: 100, height: 20, kind: 'del' as const },
+            { hunk: 1, top: 500, height: 20, kind: 'del' as const },
             { hunk: 2, top: 5000, height: 20, kind: 'add' as const },
         ];
-        // 10,000 pixels on a 100-pixel track: the first two are a pixel apart
-        expect(trackMarks(marks, 10_000, 100)).toEqual([
-            { hunk: 0, count: 2, top: 0, height: 1.2, kind: 'mixed' },
-            { hunk: 2, count: 1, top: 50, height: expect.closeTo(0.2), kind: 'add' },
+        // 10,000 pixels on a 100-pixel track: the first two are 5 pixels apart, closer than a
+        // click's room
+        const shown = trackMarks(marks, 10_000, 100);
+        expect(shown.map(({ hunk, kind }) => [hunk, kind])).toEqual([
+            [0, 'mixed'],
+            [2, 'add'],
         ]);
+        // a fifth of a pixel shows, twelve take the click, around it
+        expect(shown[1].height).toBeCloseTo(0.2);
+        expect(shown[1].hitTop).toBeCloseTo(50.1 - 6);
+        expect(shown[1].hitHeight).toBe(12);
         expect(trackMarks(marks, 0, 100)).toEqual([]);
     });
 

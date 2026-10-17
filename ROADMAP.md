@@ -40,13 +40,13 @@ Workspace:
 - [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
       double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
 - [x] Scrollbar as a map of the changes (2026-10-17): a mark per hunk where its changed lines are
-      (added, deleted, both; the one gone to ringed), marks closer than 2 px of track are one, a
-      translucent thumb that drags, a click on the track centers there; `diffScrollbar` narrow
+      (added, deleted, both; the diff's gutter colors), 12 px of click room each (overlapping
+      ones join), under a translucent thumb that drags (a click on it goes to the mark below), a
+      click on the track centers there, wider under the pointer; `diffScrollbar` narrow
       (12 px) or wide (20 px). The viewer's native scrollbars are hidden, a thin horizontal bar
       shows while lines run past the edge
-- [x] `n`/`p`: next/previous change across the files of the list (or of the commit viewed); the
-      change gone to is marked (accent bar) and steps go on from it while on screen; a word at
-      either end
+- [x] `n`/`p`: next/previous change across the files of the list (or of the commit viewed);
+      steps go on from the change gone to while on screen; a word at either end
 - [x] Mock icons from Tabler: all in; open in editor's comes with that feature
 - [x] Level 0 cards tell the notes waiting and the newest (`notes_summary`, kept in memory once
       read, until they change)

@@ -61,7 +61,9 @@ Changes:
 - Diff in either view, copy with a click through the user's template (built).
 - Scrollbar as a map (built 2026-10-17): one mark per hunk (added/removed/both) in the diff's
   gutter colors, full width, under a translucent thumb as VS Code's (2026-10-17: the marks'
-  strong colors were too loud); click a mark to go there. Narrow or wide in settings.
+  strong colors were too loud); click a mark to go there: 12 px of click room at least, also under
+  the thumb; the map widens under the pointer (12→36 px, wide 20→48) over the rows. Nothing marks
+  the change gone to, on the map or by the rows (2026-10-17: too much); no tooltip. Narrow or wide in settings.
   Native scrollbars hidden in the viewer on every engine (`scrollbar-width` cannot hide one axis
   only), so a thin horizontal bar of our own shows while lines run past the edge.
 - `n`/`p` next/previous change, across files (built 2026-10-17): the first `n` on a file marks

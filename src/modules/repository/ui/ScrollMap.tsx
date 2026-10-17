@@ -1,11 +1,20 @@
-import { type PointerEvent, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    type CSSProperties,
+    type PointerEvent,
+    type RefObject,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import { trackDrag } from '@/shared/ui/pointer-drag';
 import type { DiffRow } from '../model/diff-rows';
 import { changeMarks, type DiffLayout, trackMarks } from './diff-layout';
 
-/** The map's width, narrow or wide (a setting), in pixels. */
+/** The map's width, narrow or wide (a setting), in pixels; and under the pointer, over the rows. */
 const MAP_WIDTH: Record<DiffScrollbar, number> = { narrow: 12, wide: 20 };
+const MAP_OPEN_WIDTH: Record<DiffScrollbar, number> = { narrow: 36, wide: 48 };
 /** The least a thumb shows of its track, so it can always be grabbed. */
 const MIN_THUMB = 0.04;
 
@@ -78,12 +87,16 @@ function useThumb(scrollElement: HTMLElement, thumb: RefObject<HTMLDivElement | 
     }, [scrollElement, thumb, axis]);
 }
 
-/** Scrolls the element by a thumb's drag along `axis`: the whole track is the whole content. */
+/**
+ * Scrolls the element by a thumb's drag along `axis`: the whole track is the whole content.
+ * `onClick` follows a press that did not move.
+ */
 function dragThumb(
     event: PointerEvent<HTMLElement>,
     scrollElement: HTMLElement,
     track: HTMLElement,
     axis: Axis,
+    onClick: () => void = () => undefined,
 ) {
     const vertical = axis === 'vertical';
     const from = vertical ? event.clientY : event.clientX;
@@ -98,15 +111,18 @@ function dragThumb(
             if (vertical) scrollElement.scrollTop = start + moved;
             else scrollElement.scrollLeft = start + moved;
         },
-        () => undefined,
+        (moved) => {
+            if (!moved) onClick();
+        },
     );
 }
 
 /**
  * The viewer's vertical scrollbar, as a map of the changes, as VS Code's: one mark per hunk where
- * its changed lines are (added, deleted, both), in the diff's own soft colors, the hunk gone to
- * outlined, under a translucent thumb. A click on a mark goes to that change, a click elsewhere
- * on the track centers that point, the thumb drags. A click on
+ * its changed lines are (added, deleted, both), in the diff's own soft colors, under a translucent
+ * thumb. A click on a mark (on at least 12 pixels around it, under the thumb too) goes to that
+ * change, a click elsewhere on the track centers that point, the thumb drags. Under the pointer it
+ * widens. A click on
  * a mark goes to that change, a click elsewhere on the track centers that point, the thumb drags.
  * Without changes (a file's text) it is the thumb alone.
  */
@@ -115,7 +131,6 @@ export function ChangeMap({
     layout,
     rows,
     topSpace,
-    current,
     width,
     onGoTo,
 }: {
@@ -124,8 +139,6 @@ export function ChangeMap({
     rows: readonly DiffRow[];
     /** Room above the rows (the find bar's), part of what scrolls. */
     topSpace: number;
-    /** The hunk gone to, ringed. */
-    current: number | null;
     width: DiffScrollbar;
     onGoTo: (hunk: number) => void;
 }) {
@@ -153,49 +166,59 @@ export function ChangeMap({
     );
 
     return (
-        <div
-            ref={track}
-            className="relative shrink-0 cursor-pointer border-l border-ui-border bg-ui-surface"
-            style={{ width: MAP_WIDTH[width] }}
-            onPointerDown={(event) => {
-                if (event.target !== event.currentTarget || event.button !== 0) return;
-                const box = event.currentTarget.getBoundingClientRect();
-                const at = (event.clientY - box.top) / box.height;
-                scrollElement.scrollTop =
-                    at * scrollElement.scrollHeight - scrollElement.clientHeight / 2;
-            }}
-        >
-            {marks.map((mark) => (
-                <button
-                    key={mark.hunk}
-                    type="button"
-                    title={
-                        mark.count > 1
-                            ? `Changes ${mark.hunk + 1}–${mark.hunk + mark.count} of ${layout.hunks.length}`
-                            : `Change ${mark.hunk + 1} of ${layout.hunks.length}`
-                    }
-                    aria-label={`Go to change ${mark.hunk + 1}`}
-                    className={`absolute inset-x-0 min-h-[3px] ${
-                        current !== null && current >= mark.hunk && current < mark.hunk + mark.count
-                            ? 'shadow-[inset_0_0_0_1px_var(--ui-accent)]'
-                            : 'hover:shadow-[inset_0_0_0_1px_var(--ui-accent-muted)]'
-                    }`}
-                    style={{
-                        top: mark.top,
-                        height: mark.height,
-                        background: MARK_COLOR[mark.kind],
-                    }}
-                    onClick={() => onGoTo(mark.hunk)}
-                />
-            ))}
+        // keeps its place in the layout; what shows widens over the rows after a moment under the
+        // pointer, to aim more easily, and narrows at once when the pointer leaves
+        <div className="group/map relative shrink-0" style={{ width: MAP_WIDTH[width] }}>
             <div
-                ref={thumb}
-                aria-hidden
-                className="absolute inset-x-0 z-[1] cursor-grab bg-ui-text/14 hover:bg-ui-text/26 active:cursor-grabbing active:bg-ui-text/26"
+                ref={track}
+                className="absolute inset-y-0 right-0 z-10 w-full cursor-pointer border-l border-ui-border bg-ui-surface transition-[width] duration-150 group-hover/map:w-(--map-open) group-hover/map:delay-200 motion-reduce:transition-none"
+                style={{ '--map-open': `${MAP_OPEN_WIDTH[width]}px` } as CSSProperties}
                 onPointerDown={(event) => {
-                    if (track.current) dragThumb(event, scrollElement, track.current, 'vertical');
+                    if (event.target !== event.currentTarget || event.button !== 0) return;
+                    const box = event.currentTarget.getBoundingClientRect();
+                    const at = (event.clientY - box.top) / box.height;
+                    scrollElement.scrollTop =
+                        at * scrollElement.scrollHeight - scrollElement.clientHeight / 2;
                 }}
-            />
+            >
+                {marks.map((mark) => (
+                    // the click's room, around what shows
+                    <button
+                        key={mark.hunk}
+                        type="button"
+                        aria-label={`Go to change ${mark.hunk + 1}`}
+                        className="absolute inset-x-0"
+                        style={{ top: mark.hitTop, height: mark.hitHeight }}
+                        onClick={() => onGoTo(mark.hunk)}
+                    >
+                        <span
+                            className="absolute inset-x-0 min-h-[3px]"
+                            style={{
+                                top: mark.top - mark.hitTop,
+                                height: mark.height,
+                                background: MARK_COLOR[mark.kind],
+                            }}
+                        />
+                    </button>
+                ))}
+                <div
+                    ref={thumb}
+                    aria-hidden
+                    className="absolute inset-x-0 z-[1] cursor-grab bg-ui-text/14 hover:bg-ui-text/22 active:cursor-grabbing active:bg-ui-text/22"
+                    onPointerDown={(event) => {
+                        const element = track.current;
+                        if (!element) return;
+                        // a click that does not drag goes to the change under it, as on the track
+                        const at = event.clientY - element.getBoundingClientRect().top;
+                        const under = marks.find(
+                            (mark) => at >= mark.hitTop && at < mark.hitTop + mark.hitHeight,
+                        );
+                        dragThumb(event, scrollElement, element, 'vertical', () => {
+                            if (under) onGoTo(under.hunk);
+                        });
+                    }}
+                />
+            </div>
         </div>
     );
 }

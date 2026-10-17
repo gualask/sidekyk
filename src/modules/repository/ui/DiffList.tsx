@@ -85,7 +85,7 @@ export function DiffList({
     openOn: number | null;
     linesAbove: number;
     reader: RefObject<HunkReader | null>;
-    /** The hunk gone to (`n`/`p`, the map, the one opened on): marked, and where steps start. */
+    /** The hunk gone to (`n`/`p`, the map, the one opened on): where the next step starts. */
     current: number | null;
     onCurrent: (hunk: number) => void;
     found: { matches: readonly FindMatch[]; current: number } | null;
@@ -277,14 +277,6 @@ export function DiffList({
                         ) : null}
                     </div>
                 ))}
-                {current !== null && layout.hunks[current] ? (
-                    // the hunk gone to: a bar along its left edge
-                    <div
-                        aria-hidden
-                        className="pointer-events-none absolute left-0 w-[3px] bg-ui-accent"
-                        style={spanBox(layout, rows, layout.hunks[current])}
-                    />
-                ) : null}
                 {hoveredSpan ? (
                     // as a button would: what a click copies, lightly
                     <div

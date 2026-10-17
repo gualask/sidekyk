@@ -219,7 +219,6 @@ export function Pane({
                     layout={layout}
                     rows={rows}
                     topSpace={topSpace}
-                    current={current}
                     width={scrollbar}
                     onGoTo={(hunk) => reader.current?.goTo(hunk)}
                 />

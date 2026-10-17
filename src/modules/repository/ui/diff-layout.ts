@@ -179,23 +179,32 @@ export function changeMarks(layout: DiffLayout, rows: readonly DiffRow[]): Chang
     return marks;
 }
 
-/** Marks closer than this on the track, in pixels, show as one: a track holds a mark per pixel. */
-const MARK_GAP = 2;
+/** The least height a mark can be clicked on, in pixels: small changes are thin on the track. */
+const MARK_HIT = 12;
 
-/** A mark on the track, in pixels: one change, or several too close to tell apart. */
+/** A mark on the track, in pixels: one change, or several too close to click apart. */
 export interface TrackMark {
     /** The first change it stands for, where a click goes. */
     hunk: number;
-    /** How many changes it stands for. */
-    count: number;
+    /** What shows. */
     top: number;
     height: number;
+    /** Where it takes a click: at least `MARK_HIT` tall, around what shows. */
+    hitTop: number;
+    hitHeight: number;
     kind: ChangeMark['kind'];
 }
 
+/** The part of the track a mark from `top` to `bottom` takes clicks on. */
+function hitOf(top: number, bottom: number): [number, number] {
+    const middle = (top + bottom) / 2;
+    return [Math.min(top, middle - MARK_HIT / 2), Math.max(bottom, middle + MARK_HIT / 2)];
+}
+
 /**
- * The marks as a track `height` pixels tall shows them, for `total` pixels of content: those
- * closer than a couple of pixels are one, so there are never more marks than pixels.
+ * The marks as a track `height` pixels tall shows them, for `total` pixels of content. Each takes
+ * clicks on at least `MARK_HIT` pixels; marks whose clicks would overlap are one, going to its
+ * first change.
  */
 export function trackMarks(
     marks: readonly ChangeMark[],
@@ -208,13 +217,21 @@ export function trackMarks(
     for (const mark of marks) {
         const top = mark.top * scale;
         const bottom = top + mark.height * scale;
+        const [hitTop, hitBottom] = hitOf(top, bottom);
         const last = shown.at(-1);
-        if (last && top <= last.top + last.height + MARK_GAP) {
+        if (last && hitTop < last.hitTop + last.hitHeight) {
             last.height = Math.max(last.height, bottom - last.top);
-            last.count += 1;
+            last.hitHeight = Math.max(last.hitTop + last.hitHeight, hitBottom) - last.hitTop;
             if (last.kind !== mark.kind) last.kind = 'mixed';
         } else {
-            shown.push({ hunk: mark.hunk, count: 1, top, height: bottom - top, kind: mark.kind });
+            shown.push({
+                hunk: mark.hunk,
+                top,
+                height: bottom - top,
+                hitTop,
+                hitHeight: hitBottom - hitTop,
+                kind: mark.kind,
+            });
         }
     }
     return shown;
