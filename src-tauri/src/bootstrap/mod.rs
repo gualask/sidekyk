@@ -8,9 +8,7 @@ use std::path::{Path, PathBuf};
 use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
-use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
-use crate::infrastructure::watcher::LocalRepositoryWatcher;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
@@ -20,10 +18,12 @@ use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
-use crate::modules::notes::NotesStore;
-use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
-use crate::modules::settings::Theme;
-use crate::modules::syntax::ColorCache;
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::modules::notes::NotesStore;
+use sidekyk_core::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
+use sidekyk_core::modules::settings::Theme;
+use sidekyk_core::modules::syntax::ColorCache;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -48,7 +48,7 @@ fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()>
 fn open_or_log(app: &::tauri::AppHandle, folder: &Path) {
     match open_folder(app, folder) {
         Ok(_) => {
-            let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::new());
+            let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
         }
         Err(error) => tracing::warn!(
             folder = %folder.display(),

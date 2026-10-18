@@ -1,11 +1,33 @@
-[package]
-name = "sidekyk"
+[workspace]
+members = ["crates/core"]
+# Every command run here (`cargo test`, `clippy`, `fmt`) covers the whole workspace.
+default-members = [".", "crates/core"]
+
+# The app and the crates it ships are versioned together: one commit, no compatibility matrix.
+[workspace.package]
 version = "0.1.0"
-description = "Lightweight desktop companion for reviewing what changed in a local git working tree."
 authors = ["gualask"]
 license = "MIT"
 repository = "https://github.com/gualask/sidekyk"
 edition = "2021"
+
+[workspace.dependencies]
+sidekyk-core = { path = "crates/core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+# Release builds compile every event below `info` out (see `infrastructure/logging.rs`).
+tracing = { version = "0.1", default-features = false, features = ["std", "release_max_level_info"] }
+tempfile = "3"
+
+[package]
+name = "sidekyk"
+description = "Lightweight desktop companion for reviewing what changed in a local git working tree."
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -20,36 +42,21 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+sidekyk-core.workspace = true
 # `tray-icon`: the change count in the tray (+235 KiB on the release binary with its menu). On
 # Linux it loads libayatana-appindicator3 at runtime; without it the app runs with no tray.
 tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-store = "2"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-anyhow = "1"
-thiserror = "2"
-notify-debouncer-mini = "0.7"
-# Release builds compile every event below `info` out (see `infrastructure/logging.rs`).
-tracing = { version = "0.1", default-features = false, features = ["std", "release_max_level_info"] }
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
 # Text output only: no ANSI colors, no `env-filter` (and its regex engine), no `log` bridge.
 tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt"] }
-# The palette's fuzzy matching (fzf's scoring). Without `unicode-segmentation`, a match's indices
-# count code points, which `modules/search` turns into the frontend's UTF-16 offsets.
-nucleo-matcher = { version = "0.3", default-features = false, features = ["unicode-normalization", "unicode-casefold"] }
-# Search in contents (ripgrep's libraries): files read through a fixed buffer, binaries skipped,
-# UTF-16 transcoded by BOM; same speed as our own `regex` loop, 4-5x less memory (2026-10-17).
-grep-searcher = "0.1.17"
-grep-regex = "0.1.14"
-grep-matcher = "0.1.9"
-# Syntax colors: TextMate-style grammars, the ~220 of `bat` (two-face), one engine for every
-# language. Chosen over tree-sitter for one stable engine and steady memory (7-16 MB); 4-10x
-# slower, which matters only on large files (2026-10-18, docs/features/syntax-colors.md).
-syntect = { version = "5.3", default-features = false, features = ["parsing", "regex-onig"] }
-two-face = { version = "0.5", default-features = false, features = ["syntect-onig"] }
 
 [dev-dependencies]
-tempfile = "3"
+tempfile.workspace = true
 
 # Profiles tuned for disk use first: a full dev, test and clippy cycle takes about 1 GB of
 # `target/` instead of 2.2 GB, at the cost of slower clean builds.

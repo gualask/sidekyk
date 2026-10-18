@@ -1,6 +1,6 @@
 /**
- * Wire contracts with the Rust backend (`src-tauri/src/modules/notes/contracts.rs`). Change both
- * sides together.
+ * Wire contracts with the Rust backend (`src-tauri/crates/core/src/modules/notes/contracts.rs`).
+ * Change both sides together.
  */
 
 /** One note: a card of plain text in a list of a project. Times are milliseconds since the epoch. */

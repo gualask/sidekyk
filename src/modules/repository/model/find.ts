@@ -9,7 +9,8 @@ export interface FindMatch {
 
 /**
  * The text as typed, literally; case is ignored unless it has a capital letter, as the search in
- * contents does (`src-tauri/src/modules/search/contents.rs`). Null when nothing is typed.
+ * contents does (`src-tauri/crates/core/src/modules/search/contents.rs`). Null when nothing is
+ * typed.
  */
 function findPattern(query: string): RegExp | null {
     if (!query) return null;

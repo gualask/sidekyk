@@ -9,22 +9,22 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 use super::tray;
-use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
-use crate::infrastructure::watcher::LocalRepositoryWatcher;
-use crate::modules::projects::ProjectList;
-use crate::modules::repository::{
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::modules::projects::ProjectList;
+use sidekyk_core::modules::repository::{
     self, classify, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths,
     RepositoryBackend, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
     RepositorySummary, RepositoryWatcher, Visible, Watch, REPOSITORY_CHANGED_EVENT,
 };
-use crate::modules::search::{
+use sidekyk_core::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, ListMatch, NoteMatch, ProjectFiles,
     SearchRequest, SearchResults,
 };
-use crate::shared::coalesce::Coalesced;
-use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
-use crate::shared::sync::lock;
+use sidekyk_core::shared::coalesce::Coalesced;
+use sidekyk_core::shared::error::{unshare, user_facing, UserFacingErrorCode};
+use sidekyk_core::shared::sync::lock;
 
 /// A result shared by every caller that waited for it.
 type Shared<T> = Result<T, Arc<anyhow::Error>>;

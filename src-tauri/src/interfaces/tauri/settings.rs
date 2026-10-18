@@ -3,8 +3,8 @@
 use super::blocking::blocking;
 use super::shortcut;
 use crate::infrastructure::settings_store;
-use crate::modules::settings::{Settings, Theme};
-use crate::shared::error::AppError;
+use sidekyk_core::modules::settings::{Settings, Theme};
+use sidekyk_core::shared::error::AppError;
 
 /// The window's theme for a setting. The pages follow it too: a webview's
 /// `prefers-color-scheme` is the theme of its window.

@@ -4,7 +4,7 @@
 
 use std::ffi::{c_char, c_void, CStr};
 
-use crate::modules::settings::ShortcutKeys;
+use sidekyk_core::modules::settings::ShortcutKeys;
 
 type CFTypeRef = *const c_void;
 type CFIndex = isize;
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn every_key_and_modifier_of_a_shortcut_has_a_carbon_name() {
-        use crate::modules::settings::shortcut_keys::{KEYS, MODIFIERS};
+        use sidekyk_core::modules::settings::shortcut_keys::{KEYS, MODIFIERS};
         for key in KEYS {
             assert!(virtual_key(key).is_some(), "{key}");
         }

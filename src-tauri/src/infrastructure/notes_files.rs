@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
-use crate::modules::notes::NotesStorage;
+use sidekyk_core::modules::notes::NotesStorage;
 
 /// A path as the file system names it, links resolved; a file not written yet, by its folder; as
 /// given when neither exists.
@@ -227,7 +227,7 @@ mod tests {
     #[test]
     #[ignore = "benchmark"]
     fn notes_timings() {
-        use crate::modules::notes::NotesStore;
+        use sidekyk_core::modules::notes::NotesStore;
         use std::time::{Duration, Instant};
 
         fn median(runs: usize, mut run: impl FnMut()) -> Duration {
@@ -275,21 +275,25 @@ mod tests {
             })
         );
         // the palette over every note, as at each key typed: a word in no first line, read in all
-        let request: crate::modules::search::SearchRequest = serde_json::from_value(
+        let request: sidekyk_core::modules::search::SearchRequest = serde_json::from_value(
             serde_json::json!({ "query": "zzqx", "panels": [], "root": root }),
         )
         .unwrap();
         println!(
             "palette over 1,000 notes: {:?}",
             median(50, || {
-                crate::modules::search::search(
+                sidekyk_core::modules::search::search(
                     &request,
                     &[],
                     |_| None,
                     |root| {
                         store
                             .with_notes(&files, root, |lists, notes| {
-                                crate::modules::search::search_notes(&request.query, lists, notes)
+                                sidekyk_core::modules::search::search_notes(
+                                    &request.query,
+                                    lists,
+                                    notes,
+                                )
                             })
                             .ok()
                     },

@@ -8,10 +8,10 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::{resolved_path, write_chosen_file, NotesFiles};
-use crate::modules::notes::{
+use sidekyk_core::modules::notes::{
     to_markdown, DeletedList, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
 };
-use crate::shared::error::{user_facing, AppError, UserFacingErrorCode};
+use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
 
 /// Runs `work` on a project's notes, once the project is known to be in the list.
 async fn with_notes<T: Send + 'static>(

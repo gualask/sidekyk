@@ -11,8 +11,8 @@ use tauri::{AppHandle, Manager};
 
 use super::state::ProjectsState;
 use super::window::show_main_window;
-use crate::modules::repository::RepositorySummary;
-use crate::shared::sync::lock;
+use sidekyk_core::modules::repository::RepositorySummary;
+use sidekyk_core::shared::sync::lock;
 
 const SHOW: &str = "show";
 const QUIT: &str = "quit";

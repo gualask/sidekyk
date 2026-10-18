@@ -96,11 +96,26 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 
 ## Backend
 
+A Cargo workspace rooted at `src-tauri/Cargo.toml`, crates versioned together; commands run there
+cover every crate (`default-members`).
+
+- `src-tauri/` (the app, `sidekyk`): Tauri, `bootstrap/`, `interfaces/`, and the infrastructure
+  only the app needs (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`).
+- `src-tauri/crates/core/` (`sidekyk-core`): `modules/`, `shared/`, and the infrastructure of the
+  machine holding the repository (`git_cli.rs`, `watcher.rs`). No Tauri: the compiler keeps it
+  out. The app runs all of it; the helper will run what reads a repository
+  (`plans/remote-projects.md`). Its items are `pub` for the app, so an item the app stops using no
+  longer warns as dead code.
+
+In the app:
+
 - `bootstrap/`: plugins (single instance, dialog, store), state, commands; creates the hidden
   window in the stored theme, tray, restores projects, opens the CLI argument.
 - `interfaces/tauri/`: commands, tray, window, and `state.rs` (project list, watcher of the project
   on screen, per-project coalesced snapshot/summary/tree reads, the cached tree). Blocking work on
   `spawn_blocking`.
+In the core:
+
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
   (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over
   `modules/repository`): no Tauri.
@@ -110,8 +125,7 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   declares the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`,
   `has_entry`) and the `RepositoryWatcher` port (changed paths after a quiet period), so it can
   run on another machine (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify), `settings_store.rs`,
-  `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`.
+- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.
 

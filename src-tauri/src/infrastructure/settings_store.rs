@@ -2,9 +2,9 @@
 
 use tauri_plugin_store::StoreExt;
 
-use crate::modules::projects::ProjectList;
-use crate::modules::repository::{repository_name, RepositoryInfo};
-use crate::modules::settings::Settings;
+use sidekyk_core::modules::projects::ProjectList;
+use sidekyk_core::modules::repository::{repository_name, RepositoryInfo};
+use sidekyk_core::modules::settings::Settings;
 
 const STORE_FILE: &str = "settings.json";
 const SETTINGS_KEY: &str = "settings";

@@ -11,9 +11,9 @@ import type { ChangeMark } from '@/shared/git/change-mark';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 
 /**
- * A stand-in for the backend's ranking (`src-tauri/src/modules/search`): the query's letters in
- * order, case ignored, the earliest ones taken. No scoring: matches keep their order. Enough to
- * check the palette's UI on fixtures.
+ * A stand-in for the backend's ranking (`src-tauri/crates/core/src/modules/search`): the query's
+ * letters in order, case ignored, the earliest ones taken. No scoring: matches keep their order.
+ * Enough to check the palette's UI on fixtures.
  */
 function match(text: string, query: string): Highlight[] | null {
     const needle = query.toLowerCase().replace(/\s+/g, '');
@@ -143,9 +143,10 @@ function searchNotes(query: string, notes: ProjectNotes, results: SearchResults)
 const CONTENT_LINE_LIMIT = 2_000;
 
 /**
- * A stand-in for the backend's search in contents (`src-tauri/src/modules/search/contents.rs`):
- * literal, case ignored unless the text has a capital, line by line, stopping at the same limit.
- * Long lines are not cut. `read` gives a file's text, or null for one with none.
+ * A stand-in for the backend's search in contents
+ * (`src-tauri/crates/core/src/modules/search/contents.rs`): literal, case ignored unless the text
+ * has a capital, line by line, stopping at the same limit. Long lines are not cut. `read` gives a
+ * file's text, or null for one with none.
  */
 export function fixtureContentSearch(
     paths: readonly string[],

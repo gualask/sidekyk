@@ -1,6 +1,6 @@
 use std::time::Instant;
 
-use crate::shared::error::{user_facing_code, AppError};
+use sidekyk_core::shared::error::{user_facing_code, AppError};
 
 /// Runs blocking work (git, the file system, a dialog) off the async runtime, and logs how long it
 /// took and how it failed.

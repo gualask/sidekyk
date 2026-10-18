@@ -1,8 +1,8 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
 
 /**
- * Wire contracts with the Rust backend (`src-tauri/src/modules/search/contracts.rs`). Change both
- * sides together.
+ * Wire contracts with the Rust backend (`src-tauri/crates/core/src/modules/search/contracts.rs`).
+ * Change both sides together.
  */
 
 /** What the command palette asks for, at every key typed. */

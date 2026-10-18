@@ -61,7 +61,7 @@ const NEW_KINDS: ReadonlySet<ChangeKind> = new Set(['untracked', 'added', 'renam
  * The mark of every changed file, and of every folder above one: a folder takes the strongest
  * change inside it, an edit over a new file. A deleted file is not in the tree, and marks
  * nothing. The palette's marks follow the same rule (`marks_by_path` in
- * `src-tauri/src/modules/search/mod.rs`: change both together).
+ * `src-tauri/crates/core/src/modules/search/mod.rs`: change both together).
  */
 export function changeMarks(files: readonly ChangedFile[]): ReadonlyMap<string, ChangeMark> {
     const marks = new Map<string, ChangeMark>();

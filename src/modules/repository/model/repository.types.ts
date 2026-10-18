@@ -1,6 +1,6 @@
 /**
- * Wire contracts with the Rust backend (`src-tauri/src/modules/repository/contracts.rs`).
- * Change both sides together.
+ * Wire contracts with the Rust backend
+ * (`src-tauri/crates/core/src/modules/repository/contracts.rs`). Change both sides together.
  */
 
 import type { ChangeArea } from '@/shared/git/change-area';

@@ -5,14 +5,14 @@ use tauri::Manager;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::tray;
-use crate::infrastructure::git_cli::LocalRepositoryBackend;
-use crate::modules::repository::{
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::modules::repository::{
     self, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
     FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
     UnifiedDiff,
 };
-use crate::modules::syntax::{self, ColorCache, SyntaxColors, SyntaxRequest};
-use crate::shared::error::AppError;
+use sidekyk_core::modules::syntax::{self, ColorCache, SyntaxColors, SyntaxRequest};
+use sidekyk_core::shared::error::AppError;
 
 /// Runs `work` off the async runtime on a project the user added, with the git backend.
 async fn on_project<T: Send + 'static>(

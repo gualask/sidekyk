@@ -1,7 +1,7 @@
 /**
  * How a file changed, the strongest of its areas (an edit over a new file over a deletion), as the
  * tree and the palette mark it. The backend's search sends it (`ChangeMark` in
- * `src-tauri/src/modules/search/contracts.rs`).
+ * `src-tauri/crates/core/src/modules/search/contracts.rs`).
  */
 export type ChangeMark = 'modified' | 'added' | 'deleted';
 

@@ -3,7 +3,7 @@
  * then the key's `KeyboardEvent.code`, joined by `+`, such as `Control+Alt+Space` or
  * `Super+Shift+KeyK`. The code names the key by its place on the keyboard, so `⌥` on macOS,
  * which changes the character typed, does not change it. The backend checks the same rule
- * (`src-tauri/src/modules/settings/shortcut_keys.rs`) and has the last word.
+ * (`src-tauri/crates/core/src/modules/settings/shortcut_keys.rs`) and has the last word.
  */
 
 /** The modifiers, in the order a combination lists them, and how each platform writes them. */

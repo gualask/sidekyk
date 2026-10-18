@@ -1,7 +1,8 @@
 /**
  * What a copy from a diff puts on the clipboard, as the user writes it in the settings:
  * `{row}` becomes where the text is (`src/cart.ts:14`, `src/cart.ts:12-15`) and `{text}` the text
- * copied. The backend keeps it (`CopyTemplate` in `src-tauri/src/modules/settings/contracts.rs`).
+ * copied. The backend keeps it (`CopyTemplate` in
+ * `src-tauri/crates/core/src/modules/settings/contracts.rs`).
  */
 
 /** Where, then what, with no formatting that could break where it is pasted. */

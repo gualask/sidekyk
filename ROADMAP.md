@@ -39,10 +39,9 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/plans/remote-projects.md`; tried as a local child process on the Mac, Linux parts on the
 container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
-- [ ] Cargo workspace: core, app, `sidekyk-agent`
-- [ ] Minimal helper over stdio (length-prefixed JSON), local projects through it with
-      `SIDEKYK_AGENT=local` in dev builds; cost measured against the direct path. **After:**
-      workspace
+- [ ] Minimal helper over stdio (`sidekyk-agent`, a crate of the workspace; length-prefixed JSON),
+      local projects through it with `SIDEKYK_AGENT=local` in dev builds; cost measured against
+      the direct path
 - [ ] Projects with an `id` and a typed `location` (local, WSL); a local project's `id` stays its
       root
 - [ ] WSL transport: folder dialog's `\\wsl.localhost\` and `\\wsl$\` paths, install from the

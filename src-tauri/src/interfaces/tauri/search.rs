@@ -5,11 +5,13 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
-use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
-use crate::modules::notes::NotesStore;
-use crate::modules::search::{search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults};
-use crate::shared::error::AppError;
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::modules::notes::NotesStore;
+use sidekyk_core::modules::search::{
+    search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
+};
+use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
 /// What was typed in the palette, ranked against the projects, the panels and the files, note

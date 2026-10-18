@@ -5,12 +5,12 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
-use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
-use crate::modules::notes::NotesStore;
-use crate::modules::projects::{ProjectList, TilesLayout};
-use crate::modules::repository::resolve_repository;
-use crate::shared::error::AppError;
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::modules::notes::NotesStore;
+use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
+use sidekyk_core::modules::repository::resolve_repository;
+use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
 /// Every project, and the one on screen.

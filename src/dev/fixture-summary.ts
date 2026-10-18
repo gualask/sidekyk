@@ -4,8 +4,8 @@ type Branch = RepositorySummary['branch'];
 
 /**
  * The summary the backend would build from these files (`summarize` in
- * `src-tauri/src/modules/repository/snapshot.rs`): one entry per path, tracked paths first in path
- * order as `git status` lists them, line counts only for tracked files.
+ * `src-tauri/crates/core/src/modules/repository/snapshot.rs`): one entry per path, tracked paths
+ * first in path order as `git status` lists them, line counts only for tracked files.
  */
 export function fixtureSummary(branch: Branch, files: readonly ChangedFile[]): RepositorySummary {
     const byPath = new Map<string, ChangedFile[]>();

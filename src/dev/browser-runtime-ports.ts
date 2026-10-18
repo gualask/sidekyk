@@ -182,7 +182,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 });
             },
             activateProject: async (root) => update({ ...list, active: project(root).root }),
-            // as in `src-tauri/src/modules/projects/list.rs`: the next project shows, else the previous
+            // as in `src-tauri/crates/core/src/modules/projects/list.rs`: the next project shows,
+            // else the previous
             removeProject: async (root) => {
                 const index = list.projects.indexOf(project(root));
                 notes.drop(root);

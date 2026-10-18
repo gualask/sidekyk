@@ -5,7 +5,7 @@
 
 use tauri::AppHandle;
 
-use crate::modules::settings::GlobalShortcutStatus;
+use sidekyk_core::modules::settings::GlobalShortcutStatus;
 
 /// `sidekyk --toggle`, run while Sidekyk runs, shows or hides its window like the shortcut.
 pub(crate) const TOGGLE_FLAG: &str = "--toggle";
@@ -31,7 +31,7 @@ mod platform {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
     use crate::interfaces::tauri::window::toggle_main_window;
-    use crate::modules::settings::{
+    use sidekyk_core::modules::settings::{
         GlobalShortcut, GlobalShortcutStatus, GlobalShortcuts, RegisterError, ShortcutKeys,
         ShortcutRegistrar,
     };
@@ -117,7 +117,7 @@ mod platform {
     #[cfg(test)]
     mod tests {
         use super::*;
-        use crate::modules::settings::shortcut_keys::{KEYS, MODIFIERS};
+        use sidekyk_core::modules::settings::shortcut_keys::{KEYS, MODIFIERS};
 
         #[test]
         fn the_plugin_names_every_shortcut() {
@@ -137,7 +137,7 @@ mod platform {
     use tauri::AppHandle;
 
     use super::TOGGLE_FLAG;
-    use crate::modules::settings::{GlobalShortcut, GlobalShortcutStatus};
+    use sidekyk_core::modules::settings::{GlobalShortcut, GlobalShortcutStatus};
 
     /// Linux registers no shortcut: there is nothing to start.
     pub(crate) fn start(_app: &AppHandle, _settings: &GlobalShortcut) {}

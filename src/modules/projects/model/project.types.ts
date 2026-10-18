@@ -1,5 +1,5 @@
 /**
- * Wire contracts with the Rust backend (`src-tauri/src/modules/projects/contracts.rs`).
+ * Wire contracts with the Rust backend (`src-tauri/crates/core/src/modules/projects/contracts.rs`).
  * Change both sides together.
  */
 

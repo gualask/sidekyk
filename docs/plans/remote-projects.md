@@ -30,7 +30,8 @@ installed on Windows (or the Mac). Steps in `ROADMAP.md`; tests on the container
     check, caches). It moves to the core with the project state, which the helper runs, in the
     helper step.
 - Same repo, a Cargo workspace: a core crate (`modules/`, `shared/`, infrastructure without
-  Tauri), the Tauri app, the helper. A second binary of the app's package would pull Tauri and
+  Tauri), the Tauri app, the helper. Built: `src-tauri/crates/core` (`../architecture.md`); the
+  helper's crate comes with the helper. A second binary of the app's package would pull Tauri and
   WebKitGTK into a static Linux build. Helper and app from one commit, versioned together: no
   compatibility matrix (Zed: version in the file name; VS Code: commit).
 - Shipped in the Windows installer (`bundle.resources`; not `externalBin`, which wants the host's

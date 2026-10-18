@@ -1,0 +1,32 @@
+[package]
+name = "sidekyk-core"
+description = "Sidekyk without Tauri: the modules, their primitives, the git CLI and the watcher."
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror = "2"
+notify-debouncer-mini = "0.7"
+tracing.workspace = true
+# The palette's fuzzy matching (fzf's scoring). Without `unicode-segmentation`, a match's indices
+# count code points, which `modules/search` turns into the frontend's UTF-16 offsets.
+nucleo-matcher = { version = "0.3", default-features = false, features = ["unicode-normalization", "unicode-casefold"] }
+# Search in contents (ripgrep's libraries): files read through a fixed buffer, binaries skipped,
+# UTF-16 transcoded by BOM; same speed as our own `regex` loop, 4-5x less memory (2026-10-17).
+grep-searcher = "0.1.17"
+grep-regex = "0.1.14"
+grep-matcher = "0.1.9"
+# Syntax colors: TextMate-style grammars, the ~220 of `bat` (two-face), one engine for every
+# language. Chosen over tree-sitter for one stable engine and steady memory (7-16 MB); 4-10x
+# slower, which matters only on large files (2026-10-18, docs/features/syntax-colors.md).
+syntect = { version = "5.3", default-features = false, features = ["parsing", "regex-onig"] }
+two-face = { version = "0.5", default-features = false, features = ["syntect-onig"] }
+
+[dev-dependencies]
+tempfile.workspace = true

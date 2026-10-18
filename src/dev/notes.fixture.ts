@@ -128,8 +128,8 @@ function largeBook(): Book {
 }
 
 /**
- * Notes in memory, as the backend keeps them (`src-tauri/src/modules/notes/book.rs`): the
- * scenario's project starts with the mock's notes, any other with none.
+ * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/book.rs`):
+ * the scenario's project starts with the mock's notes, any other with none.
  */
 export function fixtureNotes(
     initial: (root: string) => 'review' | 'large' | 'empty',

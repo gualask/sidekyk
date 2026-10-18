@@ -39,7 +39,10 @@ function largePaths(): string[] {
     return paths;
 }
 
-/** The folder entries a list of paths makes, as `src-tauri/src/modules/repository/tree.rs`. */
+/**
+ * The folder entries a list of paths makes, as
+ * `src-tauri/crates/core/src/modules/repository/tree.rs`.
+ */
 class FixtureTree {
     private readonly folders = new Map<string, { folders: Set<string>; files: string[] }>();
     /** Every file's path, sorted: the palette searches them. */
