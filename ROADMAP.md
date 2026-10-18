@@ -41,7 +41,7 @@ container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
 - [ ] WSL transport: folder dialog's `\\wsl.localhost\` and `\\wsl$\` paths, install from the
       installer's resources, `wsl.exe`, stopped distro not started (`--list --verbose`), helper
-      exits 60 s after its last request off screen; tried on Windows 11 x64 (later WSL1, ARM64,
+      exits 10 min after its last request off screen; tried on Windows 11 x64 (later WSL1, ARM64,
       no git in the distro); the stopped, starting and failed states agreed in the plan; notes
       export refuses a path inside a WSL repository; Locate… and the window's visibility go to
       the project's distro

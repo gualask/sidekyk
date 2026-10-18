@@ -38,3 +38,6 @@ dist-ssr
 
 # Local-only material, such as reference clones (see AGENTS.md)
 .local/
+
+# the Linux helper a Windows build ships, put there by CI (build.yml)
+src-tauri/resources/

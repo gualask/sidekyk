@@ -121,10 +121,11 @@ indicator uses. With the transport:
 - One helper per distro, a child of the app, started on first need; no daemon, no timer while
   idle.
 - Alive while a project of its distro is on screen, the window hidden included (the tray mark).
-  Otherwise it exits 60 s after its last request: level 0 does not start it again each time, and
-  a helper kept longer keeps the WSL VM and its memory alive. Zed waits 10 min after a disconnect
-  and VS Code 5 min (opt-in), both for network drops. The 60 s are set again from `wsl.exe`'s
-  start time measured on Windows.
+  Otherwise the app closes its stdin 10 min after its last request, and it exits (2026-10-18, the
+  maintainer's call, as Zed after a disconnect; VS Code 5 min, opt-in): a short pause or level 0
+  never waits for a new helper, and the WSL VM it keeps alive for those 10 min is acceptable. The
+  repositories of one distro share its helper: switching between them starts nothing. Back after
+  10 min, the panels show what was read before while a new helper reads again.
 - A stopped distro is never started for a summary: `wsl.exe --list --verbose` (as VS Code before
   starting its server) with `WSL_UTF8=1` (otherwise UTF-16LE), and the card says it is stopped.
   It starts when its project is opened. Zed and VS Code do not check: opening starts the distro,
