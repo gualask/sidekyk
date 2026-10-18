@@ -24,11 +24,10 @@ installed on Windows (or the Mac). Steps in `ROADMAP.md`; tests on the container
 - Watcher and ignored-paths filter in the helper (2026-10-18): only relevant changes cross the
   pipe, never a burst under `node_modules` or `target`. The app tells the helper when the window
   hides or shows, so hidden it only marks, as locally (`../features/background.md`).
-  - Built: the `RepositoryWatcher` port (raw changed paths) and `classify` in
-    `modules/repository`; the module reads the disk only through `RepositoryBackend`. Still in
-    `interfaces/tauri/state.rs`: what a batch does next (ignored filter, mark while hidden, tree
-    check, caches). It moves to the core with the project state, which the helper runs, in the
-    helper step.
+  - Built: the `RepositoryWatcher` port (raw changed paths), `classify`, and what a batch does
+    next in `modules/repositories` (`Repositories`, `../architecture.md`), which the app runs
+    for local projects and the helper will serve. The palette's files are ranked there too
+    (`search_files`): only matches cross the pipe, never the tree.
 - Same repo, a Cargo workspace: a core crate (`modules/`, `shared/`, infrastructure without
   Tauri), the Tauri app, the helper. Built: `src-tauri/crates/core` (`../architecture.md`); the
   helper's crate comes with the helper. A second binary of the app's package would pull Tauri and

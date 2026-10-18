@@ -25,7 +25,7 @@ The project's tree and the view of any file in it (built 2026-10-17).
   the git dir changed or a non-ignored path appeared/disappeared (`may_have_changed`: `stat`
   against the tree); a marked batch while hidden and a project switch drop it too. A read racing a
   change is not kept.
-- `get_file_content` (`ProjectsState::file_content`): only files of the tree. `read_entry` refuses
+- `get_file_content` (`Repositories::file_content`): only files of the tree. `read_entry` refuses
   a path through a linked folder, returns a link's target unfollowed, a submodule as a folder, a
   file's first 2 MiB (cut at a whole line; binary by NUL).
 - Shared selection (`model/selection.ts`, one per project): a changed file by key, or a tree path

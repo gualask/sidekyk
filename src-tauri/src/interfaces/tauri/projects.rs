@@ -6,10 +6,8 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
 use crate::infrastructure::notes_files::NotesFiles;
-use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
-use sidekyk_core::modules::repository::resolve_repository;
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
@@ -98,8 +96,7 @@ pub(crate) async fn relocate_project(
         else {
             return Ok(None);
         };
-        let backend = app.state::<LocalRepositoryBackend>();
-        let found = resolve_repository(backend.inner(), &folder.into_path()?)?.info;
+        let found = projects.repositories().resolve(&folder.into_path()?)?;
         if found.root == root {
             return Ok(Some(projects.list()));
         }

@@ -55,6 +55,13 @@ pub struct FileMatch {
     pub highlights: Vec<Highlight>,
 }
 
+/// The files of a project that matched best, and how many more did.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct FileMatches {
+    pub files: Vec<FileMatch>,
+    pub more: u32,
+}
+
 /// A line where the text searched is: its number, its text (cut around the first match when
 /// long, `…` marking a cut) and where the text is in it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

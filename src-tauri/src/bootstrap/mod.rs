@@ -18,12 +18,9 @@ use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
-use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
-use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 use sidekyk_core::modules::settings::Theme;
-use sidekyk_core::modules::syntax::ColorCache;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -77,12 +74,9 @@ pub(crate) fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .manage(LocalRepositoryBackend::default())
-        .manage(LocalRepositoryWatcher)
         .manage(ProjectsState::default())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
-        .manage(ColorCache::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);

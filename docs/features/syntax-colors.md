@@ -21,7 +21,7 @@ Both sides of a diff, and any file shown, colored from their whole versions.
   scopes. Spans per line in UTF-16 offsets, merged when touching with one tone; each line carries
   `check` (FNV-1a of its UTF-16 units).
 - The largest source file of Zed's clone (885 KiB, 23,205 lines): 0.64 s; a kept block 0.4 ms.
-- `ColorCache` (managed state, `cache.rs`): a thread of its own, started on the first text
+- `ColorCache` (held by `Repositories`, `cache.rs`): a thread of its own, started on the first text
   colored, idle on its channel; it alone holds the parser states (oniguruma regions cannot leave
   their thread). The last 4 versions' lines are kept in a table callers read without it (key:
   root, path, version; bytes hashed at each request). Jobs run in order; one whose text was colored

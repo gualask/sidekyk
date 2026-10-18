@@ -5,25 +5,27 @@ use tauri::Manager;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::tray;
-use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
-    self, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-    UnifiedDiff,
+    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
+    RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
-use sidekyk_core::modules::syntax::{self, ColorCache, SyntaxColors, SyntaxRequest};
+use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
 
-/// Runs `work` off the async runtime on a project the user added, with the git backend.
-async fn on_project<T: Send + 'static>(
+/// Runs `work` off the async runtime on a project the user added, with what reads its repository.
+pub(super) async fn on_project<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
     root: String,
-    work: impl FnOnce(&LocalRepositoryBackend, &RepositoryInfo) -> anyhow::Result<T> + Send + 'static,
+    work: impl FnOnce(&tauri::AppHandle, &Repositories, &RepositoryInfo) -> anyhow::Result<T>
+        + Send
+        + 'static,
 ) -> Result<T, AppError> {
     blocking(command, app, move |app| {
-        let info = app.state::<ProjectsState>().project(&root)?;
-        work(app.state::<LocalRepositoryBackend>().inner(), &info)
+        let projects = app.state::<ProjectsState>();
+        let info = projects.project(&root)?;
+        work(app, projects.repositories(), &info)
     })
     .await
 }
@@ -34,14 +36,16 @@ pub(crate) async fn get_repository_snapshot(
     app: tauri::AppHandle,
     root: String,
 ) -> Result<RepositorySnapshot, AppError> {
-    blocking("get_repository_snapshot", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
-        let snapshot = app
-            .state::<ProjectsState>()
-            .snapshot(backend.inner(), &root);
-        tray::show_read(app, &root, snapshot.as_ref().ok().map(|s| &s.summary));
-        snapshot
-    })
+    on_project(
+        "get_repository_snapshot",
+        app,
+        root,
+        |app, repositories, info| {
+            let snapshot = repositories.snapshot(info);
+            tray::show_read(app, &info.root, snapshot.as_ref().ok().map(|s| &s.summary));
+            snapshot
+        },
+    )
     .await
 }
 
@@ -51,12 +55,16 @@ pub(crate) async fn get_repository_summary(
     app: tauri::AppHandle,
     root: String,
 ) -> Result<RepositorySummary, AppError> {
-    blocking("get_repository_summary", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
-        let summary = app.state::<ProjectsState>().summary(backend.inner(), &root);
-        tray::show_read(app, &root, summary.as_ref().ok());
-        summary
-    })
+    on_project(
+        "get_repository_summary",
+        app,
+        root,
+        |app, repositories, info| {
+            let summary = repositories.summary(info);
+            tray::show_read(app, &info.root, summary.as_ref().ok());
+            summary
+        },
+    )
     .await
 }
 
@@ -67,8 +75,8 @@ pub(crate) async fn get_file_diff(
     root: String,
     request: FileDiffRequest,
 ) -> Result<UnifiedDiff, AppError> {
-    on_project("get_file_diff", app, root, move |backend, info| {
-        repository::load_file_diff(backend, info, &request)
+    on_project("get_file_diff", app, root, move |_, repositories, info| {
+        repositories.file_diff(info, &request)
     })
     .await
 }
@@ -79,8 +87,8 @@ pub(crate) async fn get_recent_commits(
     app: tauri::AppHandle,
     root: String,
 ) -> Result<RecentCommits, AppError> {
-    on_project("get_recent_commits", app, root, move |backend, info| {
-        repository::load_recent_commits(backend, info)
+    on_project("get_recent_commits", app, root, |_, repositories, info| {
+        repositories.recent_commits(info)
     })
     .await
 }
@@ -92,9 +100,12 @@ pub(crate) async fn get_commit_files(
     root: String,
     commit: CommitRequest,
 ) -> Result<CommitFiles, AppError> {
-    on_project("get_commit_files", app, root, move |backend, info| {
-        repository::load_commit_files(backend, info, &commit)
-    })
+    on_project(
+        "get_commit_files",
+        app,
+        root,
+        move |_, repositories, info| repositories.commit_files(info, &commit),
+    )
     .await
 }
 
@@ -105,9 +116,12 @@ pub(crate) async fn get_commit_file_diff(
     root: String,
     request: CommitFileDiffRequest,
 ) -> Result<UnifiedDiff, AppError> {
-    on_project("get_commit_file_diff", app, root, move |backend, info| {
-        repository::load_commit_file_diff(backend, info, &request)
-    })
+    on_project(
+        "get_commit_file_diff",
+        app,
+        root,
+        move |_, repositories, info| repositories.commit_file_diff(info, &request),
+    )
     .await
 }
 
@@ -118,12 +132,8 @@ pub(crate) async fn get_directory(
     root: String,
     path: String,
 ) -> Result<Directory, AppError> {
-    blocking("get_directory", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
-        let tree = app
-            .state::<ProjectsState>()
-            .file_tree(backend.inner(), &root)?;
-        Ok(tree.directory(&path))
+    on_project("get_directory", app, root, move |_, repositories, info| {
+        repositories.directory(info, &path)
     })
     .await
 }
@@ -135,11 +145,12 @@ pub(crate) async fn get_file_content(
     root: String,
     path: String,
 ) -> Result<FileContent, AppError> {
-    blocking("get_file_content", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
-        app.state::<ProjectsState>()
-            .file_content(backend.inner(), &root, &path)
-    })
+    on_project(
+        "get_file_content",
+        app,
+        root,
+        move |_, repositories, info| repositories.file_content(info, &path),
+    )
     .await
 }
 
@@ -150,11 +161,11 @@ pub(crate) async fn get_syntax_colors(
     root: String,
     request: SyntaxRequest,
 ) -> Result<SyntaxColors, AppError> {
-    blocking("get_syntax_colors", app, move |app| {
-        let info = app.state::<ProjectsState>().project(&root)?;
-        let backend = app.state::<LocalRepositoryBackend>();
-        let cache = app.state::<ColorCache>();
-        syntax::load_syntax_colors(backend.inner(), &info, cache.inner(), &request)
-    })
+    on_project(
+        "get_syntax_colors",
+        app,
+        root,
+        move |_, repositories, info| repositories.syntax_colors(info, &request),
+    )
     .await
 }

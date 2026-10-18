@@ -314,8 +314,12 @@ mod tests {
         RepositorySnapshot, VersionText, Visible,
     };
     use crate::modules::search::{
-        search, search_contents, ContentSearch, ProjectFiles, SearchRequest,
+        search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
     };
+    use std::sync::Arc;
+
+    use crate::infrastructure::watcher::LocalRepositoryWatcher;
+    use crate::modules::repositories::Repositories;
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
 
@@ -914,6 +918,62 @@ mod tests {
     }
 
     #[test]
+    fn the_watched_repository_tells_what_shows_and_marks_it_while_hidden() {
+        // past the watcher's quiet period (250 ms) and the system's own delay
+        const QUIET: Duration = Duration::from_secs(1);
+        const DEADLINE: Duration = Duration::from_secs(10);
+        let dir = scratch_repo();
+        write(dir.path(), ".gitignore", "build/\n");
+        let repositories = Arc::new(Repositories::new(
+            Arc::new(LocalRepositoryBackend::default()),
+            Arc::new(LocalRepositoryWatcher),
+        ));
+        let info = repositories.resolve(dir.path()).unwrap();
+        let root = Path::new(&info.root);
+        let (sent, received) = std::sync::mpsc::channel();
+        repositories.watch(Some(&info), move |event| {
+            let _ = sent.send(event);
+        });
+        // events still on their way, such as FSEvents reporting what happened before the watch
+        let settle = || {
+            let started = Instant::now();
+            while received.recv_timeout(QUIET).is_ok() {
+                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
+            }
+        };
+        settle();
+
+        write(root, "build/out.o", "");
+        assert!(
+            received.recv_timeout(QUIET).is_err(),
+            "a path git ignores shows nothing"
+        );
+
+        write(root, "src/cart.ts", "changed\n");
+        let event = received.recv_timeout(DEADLINE).unwrap();
+        assert_eq!(event.root, info.root);
+        assert!(!event.git_dir);
+        settle();
+
+        assert_eq!(repositories.set_visible(false), None);
+        write(root, "src/cart.ts", "again\n");
+        // the mark lands once the batch is in: looked for until then, hidden in between
+        let started = Instant::now();
+        let missed = loop {
+            if let Some(missed) = repositories.set_visible(true) {
+                break missed;
+            }
+            repositories.set_visible(false);
+            assert!(started.elapsed() < DEADLINE, "the change was never marked");
+            std::thread::sleep(Duration::from_millis(100));
+        };
+        assert_eq!(missed, info.root);
+        assert!(received.try_recv().is_err(), "nothing is told while hidden");
+        assert_eq!(repositories.set_visible(true), None);
+        repositories.watch(None, |_| {});
+    }
+
+    #[test]
     fn a_repository_moved_away_is_reported_as_missing() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path().to_string_lossy().into_owned();
@@ -1000,10 +1060,13 @@ mod tests {
                     &palette,
                     std::slice::from_ref(&repo.info),
                     |_| {
-                        Some(ProjectFiles {
-                            tree: tree.clone(),
-                            changed: changed.clone(),
-                        })
+                        Some(search_files(
+                            &palette.query,
+                            &ProjectFiles {
+                                tree: tree.clone(),
+                                changed: changed.clone(),
+                            },
+                        ))
                     },
                     |_| None,
                 );

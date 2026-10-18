@@ -9,14 +9,15 @@ mod rank;
 
 pub use contents::{narrows, search_contents, ContentSearch};
 pub use contracts::{
-    ContentEnd, ContentFile, ListMatch, NoteMatch, SearchRequest, SearchResults,
+    ContentEnd, ContentFile, FileMatch, FileMatches, ListMatch, NoteMatch, SearchRequest,
+    SearchResults,
 };
 pub use notes::search_notes;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use contracts::{ChangeMark, FileMatch, PanelMatch, ProjectMatch};
+use contracts::{ChangeMark, PanelMatch, ProjectMatch};
 use rank::{Ranker, Texts};
 
 use crate::modules::repository::{ChangeKind, ChangedFile, FileTree, RepositoryInfo};
@@ -43,11 +44,11 @@ pub struct ProjectFiles {
 /// against the query. With nothing typed, every project and panel in their order and nothing of
 /// the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
 /// something is typed, as listing a project's files may run git and its notes be read from disk;
-/// `notes_of` ranks them where they are kept (`search_notes`).
+/// each ranks them where they are kept (`search_files`, `search_notes`).
 pub fn search(
     request: &SearchRequest,
     projects: &[RepositoryInfo],
-    files_of: impl FnOnce(&str) -> Option<ProjectFiles>,
+    files_of: impl FnOnce(&str) -> Option<FileMatches>,
     notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
@@ -74,9 +75,10 @@ pub fn search(
         .collect();
 
     let root = request.root.as_deref().filter(|_| !names.is_empty());
-    let (files, more_files) = root.and_then(files_of).map_or((Vec::new(), 0), |files| {
-        search_files(&request.query, &files)
-    });
+    let FileMatches {
+        files,
+        more: more_files,
+    } = root.and_then(files_of).unwrap_or_default();
     let (lists, notes) = root.and_then(notes_of).unwrap_or_default();
 
     SearchResults {
@@ -89,9 +91,9 @@ pub fn search(
     }
 }
 
-/// The best files, and how many more matched. A deleted file is not in the tree, but Changes
-/// lists it: it is searched too.
-fn search_files(query: &str, files: &ProjectFiles) -> (Vec<FileMatch>, u32) {
+/// The files of a project that match `query` best, and how many more did. A deleted file is not
+/// in the tree, but Changes lists it: it is searched too.
+pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
     let mut deleted: Vec<&str> = files
         .changed
         .iter()
@@ -111,7 +113,7 @@ fn search_files(query: &str, files: &ProjectFiles) -> (Vec<FileMatch>, u32) {
     let (ranked, total) = Ranker::new(query, Texts::Paths).rank(&paths, FILE_LIMIT);
     let more = (total - ranked.len()) as u32;
     let marks = marks_by_path(&files.changed);
-    let matches = ranked
+    let files = ranked
         .into_iter()
         .map(|r| FileMatch {
             path: paths[r.index].to_string(),
@@ -119,7 +121,7 @@ fn search_files(query: &str, files: &ProjectFiles) -> (Vec<FileMatch>, u32) {
             highlights: r.highlights,
         })
         .collect();
-    (matches, more)
+    FileMatches { files, more }
 }
 
 /// How each changed path changed, the strongest of its areas: an edit over a new file over a
@@ -174,11 +176,13 @@ mod tests {
         }
     }
 
-    fn files(paths: &[&str], changed: &[ChangedFile]) -> ProjectFiles {
-        ProjectFiles {
+    /// The files of a project that match `query`, as the holder of its files ranks them.
+    fn files(query: &str, paths: &[&str], changed: &[ChangedFile]) -> FileMatches {
+        let files = ProjectFiles {
             tree: Arc::new(FileTree::from_paths(paths.iter().copied())),
             changed: changed.into(),
-        }
+        };
+        search_files(query, &files)
     }
 
     #[test]
@@ -203,7 +207,7 @@ mod tests {
             &[project("shop"), project("cache-hub")],
             |root| {
                 assert_eq!(root, "/dev/shop");
-                Some(files(&["src/cart/checkout.ts", "README.md"], &[]))
+                Some(files("ch", &["src/cart/checkout.ts", "README.md"], &[]))
             },
             |_| None,
         );
@@ -230,7 +234,7 @@ mod tests {
         let results = search(
             &request("ts"),
             &[],
-            |_| Some(files(&["a.ts", "b.ts", "c.ts", "back.ts"], &changed)),
+            |_| Some(files("ts", &["a.ts", "b.ts", "c.ts", "back.ts"], &changed)),
             |_| None,
         );
         let found: HashMap<&str, Option<ChangeMark>> = results
@@ -272,7 +276,7 @@ mod tests {
         let results = search(
             &request("file"),
             &[],
-            |_| Some(files(&paths, &[])),
+            |_| Some(files("file", &paths, &[])),
             |_| None,
         );
         assert_eq!(results.files.len(), FILE_LIMIT);

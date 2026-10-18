@@ -4,9 +4,9 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 
 use super::blocking::blocking;
+use super::repository::on_project;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
-use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::search::{
     search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
@@ -22,22 +22,19 @@ pub(crate) async fn search(
     request: SearchRequest,
 ) -> Result<SearchResults, AppError> {
     blocking("search", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
         let query = request.query.clone();
-        Ok(app
-            .state::<ProjectsState>()
-            .search(backend.inner(), &request, |root| {
-                notes
-                    .with_notes(files.inner(), root, |lists, found| {
-                        search_notes(&query, lists, found)
-                    })
-                    .inspect_err(
-                        |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
-                    )
-                    .ok()
-            }))
+        Ok(app.state::<ProjectsState>().search(&request, |root| {
+            notes
+                .with_notes(files.inner(), root, |lists, found| {
+                    search_notes(&query, lists, found)
+                })
+                .inspect_err(
+                    |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
+                )
+                .ok()
+        }))
     })
     .await
 }
@@ -51,19 +48,22 @@ pub(crate) async fn search_contents(
     query: String,
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
-    blocking("search_contents", app, move |app| {
-        let backend = app.state::<LocalRepositoryBackend>();
-        app.state::<ProjectsState>()
-            .search_contents(backend.inner(), &root, &query, &|files| {
+    on_project(
+        "search_contents",
+        app,
+        root,
+        move |_, repositories, info| {
+            repositories.search_contents(info, &query, &|files| {
                 // the page went away: nothing left to stop
                 let _ = on_files.send(files);
             })
-    })
+        },
+    )
     .await
 }
 
 #[tauri::command]
 /// Stops the search in contents going on: the palette closed.
 pub(crate) fn stop_content_search(state: tauri::State<'_, ProjectsState>) {
-    state.stop_content_search();
+    state.repositories().stop_content_search();
 }

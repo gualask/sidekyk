@@ -111,10 +111,17 @@ In the app:
 
 - `bootstrap/`: plugins (single instance, dialog, store), state, commands; creates the hidden
   window in the stored theme, tray, restores projects, opens the CLI argument.
-- `interfaces/tauri/`: commands, tray, window, and `state.rs` (project list, watcher of the project
-  on screen, per-project coalesced snapshot/summary/tree reads, the cached tree). Blocking work on
-  `spawn_blocking`.
+- `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, and the
+  `Repositories` that read the projects; the commands check a root is in the list first). Blocking
+  work on `spawn_blocking`.
 In the core:
+
+- `modules/repositories/`: `Repositories`, everything that reads the repositories the caller
+  names: per-repository coalesced snapshot/summary/tree reads, the cached tree, the changed files
+  the palette ranks, the last search in contents, syntax colors (`ColorCache`), and the watched
+  repository (`watch.rs`: a batch through `classify`, the ignored filter and the tree check; only
+  a mark while the window is hidden). The app runs it for local projects; the helper will run it
+  in a distro (`plans/remote-projects.md`).
 
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
   (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over

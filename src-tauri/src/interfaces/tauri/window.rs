@@ -57,7 +57,9 @@ pub(crate) fn show_by_deadline(app: &AppHandle) {
 /// every platform's webview keeps. Showing again answers with the project on screen when its
 /// files or refs changed meanwhile.
 pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option<String> {
-    app.state::<ProjectsState>().set_window_visible(visible)
+    app.state::<ProjectsState>()
+        .repositories()
+        .set_visible(visible)
 }
 
 /// Shows the window if nothing showed it yet, and says whether it did.
