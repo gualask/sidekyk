@@ -1,0 +1,18 @@
+# The container fixture: a stand-in for a WSL distro. Driven by scripts/container-fixture.sh; see
+# docs/container-testing.md.
+
+name: sidekyk-fixture
+
+services:
+  distro:
+    build: .
+    # tini as PID 1: `sleep infinity` gets the stop signal, so `down` takes a second, not ten.
+    init: true
+    volumes:
+      # A named volume, never a bind mount from the Mac: files on the VM's own filesystem, edited
+      # from inside, as in WSL. Edits made on the Mac to a bind mount do not reliably reach inotify
+      # inside the VM.
+      - project:/home/ubuntu/project
+
+volumes:
+  project:

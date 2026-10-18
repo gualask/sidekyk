@@ -122,6 +122,16 @@ Explore and copy:
       filter without git (direction and open points in evolution, Beyond developers)
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
 
+## Remote projects
+
+- [x] Container fixture as a WSL stand-in on Colima (`docs/container-testing.md`)
+- [ ] Watcher behind a port; `tree.rs` `may_have_changed` reads the disk through the backend
+- [ ] Cargo workspace: core, app, `sidekyk-agent` (direction in evolution, Remote projects)
+- [ ] Minimal helper over stdio, tried on the fixture (`docker exec -i`)
+- [ ] WSL transport: `\\wsl.localhost\` paths, install from the installer's resources, `wsl.exe`;
+      tried on Windows (WSL2, WSL1, ARM64, stopped distro, no git in the distro)
+- [ ] Nice to have: remove the helper from a distro when its last project goes
+
 ## Then
 
 - [ ] Collect several hunks with a comment each, copy as one batch
@@ -142,7 +152,9 @@ Explore and copy:
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, `⌘W` hides and
     `⌘Q` quits, no blank frame at startup
   - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
-    git-dir check, case included
+    git-dir check, case included; snapshot timings (process start, Defender); a repo on `C:\`
+    edited from WSL (`/mnt/c`): events reach the watcher, Linux and Windows git on one index
+    (stat data, filemode, autocrlf)
   - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
     runs View Transitions
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
