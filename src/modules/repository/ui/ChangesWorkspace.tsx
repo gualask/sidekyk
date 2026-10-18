@@ -243,6 +243,7 @@ export function ChangesWorkspace({
                                 renderHeader={(pane) => (
                                     <FileHeader
                                         path={commitFile.path}
+                                        uncolored={pane.uncolored}
                                         origPath={commitFile.origPath}
                                         view={viewSwitch(pane.currentHunk)}
                                         copyDiff={{
@@ -266,6 +267,7 @@ export function ChangesWorkspace({
                             renderHeader={(pane) => (
                                 <FileHeader
                                     path={selected.path}
+                                    uncolored={pane.uncolored}
                                     origPath={selected.origPath}
                                     view={viewSwitch(pane.currentHunk)}
                                     showIn={
@@ -285,9 +287,10 @@ export function ChangesWorkspace({
                             path={unchanged}
                             header={header}
                             finder={find.finderFor(unchanged)}
-                            renderHeader={() => (
+                            renderHeader={(pane) => (
                                 <FileHeader
                                     path={unchanged}
+                                    uncolored={pane.uncolored}
                                     badge={{
                                         label: 'Unchanged',
                                         title: 'Opened from Files; Esc goes back to the changes',

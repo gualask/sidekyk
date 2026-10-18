@@ -95,14 +95,20 @@ Explore and copy:
 
 ## Next
 
-Nothing queued: the mock frozen for the MVP is built (2026-10-17).
+- [x] Syntax colors (2026-10-18): syntect + two-face (bat's ~220 grammars, one engine), One Dark /
+      One Light; both sides of a diff colored from the whole versions, served in 256-line blocks
+      for the rows on screen, kept per version (last 4); 1 MiB per version ("No colors"), lines
+      past 4,000 B and anything past 2 s left in the text's color; a changed version colored
+      again only around its change (VS Code's way: a file written every 250 ms while on screen,
+      23,205 lines, 8-9 ms per write instead of 650 ms; decision in evolution, Syntax colors).
+      Left: try it in the app (`pnpm tauri:dev`)
 
 ## Notes
 
-- [ ] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes).
+- [x] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes).
       Built (2026-10-17): storage, full screen and tile, reorder, Undo toasts, ⌘K by name, long
-      lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects. Left:
-      try it in the app (`pnpm tauri:dev`; so far browser fixtures and Rust tests only)
+      lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects; tried in
+      the app (2026-10-18)
 - [x] Export a project's notes to Markdown from the Notes panel's ⋯ (never inside a repository);
       removing a project with notes asks: export then remove, or delete (nothing left on disk)
 - [x] A moved repository is relinked with Locate… (the problem's fix): notes and layout follow,
@@ -119,7 +125,6 @@ Nothing queued: the mock frozen for the MVP is built (2026-10-17).
 ## Then
 
 - [ ] Collect several hunks with a comment each, copy as one batch
-- [ ] Syntax highlighting: lazy, rows on screen only, skipped above a size limit
 - [ ] Side-by-side view; collapse unchanged regions with expand on demand
 - [ ] Open a file in the editor at the hunk's line
 - [ ] Diff context lines setting; Italian and English UI (as in Fyler); real app icon and tray

@@ -42,6 +42,11 @@ nucleo-matcher = { version = "0.3", default-features = false, features = ["unico
 grep-searcher = "0.1.17"
 grep-regex = "0.1.14"
 grep-matcher = "0.1.9"
+# Syntax colors: TextMate-style grammars, the ~220 of `bat` (two-face), one engine for every
+# language. Chosen over tree-sitter for one stable engine and steady memory (7-16 MB); 4-10x
+# slower, which matters only on large files (2026-10-18, docs/evolution.md).
+syntect = { version = "5.3", default-features = false, features = ["parsing", "regex-onig"] }
+two-face = { version = "0.5", default-features = false, features = ["syntect-onig"] }
 
 [dev-dependencies]
 tempfile = "3"

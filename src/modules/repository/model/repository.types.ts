@@ -166,6 +166,63 @@ export type FileContent =
     /** A folder git lists as one entry: a submodule. */
     | { kind: 'folder' };
 
+/** One version of a file: the two sides of a diff, or the file the Files panel shows. */
+export type FileVersion =
+    | { kind: 'worktree' }
+    | { kind: 'index' }
+    | { kind: 'head' }
+    /** A commit's parent is a commit too. */
+    | { kind: 'commit'; sha: string };
+
+/** The syntax colors of some lines of one version of a file. */
+export interface SyntaxRequest {
+    path: string;
+    version: FileVersion;
+    /** The first line asked for, from 1. */
+    first: number;
+    /** At most 2,048. */
+    count: number;
+}
+
+/** What a part of a line is, for its color (One Dark, One Light). */
+export type SyntaxTone =
+    | 'comment'
+    | 'string'
+    | 'escape'
+    | 'literal'
+    | 'constant'
+    | 'keyword'
+    | 'operator'
+    | 'function'
+    | 'type'
+    | 'tag'
+    | 'attribute'
+    | 'property'
+    | 'parameter'
+    | 'title'
+    | 'link'
+    | 'inserted'
+    | 'deleted';
+
+/**
+ * One line's colors: each colored part's start and end (UTF-16 offsets), in order. `check` hashes
+ * the line's text (`lineCheck`): a line is colored only when its own text has the same.
+ */
+export interface LineColors {
+    check: number;
+    spans: [start: number, end: number, tone: SyntaxTone][];
+}
+
+/**
+ * The colors of the lines asked for, fewer past the end of the file; none when the file has no
+ * grammar, or is binary, missing or too large.
+ */
+export interface SyntaxColors {
+    /** Larger than 1 MiB: shown without colors. */
+    tooLarge: boolean;
+    lines: LineColors[];
+}
+
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {

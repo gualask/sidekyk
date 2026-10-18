@@ -9,6 +9,7 @@ import { fixtureContentSearch, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
+import { type FixtureTexts, fixtureColors, fixtureVersionText } from './syntax.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
 
 export const SCENARIOS = ['review', 'clean', 'no-repo', 'large', 'problems'] as const;
@@ -132,6 +133,37 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         }
     };
 
+    // the versions a diff compares, from the diffs and files served below
+    const texts = (root: string): FixtureTexts => ({
+        changeDiff: (area, path) => {
+            if (!snapshot(root).files.some((f) => f.area === area && f.path === path)) return null;
+            const diff = large(root)
+                ? wholeFileDiff(largeDiff())
+                : reviewDiff({ area, path, wholeFile: true });
+            return diff.text;
+        },
+        fileText: (path) => {
+            if (!tree(root).has(path)) return null;
+            const content = fixtureFileContent(path);
+            return content.kind === 'text' ? content.text : null;
+        },
+        commitDiff: (sha, path) => {
+            for (const { sha: commitSha, parent } of recentCommits(large(root)).commits) {
+                const side = commitSha === sha ? 'new' : parent === sha ? 'old' : null;
+                if (!side) continue;
+                const commit = { sha: commitSha, parent };
+                const file = commitFiles(large(root), commit).files.find(
+                    (f) => (side === 'new' ? f.path : (f.origPath ?? f.path)) === path,
+                );
+                if (!file) continue;
+                const request = { commit, path: file.path, origPath: file.origPath };
+                const diff = commitFileDiff(large(root), { ...request, wholeFile: true });
+                return { text: wholeFileDiff(diff).text, side };
+            }
+            return null;
+        },
+    });
+
     return {
         notes,
         projects: {
@@ -205,6 +237,10 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getFileContent: async (root, path) => {
                 if (!tree(root).has(path)) throw failure('file_missing');
                 return fixtureFileContent(path);
+            },
+            getSyntaxColors: async (root, { path, version, first, count }) => {
+                readable(root);
+                return fixtureColors(fixtureVersionText(texts(root), path, version), first, count);
             },
             onRepositoryChanged: () => () => undefined,
             setWindowVisible: async () => null,

@@ -32,6 +32,7 @@ const ICON_BUTTON = 'btn-icon h-[26px] w-[26px]';
  * in Files, its area and counts), the view a diff shows in, the way to the other panel, and a
  * copy: of the diff when there is one, else of the path. Copy is an icon, as
  * everywhere: its tooltip says what it copies, and it turns into a check for a moment once done.
+ * A file too large to color says so, quietly.
  */
 export function FileHeader({
     path,
@@ -41,6 +42,7 @@ export function FileHeader({
     view = null,
     showIn = null,
     copyDiff = null,
+    uncolored = false,
 }: {
     path: string;
     /** The path before a rename. */
@@ -53,6 +55,8 @@ export function FileHeader({
     showIn?: { panel: keyof typeof SHOW_IN; onShow: () => void } | null;
     /** The copy of the diff, null while it has no hunks; without it, the path copies. */
     copyDiff?: { copied: CopyState; onCopy: (() => void) | null } | null;
+    /** Too large to color (see `PaneHeader`). */
+    uncolored?: boolean;
 }) {
     const shown = origPath ? `${origPath} → ${path}` : path;
     const pathCopy = useCopyToClipboard();
@@ -92,6 +96,14 @@ export function FileHeader({
                             deletions={counts.deletions}
                             binary={counts.binary}
                         />
+                    </span>
+                ) : null}
+                {uncolored ? (
+                    <span
+                        className="shrink-0 font-sans text-[11px] font-normal text-ui-text-muted"
+                        title="Larger than 1 MiB: shown without syntax colors"
+                    >
+                        No colors
                     </span>
                 ) : null}
             </span>

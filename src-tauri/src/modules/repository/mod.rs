@@ -12,14 +12,15 @@ mod ports;
 mod snapshot;
 mod status;
 mod tree;
+mod version;
 
 pub(crate) use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
 #[cfg(test)]
 pub(crate) use contracts::{ChangeArea, Commit};
 pub(crate) use contracts::{
     ChangeKind, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory,
-    FileContent, FileDiffRequest, RecentCommits, RepositoryChangedEvent, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
+    FileContent, FileDiffRequest, FileVersion, RecentCommits, RepositoryChangedEvent,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
 };
 pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::{IgnoredPaths, Visible};
@@ -28,3 +29,4 @@ pub(crate) use open::{repository_name, resolve_repository};
 pub(crate) use ports::{GitOutput, RepositoryBackend, WorktreeEntry};
 pub(crate) use snapshot::{load_snapshot, load_summary};
 pub(crate) use tree::{load_file_content, load_file_tree, FileTree};
+pub(crate) use version::{load_version_text, VersionText};

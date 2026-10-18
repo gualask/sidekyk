@@ -17,7 +17,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                    ├─▶ get_file_diff             one file, one area
                                    ├─▶ get_recent_commits        only while unfolded
                                    ├─▶ get_directory             each open folder, from memory
-                                   └─▶ get_file_content          the unchanged file shown
+                                   ├─▶ get_file_content          the unchanged file shown
+                                   └─▶ get_syntax_colors         blocks of lines on screen
 ```
 
 - A commit's files and diffs (`get_commit_files`, `get_commit_file_diff`) never change: cached
@@ -172,9 +173,11 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   on screen, per-project coalesced snapshot/summary/tree reads, the cached tree). Blocking work on
   `spawn_blocking`.
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
-  (`Book` in memory, `NotesStore` over the `NotesStorage` port): no Tauri.
+  (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over
+  `modules/repository`): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
-  content (`tree.rs`), path checks, ignored-paths filter, contracts. No Tauri; the outside world is
+  content (`tree.rs`), a version's whole text (`version.rs`), path checks, ignored-paths filter,
+  contracts. No Tauri; the outside world is
   the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`).
 - `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`,
   `notes_files.rs`, `logging.rs`.
@@ -222,6 +225,36 @@ killed and output is `truncated` (cut records dropped, diffs cut at a whole line
 - `ProjectsState::file_content`: only files of the tree. `read_entry` refuses a path through a
   linked folder, returns a link's target unfollowed, a submodule as a folder, a file's first
   2 MiB (cut at a whole line; binary by NUL).
+
+### Syntax colors
+
+- `get_syntax_colors` (`modules/syntax/`): `{ path, version, first, count ≤ 2,048 }`, version
+  `worktree` (`read_entry`, links never followed), `index`, `head` or `commit` (`git cat-file blob
+  <rev>:<path>`, ids must be hashes). A diff's old side: index (unstaged), HEAD (staged, the path
+  before a rename), the parent commit; its new side the worktree, index or commit.
+- syntect + two-face: grammar by file name, extension, then first line (`#!`). Theme items whose
+  color is a tone (17 tones: comment, string, keyword…), so syntect's own scope matching folds
+  scopes. Spans per line in UTF-16 offsets, merged when touching with one tone; each line carries
+  `check` (FNV-1a of its UTF-16 units).
+- Limits: 1 MiB per version (`tooLarge`, "No colors" in the header); lines past 4,000 bytes keep
+  the text's color (a minified line: 4,000 B 29 ms, 32,000 B 1.9 s); coloring stops after 2 s.
+  The largest source file of Zed's clone (885 KiB, 23,205 lines): 0.64 s; a kept block 0.4 ms.
+- `ColorCache` (managed state, `cache.rs`): a thread of its own, started on the first text
+  colored, idle on its channel; it alone holds the parser states (oniguruma regions cannot leave
+  their thread). The last 4 versions' lines are kept in a table callers read without it (key:
+  root, path, version; bytes hashed at each request). Jobs run in order; one whose text was colored
+  meanwhile is answered from the table, one with a newer text of its file queued behind it with
+  `None` (its caller reads the file again, 3 times, then gets the file's last colors, which
+  `lineCheck` filters); a newer text stops the run of an older one. Bytes become text on the
+  thread, only to color. A panic loses that text's colors, not the thread.
+- A changed version is colored from the last (`colors.rs`, as VS Code): the state kept every 64
+  lines; from the last one at or before the first changed line, until, in the unchanged tail, the
+  state equals one kept there, whose lines and states are reused, shifted. A line edited in 23,205:
+  8-9 ms; an unclosed comment colors to the end.
+- Frontend: `DiffList` asks for the 256-line blocks of the rows on screen (`useSyntaxColors`,
+  `model/syntax.ts`); a line takes its colors only when `lineCheck(text)` matches, so colors read
+  before a change never land on other text. Worktree blocks are invalidated by every change,
+  index/HEAD ones only when the git dir changed, commit ones never.
 
 ### Search
 

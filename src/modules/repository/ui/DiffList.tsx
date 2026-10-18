@@ -2,6 +2,7 @@ import { IconCheck, IconCopy, IconCopyOff } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
+import { useSyntaxColors } from '../application/repository.queries';
 import { useRepositorySettings } from '../application/repository-settings';
 import {
     type Copied,
@@ -15,6 +16,7 @@ import {
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import type { FindMatch } from '../model/find';
+import { blocksOf, type FileSyntax } from '../model/syntax';
 import { DiffLineRow, HunkHeaderRow, type LineFound } from './DiffRows';
 import {
     BRACKET_WIDTH,
@@ -57,7 +59,9 @@ type Flash = Span & { label: string; right: number; key: number };
  * lines above it; `reader` tells which hunk is being read meanwhile, as many lines below the top,
  * for the other view to open on, and steps to the next or previous one (`n`/`p`).
  * `found` marks the text looked for, and brings the match being read on screen. `topSpace` leaves
- * room above the first row, under the find bar floating over the list, as VS Code does.
+ * room above the first row, under the find bar floating over the list, as VS Code does. The lines
+ * on screen take the colors of `syntax`, read a block at a time; `onTooLarge` says when a version
+ * is too large to color.
  */
 export function DiffList({
     source,
@@ -73,6 +77,8 @@ export function DiffList({
     onCurrent,
     found,
     topSpace,
+    syntax,
+    onTooLarge,
 }: {
     source: CopySource;
     rows: readonly DiffRow[];
@@ -91,6 +97,8 @@ export function DiffList({
     found: { matches: readonly FindMatch[]; current: number } | null;
     /** Room above the first row, in pixels: none without the find bar. */
     topSpace: number;
+    syntax: FileSyntax;
+    onTooLarge: (tooLarge: boolean) => void;
 }) {
     const { copyTemplate } = useRepositorySettings();
     const listRef = useRef<HTMLDivElement>(null);
@@ -220,6 +228,12 @@ export function DiffList({
     const hoveredSpan = hovered ? targetSpan(layout, hovered) : undefined;
     const hoveredHunk = hovered?.kind === 'hunk' ? hovered.hunk : -1;
     const items = virtualizer.getVirtualItems();
+    const shownLines = items.flatMap((item): DiffLine[] => {
+        const row = rows[item.index];
+        return row?.kind === 'line' ? [row.line] : [];
+    });
+    const colors = useSyntaxColors(syntax.root, syntax.sides, blocksOf(shownLines, syntax.sides));
+    useEffect(() => onTooLarge(colors.tooLarge), [colors.tooLarge, onTooLarge]);
     const brackets = hunksBetween(layout, rows, items[0]?.index ?? 0, items.at(-1)?.index ?? -1);
 
     const minWidth = `calc(${LINE_CHROME_WIDTH}px + ${widest}ch)`;
@@ -253,7 +267,11 @@ export function DiffList({
                                     onCopy={() => copyTarget({ kind: 'hunk', hunk: row.hunkIndex })}
                                 />
                             ) : (
-                                <DiffLineRow line={row.line} found={lineFound(item.index)} />
+                                <DiffLineRow
+                                    line={row.line}
+                                    colors={colors.colorsOf(row.line)}
+                                    found={lineFound(item.index)}
+                                />
                             )}
                         </div>
                     );

@@ -4,6 +4,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { FileFinder } from '../application/find';
 import { useFileContent } from '../application/repository.queries';
 import { textLines, textRows } from '../model/diff-rows';
+import { fileSides } from '../model/syntax';
 import { Notice, Pane, type PaneHeader } from './Pane';
 
 const NO_HUNKS: [] = [];
@@ -32,6 +33,7 @@ export function TextFileView({
     const text = data?.kind === 'text' ? data : null;
     const { rows, widest } = useMemo(() => textRows(textLines(text?.text ?? '')), [text]);
     const source = useMemo(() => ({ path, origPath: null, commit: null }), [path]);
+    const syntax = useMemo(() => ({ root, sides: fileSides(path) }), [root, path]);
 
     return (
         <Pane
@@ -44,6 +46,7 @@ export function TextFileView({
             openOn={null}
             linesAbove={0}
             finder={finder}
+            syntax={syntax}
         >
             {content.isPending ? <Notice>Loading file…</Notice> : null}
             {content.isError ? (

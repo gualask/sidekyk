@@ -221,6 +221,7 @@ export function FilesWorkspace({
             renderHeader={(pane) => (
                 <FileHeader
                     path={change.path}
+                    uncolored={pane.uncolored}
                     badge={{ label: CHANGE_AREA_LABEL[change.area] }}
                     counts={change}
                     showIn={{
@@ -243,7 +244,7 @@ export function FilesWorkspace({
             path={file}
             header={header}
             finder={find.finderFor(file)}
-            renderHeader={() => <FileHeader path={file} />}
+            renderHeader={(pane) => <FileHeader path={file} uncolored={pane.uncolored} />}
         />
     );
 

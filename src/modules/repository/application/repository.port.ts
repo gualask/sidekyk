@@ -10,6 +10,8 @@ import type {
     RepositoryChangedEvent,
     RepositorySnapshot,
     RepositorySummary,
+    SyntaxColors,
+    SyntaxRequest,
     UnifiedDiff,
 } from '../model/repository.types';
 
@@ -30,6 +32,8 @@ export interface RepositoryPort {
     getDirectory(root: string, path: string): Promise<Directory>;
     /** A file of the tree, as the Files panel shows it. */
     getFileContent(root: string, path: string): Promise<FileContent>;
+    /** The colors of a block of lines of one version of a file: colored whole once, then kept. */
+    getSyntaxColors(root: string, request: SyntaxRequest): Promise<SyntaxColors>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
     /**

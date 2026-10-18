@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import { commitRequest } from '../model/commits';
+import type { DiffLine } from '../model/diff-parser';
 import { foldersToRead } from '../model/file-tree';
 import type {
     Commit,
@@ -17,7 +18,17 @@ import type {
     Directory,
     FileDiffRequest,
     RepositorySnapshot,
+    SyntaxColors,
 } from '../model/repository.types';
+import {
+    blockKey,
+    COLOR_BLOCK,
+    type ColorBlock,
+    type ColorSides,
+    type ColorSource,
+    type LineSpans,
+    lineColors,
+} from '../model/syntax';
 import { useRepositoryPort } from './repository.port';
 
 /** Every query of a repository starts with its root, so a change on disk refetches only its own. */
@@ -39,6 +50,9 @@ const repositoryKeys = {
     directory: (root: string, path: string) =>
         [...repositoryKeys.of(root), 'directory', path] as const,
     file: (root: string, path: string) => [...repositoryKeys.of(root), 'file', path] as const,
+    /** The working tree's, the index's or HEAD's: `[3]` is the version. */
+    colors: (root: string, { path, version }: ColorSource, first: number) =>
+        [...repositoryKeys.of(root), 'colors', version.kind, path, first] as const,
 };
 
 /**
@@ -58,6 +72,8 @@ const commitKeys = {
             request.origPath,
             request.wholeFile,
         ] as const,
+    colors: (root: string, sha: string, path: string, first: number) =>
+        ['commit', root, sha, 'colors', path, first] as const,
 };
 
 /**
@@ -208,6 +224,60 @@ export function useCommitFileDiff(root: string, request: CommitFileDiffRequest |
     });
 }
 
+/** The viewer's colors: a line's, or none; and whether a version was too large to color. */
+export interface ShownColors {
+    colorsOf: (line: DiffLine) => LineSpans | undefined;
+    tooLarge: boolean;
+}
+
+const NO_COLORS: ShownColors = { colorsOf: () => undefined, tooLarge: false };
+
+/**
+ * The colors of the blocks of lines on screen, each block read once per version of its file:
+ * the working tree's again when a change on disk comes, the index's and HEAD's when git's own
+ * files changed, a commit's never. A line takes its colors only while its text is the one colored,
+ * so colors read before a change never land on other text while the next read comes.
+ */
+export function useSyntaxColors(
+    root: string,
+    sides: ColorSides,
+    blocks: readonly ColorBlock[],
+): ShownColors {
+    const port = useRepositoryPort();
+    const shown = blocks.flatMap((block) => {
+        const source = sides[block.side];
+        return source ? [{ ...block, source }] : [];
+    });
+    return useQueries({
+        queries: shown.map(({ source, first }) => ({
+            queryKey:
+                source.version.kind === 'commit'
+                    ? commitKeys.colors(root, source.version.sha, source.path, first)
+                    : repositoryKeys.colors(root, source, first),
+            queryFn: () =>
+                port.getSyntaxColors(root, {
+                    path: source.path,
+                    version: source.version,
+                    first,
+                    count: COLOR_BLOCK,
+                }),
+            staleTime: source.version.kind === 'commit' ? Number.POSITIVE_INFINITY : 0,
+        })),
+        combine: (results) => {
+            const read = new Map<string, SyntaxColors>();
+            results.forEach((result, index) => {
+                const block = shown[index];
+                if (block && result.data) read.set(blockKey(block), result.data);
+            });
+            if (read.size === 0) return NO_COLORS;
+            return {
+                colorsOf: (line: DiffLine) => lineColors(read, line),
+                tooLarge: [...read.values()].some((colors) => colors.tooLarge),
+            };
+        },
+    });
+}
+
 /** The roots whose last read failed as moved or deleted, joined by NUL (no path has one). */
 function missingRoots(cache: QueryCache): string {
     const roots = new Set<string>();
@@ -253,8 +323,11 @@ export function useRepositoryChangeSubscription() {
             port.onRepositoryChanged(({ root, gitDir }) => {
                 void queryClient.invalidateQueries({
                     queryKey: repositoryKeys.of(root),
-                    // files written in the working tree make no commit
-                    predicate: (query) => gitDir || query.queryKey[2] !== 'commits',
+                    // files written in the working tree make no commit, and change neither the
+                    // index nor HEAD
+                    predicate: ({ queryKey: [, , kind, version] }) =>
+                        gitDir ||
+                        (kind !== 'commits' && (kind !== 'colors' || version === 'worktree')),
                 });
             }),
         [port, queryClient],

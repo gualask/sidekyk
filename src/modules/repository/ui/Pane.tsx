@@ -10,6 +10,7 @@ import { type CopySource, fileText } from '../model/copied';
 import type { DiffHunk } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
+import type { FileSyntax } from '../model/syntax';
 import { DiffList, type HunkReader } from './DiffList';
 import { diffLayout, FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
@@ -32,6 +33,8 @@ export interface PaneHeader {
     fileCopied: CopyState;
     /** The hunk being read, for the other view, or the other panel, to open on. */
     currentHunk: () => number;
+    /** The file is too large to color: shown in the text's color alone. */
+    uncolored: boolean;
 }
 
 /**
@@ -75,6 +78,7 @@ export function Pane({
     openOn,
     linesAbove,
     finder,
+    syntax,
     onPastEnd,
     children,
 }: {
@@ -92,6 +96,8 @@ export function Pane({
     /** Lines left above that hunk, so it shows where it sits. */
     linesAbove: number;
     finder: FileFinder;
+    /** What the lines are colored from. */
+    syntax: FileSyntax;
     /**
      * `n`/`p` go through the changes, and past the last or the first go on here (the next or
      * previous file); without it, the pane takes no `n`/`p`.
@@ -110,6 +116,7 @@ export function Pane({
     const bars = useScrollbars(scrollElement);
     const reader = useRef<HunkReader | null>(null);
     const { copied, copy } = useCopyToClipboard();
+    const [uncolored, setUncolored] = useState(false);
     const pane = useMemo<PaneHeader>(
         () => ({
             copyFile:
@@ -118,8 +125,9 @@ export function Pane({
                     : null,
             fileCopied: copied?.id === 'file' ? copied : null,
             currentHunk: () => reader.current?.current() ?? 0,
+            uncolored,
         }),
-        [hunks, copy, copyTemplate, source, copied],
+        [hunks, copy, copyTemplate, source, copied, uncolored],
     );
 
     // the matches of the text looked for; a new text, or the file read again, starts from the
@@ -209,6 +217,8 @@ export function Pane({
                             onCurrent={setStepped}
                             found={find && matches.length > 0 ? { matches, current: index } : null}
                             topSpace={topSpace}
+                            syntax={syntax}
+                            onTooLarge={setUncolored}
                         />
                     ) : null}
                     {children}

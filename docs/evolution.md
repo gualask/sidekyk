@@ -225,6 +225,26 @@ and a stable API do. Behind `modules/search/rank.rs`.
 - Conflicts: refused ones keep the previous; macOS accepts duplicates silently, so its own
   shortcuts are read (`CopySymbolicHotKeys`) to warn. `⌥`-only shortcuts work on macOS 27.
 
+## Syntax colors (2026-10-18)
+
+- `syntect` 5.3 (oniguruma) with `two-face` (bat's ~220 grammars), one engine for every language.
+  Unknown files stay in the text's color, as in Zed and VS Code.
+- Measured (Apple Silicon, one thread): tree-sitter 4-10x faster (Zed's `editor.rs`, 13,291 lines:
+  74 ms vs 344 ms) but 1 grammar crate per language, 4-25 MB of memory per grammar on first use
+  (SQL +22 MB, Swift 114 ms to load); two-face 7-16 MB whatever the language, ~2 ms to load.
+  Rejected: hybrid tree-sitter (arborium grammars) + two-face fallback (41 crates, two engines);
+  `giallo` (VS Code grammars: as slow as syntect, 42-98 MB, young); `tree-sitter-language-pack`
+  at runtime (26 MB download of native libraries, ad-hoc signed: a hardened-runtime app refuses
+  them; TypeScript query without its JavaScript base); Shiki in the WebView (heavy work stays in
+  Rust).
+- Theme: One Dark / One Light (Zed's `one.json`, Atom's One, MIT).
+- Coloring again after a change as VS Code does (2026-10-18): measured first on a file written
+  every 250 ms while on screen (`syntax_colors_while_written`). Whole each time, a 5,192-line file
+  showed 0 of 19 answers in time (each new text stopped the run of the last) and kept a core busy
+  (5.2 s CPU in 5.2 s); from the state before the change, until the state meets one kept past it:
+  19 of 19 in 8-9 ms, 0.18 s CPU (23,205 lines: 0.22 s). Coloring runs on a thread of its own:
+  syntect's parser states hold oniguruma regions, which cannot leave their thread (no `unsafe`).
+
 ## What changes in the rules
 
 When notes and sync land, `AGENTS.md` says: repositories are never written, app data is; sync is

@@ -11,6 +11,7 @@ use crate::modules::repository::{
     FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
     UnifiedDiff,
 };
+use crate::modules::syntax::{self, ColorCache, SyntaxColors, SyntaxRequest};
 use crate::shared::error::AppError;
 
 /// Runs `work` off the async runtime on a project the user added, with the git backend.
@@ -138,6 +139,22 @@ pub(crate) async fn get_file_content(
         let backend = app.state::<LocalRepositoryBackend>();
         app.state::<ProjectsState>()
             .file_content(backend.inner(), &root, &path)
+    })
+    .await
+}
+
+#[tauri::command]
+/// The syntax colors of some lines of one version of a file of a project.
+pub(crate) async fn get_syntax_colors(
+    app: tauri::AppHandle,
+    root: String,
+    request: SyntaxRequest,
+) -> Result<SyntaxColors, AppError> {
+    blocking("get_syntax_colors", app, move |app| {
+        let info = app.state::<ProjectsState>().project(&root)?;
+        let backend = app.state::<LocalRepositoryBackend>();
+        let cache = app.state::<ColorCache>();
+        syntax::load_syntax_colors(backend.inner(), &info, cache.inner(), &request)
     })
     .await
 }

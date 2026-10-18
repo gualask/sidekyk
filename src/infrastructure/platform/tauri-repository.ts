@@ -20,6 +20,7 @@ export const tauriRepository: RepositoryPort = {
     getCommitFileDiff: (root, request) => invoke('get_commit_file_diff', { root, request }),
     getDirectory: (root, path) => invoke('get_directory', { root, path }),
     getFileContent: (root, path) => invoke('get_file_content', { root, path }),
+    getSyntaxColors: (root, request) => invoke('get_syntax_colors', { root, request }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),
     setWindowVisible: (visible) =>

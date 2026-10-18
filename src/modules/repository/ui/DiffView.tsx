@@ -9,6 +9,7 @@ import { commitRequest, shortSha } from '../model/commits';
 import { parseUnifiedDiff } from '../model/diff-parser';
 import { diffRows, wholeFileRows, widestLine } from '../model/diff-rows';
 import type { ChangedFile, Commit, FileChange, UnifiedDiff } from '../model/repository.types';
+import { changeSides, commitSides, type FileSyntax } from '../model/syntax';
 import { wholeFile } from '../model/whole-file';
 import { Notice, Pane, type PaneHeader } from './Pane';
 
@@ -34,6 +35,7 @@ function DiffPane({
     diff,
     file,
     commit,
+    syntax,
     view,
     openOn,
     header,
@@ -45,6 +47,7 @@ function DiffPane({
     file: FileChange;
     /** The commit shown (its short hash); null for the working tree. */
     commit: string | null;
+    syntax: FileSyntax;
 }) {
     const parsed = useMemo(
         () => (diff.data ? parseUnifiedDiff(diff.data.text) : null),
@@ -78,6 +81,7 @@ function DiffPane({
             openOn={openOn}
             linesAbove={whole ? LINES_ABOVE : 0}
             finder={finder}
+            syntax={syntax}
             // until the diff is read there are no changes to go through: the keys wait
             onPastEnd={diff.isPending ? undefined : onPastEnd}
         >
@@ -119,7 +123,12 @@ export function ChangeDiffView({
         area: file.area,
         wholeFile: shown.view === 'file',
     });
-    return <DiffPane diff={diff} file={file} commit={null} {...shown} />;
+    const { path, origPath, area } = file;
+    const syntax = useMemo(
+        () => ({ root, sides: changeSides({ path, origPath, area }) }),
+        [root, path, origPath, area],
+    );
+    return <DiffPane diff={diff} file={file} commit={null} syntax={syntax} {...shown} />;
 }
 
 /** A file of a commit, against the commit's parent. */
@@ -135,5 +144,19 @@ export function CommitDiffView({
         origPath: file.origPath,
         wholeFile: shown.view === 'file',
     });
-    return <DiffPane diff={diff} file={file} commit={shortSha(commit.sha)} {...shown} />;
+    const { sha, parent } = commit;
+    const { path, origPath } = file;
+    const syntax = useMemo(
+        () => ({ root, sides: commitSides({ sha, parent }, { path, origPath }) }),
+        [root, sha, parent, path, origPath],
+    );
+    return (
+        <DiffPane
+            diff={diff}
+            file={file}
+            commit={shortSha(commit.sha)}
+            syntax={syntax}
+            {...shown}
+        />
+    );
 }

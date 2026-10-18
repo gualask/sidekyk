@@ -22,6 +22,7 @@ use crate::interfaces::tauri::window::{
 use crate::modules::notes::NotesStore;
 use crate::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 use crate::modules::settings::Theme;
+use crate::modules::syntax::ColorCache;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -79,6 +80,7 @@ pub(crate) fn run() {
         .manage(ProjectsState::default())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
+        .manage(ColorCache::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
@@ -123,6 +125,7 @@ pub(crate) fn run() {
             tauri_commands::repository::get_commit_file_diff,
             tauri_commands::repository::get_directory,
             tauri_commands::repository::get_file_content,
+            tauri_commands::repository::get_syntax_colors,
             tauri_commands::notes::get_notes,
             tauri_commands::notes::add_note,
             tauri_commands::notes::set_note_text,

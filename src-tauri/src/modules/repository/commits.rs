@@ -27,7 +27,7 @@ const MAX_LOG_BYTES: usize = 1024 * 1024;
 
 /// What git takes for a commit: a whole or abbreviated hash. Anything else is refused before
 /// git runs, so the frontend cannot pass an option or a revision expression.
-fn checked_commit(id: &str) -> anyhow::Result<&str> {
+pub(super) fn checked_commit(id: &str) -> anyhow::Result<&str> {
     let hash = (4..=64).contains(&id.len()) && id.bytes().all(|b| b.is_ascii_hexdigit());
     if hash {
         Ok(id)

@@ -227,6 +227,17 @@ pub(crate) struct Directory {
     pub(crate) truncated: bool,
 }
 
+/// One version of a file: the two sides of a diff, or the file the Files panel shows. A commit's
+/// parent is a commit too.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub(crate) enum FileVersion {
+    Worktree,
+    Index,
+    Head,
+    Commit { sha: String },
+}
+
 /// A file as the Files panel shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

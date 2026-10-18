@@ -300,13 +300,14 @@ mod tests {
     use super::*;
     use crate::modules::repository::{
         load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
-        load_file_tree, load_recent_commits, load_snapshot, load_summary, resolve_repository,
-        ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest,
-        IgnoredPaths, RepositorySnapshot, Visible,
+        load_file_tree, load_recent_commits, load_snapshot, load_summary, load_version_text,
+        resolve_repository, ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
+        FileDiffRequest, FileVersion, IgnoredPaths, RepositorySnapshot, VersionText, Visible,
     };
     use crate::modules::search::{
         search, search_contents, ContentSearch, ProjectFiles, SearchRequest,
     };
+    use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
 
     fn git(root: &Path, args: &[&str]) {
@@ -605,6 +606,80 @@ mod tests {
         let merged = load_commit_files(&backend, &repo.info, &commit(&recent.commits[0])).unwrap();
         let paths: Vec<&str> = merged.files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["src/side.ts"]);
+    }
+
+    #[test]
+    fn versions_of_a_file_read_whole_and_color_a_block_at_a_time() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        let head = backend.git(root, &["rev-parse", "HEAD"], 100).unwrap();
+        let sha = String::from_utf8(head.stdout).unwrap().trim().to_string();
+        write(root, "src/cart.ts", "a\nI\nc\n");
+        git(root, &["add", "src/cart.ts"]);
+        write(root, "src/cart.ts", "a\nW\nc\n");
+        write(root, "image.bin", "\0\x01");
+
+        let text = |path: &str, version: FileVersion| {
+            load_version_text(&backend, &repo.info, path, &version, 1024).unwrap()
+        };
+        let read = |body: &str| VersionText::Text(body.as_bytes().to_vec());
+        assert_eq!(
+            text("src/cart.ts", FileVersion::Worktree),
+            read("a\nW\nc\n")
+        );
+        assert_eq!(text("src/cart.ts", FileVersion::Index), read("a\nI\nc\n"));
+        assert_eq!(text("src/cart.ts", FileVersion::Head), read("a\nb\nc\n"));
+        let commit = FileVersion::Commit { sha: sha.clone() };
+        assert_eq!(text("src/cart.ts", commit.clone()), read("a\nb\nc\n"));
+        assert_eq!(text("new.ts", FileVersion::Head), VersionText::Missing);
+        assert_eq!(
+            text("image.bin", FileVersion::Worktree),
+            VersionText::Binary
+        );
+        let small = |version: FileVersion| {
+            load_version_text(&backend, &repo.info, "src/cart.ts", &version, 3).unwrap()
+        };
+        assert_eq!(small(FileVersion::Worktree), VersionText::TooLarge);
+        assert_eq!(small(FileVersion::Head), VersionText::TooLarge);
+        let revision = FileVersion::Commit {
+            sha: "HEAD~1".into(),
+        };
+        assert!(load_version_text(&backend, &repo.info, "src/cart.ts", &revision, 9).is_err());
+        assert!(load_version_text(&backend, &repo.info, "../x", &FileVersion::Head, 9).is_err());
+
+        write(
+            root,
+            "src/total.ts",
+            "const total = 1;\n// the end\nlet x = 2;\n",
+        );
+        let cache = ColorCache::default();
+        let colors = |first: u32, count: u32| {
+            let request = SyntaxRequest {
+                path: "src/total.ts".into(),
+                version: FileVersion::Worktree,
+                first,
+                count,
+            };
+            let colors = load_syntax_colors(&backend, &repo.info, &cache, &request).unwrap();
+            serde_json::to_value(colors).unwrap()
+        };
+        let block = colors(2, 5);
+        assert_eq!(block["tooLarge"], false);
+        assert_eq!(
+            block["lines"].as_array().unwrap().len(),
+            2,
+            "two lines from the second"
+        );
+        assert_eq!(block["lines"][0]["spans"], json!([[0, 10, "comment"]]));
+        assert_eq!(block["lines"][1]["spans"][0], json!([0, 3, "keyword"]));
+        // the file changed: colored again
+        write(root, "src/total.ts", "// only\n");
+        assert_eq!(
+            colors(1, 1)["lines"][0]["spans"],
+            json!([[0, 7, "comment"]])
+        );
     }
 
     #[test]
@@ -956,6 +1031,39 @@ mod tests {
             );
         }
 
+        // syntax colors of the largest source file colored (1 MiB at most), whole, then a block
+        const SOURCE: [&str; 8] = [".rs", ".ts", ".tsx", ".js", ".c", ".h", ".py", ".go"];
+        let sources = files
+            .iter()
+            .filter(|path| SOURCE.iter().any(|e| path.ends_with(e)));
+        let sized = sources.filter_map(|path| {
+            let meta = std::fs::metadata(Path::new(&repo.info.root).join(path)).ok()?;
+            (meta.len() <= 1024 * 1024).then_some((meta.len(), *path))
+        });
+        if let Some((bytes, path)) = sized.max() {
+            let request = SyntaxRequest {
+                path: path.to_string(),
+                version: FileVersion::Worktree,
+                first: 1,
+                count: 256,
+            };
+            println!(
+                "colors of {path} ({} KiB): {}",
+                bytes / 1024,
+                time(5, || {
+                    load_syntax_colors(&backend, &repo.info, &ColorCache::default(), &request)
+                        .unwrap();
+                })
+            );
+            let cache = ColorCache::default();
+            println!(
+                "a block of it, colored before: {}",
+                time(20, || {
+                    load_syntax_colors(&backend, &repo.info, &cache, &request).unwrap();
+                })
+            );
+        }
+
         let snapshot = load_snapshot(&backend, &repo.info).unwrap();
         let Some(largest) = snapshot
             .files
@@ -979,5 +1087,135 @@ mod tests {
                 load_file_diff(&backend, &repo.info, &request).unwrap();
             })
         );
+    }
+
+    /// This process's CPU time so far, as `ps` reports it (`[[h:]m:]s[.cc]`).
+    fn cpu_time() -> Duration {
+        let pid = std::process::id().to_string();
+        let out = Command::new("ps")
+            .args(["-o", "cputime=", "-p", &pid])
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&out.stdout);
+        let seconds = text.trim().split(':').fold(0.0, |total, part| {
+            total * 60.0 + part.parse::<f64>().unwrap()
+        });
+        Duration::from_secs_f64(seconds)
+    }
+
+    /// Syntax colors while an agent writes the file on screen: written every 250 ms (the
+    /// watcher's batches during a burst), and after each write the block on screen, at the end of
+    /// the file, asked for as the viewer does when a change invalidates it, without waiting for
+    /// the last answer. An answer shows only if it comes before the next write (the viewer drops
+    /// the others). Two edits: a line changed in the middle, a line added near the top.
+    /// `SIDEKYK_BENCH_FILE=/path/to/file cargo test --release syntax_colors_while_written -- --ignored --nocapture`
+    #[test]
+    #[ignore = "benchmark, needs SIDEKYK_BENCH_FILE"]
+    fn syntax_colors_while_written() {
+        const WRITES: usize = 20;
+        const EVERY: Duration = Duration::from_millis(250);
+        let source = std::env::var("SIDEKYK_BENCH_FILE").expect("SIDEKYK_BENCH_FILE is set");
+        let source = Path::new(&source);
+        let name = source.file_name().unwrap().to_str().unwrap().to_string();
+        let original: Vec<String> = std::fs::read_to_string(source)
+            .unwrap()
+            .lines()
+            .map(String::from)
+            .collect();
+        let dir = scratch_repo();
+        let backend = std::sync::Arc::new(LocalRepositoryBackend::default());
+        let repo = resolve_repository(&*backend, dir.path()).unwrap().info;
+        let root = Path::new(&repo.root).to_path_buf();
+        // the block of the last screen of the file
+        let first = original.len().saturating_sub(40) / 256 * 256 + 1;
+        let request = SyntaxRequest {
+            path: name.clone(),
+            version: FileVersion::Worktree,
+            first: first as u32,
+            count: 256,
+        };
+
+        type Edit = fn(&mut Vec<String>, usize);
+        let edits: [(&str, Edit); 2] = [
+            ("a line changed in the middle", |lines, i| {
+                let middle = lines.len() / 2;
+                lines[middle] = format!("// edit {i}");
+            }),
+            ("a line added near the top", |lines, i| {
+                let at = lines.len() / 10;
+                lines.insert(at, format!("// edit {i}"));
+            }),
+        ];
+        for (edit_name, edit) in edits {
+            let cache = std::sync::Arc::new(ColorCache::default());
+            let mut lines = original.clone();
+            write(&root, &name, &format!("{}\n", lines.join("\n")));
+            let started = Instant::now();
+            load_syntax_colors(&*backend, &repo, &cache, &request).unwrap();
+            let cold = started.elapsed();
+
+            let cpu = cpu_time();
+            let burst = Instant::now();
+            let mut asks = Vec::new();
+            for i in 0..WRITES {
+                edit(&mut lines, i);
+                let expected: Vec<u64> = lines
+                    .iter()
+                    .skip(first - 1)
+                    .take(256)
+                    .map(|line| u64::from(line_check(line)))
+                    .collect();
+                write(&root, &name, &format!("{}\n", lines.join("\n")));
+                let written = Instant::now();
+                let (backend, cache, repo, request) = (
+                    backend.clone(),
+                    cache.clone(),
+                    repo.clone(),
+                    request.clone(),
+                );
+                asks.push(std::thread::spawn(move || {
+                    let colors = load_syntax_colors(&*backend, &repo, &cache, &request).unwrap();
+                    let answered = written.elapsed();
+                    let colors = serde_json::to_value(colors).unwrap();
+                    let checks: Vec<u64> = colors["lines"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|line| line["check"].as_u64().unwrap())
+                        .collect();
+                    // the colors of this version, not of a newer one read again
+                    (answered, checks == expected)
+                }));
+                std::thread::sleep(EVERY.saturating_sub(written.elapsed()));
+            }
+            let answers: Vec<_> = asks.into_iter().map(|ask| ask.join().unwrap()).collect();
+            let cpu = cpu_time() - cpu;
+            let wall = burst.elapsed();
+
+            let in_time = answers[..WRITES - 1]
+                .iter()
+                .filter(|&&(time, own)| own && time < EVERY)
+                .count();
+            let (last, last_own) = answers[WRITES - 1];
+            let mut times: Vec<_> = answers.iter().map(|&(time, _)| time).collect();
+            times.sort();
+            println!(
+                "{name} ({} lines), {edit_name}: first colors {cold:.0?}; shown {in_time}/{} \
+                 answers; answer median {:.0?}, max {:.0?}; colors {:.0?} after the last \
+                 write{}; CPU {:.2} s in {:.2} s",
+                original.len(),
+                WRITES - 1,
+                times[WRITES / 2],
+                times[WRITES - 1],
+                last,
+                if last_own {
+                    ""
+                } else {
+                    " (of another version)"
+                },
+                cpu.as_secs_f64(),
+                wall.as_secs_f64(),
+            );
+        }
     }
 }

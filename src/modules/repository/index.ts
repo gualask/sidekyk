@@ -14,14 +14,17 @@ export {
     type Directory,
     type FileChange,
     type FileContent,
+    type FileVersion,
     REPOSITORY_CHANGED_EVENT,
     type RecentCommits,
     type RepositoryChangedEvent,
     type RepositorySnapshot,
     type RepositorySummary,
+    type SyntaxColors,
     type TreeEntry,
     type UnifiedDiff,
 } from './model/repository.types';
+export { lineCheck } from './model/syntax';
 export { fileTarget } from './model/targets';
 export { changesPanel, filesPanel } from './panel';
 export { ChangeCount } from './ui/ChangeCount';
