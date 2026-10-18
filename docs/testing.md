@@ -32,7 +32,9 @@ machine at hand (the Mac); every platform is checked before a release.
 
 `pnpm dev`, `http://localhost:1420/?dev=app&scenario=…` (`src/dev/`, dev builds only): the app on
 in-memory ports. Scenarios: `review` (changes, commits, notes, long files changed in many places),
-`clean`, `no-repo`, `large`, `problems` (a missing repository). UI changes are checked there, in
+`clean`, `no-repo`, `large`, `problems` (a missing repository; WSL projects whose distro is
+stopped, gone or without git). `review` has a WSL clone of its project, whose helper takes 1.5 s
+to start. UI changes are checked there, in
 light and dark.
 
 ## Timing tests

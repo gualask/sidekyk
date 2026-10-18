@@ -9,8 +9,8 @@ describe('avatarColor', () => {
     });
 
     it('spreads projects over the colors', () => {
-        const roots = Array.from({ length: 24 }, (_, i) => `/Users/dev/Projects/p${i}`);
-        expect(new Set(roots.map(avatarColor)).size).toBeGreaterThan(3);
+        const ids = Array.from({ length: 24 }, (_, i) => `/Users/dev/Projects/p${i}`);
+        expect(new Set(ids.map(avatarColor)).size).toBeGreaterThan(3);
     });
 });
 

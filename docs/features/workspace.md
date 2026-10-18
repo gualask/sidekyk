@@ -25,7 +25,8 @@ problems. Why semantic zoom: `../product.md`.
   Icons from Tabler.
 - Copy is one icon everywhere, its tooltip says what it copies, a check once done.
 - Toasts for passing events (bottom center, max three; errors stay); lasting problems in the top
-  bar, each with its fix (`repository_missing`: Locate…, Remove; a refused global shortcut).
+  bar, each with its fix (`repository_missing`: Locate…, Remove; a WSL distro gone, no git there,
+  the helper not starting: Try again, Remove; a refused global shortcut).
 - Theme dark by default, light in settings; no system following.
 - Settings: modal (`⌘,`, gear), applies at once: theme, diff view and scrollbar width, copy
   template, long lines in notes, global shortcut.

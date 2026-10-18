@@ -28,6 +28,7 @@ pub struct RepositoryChange {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
+    /// 2: the project named by its id; 1 named its root.
     pub version: u8,
     pub project_id: String,
     /// As in `RepositoryChange`.
@@ -37,7 +38,7 @@ pub struct RepositoryChangedEvent {
 impl RepositoryChangedEvent {
     pub fn new(project_id: &str, git_dir: bool) -> Self {
         Self {
-            version: 1,
+            version: 2,
             project_id: project_id.to_string(),
             git_dir,
         }
@@ -361,7 +362,7 @@ mod tests {
     fn repository_changed_event_is_versioned() {
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("/r", true)).unwrap(),
-            serde_json::json!({ "version": 1, "projectId": "/r", "gitDir": true })
+            serde_json::json!({ "version": 2, "projectId": "/r", "gitDir": true })
         );
     }
 

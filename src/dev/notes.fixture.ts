@@ -296,7 +296,7 @@ export function fixtureNotes(
         // as if saved where the dialog first offers
         exportNotes: async (projectId) => {
             book(projectId);
-            return `/Users/dev/Documents/${projectId.split('/').pop()}-notes.md`;
+            return '/Users/dev/Documents/notes.md';
         },
         openList: async (projectId, id) => {
             const b = book(projectId);

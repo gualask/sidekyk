@@ -12,10 +12,10 @@ const USER_MESSAGES: Record<string, string> = {
         'Sidekyk never writes inside a repository: pick a folder outside your projects.',
     file_missing: 'This file is no longer in the repository: it was moved or deleted.',
     git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
-    helper_failed:
-        "Sidekyk could not start in this project's WSL distro: see the top bar's warning.",
     git_timed_out:
         'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',
+    helper_failed:
+        "Sidekyk could not start in this project's WSL distro: see the top bar's warning.",
     invalid_commit: 'That is not a commit of this repository.',
     invalid_shortcut: 'That is not a keyboard shortcut Sidekyk can register.',
     not_a_repository: 'That folder is not inside a git repository.',

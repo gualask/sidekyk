@@ -7,7 +7,7 @@ import type { ProjectLocation } from '@/shared/projects/project-info';
  */
 export function projectErrorMessage(error: unknown, location: ProjectLocation): string {
     if (location.kind === 'wsl' && hasErrorCode(error, 'git_not_found')) {
-        return `git is not installed in ${location.distro}: see the top bar's warning.`;
+        return `Git is not installed in ${location.distro}: see the top bar's warning.`;
     }
     return errorMessage(error);
 }

@@ -10,7 +10,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory)
-                       └─▶ "repository-changed" { version: 1, projectId, gitDir }
+                       └─▶ "repository-changed" { version: 2, projectId, gitDir }
                              └─▶ frontend invalidates ['repository', projectId, …]
                                  (recent commits only when gitDir: index, HEAD, refs)
                                    ├─▶ get_repository_snapshot   status + numstat ×3, with summary
@@ -59,8 +59,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
 - `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
   `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
-  `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type, change
-  areas, panel contract, sidebar widths (`ui/sidebar-width.ts`).
+  `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type and its
+  place (`project-place.ts`, `RemoteTag`), change areas, panel contract, sidebar widths
+  (`ui/sidebar-width.ts`).
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
 
 ### Dependency rules
@@ -130,9 +131,9 @@ In the core:
   `classify`, the ignored filter and the tree check; only a mark while the window is hidden).
 - `infrastructure/agent/`: the helper's protocol (`protocol.rs`), its side (`server.rs`, over
   `LocalRepositories`) and the app's (`client.rs`, `AgentRepositories`: the same port through a
-  child process). The app reads through `LocalRepositories`, or in dev builds with
-  `SIDEKYK_AGENT=local` through the helper (`plans/remote-projects.md`).
-
+  child process). The app reads local projects through `LocalRepositories` (in dev builds with
+  `SIDEKYK_AGENT=local`, through the helper) and WSL projects through their distro's helper
+  (`infrastructure/wsl.rs`, `features/projects.md`).
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
   (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over
   `modules/repository`): no Tauri.
@@ -144,9 +145,8 @@ In the core:
   run on another machine (`plans/remote-projects.md`).
 - `infrastructure/`: `git_cli.rs` (bounded git), `process.rs` (a child within an output size and a
   time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
-  command's reads would refresh again, without end; found by CI 2026-10-18), `agent/` (the
-  helper's protocol, its server and the app's client), `wsl.rs` (distros, the helper installed
-  and started in one, `WslRepositories`).
+  command's reads would refresh again, without end; found by CI 2026-10-18), `agent/` (above),
+  `wsl.rs` (distros, the helper installed and started in one, `WslRepositories`).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.
 
@@ -164,8 +164,8 @@ In the core:
 
 ### Logs
 
-`tracing` to the app's log dir (one file per session, previous kept, size cap). Development:
-every git call, watcher batch and command duration, also on stderr. The level set applies to the
-app, its core and the helper's lines (target `helper`, at the level the helper wrote them). Release compiles out below
-`info` (+144 KiB on the binary): startup, project opened, failures, panics, frontend errors (max
-50 per session). Hot-path events are `debug`.
+`tracing` to the app's log dir (one file per session, previous kept, size cap). Development: every
+git call, watcher batch and command duration, also on stderr. The level set applies to the app, its
+core and the helper's lines (target `helper`, at the level the helper wrote them). Release compiles
+out below `info` (+144 KiB on the binary): startup, project opened, failures, panics, frontend
+errors (max 50 per session). Hot-path events are `debug`.

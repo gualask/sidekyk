@@ -2,7 +2,8 @@
 
 Direction 2026-10-18. A repository in a WSL distro (later a container) watched from the app
 installed on Windows (or the Mac). Steps in `ROADMAP.md`; tests on the container fixture
-(`../testing.md`).
+(`../testing.md`). WSL is built (`../features/projects.md`); its "Built:" notes stay here until it
+is tried on Windows (Open), then the plan keeps only containers.
 
 ## Design
 
@@ -26,11 +27,11 @@ installed on Windows (or the Mac). Steps in `ROADMAP.md`; tests on the container
   hides or shows, so hidden it only marks, as locally (`../features/background.md`).
   - Built: the `RepositoryWatcher` port (raw changed paths), `classify`, and what a batch does
     next in `modules/repositories` (`Repositories`, `../architecture.md`), which the app runs
-    for local projects and the helper will serve. The palette's files are ranked there too
+    for local projects and the helper serves. The palette's files are ranked there too
     (`search_files`): only matches cross the pipe, never the tree.
 - Same repo, a Cargo workspace: a core crate (`modules/`, `shared/`, infrastructure without
   Tauri), the Tauri app, the helper. Built: `src-tauri/crates/core` (`../architecture.md`); the
-  helper's crate comes with the helper. A second binary of the app's package would pull Tauri and
+  helper's is `crates/agent`. A second binary of the app's package would pull Tauri and
   WebKitGTK into a static Linux build. Helper and app from one commit, versioned together: no
   compatibility matrix (Zed: version in the file name; VS Code: commit).
 - Shipped in the Windows installer (`bundle.resources`; not `externalBin`, which wants the host's
@@ -73,7 +74,7 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
 - Later: `sidekyk .` from a WSL shell, a script reading `$WSL_DISTRO_NAME` as both do.
 - Built: `Project { id, name, location }` (`../features/projects.md`); the id is made from the
   location, opaque to the frontend. The app routes a project to what reads it by its location
-  (`ProjectsState::repositories_of`): a WSL project is refused until the transport.
+  (`ProjectsState::repositories_of`).
 
 ### How a WSL project shows (2026-10-18)
 
@@ -86,10 +87,10 @@ indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problem
   Open the project to start it."
 - Opening it the first time (distro, helper copied): the panels' own loading state, with
   "Starting Ubuntu…".
-- Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Remove);
-  no git in the distro, "git is not installed in Ubuntu", installed with the distro's package
-  manager (`sudo apt install git` on Ubuntu and Debian) (Try again); the helper fails, "Sidekyk
-  could not start in Ubuntu" (Try again, details in the log).
+- Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Try again,
+  Remove); no git in the distro, "git is not installed in Ubuntu", installed with the distro's
+  package manager (`sudo apt install git` on Ubuntu and Debian) (Try again); the helper fails,
+  "Sidekyk could not start in Ubuntu" (Try again, details in the log).
 
 ### Protocol (2026-10-18)
 

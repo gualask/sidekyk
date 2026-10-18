@@ -80,14 +80,14 @@ function projectProblem(
         return {
             id,
             title: `${distro} is not installed`,
-            detail: `${project.name} is in the WSL distro ${distro}, which is not on this computer anymore. Install it again, or remove the project.`,
-            fixes: [remove, retry],
+            detail: `${project.name} is in the WSL distro ${distro}, which is not on this computer anymore. Install it again and try again, or remove the project.`,
+            fixes: [retry, remove],
         };
     }
     if (failure === 'git_not_found') {
         return {
             id,
-            title: `git is not installed in ${distro}`,
+            title: `Git is not installed in ${distro}`,
             detail: `Sidekyk reads ${project.name} with the git of ${distro}. Install it there with its package manager (sudo apt install git on Ubuntu and Debian), then try again.`,
             fixes: [retry],
         };

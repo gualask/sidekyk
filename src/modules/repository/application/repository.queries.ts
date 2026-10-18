@@ -31,7 +31,10 @@ import {
 } from '../model/syntax';
 import { useRepositoryPort } from './repository.port';
 
-/** Every query of a repository starts with its project's id, so a change on disk refetches only its own. */
+/**
+ * Every query of a repository starts with its project's id, so a change on disk refetches only
+ * its own.
+ */
 const repositoryKeys = {
     all: ['repository'] as const,
     of: (projectId: string) => [...repositoryKeys.all, projectId] as const,
@@ -84,7 +87,12 @@ const commitKeys = {
  */
 const READ_AGAIN_AFTER_MS = 30_000;
 
+/**
+ * A read that failed is never fresh: what fixed it outside (a WSL distro started by opening
+ * another of its projects, a folder put back) shows the next time.
+ */
 function isOld({ state }: { state: QueryState<unknown> }): boolean {
+    if (state.status === 'error') return true;
     const readAt = Math.max(state.dataUpdatedAt, state.errorUpdatedAt);
     return Date.now() - readAt > READ_AGAIN_AFTER_MS;
 }
@@ -337,7 +345,14 @@ export function useReadProjectAgain(): (projectId: string) => void {
     const queryClient = useQueryClient();
     return useCallback(
         (projectId: string) => {
-            void queryClient.invalidateQueries({ queryKey: repositoryKeys.of(projectId) });
+            const queryKey = repositoryKeys.of(projectId);
+            void queryClient.invalidateQueries({ queryKey });
+            // a failed read off screen too: the problem it raised goes once it reads well
+            void queryClient.invalidateQueries({
+                queryKey,
+                predicate: (query) => query.state.status === 'error',
+                refetchType: 'all',
+            });
         },
         [queryClient],
     );

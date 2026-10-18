@@ -6,7 +6,7 @@ describe('projectErrorMessage', () => {
 
     it("names a WSL project's distro when git is missing there", () => {
         expect(projectErrorMessage(noGit, { kind: 'wsl', distro: 'Alpine', root: '/r' })).toBe(
-            "git is not installed in Alpine: see the top bar's warning.",
+            "Git is not installed in Alpine: see the top bar's warning.",
         );
     });
 

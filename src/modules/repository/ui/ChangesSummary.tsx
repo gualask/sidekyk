@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { useRepositorySummary } from '../application/repository.queries';
@@ -23,9 +24,7 @@ export function ChangesSummary({ project }: PanelSummaryProps) {
         return (
             <>
                 <div className="flex items-center gap-1.5">
-                    <span className="inline-flex h-6 items-center rounded-full bg-ui-surface-hover px-2 text-[11px] font-bold text-ui-text-secondary">
-                        stopped
-                    </span>
+                    <StatePill tone="bg-ui-surface-hover text-ui-text-secondary">stopped</StatePill>
                 </div>
                 <p className="text-xs text-ui-text-muted">
                     {project.location.distro} is not running. Open the project to start it.
@@ -47,15 +46,15 @@ export function ChangesSummary({ project }: PanelSummaryProps) {
     return (
         <>
             <div className="flex flex-wrap items-center gap-1.5">
-                <span
-                    className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-bold ${
+                <StatePill
+                    tone={
                         totals.files > 0
                             ? 'bg-ui-accent-soft text-ui-accent-on-soft'
                             : 'bg-ui-success-soft text-ui-success-soft-text'
-                    }`}
+                    }
                 >
                     {totals.files > 0 ? `${changedCount(summary.data)} changed` : 'clean'}
-                </span>
+                </StatePill>
                 <span className="chip max-w-56">
                     <BranchName branch={branch} />
                 </span>
@@ -93,5 +92,16 @@ export function ChangesSummary({ project }: PanelSummaryProps) {
                 <p className="text-xs text-ui-text-muted">Working tree clean.</p>
             )}
         </>
+    );
+}
+
+/** The project's state first on its card: changed, clean or stopped; `tone` its colors. */
+function StatePill({ tone, children }: { tone: string; children: ReactNode }) {
+    return (
+        <span
+            className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-bold ${tone}`}
+        >
+            {children}
+        </span>
     );
 }

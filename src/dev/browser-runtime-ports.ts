@@ -32,8 +32,10 @@ const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
 const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-prototype');
 
-/** In `problems`, WSL projects: a distro that does not run (until the project opens), one gone, one
- * without git. */
+/**
+ * In `problems`, WSL projects: a distro that does not run (until the project opens), one gone, one
+ * without git.
+ */
 const STOPPED_PROJECT = wslProject('Debian', '/home/dev/api', 'api');
 const GONE_PROJECT = wslProject('Arch', '/home/dev/dotfiles', 'dotfiles');
 const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools');

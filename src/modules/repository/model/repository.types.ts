@@ -226,7 +226,8 @@ export interface SyntaxColors {
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {
-    version: 1;
+    /** 2 since it names the project by its id (`projectId`), not its root. */
+    version: 2;
     projectId: string;
     /** The index, HEAD or refs changed too: only then may the recent commits have. */
     gitDir: boolean;
