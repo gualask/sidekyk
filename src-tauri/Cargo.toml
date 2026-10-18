@@ -1,7 +1,7 @@
 [workspace]
-members = ["crates/core"]
+members = ["crates/core", "crates/agent"]
 # Every command run here (`cargo test`, `clippy`, `fmt`) covers the whole workspace.
-default-members = [".", "crates/core"]
+default-members = [".", "crates/core", "crates/agent"]
 
 # The app and the crates it ships are versioned together: one commit, no compatibility matrix.
 [workspace.package]
@@ -14,10 +14,13 @@ edition = "2021"
 [workspace.dependencies]
 sidekyk-core = { path = "crates/core" }
 serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# `raw_value`: the helper's replies are read once, as the type the caller expects.
+serde_json = { version = "1", features = ["raw_value"] }
 anyhow = "1"
 # Release builds compile every event below `info` out (see `infrastructure/logging.rs`).
 tracing = { version = "0.1", default-features = false, features = ["std", "release_max_level_info"] }
+# Text output only: no ANSI colors, no `env-filter` (and its regex engine), no `log` bridge.
+tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt"] }
 tempfile = "3"
 
 [package]
@@ -52,8 +55,7 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
-# Text output only: no ANSI colors, no `env-filter` (and its regex engine), no `log` bridge.
-tracing-subscriber = { version = "0.3", default-features = false, features = ["std", "fmt"] }
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

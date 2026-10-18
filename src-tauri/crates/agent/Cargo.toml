@@ -1,0 +1,18 @@
+[package]
+name = "sidekyk-agent"
+description = "Sidekyk's helper: reads repositories where they are (a WSL distro) and answers the app over stdin and stdout."
+version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+edition.workspace = true
+
+[dependencies]
+sidekyk-core.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true

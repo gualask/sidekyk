@@ -100,10 +100,13 @@ pub(crate) fn init(dir: &Path) {
     });
 
     let level = level(std::env::var(LEVEL_VAR).ok().as_deref());
-    // Sidekyk's own events at `level`; dependencies (Tauri plugins) only when something is wrong.
+    // Sidekyk's own events at `level` (the app, its core, the lines of its helper); dependencies
+    // (Tauri plugins) only when something is wrong.
     let filter = Targets::new()
         .with_default(LevelFilter::WARN)
-        .with_target(env!("CARGO_CRATE_NAME"), level);
+        .with_target(env!("CARGO_CRATE_NAME"), level)
+        .with_target("sidekyk_core", level)
+        .with_target("helper", level);
 
     let writer = file.and(io::stderr.with_filter(|_| PROFILE.stderr));
     let layer = tracing_subscriber::fmt::layer()

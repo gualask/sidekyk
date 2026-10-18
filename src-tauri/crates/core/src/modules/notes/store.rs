@@ -308,21 +308,13 @@ impl NotesStore {
     }
 
     /// A project's notes; none written yet is a first, empty list.
-    pub fn notes(
-        &self,
-        storage: &dyn NotesStorage,
-        root: &str,
-    ) -> anyhow::Result<ProjectNotes> {
+    pub fn notes(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<ProjectNotes> {
         self.change(storage, root, |book| Ok((book.snapshot(), Vec::new())))
     }
 
     /// What a project's card tells of its notes: from those in memory, else read once (without
     /// replacing those in memory) and kept until they change.
-    pub fn summary(
-        &self,
-        storage: &dyn NotesStorage,
-        root: &str,
-    ) -> anyhow::Result<NotesSummary> {
+    pub fn summary(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<NotesSummary> {
         // held throughout, as a change holds it: a summary read meanwhile could keep notes older
         // than the change that cleared it
         let open = lock(&self.open);
@@ -350,11 +342,7 @@ impl NotesStore {
     }
 
     /// Deletes a project's notes, its folder with them: the project goes.
-    pub fn delete_project(
-        &self,
-        storage: &dyn NotesStorage,
-        root: &str,
-    ) -> anyhow::Result<()> {
+    pub fn delete_project(&self, storage: &dyn NotesStorage, root: &str) -> anyhow::Result<()> {
         let mut open = lock(&self.open);
         if let Some(folder) = self.folder_of(storage, root)? {
             storage.remove_folder(&folder)?;
@@ -371,12 +359,7 @@ impl NotesStore {
 
     /// A project found again at `to` (its repository moved): its notes go with it. When `to` has
     /// notes already (it is a project too), they take these in and this project's folder goes.
-    pub fn relink(
-        &self,
-        storage: &dyn NotesStorage,
-        from: &str,
-        to: &str,
-    ) -> anyhow::Result<()> {
+    pub fn relink(&self, storage: &dyn NotesStorage, from: &str, to: &str) -> anyhow::Result<()> {
         if from == to {
             return Ok(());
         }

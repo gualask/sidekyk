@@ -4,24 +4,28 @@
 //! (`docs/plans/remote-projects.md`). The caller checks that a repository is one the user added
 //! before naming it.
 
+mod port;
 mod watch;
 
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, Weak};
 
 use crate::modules::repository::{
     self, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
+    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryChangedEvent,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
 };
-use crate::modules::search::{self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles};
+use crate::modules::search::{
+    self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
+};
 use crate::modules::syntax::{self, ColorCache, SyntaxColors, SyntaxRequest};
 use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
+pub use port::{ContentRun, Repositories};
 use watch::{Visibility, Watched};
 
 /// A result shared by every caller that waited for it.
@@ -70,7 +74,9 @@ struct LastContents {
     files: Arc<[String]>,
 }
 
-pub struct Repositories {
+pub struct LocalRepositories {
+    /// Itself, for the watcher it starts to reach back without keeping it alive.
+    this: Weak<Self>,
     backend: Arc<dyn RepositoryBackend>,
     watcher: Arc<dyn RepositoryWatcher>,
     colors: ColorCache,
@@ -99,9 +105,13 @@ pub struct Repositories {
     content_runs: AtomicU64,
 }
 
-impl Repositories {
-    pub fn new(backend: Arc<dyn RepositoryBackend>, watcher: Arc<dyn RepositoryWatcher>) -> Self {
-        Self {
+impl LocalRepositories {
+    pub fn new(
+        backend: Arc<dyn RepositoryBackend>,
+        watcher: Arc<dyn RepositoryWatcher>,
+    ) -> Arc<Self> {
+        Arc::new_cyclic(|this| Self {
+            this: this.clone(),
             backend,
             watcher,
             colors: ColorCache::default(),
@@ -115,117 +125,24 @@ impl Repositories {
             tree_reads: PerRepository::default(),
             contents: Mutex::default(),
             content_runs: AtomicU64::new(0),
-        }
-    }
-
-    /// The repository that contains `candidate`, which can be any folder inside it.
-    pub fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo> {
-        Ok(repository::resolve_repository(&*self.backend, candidate)?.info)
-    }
-
-    /// A repository's snapshot, sharing the one in flight.
-    pub fn snapshot(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {
-        let root = info.root.as_str();
-        self.snapshots.run(root, || {
-            let snapshot = repository::load_snapshot(&*self.backend, info);
-            let mut changed = lock(&self.changed);
-            match &snapshot {
-                Ok(snapshot) => {
-                    changed.insert(root.to_string(), snapshot.files.as_slice().into());
-                }
-                // a repository moved away has nothing left to search
-                Err(_) => {
-                    changed.remove(root);
-                }
-            }
-            snapshot
         })
     }
 
-    /// A repository's summary, sharing the one in flight.
-    pub fn summary(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySummary> {
-        self.summaries
-            .run(&info.root, || repository::load_summary(&*self.backend, info))
+    /// Takes the next search in contents' turn, which stops the one going on: in the order
+    /// searches were asked for, before any of them starts.
+    pub fn next_content_search(&self) -> ContentRun {
+        ContentRun(self.content_runs.fetch_add(1, Ordering::Relaxed) + 1)
     }
 
-    pub fn file_diff(
+    /// Runs the search in contents that took `run`, as `Repositories::search_contents`.
+    pub fn search_contents_in_turn(
         &self,
-        info: &RepositoryInfo,
-        request: &FileDiffRequest,
-    ) -> anyhow::Result<UnifiedDiff> {
-        repository::load_file_diff(&*self.backend, info, request)
-    }
-
-    pub fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
-        repository::load_recent_commits(&*self.backend, info)
-    }
-
-    pub fn commit_files(
-        &self,
-        info: &RepositoryInfo,
-        commit: &CommitRequest,
-    ) -> anyhow::Result<CommitFiles> {
-        repository::load_commit_files(&*self.backend, info, commit)
-    }
-
-    pub fn commit_file_diff(
-        &self,
-        info: &RepositoryInfo,
-        request: &CommitFileDiffRequest,
-    ) -> anyhow::Result<UnifiedDiff> {
-        repository::load_commit_file_diff(&*self.backend, info, request)
-    }
-
-    /// What a folder of a repository holds, from its files in memory; `""` is the root.
-    pub fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory> {
-        Ok(self.file_tree(info)?.directory(path))
-    }
-
-    /// One file of a repository's tree. Only a file of the tree is read, so never one git ignores.
-    pub fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
-        if !self.file_tree(info)?.contains_file(path) {
-            return Err(user_facing(UserFacingErrorCode::FileMissing));
-        }
-        repository::load_file_content(&*self.backend, info, path)
-    }
-
-    /// The syntax colors of some lines of one version of a file.
-    pub fn syntax_colors(
-        &self,
-        info: &RepositoryInfo,
-        request: &SyntaxRequest,
-    ) -> anyhow::Result<SyntaxColors> {
-        syntax::load_syntax_colors(&*self.backend, info, &self.colors, request)
-    }
-
-    /// The palette's matches among a repository's files: its tree (read if not yet), and how its
-    /// last snapshot found them changed; none when they cannot be listed.
-    pub fn search_files(&self, info: &RepositoryInfo, query: &str) -> Option<FileMatches> {
-        let tree = self
-            .file_tree(info)
-            .inspect_err(
-                |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
-            )
-            .ok()?;
-        let changed = lock(&self.changed)
-            .get(&info.root)
-            .cloned()
-            .unwrap_or_else(|| Arc::from([]));
-        Some(search::search_files(query, &ProjectFiles { tree, changed }))
-    }
-
-    /// The lines of a repository's files where `query` is, sent to `send` as they are found. A
-    /// newer search, or `stop_content_search`, stops this one. When the text grew from the last
-    /// complete search's, in the same files and with nothing changed since, only the files it
-    /// found are read.
-    pub fn search_contents(
-        &self,
+        run: ContentRun,
         info: &RepositoryInfo,
         query: &str,
         send: &(dyn Fn(Vec<ContentFile>) + Sync),
     ) -> anyhow::Result<ContentEnd> {
-        let run = self.content_runs.fetch_add(1, Ordering::Relaxed) + 1;
-        let cancelled = || self.content_runs.load(Ordering::Relaxed) != run;
+        let cancelled = || self.content_runs.load(Ordering::Relaxed) != run.0;
         let root = info.root.as_str();
         let tree = self.file_tree(info)?;
         let narrowed = lock(&self.contents)
@@ -263,20 +180,6 @@ impl Repositories {
             more: searched.cut,
             cancelled,
         })
-    }
-
-    /// Stops the search in contents going on, if any: the palette closed.
-    pub fn stop_content_search(&self) {
-        self.content_runs.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Forgets every repository but `roots`, the ones the caller still reads.
-    pub fn retain(&self, roots: &[String]) {
-        let keep = |root: &str| roots.iter().any(|r| r == root);
-        self.snapshots.retain(&keep);
-        self.summaries.retain(&keep);
-        self.tree_reads.retain(&keep);
-        lock(&self.changed).retain(|root, _| keep(root));
     }
 
     /// A repository's files, read again only when they may have changed, sharing the read in
@@ -317,5 +220,129 @@ impl Repositories {
         let entry = trees.entry(root.to_string()).or_default();
         entry.tree = None;
         entry.changes += 1;
+    }
+}
+
+impl Repositories for LocalRepositories {
+    fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo> {
+        Ok(repository::resolve_repository(&*self.backend, candidate)?.info)
+    }
+
+    fn snapshot(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {
+        let root = info.root.as_str();
+        self.snapshots.run(root, || {
+            let snapshot = repository::load_snapshot(&*self.backend, info);
+            let mut changed = lock(&self.changed);
+            match &snapshot {
+                Ok(snapshot) => {
+                    changed.insert(root.to_string(), snapshot.files.as_slice().into());
+                }
+                // a repository moved away has nothing left to search
+                Err(_) => {
+                    changed.remove(root);
+                }
+            }
+            snapshot
+        })
+    }
+
+    fn summary(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySummary> {
+        self.summaries.run(&info.root, || {
+            repository::load_summary(&*self.backend, info)
+        })
+    }
+
+    fn file_diff(
+        &self,
+        info: &RepositoryInfo,
+        request: &FileDiffRequest,
+    ) -> anyhow::Result<UnifiedDiff> {
+        repository::load_file_diff(&*self.backend, info, request)
+    }
+
+    fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
+        repository::load_recent_commits(&*self.backend, info)
+    }
+
+    fn commit_files(
+        &self,
+        info: &RepositoryInfo,
+        commit: &CommitRequest,
+    ) -> anyhow::Result<CommitFiles> {
+        repository::load_commit_files(&*self.backend, info, commit)
+    }
+
+    fn commit_file_diff(
+        &self,
+        info: &RepositoryInfo,
+        request: &CommitFileDiffRequest,
+    ) -> anyhow::Result<UnifiedDiff> {
+        repository::load_commit_file_diff(&*self.backend, info, request)
+    }
+
+    fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory> {
+        Ok(self.file_tree(info)?.directory(path))
+    }
+
+    fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
+        if !self.file_tree(info)?.contains_file(path) {
+            return Err(user_facing(UserFacingErrorCode::FileMissing));
+        }
+        repository::load_file_content(&*self.backend, info, path)
+    }
+
+    fn syntax_colors(
+        &self,
+        info: &RepositoryInfo,
+        request: &SyntaxRequest,
+    ) -> anyhow::Result<SyntaxColors> {
+        syntax::load_syntax_colors(&*self.backend, info, &self.colors, request)
+    }
+
+    fn search_files(&self, info: &RepositoryInfo, query: &str) -> Option<FileMatches> {
+        let tree = self
+            .file_tree(info)
+            .inspect_err(
+                |error| tracing::debug!(error = %format!("{error:#}"), "no files to search"),
+            )
+            .ok()?;
+        let changed = lock(&self.changed)
+            .get(&info.root)
+            .cloned()
+            .unwrap_or_else(|| Arc::from([]));
+        Some(search::search_files(query, &ProjectFiles { tree, changed }))
+    }
+
+    fn search_contents(
+        &self,
+        info: &RepositoryInfo,
+        query: &str,
+        send: &(dyn Fn(Vec<ContentFile>) + Sync),
+    ) -> anyhow::Result<ContentEnd> {
+        self.search_contents_in_turn(self.next_content_search(), info, query, send)
+    }
+
+    fn stop_content_search(&self) {
+        self.content_runs.fetch_add(1, Ordering::Relaxed);
+    }
+
+    fn retain(&self, roots: &[String]) {
+        let keep = |root: &str| roots.iter().any(|r| r == root);
+        self.snapshots.retain(&keep);
+        self.summaries.retain(&keep);
+        self.tree_reads.retain(&keep);
+        lock(&self.changed).retain(|root, _| keep(root));
+    }
+
+    fn watch(
+        &self,
+        repository: Option<&RepositoryInfo>,
+        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+    ) {
+        self.watch_on_screen(repository, on_change);
+    }
+
+    fn set_visible(&self, visible: bool) -> Option<String> {
+        self.record_visible(visible)
     }
 }

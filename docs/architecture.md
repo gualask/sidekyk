@@ -97,31 +97,37 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 ## Backend
 
 A Cargo workspace rooted at `src-tauri/Cargo.toml`, crates versioned together; commands run there
-cover every crate (`default-members`).
+cover every crate (`default-members`), except `cargo fmt`, which needs `--all`.
 
 - `src-tauri/` (the app, `sidekyk`): Tauri, `bootstrap/`, `interfaces/`, and the infrastructure
   only the app needs (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`).
 - `src-tauri/crates/core/` (`sidekyk-core`): `modules/`, `shared/`, and the infrastructure of the
-  machine holding the repository (`git_cli.rs`, `watcher.rs`). No Tauri: the compiler keeps it
-  out. The app runs all of it; the helper will run what reads a repository
+  machine holding the repository (`git_cli.rs`, `watcher.rs`, the helper's protocol). No Tauri:
+  the compiler keeps it out. The app runs all of it; the helper runs what reads a repository
   (`plans/remote-projects.md`). Its items are `pub` for the app, so an item the app stops using no
   longer warns as dead code.
+- `src-tauri/crates/agent/` (`sidekyk-agent`): the helper's binary, `version` and `serve`; its
+  tests drive it as the app does.
 
 In the app:
 
 - `bootstrap/`: plugins (single instance, dialog, store), state, commands; creates the hidden
   window in the stored theme, tray, restores projects, opens the CLI argument.
-- `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, and the
-  `Repositories` that read the projects; the commands check a root is in the list first). Blocking
-  work on `spawn_blocking`.
+- `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, the order of
+  watch calls, and the `Repositories` the projects are read through; the commands check a root is
+  in the list first). Blocking work on `spawn_blocking`.
+
 In the core:
 
-- `modules/repositories/`: `Repositories`, everything that reads the repositories the caller
-  names: per-repository coalesced snapshot/summary/tree reads, the cached tree, the changed files
-  the palette ranks, the last search in contents, syntax colors (`ColorCache`), and the watched
-  repository (`watch.rs`: a batch through `classify`, the ignored filter and the tree check; only
-  a mark while the window is hidden). The app runs it for local projects; the helper will run it
-  in a distro (`plans/remote-projects.md`).
+- `modules/repositories/`: the `Repositories` port (`port.rs`), one method per read, and
+  `LocalRepositories`, which reads this machine's: per-repository coalesced snapshot/summary/tree
+  reads, the cached tree, the changed files the palette ranks, the last search in contents,
+  syntax colors (`ColorCache`), and the watched repository (`watch.rs`: a batch through
+  `classify`, the ignored filter and the tree check; only a mark while the window is hidden).
+- `infrastructure/agent/`: the helper's protocol (`protocol.rs`), its side (`server.rs`, over
+  `LocalRepositories`) and the app's (`client.rs`, `AgentRepositories`: the same port through a
+  child process). The app reads through `LocalRepositories`, or in dev builds with
+  `SIDEKYK_AGENT=local` through the helper (`plans/remote-projects.md`).
 
 - `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
   (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over
@@ -151,6 +157,7 @@ In the core:
 ### Logs
 
 `tracing` to the app's log dir (one file per session, previous kept, size cap). Development:
-every git call, watcher batch and command duration, also on stderr. Release compiles out below
+every git call, watcher batch and command duration, also on stderr. The level set applies to the
+app, its core and the helper's lines (target `helper`, at the level the helper wrote them). Release compiles out below
 `info` (+144 KiB on the binary): startup, project opened, failures, panics, frontend errors (max
 50 per session). Hot-path events are `debug`.

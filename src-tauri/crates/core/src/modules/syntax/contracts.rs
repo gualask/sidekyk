@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::modules::repository::FileVersion;
 
 /// The colors of some lines of one version of a file.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyntaxRequest {
     pub path: String,
@@ -18,7 +18,7 @@ pub struct SyntaxRequest {
 
 /// What a part of a line is, for its color: the scopes of a grammar, folded into the few colors
 /// of the theme (One Dark, One Light).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Tone {
     Comment,
@@ -48,7 +48,7 @@ pub enum Tone {
 /// in order; the rest of the line keeps the text's color. `check` is the FNV-1a hash of the line's
 /// UTF-16 units: the frontend colors a line only when its own text has the same, so colors read
 /// before the file changed never land on other text.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LineColors {
     pub check: u32,
     pub spans: Vec<(u32, u32, Tone)>,
@@ -56,7 +56,7 @@ pub struct LineColors {
 
 /// The colors of the lines asked for, fewer past the end of the file; none when the file has no
 /// grammar, or is binary, missing or too large.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyntaxColors {
     /// Larger than `MAX_COLORED_BYTES`: shown without colors, which the viewer says.

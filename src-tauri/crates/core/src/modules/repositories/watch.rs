@@ -3,9 +3,8 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
-use super::Repositories;
+use super::LocalRepositories;
 use crate::modules::repository::{
     classify, resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo, Visible,
     Watch,
@@ -27,15 +26,12 @@ pub(super) struct Visibility {
     missed: Option<String>,
 }
 
-impl Repositories {
-    /// Watches the repository on screen, unless it is the one watched already, and stops watching
-    /// the previous one; `None` watches nothing. `on_change` gets each change that shows; for the
-    /// repository watched already, the first `on_change` stays. The caller calls it in the order
-    /// the repository on screen changed.
-    pub fn watch(
-        self: &Arc<Self>,
+impl LocalRepositories {
+    /// `Repositories::watch`.
+    pub(super) fn watch_on_screen(
+        &self,
         repository: Option<&RepositoryInfo>,
-        on_change: impl Fn(RepositoryChangedEvent) + Send + 'static,
+        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
     ) {
         let mut watched = lock(&self.watched);
         let Some(repository) = repository else {
@@ -74,9 +70,8 @@ impl Repositories {
         });
     }
 
-    /// Records whether the window shows. Showing again returns the repository on screen if its
-    /// watcher saw a change meanwhile, for the app to read again.
-    pub fn set_visible(&self, visible: bool) -> Option<String> {
+    /// `Repositories::set_visible`.
+    pub(super) fn record_visible(&self, visible: bool) -> Option<String> {
         let mut visibility = lock(&self.visibility);
         visibility.hidden = !visible;
         let missed = if visible {
@@ -89,17 +84,17 @@ impl Repositories {
     }
 
     fn start_watch(
-        self: &Arc<Self>,
+        &self,
         root: &str,
         generation: u64,
-        on_change: impl Fn(RepositoryChangedEvent) + Send + 'static,
+        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
     ) -> anyhow::Result<Watch> {
         let resolved = resolve_repository(&*self.backend, Path::new(root))?;
         let root = resolved.info.root;
         let git_dir = resolved.git_dir;
         let mut ignored = IgnoredPaths::new(root.clone().into());
         // the watch is kept in `self`: a strong reference here would keep both alive
-        let repositories = Arc::downgrade(self);
+        let repositories = self.this.clone();
         let (watched_root, watched_git_dir) = (root.clone(), git_dir.clone());
         let on_paths = move |paths: Vec<PathBuf>| {
             if let Some(repositories) = repositories.upgrade() {

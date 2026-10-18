@@ -36,7 +36,7 @@ pub struct PanelMatch {
 
 /// How a file found changed, as the Files panel colors it; the strongest when it changed in both
 /// areas.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ChangeMark {
     Deleted,
@@ -45,7 +45,7 @@ pub enum ChangeMark {
 }
 
 /// A file of the project searched: one git lists, or one deleted that Changes lists.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileMatch {
     pub path: String,
@@ -56,7 +56,8 @@ pub struct FileMatch {
 }
 
 /// The files of a project that matched best, and how many more did.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FileMatches {
     pub files: Vec<FileMatch>,
     pub more: u32,
@@ -64,7 +65,7 @@ pub struct FileMatches {
 
 /// A line where the text searched is: its number, its text (cut around the first match when
 /// long, `…` marking a cut) and where the text is in it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentLine {
     pub number: u32,
@@ -73,7 +74,7 @@ pub struct ContentLine {
 }
 
 /// A file's lines where the text searched is, in order.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentFile {
     pub path: String,
@@ -81,7 +82,7 @@ pub struct ContentFile {
 }
 
 /// How a search in contents ended, once its files were all sent.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContentEnd {
     /// More lines matched than were sent: the search stopped there.

@@ -4,6 +4,4 @@
 mod contracts;
 mod list;
 
-pub use contracts::{
-    ProjectList, ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT,
-};
+pub use contracts::{ProjectList, ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT};

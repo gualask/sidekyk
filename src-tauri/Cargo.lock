@@ -3385,6 +3385,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "sidekyk-agent"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sidekyk-core",
+ "tempfile",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "sidekyk-core"
 version = "0.1.0"
 dependencies = [

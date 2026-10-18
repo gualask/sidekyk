@@ -53,6 +53,30 @@ impl UserFacingErrorCode {
             Self::ShortcutTaken => "shortcut_taken",
         }
     }
+
+    /// The code `as_str` gives, back: an error that crossed a process boundary (the helper's).
+    pub fn parse(code: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|c| c.as_str() == code)
+    }
+
+    const ALL: &[Self] = &[
+        Self::ExportInRepository,
+        Self::FileMissing,
+        Self::GitNotFound,
+        Self::GitTimedOut,
+        Self::InvalidCommit,
+        #[cfg(any(target_os = "macos", windows))]
+        Self::InvalidShortcut,
+        Self::NotARepository,
+        Self::NoteListMissing,
+        Self::NoteMissing,
+        Self::NoteTooLong,
+        Self::PathOutsideRepository,
+        Self::ProjectNotFound,
+        Self::RepositoryMissing,
+        #[cfg(any(target_os = "macos", windows))]
+        Self::ShortcutTaken,
+    ];
 }
 
 /// An error intended to be surfaced to the user (via a stable error `code`).
@@ -169,7 +193,9 @@ mod tests {
         ];
         for (code, wire) in cases {
             assert_eq!(code.as_str(), wire);
+            assert_eq!(UserFacingErrorCode::parse(wire), Some(code));
         }
+        assert_eq!(UserFacingErrorCode::parse("unknown"), None);
     }
 
     #[cfg(target_os = "macos")]
@@ -181,6 +207,7 @@ mod tests {
         ];
         for (code, wire) in cases {
             assert_eq!(code.as_str(), wire);
+            assert_eq!(UserFacingErrorCode::parse(wire), Some(code));
         }
     }
 }

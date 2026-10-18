@@ -18,7 +18,7 @@ pub(super) async fn on_project<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
     root: String,
-    work: impl FnOnce(&tauri::AppHandle, &Repositories, &RepositoryInfo) -> anyhow::Result<T>
+    work: impl FnOnce(&tauri::AppHandle, &dyn Repositories, &RepositoryInfo) -> anyhow::Result<T>
         + Send
         + 'static,
 ) -> Result<T, AppError> {

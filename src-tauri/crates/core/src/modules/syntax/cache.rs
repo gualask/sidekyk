@@ -87,13 +87,7 @@ impl<C: Coloring + 'static> ColorThread<C> {
     /// The colors of the text with `hash` under `key`: kept, or colored on the coloring thread,
     /// after what is asked before. A newer text under the same key stops the run of an older one,
     /// and makes the callers of the older one get `None`, to read the file again.
-    pub fn colored(
-        &self,
-        key: &str,
-        hash: u64,
-        path: &str,
-        bytes: Vec<u8>,
-    ) -> Option<Lines> {
+    pub fn colored(&self, key: &str, hash: u64, path: &str, bytes: Vec<u8>) -> Option<Lines> {
         if let Some(lines) = self.shared.kept(key, Some(hash)) {
             return Some(lines);
         }

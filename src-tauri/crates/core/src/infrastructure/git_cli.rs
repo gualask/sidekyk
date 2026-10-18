@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
+use super::hide_console;
 use crate::modules::repository::{GitOutput, RepositoryBackend, WorktreeEntry};
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
 
@@ -26,11 +27,6 @@ const MAX_STDERR_BYTES: usize = 64 * 1024;
 const FALLBACK_DIRS: &[&str] = &["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"];
 #[cfg(windows)]
 const FALLBACK_DIRS: &[&str] = &[r"C:\Program Files\Git\cmd"];
-
-/// Keeps git from opening a console window for every command, which a GUI app's child process
-/// does on Windows.
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 fn find_git() -> Option<PathBuf> {
     let path_dirs = std::env::var_os("PATH")
@@ -68,8 +64,8 @@ impl LocalRepositoryBackend {
             .env("LC_ALL", "C")
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        #[cfg(windows)]
-        std::os::windows::process::CommandExt::creation_flags(&mut command, CREATE_NO_WINDOW);
+        // git would open a console window for every command
+        hide_console(&mut command);
         Ok(command)
     }
 
@@ -319,7 +315,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::infrastructure::watcher::LocalRepositoryWatcher;
-    use crate::modules::repositories::Repositories;
+    use crate::modules::repositories::{LocalRepositories, Repositories};
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
 
@@ -924,16 +920,19 @@ mod tests {
         const DEADLINE: Duration = Duration::from_secs(10);
         let dir = scratch_repo();
         write(dir.path(), ".gitignore", "build/\n");
-        let repositories = Arc::new(Repositories::new(
+        let repositories = LocalRepositories::new(
             Arc::new(LocalRepositoryBackend::default()),
             Arc::new(LocalRepositoryWatcher),
-        ));
+        );
         let info = repositories.resolve(dir.path()).unwrap();
         let root = Path::new(&info.root);
         let (sent, received) = std::sync::mpsc::channel();
-        repositories.watch(Some(&info), move |event| {
-            let _ = sent.send(event);
-        });
+        repositories.watch(
+            Some(&info),
+            Box::new(move |event| {
+                let _ = sent.send(event);
+            }),
+        );
         // events still on their way, such as FSEvents reporting what happened before the watch
         let settle = || {
             let started = Instant::now();
@@ -970,7 +969,7 @@ mod tests {
         assert_eq!(missed, info.root);
         assert!(received.try_recv().is_err(), "nothing is told while hidden");
         assert_eq!(repositories.set_visible(true), None);
-        repositories.watch(None, |_| {});
+        repositories.watch(None, Box::new(|_| {}));
     }
 
     #[test]

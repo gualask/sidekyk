@@ -69,13 +69,33 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
   matched by `id`, several in flight; a stream (search in contents) ends with an end message;
   cancel is an explicit message (as VS Code; Zed has none in general). The helper logs on stderr,
   the app writes it to its log (as Zed).
+- Built (`infrastructure/agent/` in the core, `crates/agent`): one request per method of the
+  `Repositories` port; a reply carries its value as raw JSON, read once as the type the caller
+  expects; a search in contents sends its files, then its reply; changes come up unasked. Frames
+  over 64 MiB are a broken stream. A failure keeps its user-facing code across. The helper
+  answers each request on a thread of its own, but takes in arrival order what depends on it:
+  stop, visibility, forgetting projects, a search in contents' turn (two typed in a row could
+  otherwise start in the wrong order and the older one win).
+- The window's visibility is not waited for (the app tells it on its main thread): a change the
+  helper missed while hidden comes up as a change.
 - JSON (`serde_json`, already a dependency) over protobuf (Zed: a second schema beside the serde
   contracts) or a binary serde format (a new dependency). Measured 2026-10-18 on a real 2 MiB
   diff, release, Mac: +3.0% bytes, encode 2.5 ms, decode 2.4 ms, a local pipe < 3 ms; the
   frontend already gets the diff as JSON once. Measured again through `wsl.exe` before it stays.
-- No acks, replay, heartbeat or reconnect: Zed and VS Code have them for network drops (SSH);
-  over a local pipe a dead helper shows as end of file, is started again and the snapshot read
-  anew.
+- Measured through the helper on the Mac, 2026-10-18 (`agent_timings`, release, medians): a
+  request's round trip 20-35 µs; snapshot unchanged (this repo 11.0 ms, Zed's clone 36.2 ms);
+  the palette's files in Zed's tree 173 → 254 µs; a 2 MiB diff 32.2 → 36.9 ms. Under the 20 ms
+  kept as the threshold: JSON stays.
+- No acks, replay of lost messages, heartbeat or reconnection grace: Zed and VS Code have them
+  for network drops (SSH); over a local pipe a dead helper shows as end of file, a new one is
+  started and the snapshot read anew.
+- Built: the requests waiting on a helper that stops fail; the next request that waits for a
+  reply starts a new one (one that does not wait never does), told first the repository watched
+  and whether the window is hidden, as they are then. One that ran 10 s or more makes the app
+  read the repository on screen again (when the window shows), which starts the next; one that
+  stops or fails to start sooner is not started again for 10 s. A request that panics, or whose
+  answer is too long to send, still gets a reply: the app waits for each. Watches run on one
+  thread, in the order they came.
 
 ### Lifecycle (2026-10-18)
 
@@ -98,6 +118,10 @@ metered connection). Meanwhile the helper builds for the Mac, and a switch of de
 (`SIDEKYK_AGENT=local`) runs local projects through it as a child process: protocol, module
 split, watcher and lifecycle on real repositories, and its cost against the direct path on the
 same repository. Linux-only parts (inotify, musl, uid 1000) wait for the container fixture.
+
+Built: `cargo build --manifest-path src-tauri/Cargo.toml -p sidekyk-agent`, then
+`SIDEKYK_AGENT=local pnpm tauri:dev`; the app starts the binary beside its own. Release builds
+ignore the switch.
 
 ## Rules when it lands
 

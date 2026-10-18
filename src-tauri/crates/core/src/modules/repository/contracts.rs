@@ -13,7 +13,7 @@ pub struct RepositoryInfo {
 
 /// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
 /// what it shows of that repository.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
     pub version: u8,
@@ -33,7 +33,7 @@ impl RepositoryChangedEvent {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BranchStatus {
     /// Branch name, or `None` when HEAD is detached.
@@ -53,7 +53,7 @@ pub enum ChangeArea {
     Untracked,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum ChangeKind {
     Added,
@@ -67,7 +67,7 @@ pub enum ChangeKind {
 }
 
 /// One file in one area. A file with both staged and unstaged edits appears twice.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangedFile {
     pub path: String,
@@ -82,7 +82,7 @@ pub struct ChangedFile {
 
 /// Everything that differs from HEAD, staged or not. `files` counts every changed path, new files
 /// included; the lines are those of tracked files, since a summary does not read new files.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangeTotals {
     pub files: u32,
@@ -92,7 +92,7 @@ pub struct ChangeTotals {
 
 /// One changed path and its line counts, whatever compares it: a summary against HEAD (whatever
 /// the path's areas), or a commit against its parent.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
     pub path: String,
@@ -107,7 +107,7 @@ pub struct FileChange {
 
 /// A repository at a glance: its card, its avatar in the rail, the breadcrumb. Cheap enough to
 /// load for every project on screen (`git status` and one numstat against HEAD).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositorySummary {
     pub branch: BranchStatus,
@@ -121,14 +121,14 @@ pub struct RepositorySummary {
 
 /// Everything the Changes panel shows of a repository. Its summary is the one
 /// `get_repository_summary` returns, built from the same git output.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositorySnapshot {
     pub files: Vec<ChangedFile>,
     pub summary: RepositorySummary,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileDiffRequest {
     pub path: String,
@@ -141,7 +141,7 @@ pub struct FileDiffRequest {
 
 /// A unified diff as git prints it, of a changed file or of a file of a commit. The frontend
 /// parses it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UnifiedDiff {
     pub text: String,
@@ -150,7 +150,7 @@ pub struct UnifiedDiff {
 }
 
 /// One commit of the branch on screen, as the recent commits list it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Commit {
     /// The full hash.
@@ -168,7 +168,7 @@ pub struct Commit {
 
 /// The last commits of the branch on screen, newest first, following first parents: the commits
 /// of a branch merged into it are in its merge.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentCommits {
     pub commits: Vec<Commit>,
@@ -177,7 +177,7 @@ pub struct RecentCommits {
 }
 
 /// A commit, and the parent it is compared with (`Commit::parent`).
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitRequest {
     pub sha: String,
@@ -185,7 +185,7 @@ pub struct CommitRequest {
 }
 
 /// The files a commit changed, in git's order.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitFiles {
     pub files: Vec<FileChange>,
@@ -193,7 +193,7 @@ pub struct CommitFiles {
     pub truncated: bool,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommitFileDiffRequest {
     pub commit: CommitRequest,
@@ -205,7 +205,7 @@ pub struct CommitFileDiffRequest {
 }
 
 /// One entry of a folder in the Files panel's tree.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeEntry {
     /// The name shown: a folder holding only one folder shares its entry with it, so a folder's
@@ -217,7 +217,7 @@ pub struct TreeEntry {
 }
 
 /// What a folder holds, folders first, each in the order of VS Code's explorer.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Directory {
     pub entries: Vec<TreeEntry>,
@@ -229,7 +229,7 @@ pub struct Directory {
 
 /// One version of a file: the two sides of a diff, or the file the Files panel shows. A commit's
 /// parent is a commit too.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum FileVersion {
     Worktree,
@@ -239,7 +239,7 @@ pub enum FileVersion {
 }
 
 /// A file as the Files panel shows it.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum FileContent {
     Text {

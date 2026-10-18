@@ -6,8 +6,11 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
 
 - Frontend: `vitest` (mostly models and parsers, some hooks and UI logic), Biome, TypeScript, knip
   (unused code), `boundaries:check` (layers, `architecture.md`).
-- Backend: `cargo test`; end-to-end tests run a real git on scratch repositories. clippy and
-  rustfmt.
+- Backend: `cargo test`; end-to-end tests run a real git on scratch repositories, the watched
+  repository a real watcher too. clippy and rustfmt.
+- Helper (`crates/agent/tests`): the `sidekyk-agent` binary started as the app starts it, its
+  answers compared with the direct reads, failures keeping their code, changes and a change
+  missed while hidden coming through.
 
 ## Browser fixtures
 
@@ -24,6 +27,8 @@ Ignored by default, run in release with `--ignored --nocapture`:
   search over it, recent commits with the newest's files, the diff of the largest changed file.
 - `syntax_colors_while_written` (`SIDEKYK_BENCH_FILE=<file>`): syntax colors while the file on
   screen is written every 250 ms (`features/syntax-colors.md`).
+- `agent_timings` (`-p sidekyk-agent`, `SIDEKYK_BENCH_REPO=<repo>`): snapshot, a folder, the
+  palette's files and the largest diff, read directly and through the helper.
 - `notes_timings`: 1,000 notes read and changed (`features/notes.md`).
 
 ## Container fixture

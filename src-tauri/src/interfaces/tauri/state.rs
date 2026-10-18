@@ -11,7 +11,7 @@ use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::projects::ProjectList;
-use sidekyk_core::modules::repositories::Repositories;
+use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{RepositoryInfo, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::search::{self, ListMatch, NoteMatch, SearchRequest, SearchResults};
 use sidekyk_core::shared::sync::lock;
@@ -21,8 +21,8 @@ pub(crate) struct ProjectsState {
     /// The root last given to `Repositories::watch`. Held while the project on screen is read and
     /// watched, so calls racing each other end on the project on screen after the last of them.
     watching: Mutex<Option<String>>,
-    /// What reads the projects' repositories, on this machine.
-    repositories: Arc<Repositories>,
+    /// What reads the projects' repositories.
+    repositories: Arc<dyn Repositories>,
 }
 
 impl Default for ProjectsState {
@@ -30,12 +30,24 @@ impl Default for ProjectsState {
         Self {
             list: Mutex::default(),
             watching: Mutex::default(),
-            repositories: Arc::new(Repositories::new(
-                Arc::new(LocalRepositoryBackend::default()),
-                Arc::new(LocalRepositoryWatcher),
-            )),
+            repositories: repositories(),
         }
     }
+}
+
+/// This machine's repositories, read here. A dev build started with `SIDEKYK_AGENT=local` reads
+/// them through the helper instead, a child process beside the app's binary, as it will read a
+/// WSL distro's (`docs/plans/remote-projects.md`).
+fn repositories() -> Arc<dyn Repositories> {
+    #[cfg(debug_assertions)]
+    if std::env::var_os("SIDEKYK_AGENT").is_some_and(|agent| agent == "local") {
+        use sidekyk_core::infrastructure::agent::{helper_beside_this_binary, AgentRepositories};
+        return Arc::new(AgentRepositories::new(helper_beside_this_binary));
+    }
+    LocalRepositories::new(
+        Arc::new(LocalRepositoryBackend::default()),
+        Arc::new(LocalRepositoryWatcher),
+    )
 }
 
 impl ProjectsState {
@@ -54,8 +66,8 @@ impl ProjectsState {
         lock(&self.list).find(root).cloned()
     }
 
-    pub(crate) fn repositories(&self) -> &Repositories {
-        &self.repositories
+    pub(crate) fn repositories(&self) -> &dyn Repositories {
+        &*self.repositories
     }
 
     /// The palette's matches: the projects, the panels the frontend names, and the files of the
@@ -122,9 +134,12 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     // the count shown is the previous project's: cleared until the new one is read
     tray::clear(app);
     let emitter = app.clone();
-    state.repositories.watch(active.as_ref(), move |event| {
-        let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
-    });
+    state.repositories.watch(
+        active.as_ref(),
+        Box::new(move |event| {
+            let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
+        }),
+    );
     *watching = root;
 }
 
