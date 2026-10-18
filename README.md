@@ -9,22 +9,24 @@ instant when you bring it up, close to idle when it sits in the background.
 
 ## Features
 
-- Several repositories as projects: add them, switch from the rail on the left (each avatar shows
-  how many files changed), see them all as cards with their branch, changes and first files, and
-  remove one from its ⋯ menu (its files are never touched).
-- The project's facts next to its name: branch, ahead/behind, changed files and the lines added
-  and removed in tracked files against HEAD, or "clean".
-- Changed files grouped as changes, new files and staged, with per-file line counts.
-- Unified diff per file, refreshed automatically when files or refs change on disk.
-- Copy on click: a hunk (or the whole file) goes to the clipboard as `path:lines` plus a `diff`
-  block, ready to paste to Codex, Claude Code or any other agent.
-- Keyboard: `↑`/`↓` or `j`/`k` move between files.
+- Several repositories as projects: switch from the rail, see them all as cards (branch, changes,
+  waiting notes), zoom from all projects to a project's panels to one panel full screen.
+- Changes: files grouped as changes, new files and staged; diff or full file, syntax colored,
+  refreshed when files or refs change on disk; recent commits; a scrollbar that maps the changes;
+  `n`/`p` from change to change across files.
+- Copy on click: a line, a hunk or a selection goes to the clipboard through your template
+  (`path:lines` plus a `diff` block by default), ready to paste to Codex, Claude Code or any other
+  agent.
+- Files: the project's tree, changes colored, any file viewed.
+- One palette: `⌘K` by name (projects, panels, files, notes), `⌘F` in the files' contents.
+- Notes per project, as cards in lists; export to Markdown.
+- In the background: tray icon with the change count, a global shortcut to show or hide, no work
+  while hidden.
 
-## Roadmap
+## Docs
 
-What is done and what is still missing is tracked in [ROADMAP.md](ROADMAP.md). Sidekyk is
-growing into a project workspace (changes, files, notes, several projects): the direction is in
-[docs/evolution.md](docs/evolution.md).
+What is left to build: [ROADMAP.md](ROADMAP.md). How Sidekyk works and why it is built that way:
+[docs/](docs/README.md).
 
 ## Requirements
 
@@ -72,4 +74,5 @@ cargo test --manifest-path src-tauri/Cargo.toml
 cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
-See `AGENTS.md` for conventions and `docs/architecture.md` for the layering.
+See `AGENTS.md` for conventions and `docs/architecture.md` for the layering; `docs/testing.md` says
+what the checks cover.

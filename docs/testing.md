@@ -1,21 +1,48 @@
-# Container testing
+# Testing
 
-A Linux container that stands in for a WSL distro on a Mac (Colima). Purpose: develop and test
-remote projects (a repository that lives in a Linux filesystem the app reaches through a helper
-process) without Windows.
+Commands: `AGENTS.md`, Commands. This file says what each covers.
 
-## Why a container stands in for WSL
+## Checks and tests
+
+- Frontend: `vitest` (mostly models and parsers, some hooks and UI logic), Biome, TypeScript, knip
+  (unused code), `boundaries:check` (layers, `architecture.md`).
+- Backend: `cargo test`; end-to-end tests run a real git on scratch repositories. clippy and
+  rustfmt.
+
+## Browser fixtures
+
+`pnpm dev`, `http://localhost:1420/?dev=app&scenario=…` (`src/dev/`, dev builds only): the app on
+in-memory ports. Scenarios: `review` (changes, commits, notes, long files changed in many places),
+`clean`, `no-repo`, `large`, `problems` (a missing repository). UI changes are checked there, in
+light and dark.
+
+## Timing tests
+
+Ignored by default, run in release with `--ignored --nocapture`:
+
+- `backend_timings` (`SIDEKYK_BENCH_REPO=<repo>`): snapshot, summary, file tree, the palette's
+  search over it, recent commits with the newest's files, the diff of the largest changed file.
+- `syntax_colors_while_written` (`SIDEKYK_BENCH_FILE=<file>`): syntax colors while the file on
+  screen is written every 250 ms (`features/syntax-colors.md`).
+- `notes_timings`: 1,000 notes read and changed (`features/notes.md`).
+
+## Container fixture
+
+A Linux container that stands in for a WSL distro on a Mac (Colima), to build and try remote
+projects (`plans/remote-projects.md`) without Windows.
+
+### Why a container stands in for WSL
 
 - Same shape: files on the VM's own filesystem, edited from inside by Linux processes; the app
   outside reaches them only by starting a process in there (`docker exec -i` here, `wsl.exe
   --distribution <d> --exec` on Windows) and talking over its stdin/stdout.
-- What it can cover: everything above that process (helper binary, protocol, versions, lifecycle,
-  inotify, Linux git, an ordinary uid-1000 account).
+- What it can cover: everything above that process (helper binary, protocol, versions,
+  lifecycle, inotify, Linux git, an ordinary uid-1000 account).
 - Not covered (needs Windows): `wsl.exe` invocation and distro list, `\\wsl.localhost\<distro>\`
   paths from the folder dialog, copying the helper into the distro, a stopped distro starting,
   `CREATE_NO_WINDOW`, WSL1, Windows on ARM64.
 
-## Setup (macOS)
+### Setup (macOS)
 
 ```bash
 brew install colima docker docker-compose
@@ -28,14 +55,14 @@ Colima, the script uses the current Docker context (Docker Desktop, a Linux engi
 - VM: Colima profile `sidekyk` (Docker context `colima-sidekyk`), 1 CPU, 512 MiB, disks 1 GiB
   for Docker's data and 4 GiB for the system (Colima's smallest; ~870 MB used), both
   thin-provisioned ceilings. Created by the first `up` with these values, kept apart from other
-  projects' VMs; the script gives the user's Docker context back after starting it.
+  projects' VMs; the script gives the user's Docker context back after starting or stopping it.
 - Resizing: memory and CPUs with `colima start --profile sidekyk --memory N`; a disk only grows
   (Colima refuses a smaller one), so shrinking means `colima delete --profile sidekyk --data`.
 - Memory on the Mac = the VM's whole memory once its page cache fills it (`footprint`: 1,022 MB
   at 1 GiB, 524 MB at 512 MiB; the guest itself uses ~160 MB). 512 MiB builds the image from
   scratch; compiling Rust inside does not fit.
 
-## Fixture
+### The fixture
 
 `tests/container/`: Ubuntu 24.04 (WSL's default distro), pinned by digest, with git and
 inotify-tools. Native arch of the engine: aarch64 on Apple Silicon, so a helper built for it
@@ -57,7 +84,7 @@ scripts/container-fixture.sh status   # engine, fixture, git status
 scripts/container-fixture.sh down     # removes fixture and repository (--colima: stops the VM)
 ```
 
-## Never a bind mount
+### Never a bind mount
 
 With Colima's virtiofs mount, a write on the Mac to a bind-mounted folder produces no inotify
 event inside the VM; a write from inside does (verified 2026-10-18). A repository edited on the

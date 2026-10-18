@@ -1,5 +1,5 @@
 # The container fixture: a stand-in for a WSL distro. Driven by scripts/container-fixture.sh; see
-# docs/container-testing.md.
+# docs/testing.md.
 
 name: sidekyk-fixture
 

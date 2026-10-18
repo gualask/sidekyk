@@ -1,5 +1,5 @@
 # A Linux box that stands in for a WSL distro: an ordinary uid-1000 account owning a repository on
-# the Linux filesystem, edited from inside. See docs/container-testing.md.
+# the Linux filesystem, edited from inside. See docs/testing.md.
 
 # Ubuntu because it is WSL's default distro. Pinned by digest (a multi-arch index: amd64 and arm64)
 # so a rebuild cannot move git under the fixture. To bump: `docker pull ubuntu:24.04`, then

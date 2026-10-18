@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Drives the container fixture (tests/container): a Linux box that stands in for a WSL distro.
-# See docs/container-testing.md. A bare invocation prints usage and does nothing else.
+# See docs/testing.md. A bare invocation prints usage and does nothing else.
 set -euo pipefail
 
 repo_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -8,7 +8,7 @@ fixture_dir="$repo_root/tests/container"
 project=/home/ubuntu/project
 
 # A Colima VM of its own, as small as the fixture allows (sizes and measures in
-# docs/container-testing.md). Given only when the VM is created: Colima refuses a smaller disk than
+# docs/testing.md). Given only when the VM is created: Colima refuses a smaller disk than
 # the VM has.
 colima_profile=sidekyk
 colima_resources=(--cpu 1 --memory 0.5 --disk 1 --root-disk 4)
@@ -60,10 +60,10 @@ colima_keeping_context() {
 # ensure_docker makes `docker info` answer: the fixture's own Colima VM, started (created with its
 # resources on first run), or without Colima the current Docker context as it is found.
 ensure_docker() {
-	command -v docker >/dev/null 2>&1 || die "docker CLI not found, see docs/container-testing.md"
+	command -v docker >/dev/null 2>&1 || die "docker CLI not found, see docs/testing.md"
 	docker info >/dev/null 2>&1 && return
 
-	command -v colima >/dev/null 2>&1 || die "no Docker engine reachable, see docs/container-testing.md"
+	command -v colima >/dev/null 2>&1 || die "no Docker engine reachable, see docs/testing.md"
 	if colima_exists; then
 		log "Starting the Colima VM '$colima_profile'"
 		colima_keeping_context start --profile "$colima_profile"

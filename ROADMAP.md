@@ -1,154 +1,62 @@
 # Roadmap
 
-Priority order. Direction and decisions: `docs/evolution.md`; how things work:
-`docs/architecture.md`. Every item keeps repositories read-only, follows the performance golden
-rule (`AGENTS.md`) and states its cost hidden and shown. Performance work that needs measuring
-first waits in **Performance review**.
+What is left to build, by theme; not a timeline. **After:** marks an item that builds on another.
+A built item leaves this file for `docs/features/` (`docs/README.md`). Every item keeps
+repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
+`docs/product.md`.
 
-## Done
+## Try in the app
 
-MVP and hardening:
+- [ ] Syntax colors in the running app (`pnpm tauri:dev`; `docs/features/syntax-colors.md`)
 
-- [x] Open a repository (folder picker, first CLI argument, last used); file list grouped as
-      changes / new files / staged with line counts; unified diff with binary and cut notices;
-      watcher refresh (filtered, debounced); keyboard between files; browser fixtures
-- [x] Ignored paths never refresh (`check-ignore`, cached per directory); snapshot's git in
-      parallel; one snapshot in flight per project; untracked reads bounded; virtualized lists;
-      `core.fsmonitor=false`; `backend_timings`; `tracing` logs (release keeps `info`+, +144 KiB)
-- [x] Bounded git: every call names its max output (status 8 MiB, numstat 4 MiB, diff 2 MiB) and
-      is killed past it or after 30 s (`git_timed_out`); at most 10,000 changed paths ("too many
-      changes", counts read `10000+`)
+## Review
 
-Workspace:
+- [ ] Collect several hunks with a comment each, copy as one batch
+- [ ] Side-by-side view; collapse unchanged regions with expand on demand
+- [ ] Open a file in the editor at the hunk's line (its Tabler icon comes with it)
+- [ ] Diff context lines setting
 
-- [x] Panel contract (`PanelDefinition`, one lazy chunk per module, no queries off screen) and
-      level 0 summaries (status + numstat vs HEAD; 52 ms on Zed's clone)
-- [x] Projects as app data: add, remove, switch (rail, `[`/`]`, `⌘K`); only the project on screen
-      is watched; `repository_missing` for a moved repository
-- [x] Shell of the approved mock: breadcrumb top bar (macOS overlay title bar), rail, level 0
-      cards, level 1 tiles, level 2 full screen; zoom transitions (View Transitions, 320 ms)
-- [x] Settings dialog (`⌘,`): theme (dark default), diff view, copy template, global shortcut
-- [x] Toasts (passing events) and top-bar problems (lasting, each with its fix)
-- [x] Command palette (`⌘K`): projects, panels, changed files, ranked in Rust (`nucleo-matcher`,
-      0.34 ms / 4,366 paths; +199 KiB binary)
-- [x] Keyboard model: `↵`/`Esc` zoom, `1`-`9` panels, `[`/`]` projects, `←`/`→` tiles at level 1
-      (selected tile takes `j`/`k`), `⌘`+scroll and pinch (macOS) zoom; `?` (and the top bar's
-      `?`) shows the shortcuts in a card, bottom right, as the mock
-- [x] Tiles show the panel's icon, title and key in its tooltip (2026-10-17)
-- [x] Splitter between the Changes and Files tiles (2026-10-17): drags the tree's width (one
-      setting with full screen), double click fits; Changes keeps 560 px, Files gives way first
-- [x] Every sidebar resizes (2026-10-17): Changes' list too (200 px min, 288 default); drag,
-      double click fits, again back; content keeps 240 px; widths in `sidebarWidths`
-- [x] Scrollbar as a map of the changes (2026-10-17): a mark per hunk where its changed lines are
-      (added, deleted, both; the diff's gutter colors), 12 px of click room each (overlapping
-      ones join), under a translucent thumb that drags (a click on it goes to the mark below), a
-      click on the track centers there, wider under the pointer; `diffScrollbar` narrow
-      (12 px) or wide (20 px). The viewer's native scrollbars are hidden, a thin horizontal bar
-      shows while lines run past the edge
-- [x] `n`/`p`: next/previous change across the files of the list (or of the commit viewed);
-      steps go on from the change gone to while on screen; a word at either end
-- [x] Mock icons from Tabler: all in; open in editor's comes with that feature
-- [x] Level 0 cards tell the notes waiting and the newest (`notes_summary`, kept in memory once
-      read, until they change)
-- [x] Side column (2026-10-17): Files above Notes, splitter between them, 320 px at least with
-      Notes; Files and Notes minimize to chips in the top bar; tiles kept per project
+## App
 
-See what the agent is doing:
-
-- [x] Tray icon with the change count; closing hides to the tray (+235 KiB)
-- [x] Global shortcut to show/hide (`tauri-plugin-global-shortcut` on macOS/Windows, `sidekyk
-      --toggle` on Linux; default `⌃⌥Space`, provisional; +160 KiB)
-- [x] No git while hidden/minimized/covered; on show, read only what may have changed (watcher
-      mark, or older than 30 s)
-- [x] Window created hidden, shown after the first paint (fallback 3 s)
-- [x] Recent commits in Changes (VS Code's graph, first parents, 50); a commit's files replace the
-      list until `×`/`Esc`
-
-Explore and copy:
-
-- [x] Whole-file view ("Changes | Full file", default in settings): diff with full context, cut
-      into git's three-line hunks; 20 ms on a 13,291-line file
-- [x] Copy with a click in both views (line, hunk, selection) through the user's `{row}`/`{text}`
-      template
-- [x] Files panel (2026-10-17): tree of `git ls-files` (cached + others, minus deleted; 200,000
-      max) kept in Rust, served per open folder (10,000 entries max); compact folders, VS Code
-      order and change colors; collapse-all; read again only when a path is added/removed or the
-      git dir changes (48 ms on Zed's clone, a folder 3 µs). In a tile the tree alone, Changes
-      being the viewer; full screen tree + viewer. One shared selection (VS Code-style
-      auto-reveal). Tree width dragged and stored (`sidebarWidths.files`)
-- [x] File view (`get_file_content`): files of the tree only, first 2 MiB, binary/link/submodule
-      notices, links never followed; same rows and copy as diffs
-- [x] Search by name in `⌘K` (2026-10-17): every file of the project on screen (the tree kept in
-      Rust, plus deleted files), none at level 0; change marked by a word; `↵` goes through the
-      shared selection. Scoring on threads from 20,000 paths (Zed's 4,366: 0.37 ms; 200,000
-      synthetic: 80 → 14 ms)
-- [x] Search in contents (`⌘F`, 2026-10-17): the palette's other mode (`⌘K`/`⌘F` switch, text
-      kept), ripgrep's crates in-process over the tree's files through the port (no git), up to
-      8 threads, first 2 MiB per file, stops at 2,000 lines, results streamed; the file shown
-      first; a longer text reads only the files the last complete search found (43-50 ms on
-      Zed's clone, ~5 MB). `↵` opens the file with a find bar at the line (`3/12`, `↵`/`⇧↵`,
-      `Esc`)
-- [x] `⌘F` with a file open (2026-10-17): the find bar on it, empty, from the top (a commit's
-      file too); `⌘F` in the bar, or its icon, opens the palette's search in contents with its
-      text; with no file open, the palette as before. The bar floats top right as VS Code's find
-      widget, with room left above the rows and the match being read never under it
-
-## Next
-
-- [x] Syntax colors (2026-10-18): syntect + two-face (bat's ~220 grammars, one engine), One Dark /
-      One Light; both sides of a diff colored from the whole versions, served in 256-line blocks
-      for the rows on screen, kept per version (last 4); 1 MiB per version ("No colors"), lines
-      past 4,000 B and anything past 2 s left in the text's color; a changed version colored
-      again only around its change (VS Code's way: a file written every 250 ms while on screen,
-      23,205 lines, 8-9 ms per write instead of 650 ms; decision in evolution, Syntax colors).
-      Left: try it in the app (`pnpm tauri:dev`)
+- [ ] Italian and English UI (as in Fyler)
+- [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
+- [ ] Copy or reveal the log for bug reports
 
 ## Notes
 
-- [x] Notes panel: cards in lists, stored in the app data directory (spec in evolution, Notes).
-      Built (2026-10-17): storage, full screen and tile, reorder, Undo toasts, ⌘K by name, long
-      lines setting (`noteLines`, `⌥Z` from a note), ⌘N from anywhere but all projects; tried in
-      the app (2026-10-18)
-- [x] Export a project's notes to Markdown from the Notes panel's ⋯ (never inside a repository);
-      removing a project with notes asks: export then remove, or delete (nothing left on disk)
-- [x] A moved repository is relinked with Locate… (the problem's fix): notes and layout follow,
-      into the project already there if it is one
-- [ ] Optional Google Drive sync/backup (OAuth loopback + PKCE, tokens in the OS credential store,
-      local first, conflicts keep both); nothing runs until an account is connected
+- [ ] Optional Google Drive sync/backup (`docs/plans/notes-sync.md`)
 
-## Beyond developers
+## Folders without git
 
-- [ ] Projects as plain folders, git optional: Files and Notes, no Changes; file list and watcher
-      filter without git (direction and open points in evolution, Beyond developers)
+`docs/plans/folders-without-git.md`.
+
+- [ ] Projects as plain folders, git optional: Files and Notes, no Changes; file list behind a
+      port; watcher filter without git
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
 
 ## Remote projects
 
-- [x] Container fixture as a WSL stand-in on Colima (`docs/container-testing.md`)
+`docs/plans/remote-projects.md`; tried on the container fixture (`docs/testing.md`).
+
 - [ ] Watcher behind a port; `tree.rs` `may_have_changed` reads the disk through the backend
-- [ ] Cargo workspace: core, app, `sidekyk-agent` (direction in evolution, Remote projects)
-- [ ] Minimal helper over stdio, tried on the fixture (`docker exec -i`)
+- [ ] Cargo workspace: core, app, `sidekyk-agent`. **After:** watcher behind a port
+- [ ] Minimal helper over stdio, tried on the fixture (`docker exec -i`). **After:** workspace
 - [ ] WSL transport: `\\wsl.localhost\` paths, install from the installer's resources, `wsl.exe`;
-      tried on Windows (WSL2, WSL1, ARM64, stopped distro, no git in the distro)
-- [ ] Nice to have: remove the helper from a distro when its last project goes
+      tried on Windows (WSL2, WSL1, ARM64, stopped distro, no git in the distro). **After:**
+      minimal helper; the app verified on Windows (Platforms)
+- [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
+      transport
 
-## Then
-
-- [ ] Collect several hunks with a comment each, copy as one batch
-- [ ] Side-by-side view; collapse unchanged regions with expand on demand
-- [ ] Open a file in the editor at the hunk's line
-- [ ] Diff context lines setting; Italian and English UI (as in Fyler); real app icon and tray
-      glyph (today Tabler's `git-compare`); copy or reveal the log for bug reports
-
-## Release
+## Platforms and release
 
 - [ ] CI with the `AGENTS.md` checks; Rust tests on macOS, Linux, Windows (end-to-end tests run a
       real git)
-- [ ] Signed builds and self-update (as in Fyler); update check at startup or on demand only
+- [ ] Signed builds and self-update (as in Fyler); update check at startup or on demand only.
+      **After:** CI (release builds come from it)
 - [ ] Linux watcher: one inotify watch per directory not ignored (~670 vs 33,000-47,000 for the
       ten repos in `~/Dev`; `clean-flow` alone 8,222 > old 8,192 limit); a failed watch must not
       fail the project
-- [ ] To verify on the packaged app and other systems:
+- [ ] Verify on the packaged app and other systems:
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, `⌘W` hides and
     `⌘Q` quits, no blank frame at startup
   - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
@@ -163,7 +71,7 @@ Explore and copy:
 
 ## Performance review
 
-Measure first; the first three give the numbers the rest are judged on.
+Measure first: the first three give the numbers the rest are judged on (**After:** them).
 
 - [ ] First paint and file switch timings as a script, also on the packaged app
 - [ ] Budgets in `docs/performance.md` (cold start, show from hidden, file switch, snapshot and
@@ -178,16 +86,7 @@ Measure first; the first three give the numbers the rest are judged on.
       interval? skip `check-ignore` for tracked paths?
 - [ ] The open file (Files) and the open diff are read again on every change on disk; restrict to
       changes that touch them
-- [ ] Prefetch neighbouring diffs, if switching shows a wait; highlighting and fuzzy search off
-      the main thread, if timings say so
-- [ ] Bundle and binary size budgets in CI
+- [ ] Prefetch neighbouring diffs, if switching shows a wait
+- [ ] Bundle and binary size budgets in CI. **After:** CI
 - [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
       written, shortcut status read again): a lighter path for layout-only settings?
-
-## Out of scope
-
-- Writing to git or to files (stage, commit, revert, edit): the agent, terminal or editor does it
-- Running or embedding the agent
-- Following the terminal's active tab (no signal holds across agents/terminals/tmux/OSes; see
-  evolution)
-- Replacing the `git` CLI with `gix`/libgit2 while process startup is not the measured bottleneck

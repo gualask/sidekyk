@@ -1,7 +1,7 @@
 # Architecture
 
 Tauri 2 app: React/Vite frontend in `src/`, Rust backend in `src-tauri/`, a modular monolith as
-in Fyler.
+in Fyler. Each area in `features/`.
 
 ## Data flow
 
@@ -25,10 +25,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   under `['commit', …]`, read once.
 - Commands name a project by its root; the backend serves only roots in the project list.
 - Projects not on screen: not watched; their summary is read after the first paint, when the
-  window shows again and when level 0 shows, only if older than 30 s.
-- Window hidden, minimized or covered (WKWebView follows occlusion): no git. The page reports
-  `visibilitychange` (`set_window_visible`); showing again returns the marked project, and the
-  frontend reads it plus anything on screen older than 30 s.
+  window shows again and when level 0 shows, only if older than 30 s (`features/projects.md`).
+- Window hidden, minimized or covered: no git (`features/background.md`).
 
 ## Frontend
 
@@ -39,39 +37,27 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - `modules/projects/`: project list, rail, level 0 cards (lazy chunk with Base UI's menu), empty
   screen.
 - `modules/settings/`: settings queries and dialog (lazy chunk).
-- `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`,
-  `useContentSearch`: 150 ms pause, results kept until the next text's first files); ranking and
+- `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`); ranking and
   reading are the backend's; the app decides what an item opens (`PaletteActions`).
 - `modules/repository/`: the repository on screen as two panels (`panel.ts`): Changes (review
   and the viewer of any file) and Files (the tree).
   - `model/`: wire types, diff parser, whole-file hunks, copy format, file grouping, tree rows and
     keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`),
-    matches of the find bar (`find.ts`).
+    matches of the find bar (`find.ts`), syntax blocks (`syntax.ts`).
   - `application/`: `RepositoryPort`, TanStack Query hooks, commit view, session state
-    (`useSelectedFile` for the shared selection),
-    `useShownTarget`, `useFileFind` (the find bar's text, per project), `RepositorySettings`
-    (what the app passes from the settings).
+    (`useSelectedFile` for the shared selection), `useShownTarget`, `useFileFind` (the find bar's
+    text, per project), `RepositorySettings` (what the app passes from the settings).
   - `ui/`: `ChangesWorkspace`, `FilesWorkspace`, `FileTree` (+ `tree-layout.ts`), the viewer
-    `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`, `TextFileView`,
-    one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count, level 0 card).
-    Lists, tree and diff are virtualized flat lists of fixed-height rows.
-- `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu): lists on
-  the left full screen, cards of the open list (virtualized, measured heights), reorder mode.
-  `useProjectNotes` reads a project once (`['notes', root]`, never stale: only the app writes);
-  `useNoteActions` changes the cache at once, then sends the change after those before it
-  (`ChangeQueue`, per project: the backend gets them in order); only the last answer is shown, a
-  skipped one makes the notes read again at the end, a failure too. Answers update notes in place
-  (`withUpdated`), only add and restore add one. Undo undoes that change only (done, a move back
-  to its place). A card saves its text 500 ms after typing stops and on close (blur: `Esc`, `⌘↵`,
-  a click outside, not the window losing the focus); emptied, it goes (Undo). Long lines wrap or
-  scroll (`noteLines`, through `NotesSettingsProvider`; `⌥Z` in a note field: the key's letter,
-  else its place when `⌥` types a symbol; the field's height follows). `⌘N` is
-  the workspace's (also from a field): `show` to Notes with `newNoteTarget`.
+    `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`,
+    `TextFileView`, one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count,
+    level 0 card). Lists, tree and diff are virtualized flat lists of fixed-height rows.
+- `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu;
+  `features/notes.md`).
 - `infrastructure/platform/`: Tauri adapters implementing the ports.
 - `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
   `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
   `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type, change
-  areas, panel contract.
+  areas, panel contract, sidebar widths (`ui/sidebar-width.ts`).
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
 
 ### Dependency rules
@@ -85,85 +71,28 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 
 - `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, optional level 0
   `summary`, optional `tileMinWidth`. `app/panels.ts` lists them in shortcut order and the level 1
-  tiles, preloading their chunks: `MAIN_TILE` (Changes, fills, keeps 560 px) and `SIDE_TILES`
-  (Files above Notes) in `SideColumn`, which owns their width (`SIDE_WIDTH`: the tree's setting,
-  `sidebarWidths.files`), at least the widest `tileMinWidth` shown (Files 160, Notes 320), giving
-  way first. Its splitter's double click fits what tiles need (`PanelProps.tileFit`: Files tells
-  its tree's), else goes back to the default. A splitter between its tiles (`split`); each tile
-  keeps its place in the tree, so minimizing one never remounts the other. Files and Notes
-  minimize to chips in the top bar (`zoom-panel-*` names: the view transition flies tile and chip
-  into each other); `show` to a minimized tile brings it back; ←/→ skip them, `2`/`3` still open
-  them full screen.
+  tiles, preloading their chunks; one lazy chunk per module, no queries off screen. Tile layout in
+  `features/workspace.md`.
 - `PanelProps`: `project`; `header` (element filled through a portal; in a tile after the panel's
   icon, full screen shown only when filled); `tileFit` (in a tile the app sizes: the panel
-  registers how wide it needs it, for the splitter's double click); `target` (a request in the panel's terms, a new object
-  each time); `place` (`tile`/`full`); `selected` (takes the keys: in a tile letters only, the
-  arrows move among tiles); `show(panel, target)` (show something in another panel: selects its
-  tile, or replaces the full-screen panel); `findInFiles(text)` (the palette's search in contents).
-- The viewer's scrollbars are ours (`ScrollMap.tsx`, kept by `useScrollbars` in `scrollbars.ts`:
-  one observer of the scroll element; thumbs follow scrolls with no render; the content's height
-  is the one scale of marks and thumb): `ChangeMap` beside the rows (`changeMarks`
-  per hunk; `trackMarks` gives each a click room of 12 px at least and joins those whose rooms
-  overlap; a click on the thumb that does not drag goes to the mark under it; widens under the
-  pointer, over the rows; thumb and marks follow scrolls and
-  content resizes with no render, `observeContent`) and `SideScrollbar` below them while lines
-  run past the edge. `Pane` owns the layout and the hunk gone to (`stepped`, else the one opened
-  on), shared by the list and the map.
-- `n`/`p` (`Pane` with `onPastEnd`, Changes only): `DiffList`'s `HunkReader` steps from the hunk
-  gone to (not marked: 2026-10-17, too much) while on screen, else from the line read (`hunkStepped`); past either end Changes
-  opens the next or previous file (`openAt`, `-1` the last hunk), or says it is the last.
+  registers how wide it needs it, for the splitter's double click); `target` (a request in the
+  panel's terms, a new object each time); `place` (`tile`/`full`); `selected` (takes the keys: in
+  a tile letters only, the arrows move among tiles); `show(panel, target)` (show something in
+  another panel: selects its tile, or replaces the full-screen panel); `findInFiles(text)` (the
+  palette's search in contents).
 - A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
-- Changes and Files share one selection per project (`model/selection.ts`): a changed file by key,
-  or a tree path shown as a change while it is one. Changes selects it in its list; Files reveals
-  it (opens the folders above). Targets (`fileTarget`) carry the path, the hunk to open on and a
-  text to find from a line (opens the find bar: on that file only, until closed; `Esc` closes it
-  first). The bar floats over the viewer's top right, by the map (`FindBar`, 300 px); while open the list
-  leaves `FIND_BAR_SPACE` above its rows (virtualizer `scrollMargin`, scroll kept steady, browser
-  scroll anchoring off) and a match under the bar counts as off screen (`rowWithin`). `⌘F` over
-  a viewer (`Pane`, capture) opens its bar empty from the top, or comes back to it; in the bar's
-  field `FindBar` takes it, as its icon, and calls `PanelProps.findInFiles`: the palette in
-  contents with the bar's text. A commit's file has its own bar (`useCommitFileFind`); opening a
-  commit closes the working tree's (`useFileFind().close`).
-
-### Zoom and keyboard
-
-- `AppShell` owns level, selected tile / full-screen panel and the pending target; every level
-  change goes through `zoom` inside a view transition. `preloadable` parts render at once when
-  their chunk is loaded, so a transition never captures an empty frame.
-- `app/workspace-keys.ts`: `↵`/`Esc`, `1`-`9`, `←`/`→` (tiles), `[`/`]`, `⌘,`, `⌘K`, `⌘F` (also
-  inside the palette, to switch mode; a viewer takes it first), `?` (`ShortcutsHelp`, lazy; list kept by hand: a new
-  shortcut adds its line). Keys a field,
-  dialog or menu takes are theirs. Panels listen with `useWindowKeys`; a panel taking `↵`/`Esc`
-  listens while capturing and the workspace skips handled keys.
-- `app/zoom-gestures.ts`: the wheel listener exists only while `⌘`/`Ctrl` is held.
-
-### Toasts and problems
-
-- Toasts (`useShowToast`) for failures nothing on screen waits for; Base UI toaster loaded with the
-  first one, earlier ones queued. Dialogs show their own errors.
-- A toast may carry an action (Undo: done, moved, deleted notes and lists): its own toast, 6 s.
-- Problems (`app/problems.ts`) are derived from caches, never fetched (`repository_missing`, a
-  refused global shortcut); popover loaded with the first problem.
 
 ### State
 
-- No client store: projects, snapshots, summaries, diffs, tree folders and settings are TanStack
-  Query caches, repository keys starting with the root. A snapshot writes its summary's cache.
+- No client store: projects, snapshots, summaries, diffs, tree folders, notes and settings are
+  TanStack Query caches, repository keys starting with the root. A snapshot writes its summary's
+  cache.
 - Settings changed from the app's bridges (sidebar widths, note lines) go through
   `useChangeSettings`: each change starts from the settings as they are then, so two in a row
   both stay.
 - UI state: zoom level and selected tile (`AppShell`); the shared selection, the tree's open
-  folders and row (session, per project); the viewed commit (Changes). Sidebar widths are one
-  setting (`sidebarWidths`, by sidebar: `changes`, `files`, `notes`), the same in a tile and full screen,
-  served to every module by `shared/ui/sidebar-width.ts` (`useSidebarWidth`, `SidebarSplitter`);
-  a drag stores the width the layout allowed.
-- Project list changes run in one mutation scope, in order; the last switch wins.
-- Tiles per project (`ProjectList.layouts`, by root: minimized panels, split; `useProjectLayout`,
-  `set_project_layout`): shown at once (in the same render, for the view transition), stored
-  after (`update_stored`: no watcher or cache touched); a removed project's layout goes with it.
+  folders and row (session, per project); the viewed commit (Changes).
 - Theme: the backend sets the window theme, the page follows `prefers-color-scheme`; no script.
-- The window is created hidden and shown once the project list is read (`show_window`, first
-  call only; backend fallback after 3 s).
 
 ## Backend
 
@@ -177,151 +106,29 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   `modules/repository`): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
   content (`tree.rs`), a version's whole text (`version.rs`), path checks, ignored-paths filter,
-  contracts. No Tauri; the outside world is
-  the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`).
+  contracts. No Tauri; the outside world is the `RepositoryBackend` port (`git`, `read_file`,
+  `read_entry`, `open_file`). Exception to remove: `tree.rs` `may_have_changed` calls
+  `std::fs::symlink_metadata` itself (`plans/remote-projects.md`).
 - `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`,
-  `notes_files.rs`, `logging.rs`.
-- `shared/`: `AppError` (`{ code, message }`, stable codes), `coalesce.rs` (one run in flight,
-  later callers share the next), `sync.rs`.
+  `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`.
+- `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
+  `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.
 
-### Snapshot
+### Git
 
-- In parallel: `git status --porcelain=v2 -z --branch --untracked-files=all`, `git diff
-  --numstat -z` (unstaged and `--cached`), `git diff HEAD --numstat` for the summary (staged +
-  unstaged before the first commit).
-- Untracked files are read to count lines (binary: NUL in the first 8 KiB): 4 MiB per file, 32 MiB
-  and 2,000 files per snapshot.
-- Summary: one entry per path (first three listed), lines of tracked files only. `load_summary`
-  runs status + numstat vs HEAD and builds the same summary.
-- At most 10,000 changed paths (`truncated`).
-
-### Git limits
-
-`limits.rs`; each call passes `max_stdout`: status 8 MiB, numstat 4 MiB, diff 2 MiB,
-`check-ignore` its input size, ls-files 32 MiB. Pipes are read on threads; past the limit git is
-killed and output is `truncated` (cut records dropped, diffs cut at a whole line). stderr keeps
-64 KiB. 30 s timeout → `git_timed_out`. Git runs with `GIT_OPTIONAL_LOCKS=0` and
-`-c core.fsmonitor=false`.
-
-### Diffs and commits
-
-- `git diff [--cached] --no-color --no-ext-diff -U3 -- <path>` (both paths for a staged rename;
-  `--no-index /dev/null <path>` for untracked); `wholeFile` uses `-U` at git's maximum. The
-  frontend parses from the first `@@`, so `diff.noprefix` and the like do not matter.
-- Recent commits: `git log -z --first-parent -n 51 HEAD --ignore-missing --no-show-signature`.
-  A commit's files: `git diff-tree -r -z --raw --numstat -M` against its first parent (`--root`
-  for a root commit), at most 10,000; ids must be hashes (`invalid_commit`).
-
-### Files
-
-- List: `git ls-files -z --cached --others --exclude-standard` minus `--deleted` (in parallel),
-  at most 200,000 files. `FileTree` sorts each folder as VS Code (folders first, case ignored,
-  numbers by value) and resolves compact folders; `get_directory` serves one folder from memory,
-  at most 10,000 entries plus a count.
-- Only the tree of the project on screen is cached, read on first request. A batch drops it when
-  the git dir changed or a non-ignored path appeared/disappeared (`may_have_changed`: `stat`
-  against the tree); a marked batch while hidden and a project switch drop it too. A read racing a
-  change is not kept.
-- `ProjectsState::file_content`: only files of the tree. `read_entry` refuses a path through a
-  linked folder, returns a link's target unfollowed, a submodule as a folder, a file's first
-  2 MiB (cut at a whole line; binary by NUL).
-
-### Syntax colors
-
-- `get_syntax_colors` (`modules/syntax/`): `{ path, version, first, count ≤ 2,048 }`, version
-  `worktree` (`read_entry`, links never followed), `index`, `head` or `commit` (`git cat-file blob
-  <rev>:<path>`, ids must be hashes). A diff's old side: index (unstaged), HEAD (staged, the path
-  before a rename), the parent commit; its new side the worktree, index or commit.
-- syntect + two-face: grammar by file name, extension, then first line (`#!`). Theme items whose
-  color is a tone (17 tones: comment, string, keyword…), so syntect's own scope matching folds
-  scopes. Spans per line in UTF-16 offsets, merged when touching with one tone; each line carries
-  `check` (FNV-1a of its UTF-16 units).
-- Limits: 1 MiB per version (`tooLarge`, "No colors" in the header); lines past 4,000 bytes keep
-  the text's color (a minified line: 4,000 B 29 ms, 32,000 B 1.9 s); coloring stops after 2 s.
-  The largest source file of Zed's clone (885 KiB, 23,205 lines): 0.64 s; a kept block 0.4 ms.
-- `ColorCache` (managed state, `cache.rs`): a thread of its own, started on the first text
-  colored, idle on its channel; it alone holds the parser states (oniguruma regions cannot leave
-  their thread). The last 4 versions' lines are kept in a table callers read without it (key:
-  root, path, version; bytes hashed at each request). Jobs run in order; one whose text was colored
-  meanwhile is answered from the table, one with a newer text of its file queued behind it with
-  `None` (its caller reads the file again, 3 times, then gets the file's last colors, which
-  `lineCheck` filters); a newer text stops the run of an older one. Bytes become text on the
-  thread, only to color. A panic loses that text's colors, not the thread.
-- A changed version is colored from the last (`colors.rs`, as VS Code): the state kept every 64
-  lines; from the last one at or before the first changed line, until, in the unchanged tail, the
-  state equals one kept there, whose lines and states are reused, shifted. A line edited in 23,205:
-  8-9 ms; an unclosed comment colors to the end.
-- Frontend: `DiffList` asks for the 256-line blocks of the rows on screen (`useSyntaxColors`,
-  `model/syntax.ts`); a line takes its colors only when `lineCheck(text)` matches, so colors read
-  before a change never land on other text. Worktree blocks are invalidated by every change,
-  index/HEAD ones only when the git dir changed, commit ones never.
-
-### Search
-
-`search` runs at every key: projects, panel titles (sent by the frontend) and, once something is
-typed, the files of the project the request names (the one on screen; none at level 0): the cached
-tree (read if missing) plus deleted files, each marked from the last snapshot (modified > added >
-deleted). Words match independently, case ignored; matched letters return as UTF-16 offsets; at
-most 500 files, the best picked without sorting the rest. From 20,000 paths scoring runs on up to
-8 threads.
-
-The same project's notes (`modules/search/notes.rs`, ranked where `NotesStore` keeps them, no
-copy; read first if not in memory; only a project of the list):
-lists by name; notes by first line (fuzzy), else by the text typed anywhere in them (substring,
-case ignored, 2 characters at least) with the part around it on one line; open before done, at
-most 50. 1,000 notes: 3.5 ms a key. The palette shows lists and notes before files; `↵` opens
-Notes at the same zoom (`notesTarget`: the list, the note scrolled to and lit up, a done one's
-group unfolded), its tile back from the top bar if minimized.
-
-`search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
-`open_file` (never through a link), up to 8 threads taking the next file, a fixed buffer each,
-binary skipped at the first NUL, UTF-16 by BOM, the first 2 MiB per file (what the viewer
-shows). Literal, smart case, at least 2 characters; stops at 2,000 lines; long lines cut to 300
-characters around the first match. Files go through a `Channel` in batches every 50 ms. Each
-search counts a run: a newer one (or `stop_content_search`) stops it. A complete search is kept
-so a longer text (`narrows`) reads only the files it found, in the same tree; any watcher batch
-drops it.
-
-### Notes
-
-- `<app data>/notes/<folder>/`, layout in `modules/notes/store.rs`; folder by root from each
-  `project.json`, scanned once. The project read last stays in memory; a change writes only the
-  files it touched (written beside, `sync_all`, renamed over; a leftover `.tmp` is removed when
-  read), a failed write drops the memory copy. Nothing is written for a project until its first
-  change. Ids: 16 hex digits, the only names let through to files.
-- A note is at most 1 MiB (`note_too_long`); a missing note or list is `note_missing` /
-  `note_list_missing`; a broken file is skipped and logged, never removed; a change that changes
-  nothing writes nothing. A new folder never takes one in use (two projects of one name).
-- Export (`export_notes`, the header's ⋯): Markdown (`to_markdown`: a section per list, notes
-  between `---`, done ones under `### Done`) where the save dialog says, never inside a project's
-  repository (`export_in_repository`; `ProjectList::holds`: paths resolved by the file system,
-  links included, compared without case on macOS and Windows). The export reads the notes
-  without replacing those in memory (`read_notes`).
-- Removing a project deletes its notes first (`remove_project`; if they cannot go, the project
-  stays). The frontend asks before (`RemoveProjectDialog`, notes module, lazy, from the overview's
-  ⋯ and the missing-repository problem): no notes (`count_notes`, files counted, nothing read),
-  it goes at once; else export then remove, or remove and delete; a count that fails asks too.
-- A moved repository (`relocate_project`, the problem's Locate…): the folder picked resolves to its
-  repository; the notes follow first (`relink`: `project.json` takes the new root; into another
-  project's notes when it is one: lists of one name join, open notes go below, the old folder
-  goes), then the list (`relocate`: same place, layout, on screen). The same folder changes
-  nothing. Problems carry several fixes (Locate…, Remove).
-- Frontend caches of a project's notes are one family: `['notes', root]`, its card's summary and
-  its count below it; every change makes the summary stale, rereading or forgetting a project's
-  notes takes all three. The backend's summary cache is read and filled under the same lock as
-  changes.
-- `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
-
-### Tray
-
-Count of the project on screen from its snapshots and summaries (no git of its own): next to the
-icon on macOS/Linux, tooltip everywhere. Menu: show, quit. macOS template glyph
-(`icons/tray-template.png`). Closing the window hides it while the tray exists; on Linux without
-appindicator the tray panic is caught and closing quits.
+- The `git` CLI, no libgit2: every answer is what the user's own git would print. Found on the
+  PATH, else in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `C:\Program Files\Git\cmd`;
+  on Windows without a console window (`CREATE_NO_WINDOW`).
+- Runs with `GIT_OPTIONAL_LOCKS=0` (never takes `index.lock`), `-c core.fsmonitor=false` (a
+  repository's config cannot make Sidekyk run a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+- Bounded (`limits.rs`): each call passes `max_stdout`: status 8 MiB, numstat 4 MiB, diff 2 MiB,
+  `check-ignore` its input size, ls-files 32 MiB. Pipes are read on threads; past the limit git is
+  killed and output is `truncated` (cut records dropped, diffs cut at a whole line). stderr keeps
+  64 KiB. 30 s timeout → `git_timed_out`.
 
 ### Logs
 
 `tracing` to the app's log dir (one file per session, previous kept, size cap). Development:
 every git call, watcher batch and command duration, also on stderr. Release compiles out below
-`info`: startup, project opened, failures, panics, frontend errors (max 50 per session). Hot-path
-events are `debug`.
+`info` (+144 KiB on the binary): startup, project opened, failures, panics, frontend errors (max
+50 per session). Hot-path events are `debug`.

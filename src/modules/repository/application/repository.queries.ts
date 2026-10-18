@@ -78,7 +78,7 @@ const commitKeys = {
 
 /**
  * How old a read may be when the window or level 0 shows again, before it is read once more
- * (decided with its cases in docs/evolution.md, Projects). The project on screen is read at once
+ * (decided with its cases in docs/features/projects.md). The project on screen is read at once
  * when its watcher saw a change while the window was hidden.
  */
 const READ_AGAIN_AFTER_MS = 30_000;
