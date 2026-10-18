@@ -145,22 +145,23 @@ indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problem
   It starts when its project is opened. Zed and VS Code do not check: opening starts the distro,
   their recent lists do not touch it.
 
-### Trying it without a Linux build
+### Trying it without Windows
 
-Building the helper for Linux on the Mac is on hold (2026-10-18: a new tool or a ~1 GB image on a
-metered connection). Meanwhile the helper builds for the Mac, and a switch of dev builds
-(`SIDEKYK_AGENT=local`) runs local projects through it as a child process: protocol, module
-split, watcher and lifecycle on real repositories, and its cost against the direct path on the
-same repository. Linux-only parts (inotify, musl, uid 1000) wait for the container fixture.
-
-Built: `cargo build --manifest-path src-tauri/Cargo.toml -p sidekyk-agent`, then
-`SIDEKYK_AGENT=local pnpm tauri:dev`; the app starts the binary beside its own. Release builds
-ignore the switch.
+- The helper beside a dev build of the app: `cargo build --manifest-path src-tauri/Cargo.toml -p
+  sidekyk-agent`, then `SIDEKYK_AGENT=local pnpm tauri:dev` reads local projects through it, a
+  child process (protocol, module split, watcher, lifecycle). Release builds ignore the switch.
+- The Linux helper in the container fixture (2026-10-18): not built on the Mac (a new tool or a
+  ~1 GB image on a metered connection) but by `build.yml` for arm64 too, on GitHub's arm64
+  runner; `scripts/container-fixture.sh helper <binary>` runs `crates/agent/tests/container.rs`.
+  The install and start (`infrastructure/linux_helper.rs`) take a `LinuxMachine`: a WSL distro
+  through `wsl.exe`, the fixture through `docker exec`. Tried there: install through stdin, the
+  older build removed, reads, inotify (an ignored write tells nothing), a change missed while
+  hidden, closing once idle. Measured (aarch64 fixture, 1 CPU): installed and first answer
+  292 ms, a snapshot 4.4 ms, started again once installed 119 ms. Left to Windows: `wsl.exe`,
+  the copy through `wslpath`, the distro states.
 
 ## Open
 
-- Building the helper on the Mac for `aarch64-unknown-linux-musl` (on hold, above):
-  `cargo-zigbuild` (a new tool, as Zed) or a Rust container (not on the 512 MiB fixture VM).
 - Shipping the helper for containers on the Mac (arm64, amd64 under emulation).
 - On Windows 11 x64, from `build.yml`'s unsigned build: the protocol's cost through `wsl.exe`;
   `wsl.exe`'s and the helper's start time; `--list --running --quiet` leaves a stopped distro

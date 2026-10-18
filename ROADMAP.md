@@ -36,13 +36,11 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 ## Remote projects
 
-`docs/plans/remote-projects.md`; tried as a local child process on the Mac, Linux parts on the
-container fixture (`docs/testing.md`) once the helper builds for Linux there.
+`docs/plans/remote-projects.md`; the helper tried as a child process on the Mac and, built for
+Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 
 - [ ] WSL projects tried on Windows 11 x64, from `build.yml`'s build
       (`docs/plans/remote-projects.md`, Open); later WSL1, ARM64
-- [ ] Linux build of the helper on the Mac (`cargo-zigbuild` or a Rust container), tried on the
-      fixture. On hold: metered connection (2026-10-18)
 - [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL projects
 - [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
       projects

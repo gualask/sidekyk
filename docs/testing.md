@@ -22,8 +22,9 @@ machine at hand (the Mac); every platform is checked before a release.
   `ReadDirectoryChangesW`) are built and tried on each. The Mac cannot type-check for Windows
   (`onig_sys` builds C).
 - `build.yml`: an unsigned Windows x64 build; its NSIS and MSI installers are the run's artifact
-  (14 days). SmartScreen warns before running them. A Linux job builds the helper first
-  (`sidekyk-agent`, static, `x86_64-unknown-linux-musl` with `musl-gcc` for its C), which
+  (14 days). SmartScreen warns before running them. Linux jobs build the helper first
+  (`sidekyk-agent`, static, musl with `musl-gcc` for its C; x64, and arm64 on an arm64 runner for
+  the container fixture, both artifacts for 14 days); the x64 one
   `tauri build --config src-tauri/tauri.helper.conf.json` puts in the installer's resources
   (`linux/sidekyk-agent`). Any other build (`cargo test`, clippy, `tauri dev`) has no helper: WSL
   projects then fail with `helper_failed`.
@@ -105,8 +106,17 @@ scripts/container-fixture.sh edit     # a burst of writes from inside, one under
 scripts/container-fixture.sh watch    # inotify events inside (Ctrl-C to stop)
 scripts/container-fixture.sh shell    # bash in the repository
 scripts/container-fixture.sh status   # engine, fixture, git status
+scripts/container-fixture.sh helper <sidekyk-agent>  # the helper end to end in the fixture
 scripts/container-fixture.sh down     # removes fixture and repository (--colima: stops the VM)
 ```
+
+### The helper in the fixture
+
+`helper <binary>` runs `crates/agent/tests/container.rs` (ignored otherwise): the real Linux helper,
+built for the fixture's arch (`build.yml`'s `sidekyk-agent-linux-arm64` on Apple Silicon), installed
+in `~/.sidekyk-server/` through `docker exec -i` as in a WSL distro, then read, watched (an edit
+from inside, a write under ignored `build/`), told the window hid and showed, and closed once idle.
+Timings printed (`--nocapture`); measured in `plans/remote-projects.md`.
 
 ### Never a bind mount
 

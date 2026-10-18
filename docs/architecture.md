@@ -146,8 +146,9 @@ In the core:
 - `infrastructure/`: `git_cli.rs` (bounded git), `process.rs` (a child within an output size and a
   time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
   command's reads would refresh again, without end; found by CI 2026-10-18), `agent/` (above),
-  `wsl.rs` (distros, the helper installed and started in one, `WslRepositories`), `machines.rs`
-  (which machine reads a project, and what every machine is told).
+  `linux_helper.rs` (the helper installed and started on a `LinuxMachine`), `wsl.rs` (distros,
+  `WslRepositories`), `machines.rs` (which machine reads a project, and what every machine is
+  told).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `process.rs`
   (what a child wrote, `GitOutput` to the repository module), `sync.rs`.
