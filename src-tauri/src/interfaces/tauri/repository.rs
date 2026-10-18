@@ -36,7 +36,7 @@ pub(super) async fn on_project<T: Send + 'static>(
         work(OnProject {
             app,
             project: &project,
-            repositories: projects.repositories_of(&project)?,
+            repositories: &*projects.repositories_of(&project),
             info: &project.repository(),
         })
     })

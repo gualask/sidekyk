@@ -1,6 +1,7 @@
 //! The app's side: `Repositories` through a helper, a child process talking over its stdin and
 //! stdout (`protocol`). A helper that stops is started again on the next request that waits for a
-//! reply, told first the repository watched and whether the window shows, as they are then.
+//! reply, told first the repository watched and whether the window shows, as they are then. One
+//! that watches nothing and was asked nothing for a while is closed.
 
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
@@ -8,7 +9,7 @@ use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Condvar, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -32,16 +33,43 @@ use crate::shared::sync::lock;
 /// the app read the repository on screen again, which starts the next.
 const STABLE_RUN: Duration = Duration::from_secs(10);
 
+/// How long a helper that watches nothing lives after its last request: a pause, or the projects'
+/// cards read again, never waits for a new one; a WSL distro it keeps running for that long is
+/// fine (`docs/plans/remote-projects.md`, Lifecycle).
+pub const IDLE_EXIT: Duration = Duration::from_secs(10 * 60);
+
 type OnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
 
+/// How a helper starts: the command, once whatever it needs is ready (installed in a distro).
+type Start = Box<dyn Fn() -> anyhow::Result<Command> + Send + Sync>;
+
+/// The helper running, if any. Held only to look: a helper starts under `starting`.
+type Slot = Arc<Mutex<Option<Arc<Connection>>>>;
+
 pub struct AgentRepositories {
-    /// How the helper starts: the local binary, or `wsl.exe` running it in a distro.
-    start: Box<dyn Fn() -> Command + Send + Sync>,
-    /// The helper running, if any. Held only to look: a helper starts under `starting`.
-    connection: Mutex<Option<Arc<Connection>>>,
+    /// The local binary, or `wsl.exe` running it in a distro.
+    start: Start,
+    connection: Slot,
     starting: Mutex<()>,
     next_id: Arc<AtomicU64>,
     kept: Arc<Kept>,
+    idle: Arc<Idle>,
+}
+
+/// When the helper was last asked something, for the thread that closes it once idle.
+struct Idle {
+    after: Duration,
+    state: Mutex<IdleState>,
+    /// Told when a request ends, the repository watched changes, or the client goes.
+    changed: Condvar,
+}
+
+struct IdleState {
+    /// Requests waiting for their reply: a helper is not idle while one does.
+    busy: usize,
+    last: Instant,
+    /// The client went: the thread ends.
+    gone: bool,
 }
 
 /// What outlives one helper.
@@ -59,7 +87,8 @@ struct Kept {
 
 /// One helper process.
 struct Connection {
-    stdin: Mutex<ChildStdin>,
+    /// `None` once closed: the helper reads the end of its input and exits.
+    stdin: Mutex<Option<ChildStdin>>,
     replies: Arc<Replies>,
 }
 
@@ -69,6 +98,8 @@ struct Replies {
     waiting: Mutex<HashMap<u64, Sender<Incoming>>>,
     /// Set with `waiting` locked, so no request waits on a helper that stopped.
     stopped: AtomicBool,
+    /// The app closed it, idle: nothing to read again, nothing to wait for before the next.
+    closed: AtomicBool,
 }
 
 enum Incoming {
@@ -78,25 +109,67 @@ enum Incoming {
 
 impl Connection {
     fn write(&self, id: u64, request: Request) -> anyhow::Result<()> {
-        write_frame(&mut *lock(&self.stdin), &RequestFrame { id, request })
-            .context("could not write to the helper")
+        let mut stdin = lock(&self.stdin);
+        let stdin = stdin.as_mut().context("the helper was closed")?;
+        write_frame(stdin, &RequestFrame { id, request }).context("could not write to the helper")
+    }
+
+    fn close(&self) {
+        self.replies.closed.store(true, Ordering::Relaxed);
+        lock(&self.stdin).take();
     }
 }
 
 impl AgentRepositories {
-    pub fn new(start: impl Fn() -> Command + Send + Sync + 'static) -> Self {
-        Self {
+    /// A client that closes its helper `IDLE_EXIT` after its last request, when it watches nothing.
+    pub fn new(start: impl Fn() -> anyhow::Result<Command> + Send + Sync + 'static) -> Self {
+        Self::closing_after(IDLE_EXIT, start)
+    }
+
+    /// As `new`, closing an idle helper after `after`.
+    pub fn closing_after(
+        after: Duration,
+        start: impl Fn() -> anyhow::Result<Command> + Send + Sync + 'static,
+    ) -> Self {
+        let this = Self {
             start: Box::new(start),
-            connection: Mutex::default(),
+            connection: Slot::default(),
             starting: Mutex::default(),
             next_id: Arc::new(AtomicU64::new(1)),
             kept: Arc::default(),
-        }
+            idle: Arc::new(Idle {
+                after,
+                state: Mutex::new(IdleState {
+                    busy: 0,
+                    last: Instant::now(),
+                    gone: false,
+                }),
+                changed: Condvar::new(),
+            }),
+        };
+        let (idle, slot, kept) = (
+            this.idle.clone(),
+            this.connection.clone(),
+            this.kept.clone(),
+        );
+        std::thread::spawn(move || close_when_idle(&idle, &slot, &kept));
+        this
     }
 
     /// Sends `request` and waits for its reply, giving `contents` the files a search in contents
     /// finds meanwhile. Starts a helper if none runs.
     fn call<T: DeserializeOwned>(
+        &self,
+        request: Request,
+        contents: &dyn Fn(Vec<ContentFile>),
+    ) -> anyhow::Result<T> {
+        lock(&self.idle.state).busy += 1;
+        let result = self.ask(request, contents);
+        self.idle.touch(|state| state.busy -= 1);
+        result
+    }
+
+    fn ask<T: DeserializeOwned>(
         &self,
         request: Request,
         contents: &dyn Fn(Vec<ContentFile>),
@@ -166,7 +239,7 @@ impl AgentRepositories {
     }
 
     fn spawn(&self) -> anyhow::Result<Arc<Connection>> {
-        let mut command = (self.start)();
+        let mut command = (self.start)()?;
         command
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -187,9 +260,64 @@ impl AgentRepositories {
         let (read_replies, kept) = (replies.clone(), self.kept.clone());
         std::thread::spawn(move || read_messages(stdout, &read_replies, &kept, child));
         Ok(Arc::new(Connection {
-            stdin: Mutex::new(stdin),
+            stdin: Mutex::new(Some(stdin)),
             replies,
         }))
+    }
+}
+
+impl Drop for AgentRepositories {
+    fn drop(&mut self) {
+        self.idle.touch(|state| state.gone = true);
+        if let Some(connection) = lock(&self.connection).take() {
+            connection.close();
+        }
+    }
+}
+
+impl Idle {
+    /// Changes the state, as of now, and tells the thread.
+    fn touch(&self, change: impl FnOnce(&mut IdleState)) {
+        let mut state = lock(&self.state);
+        change(&mut state);
+        state.last = Instant::now();
+        self.changed.notify_one();
+    }
+}
+
+/// Closes the helper once it has watched nothing and been asked nothing for `idle.after`. Sleeps
+/// until then, or until something changes: no wake-up while there is nothing to close.
+fn close_when_idle(idle: &Idle, slot: &Mutex<Option<Arc<Connection>>>, kept: &Kept) {
+    let mut state = lock(&idle.state);
+    loop {
+        if state.gone {
+            return;
+        }
+        let running = lock(slot)
+            .as_ref()
+            .is_some_and(|c| !c.replies.stopped.load(Ordering::Relaxed));
+        let watching = lock(&kept.watched).is_some();
+        if !running || watching || state.busy > 0 {
+            state = idle
+                .changed
+                .wait(state)
+                .unwrap_or_else(PoisonError::into_inner);
+            continue;
+        }
+        let deadline = state.last + idle.after;
+        let now = Instant::now();
+        if now < deadline {
+            state = idle
+                .changed
+                .wait_timeout(state, deadline - now)
+                .unwrap_or_else(PoisonError::into_inner)
+                .0;
+            continue;
+        }
+        if let Some(connection) = lock(slot).take() {
+            tracing::info!("helper idle: closing it");
+            connection.close();
+        }
     }
 }
 
@@ -197,9 +325,10 @@ impl AgentRepositories {
 /// are written with, so a change told meanwhile is never told before an older state.
 fn tell_kept(connection: &Connection, kept: &Kept, next_id: &AtomicU64) -> anyhow::Result<()> {
     let mut stdin = lock(&connection.stdin);
+    let stdin = stdin.as_mut().context("the helper was closed")?;
     let mut tell = |request| {
         let id = next_id.fetch_add(1, Ordering::Relaxed);
-        write_frame(&mut *stdin, &RequestFrame { id, request })
+        write_frame(stdin, &RequestFrame { id, request })
     };
     if kept.hidden.load(Ordering::Relaxed) {
         tell(Request::SetVisible { visible: false })?;
@@ -243,7 +372,8 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
         }
     }
     // before it shows as stopped, so no request starts the next one too soon
-    let stable = started.elapsed() >= STABLE_RUN;
+    let closed = replies.closed.load(Ordering::Relaxed);
+    let stable = closed || started.elapsed() >= STABLE_RUN;
     if !stable {
         *lock(&kept.not_before) = Some(Instant::now() + STABLE_RUN);
     }
@@ -257,7 +387,7 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
         Ok(status) => tracing::info!(%status, "helper stopped"),
         Err(error) => tracing::warn!(%error, "helper stopped"),
     }
-    if !stable {
+    if closed || !stable {
         return;
     }
     if kept.hidden.load(Ordering::Relaxed) {
@@ -421,8 +551,16 @@ impl Repositories for AgentRepositories {
         on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) {
         *lock(&self.kept.watched) = repository.map(|r| (r.clone(), OnChange::from(on_change)));
-        let repository = repository.cloned();
-        if let Err(error) = self.call::<()>(Request::Watch { repository }, &nothing) {
+        let Some(repository) = repository.cloned() else {
+            // nothing to watch starts no helper; one running, idle from now, closes in time
+            self.tell(Request::Watch { repository: None });
+            self.idle.touch(|_| {});
+            return;
+        };
+        let watch = Request::Watch {
+            repository: Some(repository),
+        };
+        if let Err(error) = self.call::<()>(watch, &nothing) {
             tracing::warn!(error = %format!("{error:#}"), "the helper could not watch");
         }
     }

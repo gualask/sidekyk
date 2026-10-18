@@ -3,7 +3,9 @@
 
 pub mod agent;
 pub mod git_cli;
+mod process;
 pub mod watcher;
+pub mod wsl;
 
 use std::process::Command;
 

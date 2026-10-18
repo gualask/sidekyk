@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::contracts::{Project, ProjectList, TilesLayout};
+use super::contracts::{Location, Project, ProjectList, TilesLayout};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A stored layout is the frontend's: panel ids are short words, and a project has a few panels.
@@ -97,6 +97,23 @@ impl ProjectList {
         })
     }
 
+    /// Whether `path`, in WSL `distro`, is inside one of its projects' repositories.
+    pub fn holds_in_wsl(&self, distro: &str, path: &str) -> bool {
+        let parts = |path: &str| -> Vec<String> {
+            path.split('/')
+                .filter(|part| !part.is_empty())
+                .map(String::from)
+                .collect()
+        };
+        let path = parts(path);
+        self.projects.iter().any(|p| match &p.location {
+            Location::Wsl { distro: d, root } => {
+                d.eq_ignore_ascii_case(distro) && path.starts_with(&parts(root))
+            }
+            Location::Local { .. } => false,
+        })
+    }
+
     /// A project found again at `found` (its repository moved): it takes the new place, and the
     /// id that comes with it, in its position, its layout with it, and stays on screen if it was.
     /// When `found` is a project already, the old one goes into it instead.
@@ -146,7 +163,6 @@ impl ProjectList {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::projects::Location;
     use crate::shared::error::user_facing_code;
 
     fn project(root: &str) -> Project {
@@ -270,6 +286,10 @@ mod tests {
         ));
         let same = |path: &Path| path.to_path_buf();
         assert!(!projects.holds(Path::new("/home/ale/shop/notes.md"), same, false));
+        assert!(projects.holds_in_wsl("Ubuntu", "/home/ale/shop/notes.md"));
+        assert!(projects.holds_in_wsl("ubuntu", "/home/ale/shop"));
+        assert!(!projects.holds_in_wsl("Ubuntu", "/home/ale/shopping/notes.md"));
+        assert!(!projects.holds_in_wsl("Debian", "/home/ale/shop/notes.md"));
     }
 
     #[test]

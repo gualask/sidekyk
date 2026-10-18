@@ -7,7 +7,7 @@ use super::blocking::blocking;
 use super::state::{self, ProjectsState};
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
-use sidekyk_core::modules::projects::{Project, ProjectList, TilesLayout};
+use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
@@ -96,8 +96,7 @@ pub(crate) async fn relocate_project(
         else {
             return Ok(None);
         };
-        let found = projects.repositories().resolve(&folder.into_path()?)?;
-        let found = Project::local(found);
+        let found = projects.project_at(&folder.into_path()?)?;
         if found.id == project_id {
             return Ok(Some(projects.list()));
         }

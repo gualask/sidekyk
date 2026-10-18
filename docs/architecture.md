@@ -142,8 +142,11 @@ In the core:
   declares the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`,
   `has_entry`) and the `RepositoryWatcher` port (changed paths after a quiet period), so it can
   run on another machine (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify; drops reads, which inotify
-  reports: each git command's reads would refresh again, without end; found by CI 2026-10-18).
+- `infrastructure/`: `git_cli.rs` (bounded git), `process.rs` (a child within an output size and a
+  time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
+  command's reads would refresh again, without end; found by CI 2026-10-18), `agent/` (the
+  helper's protocol, its server and the app's client), `wsl.rs` (distros, the helper installed
+  and started in one, `WslRepositories`).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.
 

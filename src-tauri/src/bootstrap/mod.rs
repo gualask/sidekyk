@@ -5,6 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
+use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
@@ -74,7 +75,6 @@ pub(crate) fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .manage(ProjectsState::default())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
         .setup(|app| {
@@ -82,6 +82,16 @@ pub(crate) fn run() {
                 logging::init(&dir);
             }
             app.manage(NotesFiles::new(&app.path().app_data_dir()?));
+            // the Linux helper WSL distros run, among the installer's resources on Windows
+            // (`tauri.windows.conf.json`)
+            let helper = app
+                .path()
+                .resolve("linux/sidekyk-agent", BaseDirectory::Resource)
+                .unwrap_or_else(|error| {
+                    tracing::warn!(%error, "no resources: WSL projects cannot be read");
+                    PathBuf::new()
+                });
+            app.manage(ProjectsState::new(helper));
             let settings = settings_store::load_settings(app.handle());
             // before the windows: their pages reach the shortcut's state as they load
             shortcut::start(app.handle(), &settings.global_shortcut);

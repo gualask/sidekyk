@@ -39,17 +39,14 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/plans/remote-projects.md`; tried as a local child process on the Mac, Linux parts on the
 container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
-- [ ] WSL transport: folder dialog's `\\wsl.localhost\` and `\\wsl$\` paths, install from the
-      installer's resources, `wsl.exe`, stopped distro not started (`--list --verbose`), helper
-      exits 10 min after its last request off screen; tried on Windows 11 x64 (later WSL1, ARM64,
-      no git in the distro); the stopped, starting and failed states agreed in the plan; notes
-      export refuses a path inside a WSL repository; Locate… and the window's visibility go to
-      the project's distro
+- [ ] WSL projects, what is left: a stopped distro not started for a summary (`--list --running
+      --quiet`), the stopped, starting and failed states agreed in the plan; tried on Windows 11
+      x64 (later WSL1, ARM64, no git in the distro)
 - [ ] Linux build of the helper on the Mac (`cargo-zigbuild` or a Rust container), tried on the
       fixture. On hold: metered connection (2026-10-18)
-- [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL transport
+- [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL projects
 - [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
-      transport
+      projects
 
 ## Platforms and release
 

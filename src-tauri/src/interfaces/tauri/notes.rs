@@ -8,6 +8,7 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::{resolved_path, write_chosen_file, NotesFiles};
+use sidekyk_core::infrastructure::wsl::wsl_path;
 use sidekyk_core::modules::notes::{
     to_markdown, DeletedList, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
 };
@@ -275,7 +276,12 @@ pub(crate) async fn export_notes(
         };
         let path: PathBuf = path.into_path()?;
         let ignore_case = cfg!(any(target_os = "macos", windows));
-        if projects.list().holds(&path, resolved_path, ignore_case) {
+        let list = projects.list();
+        let inside = match wsl_path(&path) {
+            Some((distro, path)) => list.holds_in_wsl(&distro, &path),
+            None => list.holds(&path, resolved_path, ignore_case),
+        };
+        if inside {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
         }
         let markdown = app.state::<NotesStore>().read_notes(

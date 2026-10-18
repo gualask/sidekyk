@@ -7,7 +7,6 @@ use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
 use super::state::ProjectsState;
 use super::tray;
-use sidekyk_core::modules::projects::Location;
 
 /// If the page never says it painted (a script that failed to load), the window shows anyway
 /// after this long, rather than leave the app running with nothing on screen.
@@ -58,10 +57,7 @@ pub(crate) fn show_by_deadline(app: &AppHandle) {
 /// every platform's webview keeps. Showing again answers with the id of the project on screen
 /// when its files or refs changed meanwhile.
 pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option<String> {
-    let projects = app.state::<ProjectsState>();
-    let missed = projects.repositories().set_visible(visible)?;
-    // a root of this machine's repositories
-    projects.id_at(&Location::Local { root: missed })
+    app.state::<ProjectsState>().set_visible(visible)
 }
 
 /// Shows the window if nothing showed it yet, and says whether it did.

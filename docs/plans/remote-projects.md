@@ -41,6 +41,15 @@ installed on Windows (or the Mac). Steps in `ROADMAP.md`; tests on the container
   if missing, copy from the app's resources (`wslpath -u` + `cp` from `/mnt/…`, stdin as
   fallback), temp name, `chmod 755`, `mv`. The helper removes older versions when it starts
   (Zed does not).
+  - Built (`infrastructure/wsl.rs` in the core): the name is
+    `sidekyk-agent-<version>-<hash of the file>`, so two builds of one version (CI's trial
+    builds) never share it; `version` is checked at each start, one `wsl.exe` call before
+    `serve`. Started as Zed starts its server, `wsl.exe --distribution <d> --cd ~ --exec
+    .sidekyk-server/<name> serve`, no shell. A folder of a distro, from the folder dialog or
+    Locate…, makes a WSL project (`wsl_path`: `\\wsl.localhost\`, `\\wsl$\`, `\\?\UNC\`);
+    the notes export refuses a path inside one. Every machine is told the window's visibility and
+    the projects it keeps; a machine not on screen is told to watch nothing, which starts no
+    helper.
 - Containers: same helper, `docker exec -i` instead of `wsl.exe`. A container that bind-mounts a
   host folder (the usual dev container) needs none: the app watches the folder on the host.
 
@@ -126,8 +135,10 @@ indicator uses. With the transport:
   never waits for a new helper, and the WSL VM it keeps alive for those 10 min is acceptable. The
   repositories of one distro share its helper: switching between them starts nothing. Back after
   10 min, the panels show what was read before while a new helper reads again.
-- A stopped distro is never started for a summary: `wsl.exe --list --verbose` (as VS Code before
-  starting its server) with `WSL_UTF8=1` (otherwise UTF-16LE), and the card says it is stopped.
+- A stopped distro is never started for a summary, and the card says it is stopped. Read from
+  `wsl.exe --list --running --quiet` and `--list --quiet` (2026-10-18), names only: the columns
+  of `--list --verbose` (VS Code's, before starting its server) are in the language of Windows,
+  `Running` a translated word. `WSL_UTF8=1`, and UTF-16LE read too for an older `wsl.exe`.
   It starts when its project is opened. Zed and VS Code do not check: opening starts the distro,
   their recent lists do not touch it.
 
@@ -160,8 +171,6 @@ and `docker exec` are child processes, in `infrastructure/` behind a port.
   case; the folder dialog's form of a WSL path.
 - The palette lists two `shop`s alike (a local and a WSL clone): name the distro there too? Ask
   with a preview first.
-- Export of notes: refuse a path inside a WSL project's repository (`\\wsl.localhost\…`), as
-  `ProjectList::holds` does for local ones.
 
 ## Sources
 

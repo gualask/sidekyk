@@ -1,7 +1,7 @@
 //! Managed Tauri state: the projects, the repositories they read, and the one place that changes
 //! them.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
@@ -10,6 +10,7 @@ use super::tray;
 use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::infrastructure::wsl::{wsl_path, WslRepositories};
 use sidekyk_core::modules::projects::{Location, Project, ProjectList};
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
@@ -23,17 +24,9 @@ pub(crate) struct ProjectsState {
     /// last of them.
     watching: Mutex<Option<String>>,
     /// What reads the local projects' repositories.
-    repositories: Arc<dyn Repositories>,
-}
-
-impl Default for ProjectsState {
-    fn default() -> Self {
-        Self {
-            list: Mutex::default(),
-            watching: Mutex::default(),
-            repositories: repositories(),
-        }
-    }
+    local: Arc<dyn Repositories>,
+    /// What reads the WSL projects', a helper per distro.
+    wsl: WslRepositories,
 }
 
 /// This machine's repositories, read here. A dev build started with `SIDEKYK_AGENT=local` reads
@@ -43,7 +36,7 @@ fn repositories() -> Arc<dyn Repositories> {
     #[cfg(debug_assertions)]
     if std::env::var_os("SIDEKYK_AGENT").is_some_and(|agent| agent == "local") {
         use sidekyk_core::infrastructure::agent::{helper_beside_this_binary, AgentRepositories};
-        return Arc::new(AgentRepositories::new(helper_beside_this_binary));
+        return Arc::new(AgentRepositories::new(|| Ok(helper_beside_this_binary())));
     }
     LocalRepositories::new(
         Arc::new(LocalRepositoryBackend::default()),
@@ -52,6 +45,16 @@ fn repositories() -> Arc<dyn Repositories> {
 }
 
 impl ProjectsState {
+    /// `helper`: the Linux helper the installer ships, for WSL distros.
+    pub(crate) fn new(helper: PathBuf) -> Self {
+        Self {
+            list: Mutex::default(),
+            watching: Mutex::default(),
+            local: repositories(),
+            wsl: WslRepositories::new(helper),
+        }
+    }
+
     pub(crate) fn list(&self) -> ProjectList {
         lock(&self.list).clone()
     }
@@ -67,23 +70,58 @@ impl ProjectsState {
         lock(&self.list).find(id).cloned()
     }
 
-    /// What reads this machine's repositories.
-    pub(crate) fn repositories(&self) -> &dyn Repositories {
-        &*self.repositories
+    /// What reads a project's repository, where it is.
+    pub(crate) fn repositories_of(&self, project: &Project) -> Arc<dyn Repositories> {
+        match &project.location {
+            Location::Local { .. } => self.local.clone(),
+            Location::Wsl { distro, .. } => self.wsl.of(distro),
+        }
     }
 
-    /// The id of the project at `location`, if one is.
-    pub(crate) fn id_at(&self, location: &Location) -> Option<String> {
+    /// What reads each machine's repositories, this one's first; a distro only once asked for.
+    fn every_machine(&self) -> Vec<(Machine, Arc<dyn Repositories>)> {
+        let wsl = self.wsl.each().into_iter();
+        std::iter::once((Machine::Local, self.local.clone()))
+            .chain(wsl.map(|(distro, r)| (Machine::Wsl(distro), r as Arc<dyn Repositories>)))
+            .collect()
+    }
+
+    /// The project that contains `candidate`: a folder of this machine, or of a WSL distro as
+    /// Windows names it (`\\wsl.localhost\<distro>\…`), read in that distro.
+    pub(crate) fn project_at(&self, candidate: &Path) -> anyhow::Result<Project> {
+        let Some((distro, path)) = wsl_path(candidate) else {
+            return Ok(Project::local(self.local.resolve(candidate)?));
+        };
+        let found = self.wsl.of(&distro).resolve(Path::new(&path))?;
+        Ok(Project::new(
+            found.name,
+            Location::Wsl {
+                distro,
+                root: found.root,
+            },
+        ))
+    }
+
+    /// Tells every machine whether the window shows; when it shows again, the id of the project on
+    /// screen if this machine saw it change meanwhile (a helper tells its own as a change).
+    pub(crate) fn set_visible(&self, visible: bool) -> Option<String> {
+        let mut missed = None;
+        for (machine, repositories) in self.every_machine() {
+            let root = repositories.set_visible(visible);
+            if let (Machine::Local, Some(root)) = (machine, root) {
+                missed = Some(Location::Local { root });
+            }
+        }
+        let missed = missed?;
         let list = lock(&self.list);
-        let project = list.projects.iter().find(|p| p.location == *location)?;
+        let project = list.projects.iter().find(|p| p.location == missed)?;
         Some(project.id.clone())
     }
 
-    /// What reads a project's repository, where it is.
-    pub(crate) fn repositories_of(&self, project: &Project) -> anyhow::Result<&dyn Repositories> {
-        match project.location {
-            Location::Local { .. } => Ok(self.repositories()),
-            Location::Wsl { .. } => Err(anyhow::anyhow!("WSL projects cannot be read yet")),
+    /// Stops the search in contents going on, wherever it runs.
+    pub(crate) fn stop_content_search(&self) {
+        for (_, repositories) in self.every_machine() {
+            repositories.stop_content_search();
         }
     }
 
@@ -99,7 +137,6 @@ impl ProjectsState {
         let files_of = |id: &str| {
             let project = list.find(id).ok()?;
             self.repositories_of(project)
-                .ok()?
                 .search_files(&project.repository(), &request.query)
         };
         let notes_of = |id: &str| list.find(id).ok().and_then(|_| notes_of(id));
@@ -118,12 +155,15 @@ impl ProjectsState {
         change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
     ) -> anyhow::Result<ProjectList> {
         let list = self.update_stored(app, change)?;
-        let local_roots: Vec<String> = list
-            .projects
-            .iter()
-            .filter_map(|p| p.location.local_root().map(String::from))
-            .collect();
-        self.repositories.retain(&local_roots);
+        for (machine, repositories) in self.every_machine() {
+            let roots: Vec<String> = list
+                .projects
+                .iter()
+                .filter(|p| machine.holds(&p.location))
+                .map(|p| p.location.root().to_string())
+                .collect();
+            repositories.retain(&roots);
+        }
         watch_active(app);
         Ok(list)
     }
@@ -156,35 +196,48 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     }
     // the count shown is the previous project's: cleared until the new one is read
     tray::clear(app);
-    let readable = active.filter(|project| {
-        state
-            .repositories_of(project)
-            .inspect_err(|error| tracing::warn!(error = %format!("{error:#}"), "not watched"))
-            .is_ok()
-    });
-    match readable {
-        Some(project) => {
-            let emitter = app.clone();
-            let project_id = project.id.clone();
-            state.repositories.watch(
-                Some(&project.repository()),
-                Box::new(move |change| {
-                    let event = RepositoryChangedEvent::new(&project_id, change.git_dir);
-                    let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
-                }),
-            );
+    // every other machine stops watching first: a helper watching nothing can close in time
+    for (machine, repositories) in state.every_machine() {
+        if !active.as_ref().is_some_and(|p| machine.holds(&p.location)) {
+            repositories.watch(None, Box::new(|_| {}));
         }
-        None => state.repositories.watch(None, Box::new(|_| {})),
+    }
+    if let Some(project) = active {
+        let emitter = app.clone();
+        let project_id = project.id.clone();
+        state.repositories_of(&project).watch(
+            Some(&project.repository()),
+            Box::new(move |change| {
+                let event = RepositoryChangedEvent::new(&project_id, change.git_dir);
+                let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
+            }),
+        );
     }
     *watching = id;
 }
 
-/// Adds the repository that contains `candidate`, on this machine, and puts it on screen.
+/// This machine, or a WSL distro: what one `Repositories` reads.
+enum Machine {
+    Local,
+    Wsl(String),
+}
+
+impl Machine {
+    fn holds(&self, location: &Location) -> bool {
+        match (self, location) {
+            (Self::Local, Location::Local { .. }) => true,
+            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => distro == d,
+            _ => false,
+        }
+    }
+}
+
+/// Adds the repository that contains `candidate` and puts it on screen.
 pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::Result<ProjectList> {
     let state = app.state::<ProjectsState>();
-    let found = state.repositories.resolve(candidate)?;
+    let found = state.project_at(candidate)?;
     state.update(app, |list| {
-        list.add(Project::local(found));
+        list.add(found);
         Ok(())
     })
 }

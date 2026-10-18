@@ -60,5 +60,5 @@ pub(crate) async fn search_contents(
 #[tauri::command]
 /// Stops the search in contents going on: the palette closed.
 pub(crate) fn stop_content_search(state: tauri::State<'_, ProjectsState>) {
-    state.repositories().stop_content_search();
+    state.stop_content_search();
 }

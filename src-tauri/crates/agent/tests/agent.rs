@@ -20,11 +20,14 @@ const QUIET: Duration = Duration::from_secs(1);
 const DEADLINE: Duration = Duration::from_secs(10);
 
 fn agent() -> AgentRepositories {
-    AgentRepositories::new(|| {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_sidekyk-agent"));
-        command.arg("serve");
-        command
-    })
+    AgentRepositories::new(|| Ok(helper()))
+}
+
+/// This crate's binary, to serve.
+fn helper() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_sidekyk-agent"));
+    command.arg("serve");
+    command
 }
 
 fn local() -> Arc<LocalRepositories> {
@@ -204,11 +207,60 @@ fn a_helper_that_stops_at_once_is_not_started_at_every_request() {
     // a helper that exits at once, or cannot start where `true` is missing
     let agent = AgentRepositories::new(move || {
         counted.fetch_add(1, Ordering::Relaxed);
-        Command::new("true")
+        Ok(Command::new("true"))
     });
     assert!(agent.resolve(Path::new(".")).is_err());
     let error = agent.resolve(Path::new(".")).unwrap_err();
     assert_eq!(starts.load(Ordering::Relaxed), 1, "{error:#}");
+}
+
+/// A client of this crate's binary closing it when idle for `after`, and how many it started.
+fn counting(after: Duration) -> (AgentRepositories, Arc<AtomicUsize>) {
+    let starts = Arc::new(AtomicUsize::new(0));
+    let counted = starts.clone();
+    let agent = AgentRepositories::closing_after(after, move || {
+        counted.fetch_add(1, Ordering::Relaxed);
+        Ok(helper())
+    });
+    (agent, starts)
+}
+
+#[test]
+fn watching_nothing_starts_no_helper() {
+    let (agent, starts) = counting(Duration::from_secs(60));
+    agent.watch(None, Box::new(|_| {}));
+    agent.set_visible(false);
+    agent.retain(&[]);
+    assert_eq!(starts.load(Ordering::Relaxed), 0);
+}
+
+#[test]
+fn an_idle_helper_is_closed_unless_it_watches() {
+    const IDLE: Duration = Duration::from_millis(300);
+    let dir = scratch_repo();
+    let (agent, starts) = counting(IDLE);
+    let info = agent.resolve(dir.path()).unwrap();
+    std::thread::sleep(IDLE * 3);
+    agent.summary(&info).unwrap();
+    assert_eq!(
+        starts.load(Ordering::Relaxed),
+        2,
+        "closed once idle, started again"
+    );
+
+    agent.watch(Some(&info), Box::new(|_| {}));
+    std::thread::sleep(IDLE * 3);
+    agent.summary(&info).unwrap();
+    assert_eq!(starts.load(Ordering::Relaxed), 2, "kept while it watches");
+
+    agent.watch(None, Box::new(|_| {}));
+    std::thread::sleep(IDLE * 3);
+    agent.summary(&info).unwrap();
+    assert_eq!(
+        starts.load(Ordering::Relaxed),
+        3,
+        "closed once it watches nothing"
+    );
 }
 
 /// The median of `runs` calls to `work`, after one warm-up call.
