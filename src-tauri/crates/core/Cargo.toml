@@ -1,6 +1,6 @@
 [package]
 name = "sidekyk-core"
-description = "Sidekyk without Tauri: the modules, their primitives, the git CLI and the watcher."
+description = "Sidekyk without Tauri: the modules, their primitives, the git CLI, the watcher, the helper's protocol and the WSL transport."
 version.workspace = true
 authors.workspace = true
 license.workspace = true

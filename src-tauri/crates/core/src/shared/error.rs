@@ -124,19 +124,38 @@ pub fn user_facing_code(err: &anyhow::Error) -> Option<UserFacingErrorCode> {
     err.downcast_ref::<UserFacingError>().map(|user| user.code)
 }
 
+/// The code a failure is told by: its user-facing one, or `unknown`.
+pub fn wire_code(err: &anyhow::Error) -> &'static str {
+    user_facing_code(err).map_or("unknown", UserFacingErrorCode::as_str)
+}
+
+/// A failure made again from its code and message (`{err:#}`), as one shared or sent from another
+/// process: both are kept, the message for the log.
+pub fn rebuilt(code: Option<UserFacingErrorCode>, message: &str) -> anyhow::Error {
+    let Some(code) = code else {
+        return anyhow::anyhow!("{message}");
+    };
+    let cause = message
+        .strip_prefix(code.as_str())
+        .map(|rest| rest.trim_start_matches(": "));
+    match cause {
+        Some("") => user_facing(code),
+        Some(cause) => anyhow::anyhow!("{cause}").context(UserFacingError::new(code)),
+        None => anyhow::anyhow!("{message}").context(UserFacingError::new(code)),
+    }
+}
+
 /// An error shared by several callers (see `Coalesced`), back as an owned error that keeps its
 /// user-facing code.
 pub fn unshare(err: std::sync::Arc<anyhow::Error>) -> anyhow::Error {
-    std::sync::Arc::try_unwrap(err).unwrap_or_else(|shared| match user_facing_code(&shared) {
-        Some(code) => user_facing(code),
-        None => anyhow::anyhow!("{shared:#}"),
-    })
+    std::sync::Arc::try_unwrap(err)
+        .unwrap_or_else(|shared| rebuilt(user_facing_code(&shared), &format!("{shared:#}")))
 }
 
 impl serde::Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
         let AppError::Anyhow(err) = self;
-        let code = user_facing_code(err).map_or("unknown", UserFacingErrorCode::as_str);
+        let code = wire_code(err);
 
         let mut st = s.serialize_struct("AppError", 2)?;
         st.serialize_field("code", code)?;
@@ -179,6 +198,23 @@ mod tests {
             serde_json::to_value(AppError::from(unshare(shared))).unwrap(),
             serde_json::json!({ "code": "unknown", "message": "snapshot: git exploded" })
         );
+    }
+
+    #[test]
+    fn a_rebuilt_error_keeps_its_code_and_its_cause() {
+        let error = anyhow::anyhow!("wsl.exe timed out")
+            .context(UserFacingError::new(UserFacingErrorCode::HelperFailed));
+        let again = rebuilt(
+            Some(UserFacingErrorCode::HelperFailed),
+            &format!("{error:#}"),
+        );
+        assert_eq!(
+            user_facing_code(&again),
+            Some(UserFacingErrorCode::HelperFailed)
+        );
+        assert_eq!(format!("{again:#}"), "helper_failed: wsl.exe timed out");
+        let bare = rebuilt(Some(UserFacingErrorCode::FileMissing), "file_missing");
+        assert_eq!(format!("{bare:#}"), "file_missing");
     }
 
     #[test]

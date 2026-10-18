@@ -18,7 +18,7 @@ use serde_json::value::RawValue;
 
 use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, WireError};
 use crate::infrastructure::hide_console;
-use crate::modules::repositories::Repositories;
+use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
     CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
     RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary,
@@ -37,9 +37,10 @@ const STABLE_RUN: Duration = Duration::from_secs(10);
 /// How long a helper that watches nothing lives after its last request: a pause, or the projects'
 /// cards read again, never waits for a new one; a WSL distro it keeps running for that long is
 /// fine (`docs/plans/remote-projects.md`, Lifecycle).
-pub const IDLE_EXIT: Duration = Duration::from_secs(10 * 60);
+const IDLE_EXIT: Duration = Duration::from_secs(10 * 60);
 
-type OnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
+/// A watch's `OnChange`, shared with the thread reading the helper's messages.
+type SharedOnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
 
 /// How a helper starts: the command, once whatever it needs is ready (installed in a distro).
 type Start = Box<dyn Fn() -> anyhow::Result<Command> + Send + Sync>;
@@ -77,13 +78,13 @@ struct IdleState {
 #[derive(Default)]
 struct Kept {
     /// Told to each helper first.
-    watched: Mutex<Option<(RepositoryInfo, OnChange)>>,
+    watched: Mutex<Option<(RepositoryInfo, SharedOnChange)>>,
     hidden: AtomicBool,
     /// A helper stopped while the window was hidden: the repository on screen is read again
     /// when it shows.
     read_again: AtomicBool,
-    /// No helper starts before then.
-    not_before: Mutex<Option<Instant>>,
+    /// No helper starts before then; meanwhile a request fails as the last start did.
+    not_before: Mutex<Option<(Instant, UserFacingErrorCode)>>,
 }
 
 /// One helper process.
@@ -232,13 +233,16 @@ impl AgentRepositories {
         if let Some(connection) = self.running() {
             return Ok(connection);
         }
-        if lock(&self.kept.not_before).is_some_and(|at| Instant::now() < at) {
-            let error = anyhow::anyhow!("the helper stopped; it starts again in a few seconds");
-            return Err(helper_failed(error));
+        let waiting = *lock(&self.kept.not_before);
+        if let Some((at, code)) = waiting.filter(|(at, _)| Instant::now() < *at) {
+            let error = anyhow::anyhow!("the helper starts again in {:?}", at - Instant::now());
+            return Err(error.context(UserFacingError::new(code)));
         }
         let connection = self.spawn().map_err(|error| {
-            *lock(&self.kept.not_before) = Some(Instant::now() + STABLE_RUN);
-            helper_failed(error)
+            let error = helper_failed(error);
+            let code = user_facing_code(&error).unwrap_or(UserFacingErrorCode::HelperFailed);
+            *lock(&self.kept.not_before) = Some((Instant::now() + STABLE_RUN, code));
+            error
         })?;
         // published before it is told anything: what changes meanwhile reaches it either way
         *lock(&self.connection) = Some(connection.clone());
@@ -396,7 +400,8 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
     let closed = replies.closed.load(Ordering::Relaxed);
     let stable = closed || started.elapsed() >= STABLE_RUN;
     if !stable {
-        *lock(&kept.not_before) = Some(Instant::now() + STABLE_RUN);
+        let code = UserFacingErrorCode::HelperFailed;
+        *lock(&kept.not_before) = Some((Instant::now() + STABLE_RUN, code));
     }
     {
         let mut waiting = lock(&replies.waiting);
@@ -420,7 +425,7 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
 
 /// What gets the changes of the repository at `root`, if it is the one watched: one the helper
 /// sent before it took the next watch is not.
-fn watching(kept: &Kept, root: &str) -> Option<OnChange> {
+fn watching(kept: &Kept, root: &str) -> Option<SharedOnChange> {
     lock(&kept.watched)
         .as_ref()
         .filter(|(repository, _)| repository.root == root)
@@ -446,6 +451,8 @@ fn log_line(line: &str) {
         Some("ERROR") => tracing::error!(target: "helper", "{line}"),
         Some("WARN") => tracing::warn!(target: "helper", "{line}"),
         Some("INFO") => tracing::info!(target: "helper", "{line}"),
+        // a panic writes no level: it is the helper failing, kept in every build
+        _ if line.contains("panicked") => tracing::error!(target: "helper", "{line}"),
         _ => tracing::debug!(target: "helper", "{line}"),
     }
 }
@@ -566,13 +573,18 @@ impl Repositories for AgentRepositories {
         self.tell(Request::Retain { roots });
     }
 
-    fn watch(
-        &self,
-        repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
-    ) {
-        let watched = repository.map(|r| (r.clone(), OnChange::from(on_change)));
-        let was_watching = std::mem::replace(&mut *lock(&self.kept.watched), watched).is_some();
+    fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange) {
+        let mut kept = lock(&self.kept.watched);
+        // the repository watched already keeps its first `on_change`, as `Repositories` says
+        let same = |(watched, _): &(RepositoryInfo, SharedOnChange)| {
+            repository.is_some_and(|r| r.root == watched.root)
+        };
+        if kept.as_ref().is_some_and(same) {
+            return;
+        }
+        let watched = repository.map(|r| (r.clone(), SharedOnChange::from(on_change)));
+        let was_watching = std::mem::replace(&mut *kept, watched).is_some();
+        drop(kept);
         // never waits, nor starts a helper (the caller may be the main thread, and a WSL distro
         // slow to start): the next one is told first, and a read of the repository starts it
         self.tell(Request::Watch {

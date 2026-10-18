@@ -19,7 +19,14 @@ pub(super) async fn blocking<T: Send + 'static>(
         Ok(_) => tracing::debug!(command, ms, "command"),
         Err(error) => match user_facing_code(error) {
             // Expected states such as a folder outside any repository: the UI shows them.
-            Some(code) => tracing::info!(command, ms, code = code.as_str(), "command refused"),
+            // its cause too, such as why a WSL helper did not start
+            Some(code) => tracing::info!(
+                command,
+                ms,
+                code = code.as_str(),
+                error = %format!("{error:#}"),
+                "command refused"
+            ),
             None => tracing::error!(command, ms, error = %format!("{error:#}"), "command failed"),
         },
     }

@@ -24,8 +24,9 @@ machine at hand (the Mac); every platform is checked before a release.
 - `build.yml`: an unsigned Windows x64 build; its NSIS and MSI installers are the run's artifact
   (14 days). SmartScreen warns before running them. A Linux job builds the helper first
   (`sidekyk-agent`, static, `x86_64-unknown-linux-musl` with `musl-gcc` for its C), which
-  `tauri.windows.conf.json` puts in the installer's resources (`linux/sidekyk-agent`): a Windows
-  build without it, such as `tauri dev` on Windows, needs it in `src-tauri/resources/linux/`.
+  `tauri build --config src-tauri/tauri.helper.conf.json` puts in the installer's resources
+  (`linux/sidekyk-agent`). Any other build (`cargo test`, clippy, `tauri dev`) has no helper: WSL
+  projects then fail with `helper_failed`.
 - Actions are pinned to a commit, their version in a comment; updated by hand.
 
 ## Browser fixtures

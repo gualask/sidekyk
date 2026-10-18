@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 
-use super::LocalRepositories;
+use super::{LocalRepositories, OnChange};
 use crate::modules::repository::{
     classify, resolve_repository, IgnoredPaths, RepositoryChange, RepositoryInfo, Visible, Watch,
 };
@@ -36,11 +36,7 @@ pub(super) struct Visibility {
 
 impl LocalRepositories {
     /// `Repositories::watch`.
-    pub(super) fn watch_on_screen(
-        &self,
-        repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
-    ) {
+    pub(super) fn watch_on_screen(&self, repository: Option<&RepositoryInfo>, on_change: OnChange) {
         let mut watched = lock(&self.watched);
         let Some(repository) = repository else {
             *watched = None;
@@ -97,7 +93,7 @@ impl LocalRepositories {
         &self,
         root: &str,
         generation: u64,
-        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
+        on_change: OnChange,
     ) -> anyhow::Result<Watch> {
         let resolved = resolve_repository(&*self.backend, Path::new(root))?;
         let folder = PathBuf::from(resolved.info.root);

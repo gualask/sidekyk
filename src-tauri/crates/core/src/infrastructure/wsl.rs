@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
@@ -20,11 +20,13 @@ use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
 /// Where the helper is installed in a distro, under its user's home.
-const SERVER_DIR: &str = ".sidekyk-server";
+pub const SERVER_DIR: &str = ".sidekyk-server";
 /// `wsl.exe` starts a stopped distro before it runs anything there.
 const START_TIMEOUT: Duration = Duration::from_secs(60);
 /// Listing the distros starts none.
 const LIST_TIMEOUT: Duration = Duration::from_secs(10);
+/// A distro's state read for one card serves the others of that distro shown with it.
+const STATE_KEPT: Duration = Duration::from_secs(5);
 const MAX_OUTPUT: usize = 64 * 1024;
 
 /// Copies the helper from Windows' side through `/mnt`, under a temporary name first, so a copy
@@ -55,7 +57,7 @@ pub fn wsl_path(path: &Path) -> Option<(String, String)> {
 
 /// Whether a distro runs, as far as `wsl.exe` tells.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DistroState {
+enum DistroState {
     Running,
     Stopped,
     /// Not installed, or no longer.
@@ -63,10 +65,12 @@ pub enum DistroState {
 }
 
 /// A distro's state, from the names `wsl.exe` lists: never its columns, which a Windows in
-/// another language words otherwise. Starts no distro.
-pub fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
+/// another language words otherwise. Starts no distro. A listing that fails is an error, never
+/// `Missing`: that one offers to remove the project.
+fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
     let named = |names: Vec<String>| names.iter().any(|n| n.eq_ignore_ascii_case(distro));
-    if named(distros(&["--list", "--running", "--quiet"])?) {
+    // none running makes `wsl.exe` fail too: not running, then
+    if named(distros(&["--list", "--running", "--quiet"]).unwrap_or_default()) {
         return Ok(DistroState::Running);
     }
     if named(distros(&["--list", "--quiet"])?) {
@@ -78,13 +82,13 @@ pub fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
 /// The name a distro is installed under, from one written in any case (a path typed by hand):
 /// one distro is one helper and one project. `distro_missing` when none has it.
 pub fn installed_distro(distro: &str) -> anyhow::Result<String> {
-    distros(&["--list", "--quiet"])
-        .context(UserFacingError::new(UserFacingErrorCode::DistroMissing))?
+    distros(&["--list", "--quiet"])?
         .into_iter()
         .find(|name| name.eq_ignore_ascii_case(distro))
         .ok_or_else(|| user_facing(UserFacingErrorCode::DistroMissing))
 }
 
+/// The distros `wsl.exe` lists; it fails when there are none, as when it cannot answer.
 fn distros(args: &[&str]) -> anyhow::Result<Vec<String>> {
     let mut command = Command::new("wsl.exe");
     command
@@ -96,10 +100,12 @@ fn distros(args: &[&str]) -> anyhow::Result<Vec<String>> {
     hide_console(&mut command);
     let output = process::run(&mut command, None, MAX_OUTPUT, LIST_TIMEOUT)
         .context("could not list the WSL distros")?;
-    // none installed, or none running: an error message, not names
-    if output.code != 0 {
-        return Ok(Vec::new());
-    }
+    anyhow::ensure!(
+        output.code == 0,
+        "wsl.exe {} failed: {}",
+        args.join(" "),
+        output.stderr.trim()
+    );
     Ok(listed(&output.stdout))
 }
 
@@ -235,14 +241,14 @@ fn runs(distro: &str, path: &str) -> anyhow::Result<bool> {
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// A helper that could not be checked or installed in `distro`: `distro_missing` when the distro,
-/// or WSL, is gone, else the failure as it is.
+/// A helper that could not be checked or installed in `distro`: `distro_missing` when the distro
+/// is gone for sure, else the failure as it is.
 fn missing_or(distro: &str, error: anyhow::Error) -> anyhow::Error {
     match distro_state(distro) {
-        Ok(DistroState::Missing) | Err(_) => {
+        Ok(DistroState::Missing) => {
             error.context(UserFacingError::new(UserFacingErrorCode::DistroMissing))
         }
-        Ok(_) => error,
+        _ => error,
     }
 }
 
@@ -253,29 +259,6 @@ fn installed_name(helper: &[u8]) -> String {
     format!("sidekyk-agent-{VERSION}-{:016x}", hasher.finish())
 }
 
-/// Run by the helper as it starts: in the folder the app installs it in, every other helper (an
-/// older build) and any copy left halfway goes. Elsewhere, such as beside a dev build, nothing.
-pub fn remove_other_helpers(this: &Path) -> std::io::Result<()> {
-    let Some(folder) = this
-        .parent()
-        .filter(|f| f.file_name() == Some(SERVER_DIR.as_ref()))
-    else {
-        return Ok(());
-    };
-    for entry in std::fs::read_dir(folder)? {
-        let path = entry?.path();
-        let name = path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or_default();
-        let helper = name.trim_start_matches('.').starts_with("sidekyk-agent-");
-        if helper && path != this {
-            std::fs::remove_file(&path)?;
-        }
-    }
-    Ok(())
-}
-
 /// The repositories of WSL distros: one helper per distro, started on first need there.
 pub struct WslRepositories {
     helper: Arc<Helper>,
@@ -283,6 +266,8 @@ pub struct WslRepositories {
     distros: Mutex<HashMap<String, Arc<AgentRepositories>>>,
     /// The window is hidden: a distro asked for meanwhile is told, as the others were.
     hidden: AtomicBool,
+    /// Each distro's state as last listed, by its name in lower case, for `STATE_KEPT`.
+    states: Mutex<HashMap<String, (Instant, DistroState)>>,
 }
 
 impl WslRepositories {
@@ -295,12 +280,13 @@ impl WslRepositories {
             }),
             distros: Mutex::default(),
             hidden: AtomicBool::new(false),
+            states: Mutex::default(),
         }
     }
 
     /// What reads `distro`'s repositories. Starts nothing until asked something.
     pub fn of(&self, distro: &str) -> Arc<AgentRepositories> {
-        let key = distro.to_lowercase();
+        let key = distro.to_ascii_lowercase();
         let mut distros = lock(&self.distros);
         if let Some(repositories) = distros.get(&key) {
             return repositories.clone();
@@ -336,14 +322,28 @@ impl WslRepositories {
         if self.of(distro).is_running() {
             return Ok(());
         }
-        match distro_state(distro) {
+        match self.state(distro) {
             Ok(DistroState::Running) => Ok(()),
             Ok(DistroState::Stopped) => Err(user_facing(UserFacingErrorCode::DistroStopped)),
             Ok(DistroState::Missing) => Err(user_facing(UserFacingErrorCode::DistroMissing)),
+            // `wsl.exe` did not answer: a passing failure, never a distro to remove
             Err(error) => {
-                Err(error.context(UserFacingError::new(UserFacingErrorCode::DistroMissing)))
+                Err(error.context(UserFacingError::new(UserFacingErrorCode::HelperFailed)))
             }
         }
+    }
+
+    /// `distro_state`, listed once for the cards of one distro shown together.
+    fn state(&self, distro: &str) -> anyhow::Result<DistroState> {
+        let key = distro.to_ascii_lowercase();
+        if let Some((at, state)) = lock(&self.states).get(&key) {
+            if at.elapsed() < STATE_KEPT {
+                return Ok(*state);
+            }
+        }
+        let state = distro_state(distro)?;
+        lock(&self.states).insert(key, (Instant::now(), state));
+        Ok(state)
     }
 
     /// Every distro asked for so far, with what reads its repositories.
@@ -403,33 +403,6 @@ mod tests {
             .collect();
         assert_eq!(listed(&utf16), ["Ubuntu", "Debian"]);
         assert!(listed(b"").is_empty());
-    }
-
-    #[test]
-    fn a_helper_starting_removes_the_others_only_where_the_app_installs_it() {
-        let home = tempfile::tempdir().unwrap();
-        let folder = home.path().join(SERVER_DIR);
-        std::fs::create_dir(&folder).unwrap();
-        for name in [
-            "sidekyk-agent-0.1.0-a",
-            "sidekyk-agent-0.1.0-b",
-            ".sidekyk-agent-0.1.0-b.42",
-            "notes",
-        ] {
-            std::fs::write(folder.join(name), "").unwrap();
-        }
-        remove_other_helpers(&folder.join("sidekyk-agent-0.1.0-b")).unwrap();
-        let mut left: Vec<_> = std::fs::read_dir(&folder)
-            .unwrap()
-            .map(|e| e.unwrap().file_name().into_string().unwrap())
-            .collect();
-        left.sort();
-        assert_eq!(left, ["notes", "sidekyk-agent-0.1.0-b"]);
-
-        let beside = home.path().join("sidekyk-agent-0.1.0-c");
-        std::fs::write(home.path().join("sidekyk-agent-old"), "").unwrap();
-        remove_other_helpers(&beside).unwrap();
-        assert!(home.path().join("sidekyk-agent-old").exists());
     }
 
     #[test]

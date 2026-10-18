@@ -11,6 +11,9 @@ use crate::modules::repository::{
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
 
+/// What gets each change of the repository watched that shows.
+pub type OnChange = Box<dyn Fn(RepositoryChange) + Send + Sync>;
+
 /// A search in contents' turn: a newer one stops it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ContentRun(pub(super) u64);
@@ -83,11 +86,7 @@ pub trait Repositories: Send + Sync {
     /// the previous one; `None` watches nothing. `on_change` gets each change that shows; for the
     /// repository watched already, the first `on_change` stays. The caller calls it in the order
     /// the repository on screen changed.
-    fn watch(
-        &self,
-        repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
-    );
+    fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange);
 
     /// Records whether the window shows. A change of the repository on screen seen meanwhile is
     /// told when it shows again: returned, or sent to `watch`'s `on_change` by an implementation

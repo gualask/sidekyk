@@ -35,14 +35,16 @@ Several repositories, one on screen.
   the frontend never reads it. Stored as the frontend gets it; on reading the id is made again
   from the location, an entry stored before ids (`{ root, name }`) is a local project, and one
   that cannot be read is left out, not the whole list.
-- WSL (`../plans/remote-projects.md`): `ProjectsState` routes a project to this machine's
-  `LocalRepositories` or its distro's `AgentRepositories` (`WslRepositories`, one helper per
-  distro); every machine is told the window's visibility and the projects it keeps, and the ones
-  not on screen to watch nothing, which never starts a helper. A helper watching nothing closes
-  10 min after its last request. A summary checks `wsl.exe --list --running --quiet` first when
-  no helper runs there (`distro_stopped`, `distro_missing`); a helper that cannot start is
-  `helper_failed`. The frontend turns these, `repository_missing` and a WSL project's
-  `git_not_found` into problems (`useProjectFailures`, `app/problems.ts`).
+- WSL (`../plans/remote-projects.md`): `Machines` (the core's `infrastructure/machines.rs`) routes a
+  project to this machine's `LocalRepositories` or its distro's `AgentRepositories`
+  (`WslRepositories`, one helper per distro); every machine is told the window's visibility and the
+  projects it keeps, and the ones not on screen to watch nothing, which never starts a helper. A
+  helper watching nothing closes 10 min after its last request. A summary checks `wsl.exe --list
+  --running --quiet` first when no helper runs there (`distro_stopped`, `distro_missing`; kept 5 s
+  for the other cards of the distro); a helper that cannot start, or a `wsl.exe` that does not
+  answer, is `helper_failed`, never `distro_missing`, which offers Remove. The frontend turns these,
+  `repository_missing` and a WSL project's `git_not_found` into problems (`useProjectFailures`,
+  `app/problems.ts`).
 - Project list: app data next to the settings. Changes run in one mutation scope, in order; the
   last switch wins.
 - Only the project on screen is watched and runs full snapshots (`changes.md`). The others show a

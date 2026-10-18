@@ -85,7 +85,7 @@ pub(crate) fn run() {
             }
             app.manage(NotesFiles::new(&app.path().app_data_dir()?));
             // the Linux helper WSL distros run, among the installer's resources on Windows
-            // (`tauri.windows.conf.json`)
+            // (`tauri.helper.conf.json`, the installer build only)
             let helper = app
                 .path()
                 .resolve("linux/sidekyk-agent", BaseDirectory::Resource)

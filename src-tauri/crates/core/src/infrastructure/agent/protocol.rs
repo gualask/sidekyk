@@ -14,7 +14,7 @@ use crate::modules::repository::{
 };
 use crate::modules::search::ContentFile;
 use crate::modules::syntax::SyntaxRequest;
-use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
+use crate::shared::error::{rebuilt, wire_code, UserFacingErrorCode};
 
 /// Past the largest message the app reads (a snapshot of 8 MiB of status, a diff of 2 MiB): a
 /// frame longer than this is a broken stream, not a message.
@@ -112,21 +112,17 @@ pub struct WireError {
 impl From<&anyhow::Error> for WireError {
     fn from(error: &anyhow::Error) -> Self {
         Self {
-            code: user_facing_code(error)
-                .map_or("unknown", UserFacingErrorCode::as_str)
-                .to_string(),
+            code: wire_code(error).to_string(),
             message: format!("{error:#}"),
         }
     }
 }
 
 impl From<WireError> for anyhow::Error {
-    /// A user-facing failure keeps its code, so the app tells it as if it were its own.
+    /// A user-facing failure keeps its code, so the app tells it as if it were its own, and its
+    /// cause, for the app's log.
     fn from(error: WireError) -> Self {
-        match UserFacingErrorCode::parse(&error.code) {
-            Some(code) => user_facing(code),
-            None => anyhow::anyhow!(error.message),
-        }
+        rebuilt(UserFacingErrorCode::parse(&error.code), &error.message)
     }
 }
 

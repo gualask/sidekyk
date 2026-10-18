@@ -1,6 +1,6 @@
 //! The repositories this process reads, as the app shows them: each one's reads shared while in
 //! flight, its files kept until they may have changed, the one on screen watched. The app runs it
-//! for its local projects; the helper will run it inside a WSL distro, answering over a pipe
+//! for its local projects; the helper runs it inside a WSL distro, answering over a pipe
 //! (`docs/plans/remote-projects.md`). The caller checks that a repository is one the user added
 //! before naming it.
 
@@ -14,7 +14,7 @@ use std::sync::{Arc, Mutex, Weak};
 
 use crate::modules::repository::{
     self, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryChange, RepositoryInfo,
+    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryInfo,
     RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
 };
 use crate::modules::search::{
@@ -25,7 +25,7 @@ use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
-pub use port::{ContentRun, Repositories};
+pub use port::{ContentRun, OnChange, Repositories};
 use watch::{Visibility, Watched};
 
 /// A result shared by every caller that waited for it.
@@ -332,13 +332,15 @@ impl Repositories for LocalRepositories {
         self.summaries.retain(&keep);
         self.tree_reads.retain(&keep);
         lock(&self.changed).retain(|root, _| keep(root));
+        // a project gone takes its files with it
+        lock(&self.trees).retain(|root, _| keep(root));
+        let mut contents = lock(&self.contents);
+        if contents.as_ref().is_some_and(|last| !keep(&last.root)) {
+            *contents = None;
+        }
     }
 
-    fn watch(
-        &self,
-        repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
-    ) {
+    fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange) {
         self.watch_on_screen(repository, on_change);
     }
 
