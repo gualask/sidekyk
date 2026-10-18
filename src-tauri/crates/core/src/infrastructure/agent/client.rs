@@ -20,9 +20,9 @@ use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, W
 use crate::infrastructure::hide_console;
 use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
-    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-    UnifiedDiff,
+    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
+    FileDiffRequest, RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -493,6 +493,11 @@ impl Repositories for AgentRepositories {
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
         let repository = info.clone();
         self.call(Request::RecentCommits { repository }, &nothing)
+    }
+
+    fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity> {
+        let repository = info.clone();
+        self.call(Request::CommitActivity { repository, since }, &nothing)
     }
 
     fn commit_files(

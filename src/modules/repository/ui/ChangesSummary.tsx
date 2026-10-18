@@ -1,107 +1,97 @@
-import type { ReactNode } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
+import type { ProjectInfo } from '@/shared/projects/project-info';
+import { Stat } from '@/shared/ui/Stat';
 import { useRepositorySummary } from '../application/repository.queries';
 import { projectErrorMessage } from '../model/project-error';
 import { changedCount } from '../model/summary';
 import { BranchName } from './BranchName';
-import { KindBadge } from './KindBadge';
-import { LineCounts } from './LineCounts';
+import { CardWell, WellMessage } from './CardWell';
+import { TrackedLines } from './LineCounts';
+import { WeekOfCommits } from './WeekOfCommits';
 
 /**
- * What Changes tells about a project on its card at all projects: how many files changed, the
- * branch, the lines, and the first files. Loaded with level 0, and read again each time it shows,
+ * What Changes tells about a project on its card at all projects: the branch under its name, how
+ * many files and lines changed among the card's numbers (quiet when clean, so that the projects at
+ * work stand out), and the lines committed day by day in the last week below, or why the
+ * repository could not be read. Loaded with level 0; the summary is read again each time it shows,
  * since all projects is where one looks for the projects with changes.
  */
-export function ChangesSummary({ project }: PanelSummaryProps) {
-    const summary = useRepositorySummary(project.id, { freshOnShow: true });
-    // never started for a card: it says so, in the place of the counts
+export function ChangesSummary({ project, part }: PanelSummaryProps) {
+    if (part === 'lead') return <BranchLine project={project} />;
+    if (part === 'facts') return <Counts project={project} />;
+    return <WeekOrProblem project={project} />;
+}
+
+/** One summary for the three parts: read once, each time the card shows. */
+function useCardSummary(project: ProjectInfo) {
+    return useRepositorySummary(project.id, { freshOnShow: true });
+}
+
+function BranchLine({ project }: { project: ProjectInfo }) {
+    const summary = useCardSummary(project);
+    if (!summary.data) return null;
+    return (
+        <div className="flex min-w-0 text-xs text-ui-text-muted">
+            <BranchName branch={summary.data.branch} className="text-[11.5px]" />
+        </div>
+    );
+}
+
+function Counts({ project }: { project: ProjectInfo }) {
+    const summary = useCardSummary(project);
+    if (!summary.data) return null;
+    const { totals } = summary.data;
+    const lines = totals.additions + totals.deletions > 0;
+    return (
+        <>
+            <Stat
+                value={changedCount(summary.data)}
+                label={totals.files === 1 ? 'file changed' : 'files changed'}
+                quiet={totals.files === 0}
+            />
+            <Stat
+                value={
+                    lines ? (
+                        <TrackedLines additions={totals.additions} deletions={totals.deletions} />
+                    ) : (
+                        '—'
+                    )
+                }
+                label="lines"
+                quiet={!lines}
+            />
+        </>
+    );
+}
+
+/** The week of commits, or why the repository could not be read in its place. */
+function WeekOrProblem({ project }: { project: ProjectInfo }) {
+    const summary = useCardSummary(project);
+    // never started for a card: it says so
     if (
         summary.isError &&
         hasErrorCode(summary.error, 'distro_stopped') &&
         project.location.kind === 'wsl'
     ) {
         return (
-            <>
-                <div className="flex items-center gap-1.5">
-                    <StatePill tone="bg-ui-surface-hover text-ui-text-secondary">stopped</StatePill>
-                </div>
-                <p className="text-xs text-ui-text-muted">
+            <CardWell>
+                <WellMessage>
                     {project.location.distro} is not running. Open the project to start it.
-                </p>
-            </>
+                </WellMessage>
+            </CardWell>
         );
     }
     if (summary.isError) {
         return (
-            <p className="text-xs text-ui-danger">
-                {projectErrorMessage(summary.error, project.location)}
-            </p>
+            <CardWell>
+                <WellMessage className="text-ui-danger">
+                    {projectErrorMessage(summary.error, project.location)}
+                </WellMessage>
+            </CardWell>
         );
     }
-    if (!summary.data) return null;
-    const { branch, totals, files } = summary.data;
-    const more = totals.files - files.length;
-
-    return (
-        <>
-            <div className="flex flex-wrap items-center gap-1.5">
-                <StatePill
-                    tone={
-                        totals.files > 0
-                            ? 'bg-ui-accent-soft text-ui-accent-on-soft'
-                            : 'bg-ui-success-soft text-ui-success-soft-text'
-                    }
-                >
-                    {totals.files > 0 ? `${changedCount(summary.data)} changed` : 'clean'}
-                </StatePill>
-                <span className="chip max-w-56">
-                    <BranchName branch={branch} />
-                </span>
-                {totals.additions + totals.deletions > 0 ? (
-                    <span className="chip text-[11.5px]" title="Lines of tracked files">
-                        <LineCounts additions={totals.additions} deletions={totals.deletions} />
-                    </span>
-                ) : null}
-            </div>
-            {files.length > 0 ? (
-                <ul className="flex flex-col gap-1 text-xs">
-                    {files.map((file) => (
-                        <li key={file.path} className="flex min-w-0 items-center gap-2">
-                            <KindBadge kind={file.kind} />
-                            <span
-                                className="min-w-0 flex-1 truncate font-mono text-[11.5px]"
-                                title={file.path}
-                            >
-                                {file.path}
-                            </span>
-                            {file.kind === 'untracked' ? null : (
-                                <span className="shrink-0 text-[11px]">
-                                    <LineCounts
-                                        additions={file.additions}
-                                        deletions={file.deletions}
-                                        binary={file.binary}
-                                    />
-                                </span>
-                            )}
-                        </li>
-                    ))}
-                    {more > 0 ? <li className="text-ui-text-muted">+{more} more</li> : null}
-                </ul>
-            ) : (
-                <p className="text-xs text-ui-text-muted">Working tree clean.</p>
-            )}
-        </>
-    );
-}
-
-/** The project's state first on its card: changed, clean or stopped; `tone` its colors. */
-function StatePill({ tone, children }: { tone: string; children: ReactNode }) {
-    return (
-        <span
-            className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-bold ${tone}`}
-        >
-            {children}
-        </span>
-    );
+    return summary.data ? (
+        <WeekOfCommits projectId={project.id} head={summary.data.branch.commit} />
+    ) : null;
 }

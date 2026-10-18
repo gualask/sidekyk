@@ -2,7 +2,9 @@ import { Menu } from '@base-ui/react/menu';
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import type { SummaryPart } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { placeName } from '@/shared/projects/project-place';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { useActivateProject, useAddProject } from '../application/projects.queries';
@@ -49,8 +51,8 @@ export function ProjectsOverview({
     onOpen: () => void;
     /** A project's removal asked for: the app asks what to do with what it holds, then removes. */
     onRemove: (project: ProjectInfo) => void;
-    /** What the panels tell about a project, below its name. */
-    summary: (project: ProjectInfo) => ReactNode;
+    /** What the panels tell about a project, below its name, part by part. */
+    summary: (project: ProjectInfo, part: SummaryPart) => ReactNode;
 }) {
     const add = useAddProject(onOpen);
     const activate = useActivateProject();
@@ -83,9 +85,8 @@ export function ProjectsOverview({
                             onOpen();
                         }}
                         onRemove={() => onRemove(project)}
-                    >
-                        {summary(project)}
-                    </ProjectCard>
+                        summary={(part) => summary(project, part)}
+                    />
                 ))}
                 <button
                     type="button"
@@ -108,7 +109,7 @@ function ProjectCard({
     zoomed,
     onOpen,
     onRemove,
-    children,
+    summary,
 }: {
     project: ProjectInfo;
     selected: boolean;
@@ -116,13 +117,13 @@ function ProjectCard({
     zoomed: boolean;
     onOpen: () => void;
     onRemove: () => void;
-    children: ReactNode;
+    summary: (part: SummaryPart) => ReactNode;
 }) {
     return (
         <article
             data-zoom
             style={zoomed ? { viewTransitionName: ZOOM_NAMES.project } : undefined}
-            className={`relative flex min-h-44 flex-col gap-3 rounded-xl border bg-ui-surface p-4 shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-colors ${
+            className={`relative flex flex-col gap-4 rounded-xl border bg-ui-surface p-4 shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-colors ${
                 selected
                     ? 'border-ui-accent shadow-[0_0_0_3px_var(--ui-accent-soft),0_8px_24px_var(--ui-shadow-soft)]'
                     : 'border-ui-border hover:border-ui-border-hover'
@@ -138,22 +139,21 @@ function ProjectCard({
                         data-zoom-in
                         data-current-card={selected ? '' : undefined}
                         className="block max-w-full truncate text-left text-[15px] font-bold after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ui-accent"
+                        // its overlay covers the card: the folder shows wherever the pointer rests
+                        title={placeName(project.location)}
                         onClick={onOpen}
                     >
                         {project.name}
                     </button>
                     <div className="flex min-w-0 items-center gap-1.5">
                         <RemoteTag location={project.location} className="h-4 px-1.5 text-[11px]" />
-                        <div
-                            className="truncate font-mono text-xs text-ui-text-muted"
-                            title={project.location.root}
-                        >
-                            {project.location.root}
-                        </div>
+                        {summary('lead')}
                     </div>
                 </div>
             </div>
-            {children}
+            {/* empty while the summaries load, or when none has a number */}
+            <div className="flex gap-1.5 empty:hidden">{summary('facts')}</div>
+            {summary('body')}
             <Menu.Root>
                 <Menu.Trigger
                     className="btn-icon absolute top-2 right-2 h-7 w-7 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"

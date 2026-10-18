@@ -40,8 +40,8 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   unstaged before the first commit). One snapshot in flight per project.
 - Untracked files are read to count lines (binary: NUL in the first 8 KiB): 4 MiB per file, 32 MiB
   and 2,000 files per snapshot.
-- Summary: one entry per path (first three listed), lines of tracked files only.
-- At most 10,000 changed paths (`truncated`: "too many changes", counts read `10000+`).
+- Summary: changed paths counted once each, lines of tracked files only.
+- At most 10,000 changed paths (`truncated`: "too many changes", counts read `10k+`).
 
 ### Diffs and commits
 

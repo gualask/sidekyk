@@ -45,9 +45,20 @@ export interface PanelProps {
     findInFiles: (query: string) => void;
 }
 
-/** What a panel's summary gets: the project of the card it is on. */
+/**
+ * The parts of a project's card at all projects, top to bottom: lines of its own under the
+ * project's folder, one row of numbers that every panel adds to, then what fills the rest.
+ */
+export type SummaryPart = 'lead' | 'facts' | 'body';
+
+/**
+ * What a panel's summary gets: the project of the card it is on, and the part to show. The card
+ * shows each summary once per part, so a summary shows nothing in the parts it has nothing for;
+ * in `facts` it shows items of a row.
+ */
 export interface PanelSummaryProps {
     project: ProjectInfo;
+    part: SummaryPart;
 }
 
 /**

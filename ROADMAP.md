@@ -9,13 +9,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 - [ ] Syntax colors in the running app (`pnpm tauri:dev`; `docs/features/syntax-colors.md`)
 
-## Review
-
-- [ ] Collect several hunks with a comment each, copy as one batch
-- [ ] Side-by-side view; collapse unchanged regions with expand on demand
-- [ ] Open a file in the editor at the hunk's line (its Tabler icon comes with it)
-- [ ] Diff context lines setting
-
 ## App
 
 - [ ] Italian and English UI (as in Fyler)

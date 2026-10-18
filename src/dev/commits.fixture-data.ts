@@ -1,5 +1,6 @@
 import type {
     Commit,
+    CommitActivity,
     CommitFileDiffRequest,
     CommitFiles,
     CommitRequest,
@@ -218,4 +219,52 @@ export function commitFiles(large: boolean, commit: CommitRequest): CommitFiles 
 export function commitFileDiff(large: boolean, request: CommitFileDiffRequest): UnifiedDiff {
     const match = find(large, request.commit)?.files.find((f) => f.path === request.path);
     return { text: match?.diff ?? '', truncated: false };
+}
+
+/** A week of lines committed, oldest day first, `[added, removed]` per commit of the day. */
+const WEEKS = {
+    busy: [
+        [[120, 30]],
+        [],
+        [
+            [1800, 240],
+            [600, 60],
+        ],
+        [[40, 900]],
+        [],
+        [[310, 80]],
+        [[54, 27]],
+    ],
+    large: [
+        [[24_000, 3_100]],
+        [[9_200, 11_400]],
+        [],
+        [[48_000, 900]],
+        [[1_200, 300]],
+        [],
+        [[700, 90]],
+    ],
+    quiet: [[], [[12, 3]], [], [], [[40, 8]], [], []],
+} as const;
+
+/**
+ * The commits made since `since`, newest first, as the backend lists them: `busy` for the
+ * scenario's repository, `large` for the large scenario's, `quiet` for a clean project; `none`
+ * has made no commit this week.
+ */
+export function commitActivity(week: keyof typeof WEEKS | 'none', since: number): CommitActivity {
+    if (week === 'none') return { commits: [], more: false };
+    const commits = WEEKS[week].flatMap((day, index) =>
+        day.map(([additions, deletions], n) => {
+            const start = new Date(since * 1000);
+            const noon = new Date(
+                start.getFullYear(),
+                start.getMonth(),
+                start.getDate() + index,
+                12 + n,
+            );
+            return { time: noon.getTime() / 1000, additions, deletions };
+        }),
+    );
+    return { commits: commits.reverse(), more: false };
 }

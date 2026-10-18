@@ -4,9 +4,9 @@
 use std::path::Path;
 
 use crate::modules::repository::{
-    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-    UnifiedDiff,
+    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
+    FileDiffRequest, RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -35,6 +35,8 @@ pub trait Repositories: Send + Sync {
     ) -> anyhow::Result<UnifiedDiff>;
 
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits>;
+
+    fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity>;
 
     fn commit_files(
         &self,

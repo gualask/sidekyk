@@ -50,6 +50,12 @@ const repositoryKeys = {
             request.wholeFile,
         ] as const,
     commits: (projectId: string) => [...repositoryKeys.of(projectId), 'commits'] as const,
+    /**
+     * Outside `of`: a change on disk, the window showing again or a project read again leave it
+     * alone, since its key names what would change it, HEAD and the first day.
+     */
+    activity: (projectId: string, head: string, since: number) =>
+        ['activity', projectId, head, since] as const,
     directory: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'directory', path] as const,
     file: (projectId: string, path: string) =>
@@ -104,7 +110,7 @@ export function useRepositorySnapshot(projectId: string) {
         queryKey: repositoryKeys.snapshot(projectId),
         queryFn: async () => {
             const snapshot = await port.getSnapshot(projectId);
-            // the same git output, so the breadcrumb and the rail need no call of their own
+            // the same git output, so the breadcrumb needs no call of its own
             queryClient.setQueryData(repositoryKeys.summary(projectId), snapshot.summary);
             return snapshot;
         },
@@ -210,6 +216,20 @@ export function useRecentCommits(projectId: string, open: boolean) {
         queryKey: repositoryKeys.commits(projectId),
         queryFn: () => port.getRecentCommits(projectId),
         enabled: open,
+    });
+}
+
+/**
+ * The lines each commit of the branch on screen changed since `since`, for a project's card: read
+ * once for a HEAD and a first day, again only when either moves. None before the first commit.
+ */
+export function useCommitActivity(projectId: string, head: string | null, since: number) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: repositoryKeys.activity(projectId, head ?? '', since),
+        queryFn: () => port.getCommitActivity(projectId, since),
+        enabled: head !== null,
+        staleTime: Number.POSITIVE_INFINITY,
     });
 }
 

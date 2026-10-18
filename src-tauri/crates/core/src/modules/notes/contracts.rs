@@ -46,8 +46,6 @@ pub struct ProjectNotes {
 pub struct NotesSummary {
     /// The notes not done.
     pub open: u32,
-    /// The first line of the open note written last.
-    pub newest: Option<String>,
 }
 
 /// A list deleted with its notes, handed back to bring them all back (undo).
@@ -163,13 +161,9 @@ mod tests {
 
     #[test]
     fn a_summary_uses_the_frontend_field_names() {
-        let summary = NotesSummary {
-            open: 2,
-            newest: Some("Try the rail".into()),
-        };
         assert_eq!(
-            serde_json::to_value(summary).unwrap(),
-            serde_json::json!({ "open": 2, "newest": "Try the rail" })
+            serde_json::to_value(NotesSummary { open: 2 }).unwrap(),
+            serde_json::json!({ "open": 2 })
         );
     }
 

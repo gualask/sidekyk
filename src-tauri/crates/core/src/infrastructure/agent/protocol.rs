@@ -47,6 +47,10 @@ pub enum Request {
     RecentCommits {
         repository: RepositoryInfo,
     },
+    CommitActivity {
+        repository: RepositoryInfo,
+        since: i64,
+    },
     CommitFiles {
         repository: RepositoryInfo,
         commit: CommitRequest,

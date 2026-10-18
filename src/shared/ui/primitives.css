@@ -18,6 +18,10 @@
     .btn-icon {
         @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-offset-2 focus-visible:ring-offset-ui-surface disabled:cursor-not-allowed;
     }
+    /* a box inside a card (a number, a chart): a step of surface, no border */
+    .card-box {
+        @apply rounded-lg bg-ui-surface-subtle;
+    }
     .chip {
         @apply inline-flex h-6 items-center gap-1 rounded-md bg-ui-surface-hover px-2 text-xs font-medium text-ui-text-secondary;
     }

@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::contracts::{
-    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, FileChange, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary,
+    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary,
 };
 use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
 use super::numstat::{count_text_lines, parse_numstat_z, Counts, LineCounts};
@@ -21,9 +21,6 @@ const MAX_UNTRACKED_FILES_READ: usize = 2_000;
 /// Output read from `git status`, well past what `MAX_CHANGED_PATHS` paths take (about 150 bytes
 /// each), so that git is killed rather than read to the end when the paths are many more.
 const MAX_STATUS_BYTES: usize = 8 * 1024 * 1024;
-
-/// How many changed paths a summary lists: a card shows them, then how many more there are.
-const SUMMARY_FILES: usize = 3;
 
 type CountsByPath = HashMap<String, Counts>;
 
@@ -160,43 +157,11 @@ fn sum(counts: impl Iterator<Item = Counts>) -> (u32, u32) {
     })
 }
 
-/// What happened to a path since HEAD, whatever its areas: a file added and then edited is added,
-/// a file edited and then deleted is deleted.
-fn kind_against_head(entry: &StatusEntry) -> ChangeKind {
-    if entry.unstaged == Some(ChangeKind::Deleted) {
-        return ChangeKind::Deleted;
-    }
-    entry
-        .staged
-        .or(entry.unstaged)
-        .unwrap_or(ChangeKind::Modified)
-}
-
 /// The summary of `status`, where `tracked` holds the line counts of tracked paths against HEAD.
-/// New files are listed and counted as files, their lines unread.
+/// New files are counted as files, their lines unread.
 fn summarize(status: &StatusReport, tracked: &Numstat) -> RepositorySummary {
     let (additions, deletions) = sum(tracked.counts.values().copied());
     let paths: HashSet<&str> = status.entries.iter().map(|e| e.path.as_str()).collect();
-    let files = status
-        .entries
-        .iter()
-        .take(SUMMARY_FILES)
-        .map(|entry| {
-            let counts = if entry.unstaged == Some(ChangeKind::Untracked) {
-                Counts::default()
-            } else {
-                tracked.counts.get(&entry.path).copied().unwrap_or_default()
-            };
-            FileChange {
-                path: entry.path.clone(),
-                orig_path: entry.orig_path.clone(),
-                kind: kind_against_head(entry),
-                additions: counts.additions,
-                deletions: counts.deletions,
-                binary: counts.binary,
-            }
-        })
-        .collect();
     RepositorySummary {
         branch: status.branch.clone(),
         totals: ChangeTotals {
@@ -204,7 +169,6 @@ fn summarize(status: &StatusReport, tracked: &Numstat) -> RepositorySummary {
             additions,
             deletions,
         },
-        files,
         truncated: status.truncated || tracked.truncated,
     }
 }
@@ -352,31 +316,6 @@ mod tests {
             }
             Some(bytes)
         }
-    }
-
-    #[test]
-    fn a_path_takes_its_kind_against_head_from_both_areas() {
-        let entry = |staged, unstaged| StatusEntry {
-            path: "a.ts".into(),
-            orig_path: None,
-            staged,
-            unstaged,
-        };
-        use ChangeKind::*;
-        assert_eq!(
-            kind_against_head(&entry(Some(Added), Some(Modified))),
-            Added
-        );
-        assert_eq!(kind_against_head(&entry(Some(Renamed), None)), Renamed);
-        assert_eq!(
-            kind_against_head(&entry(Some(Modified), Some(Deleted))),
-            Deleted
-        );
-        assert_eq!(kind_against_head(&entry(None, Some(Untracked))), Untracked);
-        assert_eq!(
-            kind_against_head(&entry(None, Some(Conflicted))),
-            Conflicted
-        );
     }
 
     /// `git status` printing `stdout`, cut by the transport when `truncated`.

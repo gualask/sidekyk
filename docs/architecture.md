@@ -27,8 +27,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - Commands name a project by its id (`features/projects.md`); the backend serves only projects in
   the list. The core reads a repository by its root on the machine that holds it; the app turns
   what it reports back into the project's id.
-- Projects not on screen: not watched; their summary is read after the first paint, when the
-  window shows again and when level 0 shows, only if older than 30 s (`features/projects.md`).
+- Projects not on screen: not watched; their summary is read when level 0 shows, and when the
+  window shows again on it, only if older than 30 s; their week of commits once per HEAD and day
+  (`features/projects.md`).
 - Window hidden, minimized or covered: no git (`features/background.md`).
 
 ## Frontend
@@ -37,7 +38,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 
 - `app/`: composition root: providers, shell (top bar, zoom levels, tiles), keyboard and zoom
   gestures, panel list (`panels.ts`).
-- `modules/projects/`: project list, rail, level 0 cards (lazy chunk with Base UI's menu), empty
+- `modules/projects/`: project list, level 0 cards (lazy chunk with Base UI's menu), empty
   screen.
 - `modules/settings/`: settings queries and dialog (lazy chunk).
 - `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`); ranking and
@@ -52,8 +53,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
     text, per project), `RepositorySettings` (what the app passes from the settings).
   - `ui/`: `ChangesWorkspace`, `FilesWorkspace`, `FileTree` (+ `tree-layout.ts`), the viewer
     `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`,
-    `TextFileView`, one `FileHeader`, recent commits, summary views (breadcrumb facts, rail count,
-    level 0 card). Lists, tree and diff are virtualized flat lists of fixed-height rows.
+    `TextFileView`, one `FileHeader`, recent commits, summary views (breadcrumb facts, level 0
+    card). Lists, tree and diff are virtualized flat lists of fixed-height rows.
 - `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu;
   `features/notes.md`).
 - `infrastructure/platform/`: Tauri adapters implementing the ports.

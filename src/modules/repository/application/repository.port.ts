@@ -1,5 +1,6 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
+    CommitActivity,
     CommitFileDiffRequest,
     CommitFiles,
     CommitRequest,
@@ -26,6 +27,8 @@ export interface RepositoryPort {
     getFileDiff(projectId: string, request: FileDiffRequest): Promise<UnifiedDiff>;
     /** The last commits of the branch on screen; none before the first commit. */
     getRecentCommits(projectId: string): Promise<RecentCommits>;
+    /** The lines each commit of the branch on screen changed since `since` (Unix seconds). */
+    getCommitActivity(projectId: string, since: number): Promise<CommitActivity>;
     getCommitFiles(projectId: string, commit: CommitRequest): Promise<CommitFiles>;
     getCommitFileDiff(projectId: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
     /** What a folder holds, `''` for the root: read from the backend's list, no git. */

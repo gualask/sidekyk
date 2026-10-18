@@ -117,19 +117,10 @@ impl Book {
         (book, touched)
     }
 
-    /// What a project's card tells of its notes: how many wait, and the newest.
+    /// What a project's card tells of its notes: how many wait.
     pub(super) fn summary(&self) -> NotesSummary {
-        let open = self.notes.iter().filter(|n| n.done.is_none());
         NotesSummary {
-            open: open.clone().count() as u32,
-            // written in the same millisecond, the higher one is the newer: new notes go on top
-            newest: open
-                .max_by(|a, b| {
-                    a.created
-                        .cmp(&b.created)
-                        .then(b.position.total_cmp(&a.position))
-                })
-                .map(|n| note_title(&n.text)),
+            open: self.notes.iter().filter(|n| n.done.is_none()).count() as u32,
         }
     }
 
@@ -683,17 +674,11 @@ mod tests {
     }
 
     #[test]
-    fn a_summary_counts_open_notes_and_names_the_newest() {
+    fn a_summary_counts_open_notes() {
         let mut book = with_notes(&["a", "b"]);
-        book.add(id(9), RELEASE, "newest\nmore".into(), 9).unwrap();
+        book.add(id(9), RELEASE, "c".into(), 9).unwrap();
         book.set_done(&id_of(&book, "a"), true, 10).unwrap();
-        assert_eq!(
-            book.summary(),
-            NotesSummary {
-                open: 2,
-                newest: Some("newest".into()),
-            }
-        );
+        assert_eq!(book.summary(), NotesSummary { open: 2 });
     }
 
     #[test]

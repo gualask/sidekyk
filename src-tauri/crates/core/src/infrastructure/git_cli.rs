@@ -201,11 +201,12 @@ mod tests {
 
     use super::*;
     use crate::modules::repository::{
-        load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
-        load_file_tree, load_recent_commits, load_snapshot, load_summary, load_version_text,
-        repository_name, resolve_repository, ChangeKind, Commit, CommitFileDiffRequest,
-        CommitRequest, FileContent, FileDiffRequest, FileVersion, IgnoredPaths, RepositoryInfo,
-        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch,
+        load_commit_activity, load_commit_file_diff, load_commit_files, load_file_content,
+        load_file_diff, load_file_tree, load_recent_commits, load_snapshot, load_summary,
+        load_version_text, repository_name, resolve_repository, ChangeKind, Commit,
+        CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
+        IgnoredPaths, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText, Visible,
+        Watch,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
@@ -283,14 +284,6 @@ mod tests {
         assert_eq!(
             value["summary"]["totals"],
             json!({ "files": 3, "additions": 3, "deletions": 2 })
-        );
-        assert_eq!(
-            value["summary"]["files"],
-            json!([
-                { "path": "README.md", "origPath": null, "kind": "deleted", "additions": 0, "deletions": 1, "binary": false },
-                { "path": "src/cart.ts", "origPath": null, "kind": "modified", "additions": 3, "deletions": 1, "binary": false },
-                { "path": "notes/todo.md", "origPath": null, "kind": "untracked", "additions": null, "deletions": null, "binary": false },
-            ])
         );
         assert_eq!(
             load_summary(&backend, &repo.info).unwrap(),
@@ -384,6 +377,52 @@ mod tests {
         );
 
         assert!(load_file_diff(&backend, &repo.info, &request("../x", "unstaged")).is_err());
+    }
+
+    #[test]
+    fn commit_activity_counts_the_lines_of_each_commit_since_a_time() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        git(root, &["init", "-q", "-b", "main"]);
+        git(root, &["config", "user.email", "test@example.com"]);
+        git(root, &["config", "user.name", "Test"]);
+        git(root, &["config", "commit.gpgsign", "false"]);
+        git(root, &["config", "log.showSignature", "true"]);
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, root).unwrap();
+        assert!(
+            load_commit_activity(&backend, &repo.info, 0)
+                .unwrap()
+                .commits
+                .is_empty(),
+            "before the first commit"
+        );
+
+        write(root, "src/cart.ts", "a\nb\nc\n");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Add the cart"]);
+        write(root, "src/cart.ts", "a\nB\n");
+        write(root, "logo.png", "PNG\0data");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Edit the cart"]);
+        git(root, &["commit", "-q", "--allow-empty", "-m", "Nothing"]);
+
+        let activity = load_commit_activity(&backend, &repo.info, 0).unwrap();
+        let lines: Vec<(u32, u32)> = activity
+            .commits
+            .iter()
+            .map(|c| (c.additions, c.deletions))
+            .collect();
+        // newest first; a binary file adds no lines
+        assert_eq!(lines, [(0, 0), (1, 2), (3, 0)]);
+        assert!(!activity.more);
+        assert!(activity.commits.iter().all(|c| c.time > 1_700_000_000));
+
+        let later = activity.commits[0].time + 3600;
+        assert!(load_commit_activity(&backend, &repo.info, later)
+            .unwrap()
+            .commits
+            .is_empty());
     }
 
     #[test]

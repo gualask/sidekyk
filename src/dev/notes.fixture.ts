@@ -3,7 +3,6 @@ import {
     type Note,
     type NoteList,
     type NotesPort,
-    noteTitle,
     openNotes,
     type ProjectNotes,
     positionAt,
@@ -47,7 +46,7 @@ const REVIEW_NOTES: [string, string, number, number | null][] = [
         null,
     ],
     ['General', 'Wide scrollbar setting', 3 * DAY, DAY],
-    ['General', 'Try the project rail against the overview for switching', 4 * DAY, 2 * DAY],
+    ['General', 'Try `[`/`]` against the overview for switching', 4 * DAY, 2 * DAY],
     [
         'Architecture',
         '"Coalescing events per directory instead of per file would cut wakeups during a large checkout, at the cost of one extra status call."',
@@ -279,19 +278,9 @@ export function fixtureNotes(
             return snapshot(b);
         },
         // as the backend's `Book::summary`
-        notesSummary: async (projectId) => {
-            const open = book(projectId).notes.filter((n) => n.done === null);
-            const newest = open.reduce<Note | null>(
-                (best, n) =>
-                    !best ||
-                    n.created > best.created ||
-                    (n.created === best.created && n.position < best.position)
-                        ? n
-                        : best,
-                null,
-            );
-            return { open: open.length, newest: newest ? noteTitle(newest.text) : null };
-        },
+        notesSummary: async (projectId) => ({
+            open: book(projectId).notes.filter((n) => n.done === null).length,
+        }),
         countNotes: async (projectId) => book(projectId).notes.length,
         // as if saved where the dialog first offers
         exportNotes: async (projectId) => {

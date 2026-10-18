@@ -86,6 +86,11 @@ pub fn serve(
             Request::RecentCommits { repository } => {
                 on_thread(Box::new(move |r| value(r.recent_commits(&repository)?)));
             }
+            Request::CommitActivity { repository, since } => {
+                on_thread(Box::new(move |r| {
+                    value(r.commit_activity(&repository, since)?)
+                }));
+            }
             Request::CommitFiles { repository, commit } => {
                 on_thread(Box::new(move |r| {
                     value(r.commit_files(&repository, &commit)?)
@@ -193,6 +198,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::Summary { .. } => "summary",
         Request::FileDiff { .. } => "fileDiff",
         Request::RecentCommits { .. } => "recentCommits",
+        Request::CommitActivity { .. } => "commitActivity",
         Request::CommitFiles { .. } => "commitFiles",
         Request::CommitFileDiff { .. } => "commitFileDiff",
         Request::Directory { .. } => "directory",

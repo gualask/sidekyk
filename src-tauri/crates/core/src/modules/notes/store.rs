@@ -786,10 +786,7 @@ pub mod tests {
         store.notes(&storage, "/dev/docs").unwrap();
         assert_eq!(
             store.summary(&storage, PROJECT).unwrap(),
-            NotesSummary {
-                open: 2,
-                newest: Some("b".into()),
-            }
+            NotesSummary { open: 2 }
         );
     }
 

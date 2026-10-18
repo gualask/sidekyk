@@ -59,13 +59,11 @@ interface ChangeTotals {
     deletions: number;
 }
 
-/** A repository at a glance: its card, its avatar in the rail, the breadcrumb. */
+/** A repository at a glance: its card, the breadcrumb. */
 export interface RepositorySummary {
     branch: BranchStatus;
     totals: ChangeTotals;
-    /** The first changed paths in git's order, at most three. */
-    files: FileChange[];
-    /** git listed more changes than are read (10,000, as VS Code): the list and the file count stop there. */
+    /** git listed more changes than are read (10,000, as VS Code): the file count stops there. */
     truncated: boolean;
 }
 
@@ -111,6 +109,23 @@ export interface Commit {
 export interface RecentCommits {
     commits: Commit[];
     /** The branch has older commits than those listed. */
+    more: boolean;
+}
+
+/** When a commit was made (seconds since the Unix epoch), and the lines it added and removed. */
+interface CommittedLines {
+    time: number;
+    additions: number;
+    deletions: number;
+}
+
+/**
+ * The commits of the branch on screen since a time, newest first, merges left out: how much work
+ * went into a project, day by day.
+ */
+export interface CommitActivity {
+    commits: CommittedLines[];
+    /** More commits were made since then than are read (500). */
     more: boolean;
 }
 

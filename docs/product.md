@@ -34,14 +34,19 @@ dated in `features/`.
 - Comparing against the default branch / merge base (2026-10-14): Changes compares against HEAD
   as VS Code and Zed do; commits are looked at in the recent commits.
 - Following the terminal (2026-10-16): no automatic switch to the project of the terminal tab used
-  last; switching stays manual (`[`/`]`, `⌘K`, rail, `sidekyk .`). Every signal breaks on some
+  last; switching stays manual (`[`/`]`, `⌘K`, level 0, `sidekyk .`). Every signal breaks on some
   axis (agent, terminal, shell, tmux, OS): terminal APIs (one adapter per terminal, settings to
   enable, blind under tmux; built for kitty on macOS, then dropped), agent hooks (not every
   agent), shell hooks (silent while the agent runs), tty access time (unchanged on macOS; no ttys
   on Windows), window titles (permissions on macOS, overwritten by agents). Kept in mind: follow
   the activity (project whose files changed last), if the manual switch proves not enough.
-- From tazly: layered glass blur (GPU), rich-text editors. Taken from it: rail of other projects,
-  one command bar, `Esc` cancels before navigating, notes with copy, `⌥` shortcuts matched on
+- In the viewer (2026-10-18): several hunks with a comment each copied as one batch; a
+  side-by-side view; unchanged regions expanded on demand ("Changes | Full file" stays); opening
+  the file in the editor at a hunk's line; a setting for the diff's context lines (git's three).
+- A rail of the projects beside a project's tiles (2026-10-18, built then dropped): `Esc` to the
+  cards is quicker than aiming at an avatar, and its counts went stale (other projects are not
+  watched, `features/projects.md`).
+- From tazly: layered glass blur (GPU), rich-text editors. Taken from it: one command bar, `Esc` cancels before navigating, notes with copy, `⌥` shortcuts matched on
   `e.code`. Open: quick capture of a note via a global shortcut; a `PRODUCT.md`.
 
 ## Out of scope

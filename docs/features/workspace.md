@@ -6,7 +6,7 @@ problems. Why semantic zoom: `../product.md`.
 ## Behaviour
 
 - Breadcrumb (All projects / project / panel) is the only "where am I", in the top bar (macOS
-  overlay title bar); project rail on the left.
+  overlay title bar); its "All projects" goes to level 0.
 - Levels: 0 all projects (cards, `projects.md`), 1 a project's panels as tiles, 2 one panel full
   screen. Zoom transitions: View Transitions, 320 ms.
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes on the left keeps 560 px;

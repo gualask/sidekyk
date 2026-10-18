@@ -1,6 +1,7 @@
 //! The repository under review: opening it, summarizing its working tree, and producing file
 //! diffs. Everything is read-only. Sidekyk never writes to the index or the working tree.
 
+mod activity;
 mod commits;
 mod contracts;
 mod diff;
@@ -15,12 +16,13 @@ mod tree;
 mod version;
 mod watched;
 
+pub use activity::load_commit_activity;
 pub use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
 #[cfg(test)]
 pub use contracts::{ChangeArea, Commit};
 pub use contracts::{
-    ChangeKind, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory,
-    FileContent, FileDiffRequest, FileVersion, RecentCommits, RepositoryChange,
+    ChangeKind, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
+    Directory, FileContent, FileDiffRequest, FileVersion, RecentCommits, RepositoryChange,
     RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
     REPOSITORY_CHANGED_EVENT,
 };

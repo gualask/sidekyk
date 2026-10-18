@@ -108,6 +108,10 @@ fn the_helper_answers_as_the_app_reads_directly() {
         json(&local.recent_commits(&info).unwrap())
     );
     assert_eq!(
+        json(&agent.commit_activity(&info, 0).unwrap()),
+        json(&local.commit_activity(&info, 0).unwrap())
+    );
+    assert_eq!(
         json(&agent.directory(&info, "").unwrap()),
         json(&local.directory(&info, "").unwrap())
     );

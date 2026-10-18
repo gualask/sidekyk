@@ -44,6 +44,4 @@ export interface DeletedList {
 export interface NotesSummary {
     /** The notes not done. */
     open: number;
-    /** The first line of the open note written last. */
-    newest: string | null;
 }

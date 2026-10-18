@@ -79,12 +79,12 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
 ### How a WSL project shows (2026-10-18)
 
 Agreed on previews. Built: `WSL: Ubuntu` before the folder on the card, after the name in the top
-bar, in the rail's tooltip (`shop (WSL: Ubuntu)`); no middle dot, the form VS Code's remote
+bar (the rail's tooltip too, until the rail went); no middle dot, the form VS Code's remote
 indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problems`, and the
 `review` scenario's WSL project, which takes 1.5 s to start):
 
-- A stopped distro's card: a `stopped` chip instead of the counts, and "Ubuntu is not running.
-  Open the project to start it."
+- A stopped distro's card: "Ubuntu is not running. Open the project to start it." instead of
+  the counts (its `stopped` chip went with the card's chips, 2026-10-18).
 - Opening it the first time (distro, helper copied): the panels' own loading state, with
   "Starting Ubuntu…".
 - Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Try again,

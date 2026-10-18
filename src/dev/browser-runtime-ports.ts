@@ -3,7 +3,7 @@ import type { ProjectList } from '@/modules/projects';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import type { ProjectInfo } from '@/shared/projects/project-info';
-import { commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
+import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureTree } from './files.fixture-data';
 import { fixtureContentSearch, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
@@ -266,6 +266,13 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getRecentCommits: async (projectId) => {
                 readable(projectId);
                 return recentCommits(large(projectId));
+            },
+            getCommitActivity: async (projectId, since) => {
+                readable(projectId);
+                if (scenarioData(projectId)) {
+                    return commitActivity(large(projectId) ? 'large' : 'busy', since);
+                }
+                return commitActivity(projectId === CLEAN_PROJECTS[0].id ? 'quiet' : 'none', since);
             },
             getCommitFiles: async (projectId, commit) => {
                 readable(projectId);

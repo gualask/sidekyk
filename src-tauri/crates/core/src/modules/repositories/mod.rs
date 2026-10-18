@@ -13,9 +13,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::modules::repository::{
-    self, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
+    self, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
+    Directory, FileContent, FileDiffRequest, FileTree, RecentCommits, RepositoryBackend,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -262,6 +262,10 @@ impl Repositories for LocalRepositories {
 
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
         repository::load_recent_commits(&*self.backend, info)
+    }
+
+    fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity> {
+        repository::load_commit_activity(&*self.backend, info, since)
     }
 
     fn commit_files(

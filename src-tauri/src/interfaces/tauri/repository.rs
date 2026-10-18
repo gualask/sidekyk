@@ -8,8 +8,9 @@ use super::tray;
 use sidekyk_core::modules::projects::Project;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
-    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
+    FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+    UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
@@ -97,6 +98,20 @@ pub(crate) async fn get_recent_commits(
 ) -> Result<RecentCommits, AppError> {
     on_project("get_recent_commits", app, project_id, |on| {
         on.repositories.recent_commits(on.info)
+    })
+    .await
+}
+
+#[tauri::command]
+/// The lines each commit of the branch on screen in a project changed since `since` (Unix
+/// seconds), newest first.
+pub(crate) async fn get_commit_activity(
+    app: tauri::AppHandle,
+    project_id: String,
+    since: i64,
+) -> Result<CommitActivity, AppError> {
+    on_project("get_commit_activity", app, project_id, move |on| {
+        on.repositories.commit_activity(on.info, since)
     })
     .await
 }

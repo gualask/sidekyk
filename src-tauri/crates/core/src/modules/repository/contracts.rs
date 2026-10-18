@@ -117,17 +117,15 @@ pub struct FileChange {
     pub binary: bool,
 }
 
-/// A repository at a glance: its card, its avatar in the rail, the breadcrumb. Cheap enough to
+/// A repository at a glance: its card, the breadcrumb. Cheap enough to
 /// load for every project on screen (`git status` and one numstat against HEAD).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositorySummary {
     pub branch: BranchStatus,
     pub totals: ChangeTotals,
-    /// The first changed paths in git's order, at most `SUMMARY_FILES`.
-    pub files: Vec<FileChange>,
-    /// git listed more changes than are read (`MAX_CHANGED_PATHS`, as VS Code): the list and the
-    /// count of files stop there.
+    /// git listed more changes than are read (`MAX_CHANGED_PATHS`, as VS Code): the count of files
+    /// stops there.
     pub truncated: bool,
 }
 
@@ -185,6 +183,25 @@ pub struct Commit {
 pub struct RecentCommits {
     pub commits: Vec<Commit>,
     /// The branch has older commits than those listed.
+    pub more: bool,
+}
+
+/// When a commit was made (Unix seconds), and the lines it added and removed.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommittedLines {
+    pub time: i64,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// The commits of the branch on screen since a time, newest first, merges left out: how much
+/// work went into a project, day by day.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitActivity {
+    pub commits: Vec<CommittedLines>,
+    /// More commits were made since then than are read.
     pub more: bool,
 }
 
@@ -297,14 +314,6 @@ mod tests {
                     additions: 0,
                     deletions: 2,
                 },
-                files: vec![FileChange {
-                    path: "b.ts".into(),
-                    orig_path: Some("a.ts".into()),
-                    kind: ChangeKind::TypeChanged,
-                    additions: None,
-                    deletions: Some(2),
-                    binary: false,
-                }],
                 truncated: false,
             },
         };
@@ -330,14 +339,6 @@ mod tests {
                         "behind": 0
                     },
                     "totals": { "files": 1, "additions": 0, "deletions": 2 },
-                    "files": [{
-                        "path": "b.ts",
-                        "origPath": "a.ts",
-                        "kind": "type-changed",
-                        "additions": null,
-                        "deletions": 2,
-                        "binary": false
-                    }],
                     "truncated": false
                 }
             })
@@ -363,6 +364,25 @@ mod tests {
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("/r", true)).unwrap(),
             serde_json::json!({ "version": 2, "projectId": "/r", "gitDir": true })
+        );
+    }
+
+    #[test]
+    fn commit_activity_serializes_with_the_frontend_field_names() {
+        let activity = CommitActivity {
+            commits: vec![CommittedLines {
+                time: 1_760_000_000,
+                additions: 12,
+                deletions: 4,
+            }],
+            more: false,
+        };
+        assert_eq!(
+            serde_json::to_value(activity).unwrap(),
+            serde_json::json!({
+                "commits": [{ "time": 1_760_000_000, "additions": 12, "deletions": 4 }],
+                "more": false
+            })
         );
     }
 

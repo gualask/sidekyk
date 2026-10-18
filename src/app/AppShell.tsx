@@ -11,7 +11,6 @@ import {
     loadProjectsOverview,
     NoProjects,
     type ProjectList,
-    ProjectRail,
     type TilesLayout,
     useActivateProject,
     useProjectLayout,
@@ -21,7 +20,6 @@ import {
     useRemoveProject,
 } from '@/modules/projects';
 import {
-    ChangeCount,
     filesPanel,
     fileTarget,
     useReadProjectAgain,
@@ -89,6 +87,9 @@ const closePalette = (palette: PaletteState): PaletteState =>
 /** A project and its panels, at level 1 or full screen: the zoom carries it to and from its card. */
 const PROJECT_ZOOM = { viewTransitionName: ZOOM_NAMES.project };
 
+/** Level 1: the project's tiles, zoomed as the project. */
+const TILES_STYLE = { ...PROJECT_ZOOM, gap: TILE_GAP };
+
 /** The window: the top bar, and below it the workspace at its zoom level. */
 export function AppShell() {
     useProjectsChangeSubscription();
@@ -107,8 +108,6 @@ export function AppShell() {
     const selectedTile = layout.minimized.includes(panel.id) ? MAIN_TILE.panel : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell
     useShowWindowWhen(!projects.isPending);
-    // what the first paint does not need waits until the window has nothing else to do
-    const [idle, setIdle] = useState(false);
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
     const [palette, setPalette] = useState(PALETTE_UNOPENED);
@@ -266,7 +265,6 @@ export function AppShell() {
     useEffect(
         () =>
             whenIdle(() => {
-                setIdle(true);
                 void ProjectsOverview.preload();
                 void SettingsDialog.preload();
                 void CommandPalette.preload();
@@ -313,7 +311,6 @@ export function AppShell() {
                         onMinimize={minimize}
                         show={show}
                         findInFiles={findInFiles}
-                        idle={idle}
                         onRemove={setRemoving}
                     />
                 ) : null}
@@ -380,7 +377,6 @@ function Workspace({
     select,
     show,
     findInFiles,
-    idle,
     layout,
     onSplit,
     onMinimize,
@@ -396,8 +392,6 @@ function Workspace({
     select: (panel: PanelDefinition) => void;
     show: PanelProps['show'];
     findInFiles: PanelProps['findInFiles'];
-    /** The first paint is done: the other projects' counts may load. */
-    idle: boolean;
     layout: TilesLayout;
     onSplit: (split: number) => void;
     onMinimize: (panel: PanelDefinition) => void;
@@ -417,10 +411,10 @@ function Workspace({
                     list={list}
                     onOpen={() => zoom(1)}
                     onRemove={onRemove}
-                    summary={(card) =>
+                    summary={(card, part) =>
                         SUMMARIES.map(({ id, Component }) => (
                             <Suspense key={id} fallback={null}>
-                                <Component project={card} />
+                                <Component project={card} part={part} />
                             </Suspense>
                         ))
                     }
@@ -443,54 +437,41 @@ function Workspace({
         );
     }
     return (
-        <div className="flex h-full" style={PROJECT_ZOOM}>
-            <ProjectRail
-                list={list}
-                onShowAll={() => zoom(0)}
-                badge={(other) => {
-                    // the project on screen gets its count from the Changes panel's snapshot
-                    const shown = other.id === project.id;
-                    return shown || idle ? (
-                        <ChangeCount project={other} fromSnapshot={shown} />
-                    ) : null;
-                }}
+        <div className="flex h-full p-2" style={TILES_STYLE}>
+            <PanelTile
+                panel={MAIN_TILE.panel}
+                project={project}
+                target={targetOf(MAIN_TILE.panel.id)}
+                selected={MAIN_TILE.panel === panel}
+                show={show}
+                findInFiles={findInFiles}
+                tile={MAIN_SIZE}
+                onZoomIn={() => zoom(2, MAIN_TILE.panel)}
+                onSelect={() => select(MAIN_TILE.panel)}
             />
-            <div className="flex min-w-0 flex-1 p-2" style={{ gap: TILE_GAP }}>
-                <PanelTile
-                    panel={MAIN_TILE.panel}
-                    project={project}
-                    target={targetOf(MAIN_TILE.panel.id)}
-                    selected={MAIN_TILE.panel === panel}
-                    show={show}
-                    findInFiles={findInFiles}
-                    tile={MAIN_SIZE}
-                    onZoomIn={() => zoom(2, MAIN_TILE.panel)}
-                    onSelect={() => select(MAIN_TILE.panel)}
+            {side.length > 0 ? (
+                <SideColumn
+                    panels={SIDE_TILES}
+                    shown={side}
+                    split={layout.split}
+                    onSplit={onSplit}
+                    tile={(tile, tileFit) => (
+                        <PanelTile
+                            panel={tile}
+                            project={project}
+                            target={targetOf(tile.id)}
+                            selected={tile === panel}
+                            show={show}
+                            findInFiles={findInFiles}
+                            tile={SIDE_SIZE}
+                            tileFit={tileFit}
+                            onZoomIn={() => zoom(2, tile)}
+                            onMinimize={() => onMinimize(tile)}
+                            onSelect={() => select(tile)}
+                        />
+                    )}
                 />
-                {side.length > 0 ? (
-                    <SideColumn
-                        panels={SIDE_TILES}
-                        shown={side}
-                        split={layout.split}
-                        onSplit={onSplit}
-                        tile={(tile, tileFit) => (
-                            <PanelTile
-                                panel={tile}
-                                project={project}
-                                target={targetOf(tile.id)}
-                                selected={tile === panel}
-                                show={show}
-                                findInFiles={findInFiles}
-                                tile={SIDE_SIZE}
-                                tileFit={tileFit}
-                                onZoomIn={() => zoom(2, tile)}
-                                onMinimize={() => onMinimize(tile)}
-                                onSelect={() => select(tile)}
-                            />
-                        )}
-                    />
-                ) : null}
-            </div>
+            ) : null}
         </div>
     );
 }

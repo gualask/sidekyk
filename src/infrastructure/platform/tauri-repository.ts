@@ -16,6 +16,7 @@ export const tauriRepository: RepositoryPort = {
     getSummary: (projectId) => invoke('get_repository_summary', { projectId }),
     getFileDiff: (projectId, request) => invoke('get_file_diff', { projectId, request }),
     getRecentCommits: (projectId) => invoke('get_recent_commits', { projectId }),
+    getCommitActivity: (projectId, since) => invoke('get_commit_activity', { projectId, since }),
     getCommitFiles: (projectId, commit) => invoke('get_commit_files', { projectId, commit }),
     getCommitFileDiff: (projectId, request) =>
         invoke('get_commit_file_diff', { projectId, request }),
