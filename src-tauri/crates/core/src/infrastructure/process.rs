@@ -131,11 +131,11 @@ fn kill(child: &mut Child) {
     let _ = child.wait();
 }
 
-#[cfg(test)]
+// the children these run are Unix shells
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 
-    #[cfg(unix)]
     fn shell(script: &str) -> Command {
         let mut command = Command::new("sh");
         command
@@ -145,7 +145,6 @@ mod tests {
         command
     }
 
-    #[cfg(unix)]
     #[test]
     fn output_past_the_limit_is_cut_and_the_process_killed() {
         let started = Instant::now();
@@ -163,7 +162,6 @@ mod tests {
         );
     }
 
-    #[cfg(unix)]
     #[test]
     fn input_is_written_and_stderr_kept() {
         let out = run(

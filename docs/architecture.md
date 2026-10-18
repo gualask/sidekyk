@@ -149,8 +149,8 @@ In the core:
   `wsl.rs` (distros, the helper installed and started in one, `WslRepositories`), `machines.rs`
   (which machine reads a project, and what every machine is told).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
-  `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `process.rs` (what a child
-  wrote, `GitOutput` to the repository module), `sync.rs`.
+  `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `process.rs`
+  (what a child wrote, `GitOutput` to the repository module), `sync.rs`.
 
 ### Git
 
