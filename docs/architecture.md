@@ -7,6 +7,7 @@ in Fyler. Each area in `features/`.
 
 ```text
 agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet period)
+                       └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory)
                        └─▶ "repository-changed" { version: 1, root, gitDir }
@@ -138,7 +139,8 @@ In the core:
   declares the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`,
   `has_entry`) and the `RepositoryWatcher` port (changed paths after a quiet period), so it can
   run on another machine (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify).
+- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify; drops reads, which inotify
+  reports: each git command's reads would refresh again, without end; found by CI 2026-10-18).
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.
 
