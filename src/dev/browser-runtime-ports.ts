@@ -32,10 +32,21 @@ const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
 const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-prototype');
 
+/** In `problems`, WSL projects: a distro that does not run (until the project opens), one gone, one
+ * without git. */
+const STOPPED_PROJECT = wslProject('Debian', '/home/dev/api', 'api');
+const GONE_PROJECT = wslProject('Arch', '/home/dev/dotfiles', 'dotfiles');
+const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools');
+
+/** How long Sidekyk's helper takes to start in a distro, as the first read of a WSL project waits. */
+const HELPER_START_MS = 1500;
+
 function initialProjects(scenario: Scenario): ProjectInfo[] {
     if (scenario === 'no-repo') return [];
     if (scenario === 'review') return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT];
-    if (scenario === 'problems') return [FIXTURE_REPOSITORY, MISSING_PROJECT];
+    if (scenario === 'problems') {
+        return [FIXTURE_REPOSITORY, MISSING_PROJECT, STOPPED_PROJECT, GONE_PROJECT, NO_GIT_PROJECT];
+    }
     return [FIXTURE_REPOSITORY];
 }
 
@@ -87,6 +98,15 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     const readable = (projectId: string) => {
         project(projectId);
         if (projectId === MISSING_PROJECT.id) throw failure('repository_missing');
+        if (projectId === GONE_PROJECT.id) throw failure('distro_missing');
+        if (projectId === NO_GIT_PROJECT.id) throw failure('git_not_found');
+    };
+    // as the backend: a card never starts a distro, opening a project starts it and the helper
+    const running = new Set(['Ubuntu', 'Alpine']);
+    const helpers = new Set<string>();
+    const distroOf = (projectId: string) => {
+        const { location } = project(projectId);
+        return location.kind === 'wsl' ? location.distro : null;
     };
     const large = (projectId: string) => scenario === 'large' && scenarioData(projectId);
     const snapshot = (projectId: string) => {
@@ -217,8 +237,24 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             onProjectsChanged: () => () => undefined,
         },
         repository: {
-            getSnapshot: async (projectId) => snapshot(projectId),
-            getSummary: async (projectId) => snapshot(projectId).summary,
+            getSnapshot: async (projectId) => {
+                readable(projectId);
+                const distro = distroOf(projectId);
+                if (distro && !helpers.has(distro)) {
+                    await new Promise((started) => setTimeout(started, HELPER_START_MS));
+                    helpers.add(distro);
+                    running.add(distro);
+                }
+                return snapshot(projectId);
+            },
+            getSummary: async (projectId) => {
+                readable(projectId);
+                const distro = distroOf(projectId);
+                if (distro && !helpers.has(distro) && !running.has(distro)) {
+                    throw failure('distro_stopped');
+                }
+                return snapshot(projectId).summary;
+            },
             getFileDiff: async (projectId, request) => {
                 readable(projectId);
                 if (!large(projectId)) return reviewDiff(request);

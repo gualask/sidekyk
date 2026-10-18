@@ -14,10 +14,16 @@ pub enum AppError {
 /// Stable codes understood by the frontend's user-facing error formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserFacingErrorCode {
+    /// A WSL project's distro is not installed, or WSL is not.
+    DistroMissing,
+    /// A WSL project's distro does not run, and a summary does not start it.
+    DistroStopped,
     ExportInRepository,
     FileMissing,
     GitNotFound,
     GitTimedOut,
+    /// The helper that reads a WSL project could not start, or stopped.
+    HelperFailed,
     InvalidCommit,
     #[cfg(any(target_os = "macos", windows))]
     InvalidShortcut,
@@ -35,10 +41,13 @@ pub enum UserFacingErrorCode {
 impl UserFacingErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::DistroMissing => "distro_missing",
+            Self::DistroStopped => "distro_stopped",
             Self::ExportInRepository => "export_in_repository",
             Self::FileMissing => "file_missing",
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
+            Self::HelperFailed => "helper_failed",
             Self::InvalidCommit => "invalid_commit",
             #[cfg(any(target_os = "macos", windows))]
             Self::InvalidShortcut => "invalid_shortcut",
@@ -60,10 +69,13 @@ impl UserFacingErrorCode {
     }
 
     const ALL: &[Self] = &[
+        Self::DistroMissing,
+        Self::DistroStopped,
         Self::ExportInRepository,
         Self::FileMissing,
         Self::GitNotFound,
         Self::GitTimedOut,
+        Self::HelperFailed,
         Self::InvalidCommit,
         #[cfg(any(target_os = "macos", windows))]
         Self::InvalidShortcut,
@@ -172,6 +184,8 @@ mod tests {
     #[test]
     fn user_facing_error_codes_keep_the_wire_contract() {
         let cases = [
+            (UserFacingErrorCode::DistroMissing, "distro_missing"),
+            (UserFacingErrorCode::DistroStopped, "distro_stopped"),
             (
                 UserFacingErrorCode::ExportInRepository,
                 "export_in_repository",
@@ -179,6 +193,7 @@ mod tests {
             (UserFacingErrorCode::FileMissing, "file_missing"),
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
+            (UserFacingErrorCode::HelperFailed, "helper_failed"),
             (UserFacingErrorCode::InvalidCommit, "invalid_commit"),
             (UserFacingErrorCode::NotARepository, "not_a_repository"),
             (UserFacingErrorCode::NoteListMissing, "note_list_missing"),

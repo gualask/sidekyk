@@ -24,6 +24,7 @@ import {
     ChangeCount,
     filesPanel,
     fileTarget,
+    useReadProjectAgain,
     useRepositoryChangeSubscription,
     useShownFile,
 } from '@/modules/repository';
@@ -126,12 +127,14 @@ export function AppShell() {
     // a moved repository found again: its notes may have joined another project's
     const rereadNotes = useRereadNotes();
     const { mutate: relocate } = useRelocateProject(rereadNotes);
+    const readAgain = useReadProjectAgain();
     const fixProject = useMemo(
         () => ({
             locate: (project: ProjectInfo) => relocate(project.id),
             remove: setRemoving,
+            retry: (project: ProjectInfo) => readAgain(project.id),
         }),
-        [relocate],
+        [relocate, readAgain],
     );
     const problems = useProblems(projects.data, openSettings, fixProject);
     const activate = useActivateProject();

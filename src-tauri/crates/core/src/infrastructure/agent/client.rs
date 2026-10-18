@@ -26,6 +26,7 @@ use crate::modules::repository::{
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
+use crate::shared::error::{user_facing_code, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
 /// A helper that stops, or cannot start, sooner than this is not started again before this long:
@@ -183,22 +184,27 @@ impl AgentRepositories {
         {
             let mut waiting = lock(&connection.replies.waiting);
             if connection.replies.stopped.load(Ordering::Relaxed) {
-                anyhow::bail!("the helper stopped");
+                return Err(helper_failed(anyhow::anyhow!("the helper stopped")));
             }
             waiting.insert(id, sender);
         }
         if let Err(error) = connection.write(id, request) {
             lock(&connection.replies.waiting).remove(&id);
-            return Err(error);
+            return Err(helper_failed(error));
         }
         loop {
             match receiver.recv() {
                 Ok(Incoming::Contents(files)) => contents(files),
                 Ok(Incoming::Reply(Ok(value))) => return Ok(serde_json::from_str(value.get())?),
                 Ok(Incoming::Reply(Err(error))) => return Err(error.into()),
-                Err(_) => anyhow::bail!("the helper stopped"),
+                Err(_) => return Err(helper_failed(anyhow::anyhow!("the helper stopped"))),
             }
         }
+    }
+
+    /// Whether a helper runs now: a request would not start one.
+    pub fn is_running(&self) -> bool {
+        self.running().is_some()
     }
 
     /// Sends `request` to the helper running without waiting, and starts none: what a helper
@@ -227,14 +233,16 @@ impl AgentRepositories {
             return Ok(connection);
         }
         if lock(&self.kept.not_before).is_some_and(|at| Instant::now() < at) {
-            anyhow::bail!("the helper stopped; it starts again in a few seconds");
+            let error = anyhow::anyhow!("the helper stopped; it starts again in a few seconds");
+            return Err(helper_failed(error));
         }
-        let connection = self.spawn().inspect_err(|_| {
+        let connection = self.spawn().map_err(|error| {
             *lock(&self.kept.not_before) = Some(Instant::now() + STABLE_RUN);
+            helper_failed(error)
         })?;
         // published before it is told anything: what changes meanwhile reaches it either way
         *lock(&self.connection) = Some(connection.clone());
-        tell_kept(&connection, &self.kept, &self.next_id)?;
+        tell_kept(&connection, &self.kept, &self.next_id).map_err(helper_failed)?;
         Ok(connection)
     }
 
@@ -314,11 +322,24 @@ fn close_when_idle(idle: &Idle, slot: &Mutex<Option<Arc<Connection>>>, kept: &Ke
                 .0;
             continue;
         }
-        if let Some(connection) = lock(slot).take() {
+        let taken = lock(slot).take();
+        if let Some(connection) = taken {
+            // closed with no lock held: a write stuck on a full pipe holds only its own
+            drop(state);
             tracing::info!("helper idle: closing it");
             connection.close();
+            state = lock(&idle.state);
         }
     }
+}
+
+/// A helper that could not start, or stopped, as the user is told it (`helper_failed`); a failure
+/// with a code of its own, such as a WSL distro gone, keeps it.
+fn helper_failed(error: anyhow::Error) -> anyhow::Error {
+    if user_facing_code(&error).is_some() {
+        return error;
+    }
+    error.context(UserFacingError::new(UserFacingErrorCode::HelperFailed))
 }
 
 /// Tells a helper just started what the app keeps, as it is now: read under the lock its requests
@@ -550,18 +571,16 @@ impl Repositories for AgentRepositories {
         repository: Option<&RepositoryInfo>,
         on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) {
-        *lock(&self.kept.watched) = repository.map(|r| (r.clone(), OnChange::from(on_change)));
-        let Some(repository) = repository.cloned() else {
-            // nothing to watch starts no helper; one running, idle from now, closes in time
-            self.tell(Request::Watch { repository: None });
+        let watched = repository.map(|r| (r.clone(), OnChange::from(on_change)));
+        let was_watching = std::mem::replace(&mut *lock(&self.kept.watched), watched).is_some();
+        // never waits, nor starts a helper (the caller may be the main thread, and a WSL distro
+        // slow to start): the next one is told first, and a read of the repository starts it
+        self.tell(Request::Watch {
+            repository: repository.cloned(),
+        });
+        // idle from now once it watches nothing; a switch elsewhere does not keep it alive
+        if was_watching || repository.is_some() {
             self.idle.touch(|_| {});
-            return;
-        };
-        let watch = Request::Watch {
-            repository: Some(repository),
-        };
-        if let Err(error) = self.call::<()>(watch, &nothing) {
-            tracing::warn!(error = %format!("{error:#}"), "the helper could not watch");
         }
     }
 

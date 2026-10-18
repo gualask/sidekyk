@@ -1,6 +1,7 @@
-import { errorMessage } from '@/shared/errors/app-error';
+import { hasErrorCode } from '@/shared/errors/app-error';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { useRepositorySummary } from '../application/repository.queries';
+import { projectErrorMessage } from '../model/project-error';
 import { changedCount } from '../model/summary';
 import { BranchName } from './BranchName';
 import { KindBadge } from './KindBadge';
@@ -13,8 +14,31 @@ import { LineCounts } from './LineCounts';
  */
 export function ChangesSummary({ project }: PanelSummaryProps) {
     const summary = useRepositorySummary(project.id, { freshOnShow: true });
+    // never started for a card: it says so, in the place of the counts
+    if (
+        summary.isError &&
+        hasErrorCode(summary.error, 'distro_stopped') &&
+        project.location.kind === 'wsl'
+    ) {
+        return (
+            <>
+                <div className="flex items-center gap-1.5">
+                    <span className="inline-flex h-6 items-center rounded-full bg-ui-surface-hover px-2 text-[11px] font-bold text-ui-text-secondary">
+                        stopped
+                    </span>
+                </div>
+                <p className="text-xs text-ui-text-muted">
+                    {project.location.distro} is not running. Open the project to start it.
+                </p>
+            </>
+        );
+    }
     if (summary.isError) {
-        return <p className="text-xs text-ui-danger">{errorMessage(summary.error)}</p>;
+        return (
+            <p className="text-xs text-ui-danger">
+                {projectErrorMessage(summary.error, project.location)}
+            </p>
+        );
     }
     if (!summary.data) return null;
     const { branch, totals, files } = summary.data;

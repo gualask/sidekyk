@@ -65,6 +65,10 @@ pub(crate) async fn get_repository_summary(
     project_id: String,
 ) -> Result<RepositorySummary, AppError> {
     on_project("get_repository_summary", app, project_id, |on| {
+        // the cards never start a stopped WSL distro
+        on.app
+            .state::<ProjectsState>()
+            .readable_without_starting(on.project)?;
         let summary = on.repositories.summary(on.info);
         tray::show_read(on.app, &on.project.id, summary.as_ref().ok());
         summary

@@ -1,6 +1,8 @@
 export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
 export {
-    useMissingRepositories,
+    type ProjectFailure,
+    useProjectFailures,
+    useReadProjectAgain,
     useRepositoryChangeSubscription,
 } from './application/repository.queries';
 export { RepositorySettingsProvider } from './application/repository-settings';

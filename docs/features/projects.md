@@ -19,6 +19,13 @@ Several repositories, one on screen.
 - A moved repository: problem `repository_missing` with Locate… (relinks: notes and layout follow,
   into the project already there if it is one) and Remove.
 
+- WSL projects (Windows): a folder of a distro (`\\wsl.localhost\<distro>\…` from the folder
+  picker, Locate… or the command line) is read in that distro by Sidekyk's helper, never through
+  Windows' view of its files. Its card never starts a stopped distro: a `stopped` chip and
+  "Ubuntu is not running. Open the project to start it."; opening it starts the distro and the
+  helper ("Starting Ubuntu…" until the first read). The distro gone, no git there, or the helper
+  not starting: a problem in the top bar (Remove, Try again).
+
 ## How it is built
 
 - Identity: a project is `{ id, name, location }`, `location` local `{ root }` or WSL
@@ -28,6 +35,14 @@ Several repositories, one on screen.
   the frontend never reads it. Stored as the frontend gets it; on reading the id is made again
   from the location, an entry stored before ids (`{ root, name }`) is a local project, and one
   that cannot be read is left out, not the whole list.
+- WSL (`../plans/remote-projects.md`): `ProjectsState` routes a project to this machine's
+  `LocalRepositories` or its distro's `AgentRepositories` (`WslRepositories`, one helper per
+  distro); every machine is told the window's visibility and the projects it keeps, and the ones
+  not on screen to watch nothing, which never starts a helper. A helper watching nothing closes
+  10 min after its last request. A summary checks `wsl.exe --list --running --quiet` first when
+  no helper runs there (`distro_stopped`, `distro_missing`); a helper that cannot start is
+  `helper_failed`. The frontend turns these, `repository_missing` and a WSL project's
+  `git_not_found` into problems (`useProjectFailures`, `app/problems.ts`).
 - Project list: app data next to the settings. Changes run in one mutation scope, in order; the
   last switch wins.
 - Only the project on screen is watched and runs full snapshots (`changes.md`). The others show a
@@ -42,9 +57,9 @@ Several repositories, one on screen.
 ## Decisions
 
 - Id made from the location (2026-10-18), not random: two projects in one place share it, and
-  Locate… keeps working as before (new place, new id: notes and layout move with it). A random id kept across
-  Locate… would collide with a repository added later where the old one was, unless every new
-  project got a random id too. VS Code names a WSL folder the same way,
+  Locate… keeps working as before (new place, new id: notes and layout move with it). A random
+  id kept across Locate… would collide with a repository added later where the old one was,
+  unless every new project got a random id too. VS Code names a WSL folder the same way,
   `vscode-remote://wsl+<distro>/<path>` (`../plans/remote-projects.md`).
 
 - Not watched (2026-10-13): level 0 reads summaries each time it shows (~65 ms, 0.4 s CPU for ten

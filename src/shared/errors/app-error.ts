@@ -5,10 +5,15 @@ interface AppErrorPayload {
 }
 
 const USER_MESSAGES: Record<string, string> = {
+    distro_missing:
+        "This project's WSL distro is not installed anymore: see the top bar's warning.",
+    distro_stopped: "This project's WSL distro is not running. Open the project to start it.",
     export_in_repository:
         'Sidekyk never writes inside a repository: pick a folder outside your projects.',
     file_missing: 'This file is no longer in the repository: it was moved or deleted.',
     git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
+    helper_failed:
+        "Sidekyk could not start in this project's WSL distro: see the top bar's warning.",
     git_timed_out:
         'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',
     invalid_commit: 'That is not a commit of this repository.',

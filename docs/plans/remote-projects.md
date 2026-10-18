@@ -79,15 +79,17 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
 
 Agreed on previews. Built: `WSL: Ubuntu` before the folder on the card, after the name in the top
 bar, in the rail's tooltip (`shop (WSL: Ubuntu)`); no middle dot, the form VS Code's remote
-indicator uses. With the transport:
+indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problems`, and the
+`review` scenario's WSL project, which takes 1.5 s to start):
 
 - A stopped distro's card: a `stopped` chip instead of the counts, and "Ubuntu is not running.
   Open the project to start it."
 - Opening it the first time (distro, helper copied): the panels' own loading state, with
   "Starting Ubuntu…".
 - Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Remove);
-  no git in the distro, "git is not installed in Ubuntu" with `sudo apt install git` (Try again);
-  the helper fails, "Sidekyk could not start in Ubuntu" (Try again, details in the log).
+  no git in the distro, "git is not installed in Ubuntu", installed with the distro's package
+  manager (`sudo apt install git` on Ubuntu and Debian) (Try again); the helper fails, "Sidekyk
+  could not start in Ubuntu" (Try again, details in the log).
 
 ### Protocol (2026-10-18)
 
@@ -154,21 +156,15 @@ Built: `cargo build --manifest-path src-tauri/Cargo.toml -p sidekyk-agent`, then
 `SIDEKYK_AGENT=local pnpm tauri:dev`; the app starts the binary beside its own. Release builds
 ignore the switch.
 
-## Rules when it lands
-
-`AGENTS.md` then says: the helper is the only thing the app writes in a distro or container, under
-`~/.sidekyk-server/`, never in a repository; the invariants (`GIT_OPTIONAL_LOCKS=0`,
-`core.fsmonitor=false`, `checked_path`, no refresh for ignored paths) hold in the helper; `wsl.exe`
-and `docker exec` are child processes, in `infrastructure/` behind a port.
-
 ## Open
 
 - Building the helper on the Mac for `aarch64-unknown-linux-musl` (on hold, above):
   `cargo-zigbuild` (a new tool, as Zed) or a Rust container (not on the 512 MiB fixture VM).
 - Shipping the helper for containers on the Mac (arm64, amd64 under emulation).
 - On Windows 11 x64, from `build.yml`'s unsigned build: the protocol's cost through `wsl.exe`;
-  `wsl.exe`'s start time; `--list --verbose` leaves a stopped distro stopped; distro names and
-  case; the folder dialog's form of a WSL path.
+  `wsl.exe`'s and the helper's start time; `--list --running --quiet` leaves a stopped distro
+  stopped; distro names and case; the folder dialog's form of a WSL path; `--exec env <path from
+  ~>`; the install through `wslpath` from the resources (`\\?\` dropped) and through stdin.
 - The palette lists two `shop`s alike (a local and a WSL clone): name the distro there too? Ask
   with a preview first.
 

@@ -3,7 +3,7 @@
 //! Runtime plugins, managed state, and the stable inbound command list are wired here. Modules
 //! and infrastructure services remain unaware of this composition root.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
@@ -42,9 +42,11 @@ fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()>
     Ok(())
 }
 
-/// Adds and shows a repository named at launch; a failure leaves the app as it was.
-fn open_or_log(app: &::tauri::AppHandle, folder: &Path) {
-    match open_folder(app, folder) {
+/// Adds and shows a repository named at launch, off the main thread: a WSL distro's may take a
+/// while to start. A failure leaves the app as it was.
+fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
+    let app = app.clone();
+    std::thread::spawn(move || match open_folder(&app, &folder) {
         Ok(_) => {
             let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
         }
@@ -53,7 +55,7 @@ fn open_or_log(app: &::tauri::AppHandle, folder: &Path) {
             error = %format!("{error:#}"),
             "could not open the repository"
         ),
-    }
+    });
 }
 
 /// Boots the Tauri app and registers all commands/plugins.
@@ -63,7 +65,7 @@ pub(crate) fn run() {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
         if let Some(folder) = folder_argument(&args) {
-            open_or_log(app, &PathBuf::from(cwd).join(folder));
+            open_or_log(app, PathBuf::from(cwd).join(folder));
             show_main_window(app);
         } else if args.iter().skip(1).any(|a| a == TOGGLE_FLAG) {
             toggle_main_window(app);
@@ -102,7 +104,7 @@ pub(crate) fn run() {
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
             if let Some(folder) = folder_argument(&args) {
-                open_or_log(app.handle(), &folder);
+                open_or_log(app.handle(), folder);
             }
             // the project on screen is watched even when the folder argument could not be opened;
             // a moved or deleted repository shows its error in the project's panels

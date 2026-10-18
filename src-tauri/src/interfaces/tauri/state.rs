@@ -10,7 +10,7 @@ use super::tray;
 use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
-use sidekyk_core::infrastructure::wsl::{wsl_path, WslRepositories};
+use sidekyk_core::infrastructure::wsl::{installed_distro, wsl_path, WslRepositories};
 use sidekyk_core::modules::projects::{Location, Project, ProjectList};
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
@@ -78,6 +78,15 @@ impl ProjectsState {
         }
     }
 
+    /// Whether `project` can be read without starting what holds it, as the projects' cards are:
+    /// a WSL distro that does not run is not started.
+    pub(crate) fn readable_without_starting(&self, project: &Project) -> anyhow::Result<()> {
+        match &project.location {
+            Location::Local { .. } => Ok(()),
+            Location::Wsl { distro, .. } => self.wsl.readable_without_starting(distro),
+        }
+    }
+
     /// What reads each machine's repositories, this one's first; a distro only once asked for.
     fn every_machine(&self) -> Vec<(Machine, Arc<dyn Repositories>)> {
         let wsl = self.wsl.each().into_iter();
@@ -92,6 +101,8 @@ impl ProjectsState {
         let Some((distro, path)) = wsl_path(candidate) else {
             return Ok(Project::local(self.local.resolve(candidate)?));
         };
+        // as WSL names it: `ubuntu` typed in the dialog is the project of `Ubuntu`
+        let distro = installed_distro(&distro)?;
         let found = self.wsl.of(&distro).resolve(Path::new(&path))?;
         Ok(Project::new(
             found.name,
@@ -105,14 +116,10 @@ impl ProjectsState {
     /// Tells every machine whether the window shows; when it shows again, the id of the project on
     /// screen if this machine saw it change meanwhile (a helper tells its own as a change).
     pub(crate) fn set_visible(&self, visible: bool) -> Option<String> {
-        let mut missed = None;
-        for (machine, repositories) in self.every_machine() {
-            let root = repositories.set_visible(visible);
-            if let (Machine::Local, Some(root)) = (machine, root) {
-                missed = Some(Location::Local { root });
-            }
-        }
-        let missed = missed?;
+        self.wsl.set_visible(visible);
+        let missed = Location::Local {
+            root: self.local.set_visible(visible)?,
+        };
         let list = lock(&self.list);
         let project = list.projects.iter().find(|p| p.location == missed)?;
         Some(project.id.clone())
@@ -226,7 +233,7 @@ impl Machine {
     fn holds(&self, location: &Location) -> bool {
         match (self, location) {
             (Self::Local, Location::Local { .. }) => true,
-            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => distro == d,
+            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => distro.eq_ignore_ascii_case(d),
             _ => false,
         }
     }

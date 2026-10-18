@@ -1,6 +1,5 @@
 import { IconCircleCheck } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
-import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -14,6 +13,7 @@ import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
 import { fileKey } from '../model/file-groups';
+import { projectErrorMessage } from '../model/project-error';
 import { selectedFile, selectionOf } from '../model/selection';
 import { fileTarget } from '../model/targets';
 import { CommitFileList } from './CommitFileList';
@@ -165,7 +165,7 @@ export function ChangesWorkspace({
         <div className="flex h-full flex-col">
             {snapshot.isError ? (
                 <div className="border-b border-ui-border bg-ui-danger-soft px-4 py-2 text-sm text-ui-danger-soft-text">
-                    {errorMessage(snapshot.error)}
+                    {projectErrorMessage(snapshot.error, project.location)}
                 </div>
             ) : null}
             {/* about the working tree: not shown while its files make room for a commit's */}
@@ -303,6 +303,11 @@ export function ChangesWorkspace({
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-ui-text-muted">
                             <IconCircleCheck size={32} stroke={1.5} />
                             <p className="text-sm">Nothing to review. The working tree is clean.</p>
+                        </div>
+                    ) : snapshot.isPending && project.location.kind === 'wsl' ? (
+                        // the first read may start the distro and Sidekyk's helper in it
+                        <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
+                            Starting {project.location.distro}…
                         </div>
                     ) : null}
                 </main>

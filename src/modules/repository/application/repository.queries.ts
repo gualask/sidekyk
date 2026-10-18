@@ -6,7 +6,7 @@ import {
     useQuery,
     useQueryClient,
 } from '@tanstack/react-query';
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import { commitRequest } from '../model/commits';
 import type { DiffLine } from '../model/diff-parser';
@@ -281,31 +281,66 @@ export function useSyntaxColors(
     });
 }
 
-/** The projects whose last read failed as moved or deleted, by id, joined by NUL (no id has one). */
-function missingProjects(cache: QueryCache): string {
-    const ids = new Set<string>();
+/** The failures of a project's reads that need the user, the weightiest first. */
+const PROJECT_FAILURES = [
+    'distro_missing',
+    'repository_missing',
+    'helper_failed',
+    'git_not_found',
+] as const;
+export type ProjectFailure = (typeof PROJECT_FAILURES)[number];
+
+/** Each project's weightiest failure, as `<failure>\u0001<id>` joined by NUL (no id has either). */
+function failedProjects(cache: QueryCache): string {
+    const failures = new Map<string, ProjectFailure>();
     for (const query of cache.findAll({ queryKey: repositoryKeys.all, type: 'all' })) {
-        if (
-            query.state.status === 'error' &&
-            hasErrorCode(query.state.error, 'repository_missing')
-        ) {
-            ids.add(query.queryKey[1] as string);
+        if (query.state.status !== 'error') continue;
+        const failure = PROJECT_FAILURES.find((code) => hasErrorCode(query.state.error, code));
+        if (!failure) continue;
+        const id = query.queryKey[1] as string;
+        const known = failures.get(id);
+        if (!known || PROJECT_FAILURES.indexOf(failure) < PROJECT_FAILURES.indexOf(known)) {
+            failures.set(id, failure);
         }
     }
-    return [...ids].sort().join('\0');
+    return [...failures]
+        .map(([id, failure]) => `${failure}\u0001${id}`)
+        .sort((a, b) => a.localeCompare(b))
+        .join('\0');
 }
 
 /**
- * The ids of the projects whose repository was found moved or deleted, from what was already read
- * of them: nothing is fetched to know it. One reads well again, and it leaves the list.
+ * The projects whose reads failed in a way that needs the user (moved, a WSL distro gone, no git
+ * there, the helper not starting), by id, from what was already read of them: nothing is fetched
+ * to know it. One that reads well again leaves the map.
  */
-export function useMissingRepositories(): readonly string[] {
+export function useProjectFailures(): ReadonlyMap<string, ProjectFailure> {
     const cache = useQueryClient().getQueryCache();
-    const ids = useSyncExternalStore(
+    const failed = useSyncExternalStore(
         (onChange) => cache.subscribe(onChange),
-        () => missingProjects(cache),
+        () => failedProjects(cache),
     );
-    return useMemo(() => (ids ? ids.split('\0') : []), [ids]);
+    return useMemo(
+        () =>
+            new Map(
+                (failed ? failed.split('\0') : []).map((entry) => {
+                    const [failure, id] = entry.split('\u0001');
+                    return [id, failure as ProjectFailure];
+                }),
+            ),
+        [failed],
+    );
+}
+
+/** Reads again what is shown of a project: after a fix, such as git installed in its distro. */
+export function useReadProjectAgain(): (projectId: string) => void {
+    const queryClient = useQueryClient();
+    return useCallback(
+        (projectId: string) => {
+            void queryClient.invalidateQueries({ queryKey: repositoryKeys.of(projectId) });
+        },
+        [queryClient],
+    );
 }
 
 /**

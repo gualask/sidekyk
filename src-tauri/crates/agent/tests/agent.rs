@@ -212,6 +212,10 @@ fn a_helper_that_stops_at_once_is_not_started_at_every_request() {
     assert!(agent.resolve(Path::new(".")).is_err());
     let error = agent.resolve(Path::new(".")).unwrap_err();
     assert_eq!(starts.load(Ordering::Relaxed), 1, "{error:#}");
+    assert_eq!(
+        user_facing_code(&error),
+        Some(UserFacingErrorCode::HelperFailed)
+    );
 }
 
 /// A client of this crate's binary closing it when idle for `after`, and how many it started.

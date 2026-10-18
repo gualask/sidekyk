@@ -39,9 +39,8 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/plans/remote-projects.md`; tried as a local child process on the Mac, Linux parts on the
 container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
-- [ ] WSL projects, what is left: a stopped distro not started for a summary (`--list --running
-      --quiet`), the stopped, starting and failed states agreed in the plan; tried on Windows 11
-      x64 (later WSL1, ARM64, no git in the distro)
+- [ ] WSL projects tried on Windows 11 x64, from `build.yml`'s build
+      (`docs/plans/remote-projects.md`, Open); later WSL1, ARM64
 - [ ] Linux build of the helper on the Mac (`cargo-zigbuild` or a Rust container), tried on the
       fixture. On hold: metered connection (2026-10-18)
 - [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL projects

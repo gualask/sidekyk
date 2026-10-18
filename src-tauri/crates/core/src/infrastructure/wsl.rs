@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::hash::{DefaultHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
@@ -14,6 +15,8 @@ use anyhow::Context;
 use super::agent::AgentRepositories;
 use super::hide_console;
 use super::process;
+use crate::modules::repositories::Repositories;
+use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
 /// Where the helper is installed in a distro, under its user's home.
@@ -72,6 +75,16 @@ pub fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
     Ok(DistroState::Missing)
 }
 
+/// The name a distro is installed under, from one written in any case (a path typed by hand):
+/// one distro is one helper and one project. `distro_missing` when none has it.
+pub fn installed_distro(distro: &str) -> anyhow::Result<String> {
+    distros(&["--list", "--quiet"])
+        .context(UserFacingError::new(UserFacingErrorCode::DistroMissing))?
+        .into_iter()
+        .find(|name| name.eq_ignore_ascii_case(distro))
+        .ok_or_else(|| user_facing(UserFacingErrorCode::DistroMissing))
+}
+
 fn distros(args: &[&str]) -> anyhow::Result<Vec<String>> {
     let mut command = Command::new("wsl.exe");
     command
@@ -110,15 +123,36 @@ fn listed(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// `wsl.exe` running `program` in `distro`, from its user's home, without a shell.
+/// `wsl.exe` running `program` in `distro`, from its user's home, without a shell: `env` finds a
+/// path relative to the home, as Zed starts its server.
 fn wsl(distro: &str, program: &str) -> Command {
     let mut command = Command::new("wsl.exe");
     command
-        .args(["--distribution", distro, "--cd", "~", "--exec", program])
+        .args([
+            "--distribution",
+            distro,
+            "--cd",
+            "~",
+            "--exec",
+            "env",
+            program,
+        ])
+        // `wsl.exe`'s own messages (a distro unknown) in UTF-8, not UTF-16
+        .env("WSL_UTF8", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     hide_console(&mut command);
     command
+}
+
+/// A Windows path as `wslpath` reads it: without the `\\?\` prefix Windows' own APIs give, which
+/// it does not know.
+fn plain_windows_path(path: &Path) -> String {
+    let path = path.to_string_lossy();
+    if let Some(share) = path.strip_prefix(r"\\?\UNC\") {
+        return format!(r"\\{share}");
+    }
+    path.strip_prefix(r"\\?\").unwrap_or(&path).to_string()
 }
 
 /// The helper the installer ships, installed in a distro on its first use there.
@@ -143,15 +177,22 @@ impl Helper {
     fn installed(&self, distro: &str) -> anyhow::Result<String> {
         let name = self.name()?;
         let path = format!("{SERVER_DIR}/{name}");
-        let mut version = wsl(distro, &path);
-        version.arg("version");
-        let output = process::run(&mut version, None, MAX_OUTPUT, START_TIMEOUT)
-            .context("could not reach the WSL distro")?;
-        if output.code == 0 && String::from_utf8_lossy(&output.stdout).trim() == VERSION {
+        if runs(distro, &path)? {
             return Ok(path);
         }
         tracing::info!(distro, name, "installing the helper");
-        let windows_path = self.file.to_string_lossy();
+        self.install(distro, name)?;
+        // one that cannot run there (another architecture, a home mounted noexec) is not copied
+        // again at every start
+        anyhow::ensure!(
+            runs(distro, &path)?,
+            "the helper installed in {distro} does not run there"
+        );
+        Ok(path)
+    }
+
+    fn install(&self, distro: &str, name: &str) -> anyhow::Result<()> {
+        let windows_path = plain_windows_path(&self.file);
         let mut copy = wsl(distro, "sh");
         copy.args([
             "-c",
@@ -161,7 +202,8 @@ impl Helper {
             name,
             &windows_path,
         ]);
-        let copied = process::run(&mut copy, None, MAX_OUTPUT, START_TIMEOUT)?;
+        let copied = process::run(&mut copy, None, MAX_OUTPUT, START_TIMEOUT)
+            .with_context(|| format!("WSL {distro} did not answer"))?;
         if copied.code != 0 {
             tracing::info!(
                 stderr = copied.stderr,
@@ -170,18 +212,39 @@ impl Helper {
             let bytes = std::fs::read(&self.file)?;
             let mut stream = wsl(distro, "sh");
             stream.args(["-c", STREAM, "sidekyk-install", SERVER_DIR, name]);
-            let streamed = process::run(&mut stream, Some(&bytes), MAX_OUTPUT, START_TIMEOUT)?;
+            let streamed = process::run(&mut stream, Some(&bytes), MAX_OUTPUT, START_TIMEOUT)
+                .with_context(|| format!("WSL {distro} did not answer"))?;
             anyhow::ensure!(
                 streamed.code == 0,
                 "could not install the helper in {distro}: {}",
                 streamed.stderr.trim()
             );
         }
-        Ok(path)
+        Ok(())
     }
 }
 
+/// Whether the helper at `path` (from the home) runs in `distro`: its name says which build it is.
+fn runs(distro: &str, path: &str) -> anyhow::Result<bool> {
+    let mut version = wsl(distro, path);
+    version.arg("version");
+    let output = process::run(&mut version, None, MAX_OUTPUT, START_TIMEOUT)
+        .with_context(|| format!("WSL {distro} did not answer"))?;
+    Ok(output.code == 0)
+}
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// A helper that could not be checked or installed in `distro`: `distro_missing` when the distro,
+/// or WSL, is gone, else the failure as it is.
+fn missing_or(distro: &str, error: anyhow::Error) -> anyhow::Error {
+    match distro_state(distro) {
+        Ok(DistroState::Missing) | Err(_) => {
+            error.context(UserFacingError::new(UserFacingErrorCode::DistroMissing))
+        }
+        Ok(_) => error,
+    }
+}
 
 /// `sidekyk-agent-<version>-<hash of its content>`.
 fn installed_name(helper: &[u8]) -> String {
@@ -216,7 +279,10 @@ pub fn remove_other_helpers(this: &Path) -> std::io::Result<()> {
 /// The repositories of WSL distros: one helper per distro, started on first need there.
 pub struct WslRepositories {
     helper: Arc<Helper>,
+    /// By the distro's name in lower case: WSL's names ignore case.
     distros: Mutex<HashMap<String, Arc<AgentRepositories>>>,
+    /// The window is hidden: a distro asked for meanwhile is told, as the others were.
+    hidden: AtomicBool,
 }
 
 impl WslRepositories {
@@ -228,23 +294,56 @@ impl WslRepositories {
                 name: OnceLock::new(),
             }),
             distros: Mutex::default(),
+            hidden: AtomicBool::new(false),
         }
     }
 
     /// What reads `distro`'s repositories. Starts nothing until asked something.
     pub fn of(&self, distro: &str) -> Arc<AgentRepositories> {
+        let key = distro.to_lowercase();
         let mut distros = lock(&self.distros);
-        if let Some(repositories) = distros.get(distro) {
+        if let Some(repositories) = distros.get(&key) {
             return repositories.clone();
         }
         let (helper, name) = (self.helper.clone(), distro.to_string());
         let repositories = Arc::new(AgentRepositories::new(move || {
-            let mut command = wsl(&name, &helper.installed(&name)?);
+            let path = helper
+                .installed(&name)
+                .map_err(|error| missing_or(&name, error))?;
+            let mut command = wsl(&name, &path);
             command.arg("serve");
             Ok(command)
         }));
-        distros.insert(distro.to_string(), repositories.clone());
+        if self.hidden.load(Ordering::Relaxed) {
+            repositories.set_visible(false);
+        }
+        distros.insert(key, repositories.clone());
         repositories
+    }
+
+    /// Tells every distro whether the window shows, and the ones asked for later too.
+    pub fn set_visible(&self, visible: bool) {
+        let distros = lock(&self.distros);
+        self.hidden.store(!visible, Ordering::Relaxed);
+        for repositories in distros.values() {
+            repositories.set_visible(visible);
+        }
+    }
+
+    /// Whether `distro` can be read without starting it, as the projects' cards are: a helper runs
+    /// there, or the distro does. Otherwise `distro_stopped`, or `distro_missing`.
+    pub fn readable_without_starting(&self, distro: &str) -> anyhow::Result<()> {
+        if self.of(distro).is_running() {
+            return Ok(());
+        }
+        match distro_state(distro) {
+            Ok(DistroState::Running) => Ok(()),
+            Ok(DistroState::Stopped) => Err(user_facing(UserFacingErrorCode::DistroStopped)),
+            Ok(DistroState::Missing) => Err(user_facing(UserFacingErrorCode::DistroMissing)),
+            Err(error) => {
+                Err(error.context(UserFacingError::new(UserFacingErrorCode::DistroMissing)))
+            }
+        }
     }
 
     /// Every distro asked for so far, with what reads its repositories.
@@ -276,6 +375,23 @@ mod tests {
         assert_eq!(found(r"\\server\share\shop"), None);
         assert_eq!(found(r"C:\Users\ale\shop"), None);
         assert_eq!(found(r"\\wsl.localhost"), None);
+    }
+
+    #[test]
+    fn a_windows_path_loses_the_prefix_wslpath_does_not_know() {
+        let plain = |path: &str| plain_windows_path(Path::new(path));
+        assert_eq!(
+            plain(r"\\?\C:\Program Files\Sidekyk\linux\sidekyk-agent"),
+            r"C:\Program Files\Sidekyk\linux\sidekyk-agent"
+        );
+        assert_eq!(
+            plain(r"\\?\UNC\server\share\sidekyk-agent"),
+            r"\\server\share\sidekyk-agent"
+        );
+        assert_eq!(
+            plain(r"C:\Sidekyk\sidekyk-agent"),
+            r"C:\Sidekyk\sidekyk-agent"
+        );
     }
 
     #[test]
