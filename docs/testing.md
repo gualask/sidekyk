@@ -12,6 +12,19 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
   answers compared with the direct reads, failures keeping their code, changes and a change
   missed while hidden coming through.
 
+## CI
+
+On demand only (Actions, Run workflow), decided 2026-10-18: day to day the checks run on the
+machine at hand (the Mac); every platform is checked before a release.
+
+- `ci.yml`: the frontend checks on Linux; rustfmt on Linux; clippy and `cargo test` on Linux,
+  macOS and Windows, so `#[cfg]` code and the real watcher (inotify, FSEvents,
+  `ReadDirectoryChangesW`) are built and tried on each. The Mac cannot type-check for Windows
+  (`onig_sys` builds C).
+- `build.yml`: an unsigned Windows x64 build; its NSIS and MSI installers are the run's artifact
+  (14 days). SmartScreen warns before running them.
+- Actions are pinned to a commit, their version in a comment; updated by hand.
+
 ## Browser fixtures
 
 `pnpm dev`, `http://localhost:1420/?dev=app&scenario=…` (`src/dev/`, dev builds only): the app on

@@ -28,7 +28,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Use a web API or CSS feature only if WKWebView, WebKitGTK and WebView2 all support it.
 - Shortcuts: `⌘` on macOS, `Ctrl` elsewhere.
 - Never assume `/` as separator or a Unix layout; paths exchanged with git and the frontend use `/`.
-- Platform-specific code and child processes live in `infrastructure/`, behind `#[cfg]` and a port. Type-check `#[cfg(windows)]` code for `x86_64-pc-windows-msvc`.
+- Platform-specific code and child processes live in `infrastructure/`, behind `#[cfg]` and a port. Type-check `#[cfg(windows)]` code for `x86_64-pc-windows-msvc`; the Mac cannot (`onig_sys` builds C), so it is `ci.yml`'s job, run on demand (`docs/testing.md`, CI).
 
 ## Code
 

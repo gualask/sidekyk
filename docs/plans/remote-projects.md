@@ -135,7 +135,7 @@ and `docker exec` are child processes, in `infrastructure/` behind a port.
 - Building the helper on the Mac for `aarch64-unknown-linux-musl` (on hold, above):
   `cargo-zigbuild` (a new tool, as Zed) or a Rust container (not on the 512 MiB fixture VM).
 - Shipping the helper for containers on the Mac (arm64, amd64 under emulation).
-- On Windows 11 x64, from the CI's release build: the protocol's cost through `wsl.exe`;
+- On Windows 11 x64, from `build.yml`'s unsigned build: the protocol's cost through `wsl.exe`;
   `wsl.exe`'s start time; `--list --verbose` leaves a stopped distro stopped; distro names and
   case; the folder dialog's form of a WSL path.
 - How a WSL project shows in the list and on its card (a preview first).

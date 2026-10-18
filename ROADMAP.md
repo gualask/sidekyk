@@ -44,7 +44,7 @@ container fixture (`docs/testing.md`) once the helper builds for Linux there.
 - [ ] WSL transport: folder dialog's `\\wsl.localhost\` and `\\wsl$\` paths, install from the
       installer's resources, `wsl.exe`, stopped distro not started (`--list --verbose`), helper
       exits 60 s after its last request off screen; tried on Windows 11 x64 (later WSL1, ARM64,
-      no git in the distro). **After:** minimal helper; project location; CI's Windows build
+      no git in the distro). **After:** project location
 - [ ] Linux build of the helper on the Mac (`cargo-zigbuild` or a Rust container), tried on the
       fixture. On hold: metered connection (2026-10-18)
 - [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL transport
@@ -53,10 +53,8 @@ container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
 ## Platforms and release
 
-- [ ] CI with the `AGENTS.md` checks; Rust tests on macOS, Linux, Windows (end-to-end tests run a
-      real git); an unsigned Windows x64 installer as an artifact, to try WSL projects
-- [ ] Signed builds and self-update (as in Fyler); update check at startup or on demand only.
-      **After:** CI (release builds come from it)
+- [ ] Signed builds and self-update (as in Fyler), built by a release workflow on a `v*` tag that
+      runs `ci.yml` first; update check at startup or on demand only
 - [ ] Linux watcher: one inotify watch per directory not ignored (~670 vs 33,000-47,000 for the
       ten repos in `~/Dev`; `clean-flow` alone 8,222 > old 8,192 limit); a failed watch must not
       fail the project
@@ -91,6 +89,6 @@ Measure first: the first three give the numbers the rest are judged on (**After:
 - [ ] The open file (Files) and the open diff are read again on every change on disk; restrict to
       changes that touch them
 - [ ] Prefetch neighbouring diffs, if switching shows a wait
-- [ ] Bundle and binary size budgets in CI. **After:** CI
+- [ ] Bundle and binary size budgets in CI
 - [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
       written, shortcut status read again): a lighter path for layout-only settings?
