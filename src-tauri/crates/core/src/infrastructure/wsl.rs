@@ -1,28 +1,24 @@
-//! WSL distros, through `wsl.exe`: which ones run, and the helper installed and started in one
-//! (`docs/plans/remote-projects.md`). Windows only: elsewhere `wsl.exe` is not found, and every
-//! call fails.
+//! WSL distros, through `wsl.exe`: which ones run, and each one's repositories through the helper
+//! started there (`linux_helper`, `docs/plans/remote-projects.md`). Windows only: elsewhere
+//! `wsl.exe` is not found, and every call fails.
 
 use std::collections::HashMap;
-use std::hash::{DefaultHasher, Hasher};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
 use super::agent::AgentRepositories;
 use super::hide_console;
+use super::linux_helper::{LinuxHelper, LinuxMachine};
 use super::process;
 use crate::modules::repositories::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
-/// Where the helper is installed in a distro, under its user's home.
-pub const SERVER_DIR: &str = ".sidekyk-server";
-/// `wsl.exe` starts a stopped distro before it runs anything there.
-const START_TIMEOUT: Duration = Duration::from_secs(60);
 /// Listing the distros starts none.
 const LIST_TIMEOUT: Duration = Duration::from_secs(10);
 /// A distro's state read for one card serves the others of that distro shown with it.
@@ -31,10 +27,8 @@ const MAX_OUTPUT: usize = 64 * 1024;
 
 /// Copies the helper from Windows' side through `/mnt`, under a temporary name first, so a copy
 /// cut short is never taken for the helper. `$1` the folder, `$2` the helper's name, `$3` its
-/// Windows path.
+/// Windows path. A distro that does not mount Windows' drives gets it through stdin.
 const COPY: &str = r#"set -e; mkdir -p "$1"; tmp="$1/.$2.$$"; cp "$(wslpath -u "$3")" "$tmp"; chmod 755 "$tmp"; mv -f "$tmp" "$1/$2""#;
-/// As `COPY`, the helper read from stdin: for a distro that does not mount Windows' drives.
-const STREAM: &str = r#"set -e; mkdir -p "$1"; tmp="$1/.$2.$$"; cat > "$tmp"; chmod 755 "$tmp"; mv -f "$tmp" "$1/$2""#;
 
 /// A path of a WSL distro as Windows names it, as the folder dialog gives it:
 /// `\\wsl.localhost\<distro>\…`, or `\\wsl$\<distro>\…` on older Windows 10. The distro, and the
@@ -129,26 +123,42 @@ fn listed(output: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// `wsl.exe` running `program` in `distro`, from its user's home, without a shell: `env` finds a
-/// path relative to the home, as Zed starts its server.
-fn wsl(distro: &str, program: &str) -> Command {
-    let mut command = Command::new("wsl.exe");
-    command
-        .args([
-            "--distribution",
-            distro,
-            "--cd",
-            "~",
-            "--exec",
-            "env",
-            program,
-        ])
-        // `wsl.exe`'s own messages (a distro unknown) in UTF-8, not UTF-16
-        .env("WSL_UTF8", "1")
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    hide_console(&mut command);
-    command
+/// A WSL distro, by its name.
+struct Distro(String);
+
+impl LinuxMachine for Distro {
+    fn name(&self) -> &str {
+        &self.0
+    }
+
+    /// `wsl.exe` running `program` in the distro, from its user's home: `env` finds a path
+    /// relative to the home, as Zed starts its server.
+    fn command(&self, program: &str) -> Command {
+        let mut command = Command::new("wsl.exe");
+        command
+            .args([
+                "--distribution",
+                &self.0,
+                "--cd",
+                "~",
+                "--exec",
+                "env",
+                program,
+            ])
+            // `wsl.exe`'s own messages (a distro unknown) in UTF-8, not UTF-16
+            .env("WSL_UTF8", "1")
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+        hide_console(&mut command);
+        command
+    }
+
+    fn copy(&self, file: &Path, folder: &str, name: &str) -> Option<Command> {
+        let mut copy = self.command("sh");
+        let windows_path = plain_windows_path(file);
+        copy.args(["-c", COPY, "sidekyk-install", folder, name, &windows_path]);
+        Some(copy)
+    }
 }
 
 /// A Windows path as `wslpath` reads it: without the `\\?\` prefix Windows' own APIs give, which
@@ -161,86 +171,6 @@ fn plain_windows_path(path: &Path) -> String {
     path.strip_prefix(r"\\?\").unwrap_or(&path).to_string()
 }
 
-/// The helper the installer ships, installed in a distro on its first use there.
-struct Helper {
-    /// On Windows' side, in the app's resources.
-    file: PathBuf,
-    /// Made from its content, so a build is never taken for another of the same version.
-    name: OnceLock<String>,
-}
-
-impl Helper {
-    fn name(&self) -> anyhow::Result<&str> {
-        if let Some(name) = self.name.get() {
-            return Ok(name);
-        }
-        let bytes = std::fs::read(&self.file)
-            .with_context(|| format!("could not read the helper at {}", self.file.display()))?;
-        Ok(self.name.get_or_init(|| installed_name(&bytes)))
-    }
-
-    /// The helper in `distro`, installed first if it is not there, as a path from its home.
-    fn installed(&self, distro: &str) -> anyhow::Result<String> {
-        let name = self.name()?;
-        let path = format!("{SERVER_DIR}/{name}");
-        if runs(distro, &path)? {
-            return Ok(path);
-        }
-        tracing::info!(distro, name, "installing the helper");
-        self.install(distro, name)?;
-        // one that cannot run there (another architecture, a home mounted noexec) is not copied
-        // again at every start
-        anyhow::ensure!(
-            runs(distro, &path)?,
-            "the helper installed in {distro} does not run there"
-        );
-        Ok(path)
-    }
-
-    fn install(&self, distro: &str, name: &str) -> anyhow::Result<()> {
-        let windows_path = plain_windows_path(&self.file);
-        let mut copy = wsl(distro, "sh");
-        copy.args([
-            "-c",
-            COPY,
-            "sidekyk-install",
-            SERVER_DIR,
-            name,
-            &windows_path,
-        ]);
-        let copied = process::run(&mut copy, None, MAX_OUTPUT, START_TIMEOUT)
-            .with_context(|| format!("WSL {distro} did not answer"))?;
-        if copied.code != 0 {
-            tracing::info!(
-                stderr = copied.stderr,
-                "the helper could not be copied: streaming it"
-            );
-            let bytes = std::fs::read(&self.file)?;
-            let mut stream = wsl(distro, "sh");
-            stream.args(["-c", STREAM, "sidekyk-install", SERVER_DIR, name]);
-            let streamed = process::run(&mut stream, Some(&bytes), MAX_OUTPUT, START_TIMEOUT)
-                .with_context(|| format!("WSL {distro} did not answer"))?;
-            anyhow::ensure!(
-                streamed.code == 0,
-                "could not install the helper in {distro}: {}",
-                streamed.stderr.trim()
-            );
-        }
-        Ok(())
-    }
-}
-
-/// Whether the helper at `path` (from the home) runs in `distro`: its name says which build it is.
-fn runs(distro: &str, path: &str) -> anyhow::Result<bool> {
-    let mut version = wsl(distro, path);
-    version.arg("version");
-    let output = process::run(&mut version, None, MAX_OUTPUT, START_TIMEOUT)
-        .with_context(|| format!("WSL {distro} did not answer"))?;
-    Ok(output.code == 0)
-}
-
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 /// A helper that could not be checked or installed in `distro`: `distro_missing` when the distro
 /// is gone for sure, else the failure as it is.
 fn missing_or(distro: &str, error: anyhow::Error) -> anyhow::Error {
@@ -252,16 +182,9 @@ fn missing_or(distro: &str, error: anyhow::Error) -> anyhow::Error {
     }
 }
 
-/// `sidekyk-agent-<version>-<hash of its content>`.
-fn installed_name(helper: &[u8]) -> String {
-    let mut hasher = DefaultHasher::new();
-    hasher.write(helper);
-    format!("sidekyk-agent-{VERSION}-{:016x}", hasher.finish())
-}
-
 /// The repositories of WSL distros: one helper per distro, started on first need there.
 pub struct WslRepositories {
-    helper: Arc<Helper>,
+    helper: Arc<LinuxHelper>,
     /// By the distro's name in lower case: WSL's names ignore case.
     distros: Mutex<HashMap<String, Arc<AgentRepositories>>>,
     /// The window is hidden: a distro asked for meanwhile is told, as the others were.
@@ -274,10 +197,7 @@ impl WslRepositories {
     /// `helper`: the Linux helper the installer ships, on Windows' side.
     pub fn new(helper: PathBuf) -> Self {
         Self {
-            helper: Arc::new(Helper {
-                file: helper,
-                name: OnceLock::new(),
-            }),
+            helper: Arc::new(LinuxHelper::new(helper)),
             distros: Mutex::default(),
             hidden: AtomicBool::new(false),
             states: Mutex::default(),
@@ -293,12 +213,9 @@ impl WslRepositories {
         }
         let (helper, name) = (self.helper.clone(), distro.to_string());
         let repositories = Arc::new(AgentRepositories::new(move || {
-            let path = helper
-                .installed(&name)
-                .map_err(|error| missing_or(&name, error))?;
-            let mut command = wsl(&name, &path);
-            command.arg("serve");
-            Ok(command)
+            helper
+                .serve(&Distro(name.clone()))
+                .map_err(|error| missing_or(&name, error))
         }));
         if self.hidden.load(Ordering::Relaxed) {
             repositories.set_visible(false);
@@ -403,13 +320,5 @@ mod tests {
             .collect();
         assert_eq!(listed(&utf16), ["Ubuntu", "Debian"]);
         assert!(listed(b"").is_empty());
-    }
-
-    #[test]
-    fn a_helper_is_installed_under_a_name_from_its_content() {
-        let name = installed_name(b"one build");
-        assert!(name.starts_with(&format!("sidekyk-agent-{VERSION}-")));
-        assert_eq!(name, installed_name(b"one build"));
-        assert_ne!(name, installed_name(b"another build"));
     }
 }

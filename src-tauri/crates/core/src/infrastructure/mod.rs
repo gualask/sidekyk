@@ -3,6 +3,7 @@
 
 pub mod agent;
 pub mod git_cli;
+pub mod linux_helper;
 pub mod machines;
 mod process;
 pub mod watcher;

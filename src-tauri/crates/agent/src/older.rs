@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use sidekyk_core::infrastructure::wsl::SERVER_DIR;
+use sidekyk_core::infrastructure::linux_helper::SERVER_DIR;
 
 /// Run by the helper as it starts: in the folder the app installs it in, every other helper (an
 /// older build) and any copy left halfway goes. Elsewhere, such as beside a dev build, nothing.

@@ -31,6 +31,8 @@ Usage: scripts/container-fixture.sh <command>
   edit            change files from inside, as a coding agent would
   watch           print the inotify events seen inside (Ctrl-C to stop)
   status          engine, fixture, and the repository's git status
+  helper <binary>  run the Linux helper's end-to-end test in the fixture: <binary> a sidekyk-agent
+                  built for the fixture's arch (CI's sidekyk-agent-linux-arm64 on Apple Silicon)
   down [--colima] remove the fixture and its repository; --colima also stops the VM
 
 Without Colima, the current Docker context is used.
@@ -122,6 +124,19 @@ cmd_watch() {
 		"$project"
 }
 
+# The helper end to end in the fixture (src-tauri/crates/agent/tests/container.rs): installed as
+# in a WSL distro, then reading, watching and closing once idle.
+cmd_helper() {
+	[ -n "${1:-}" ] || die "usage: scripts/container-fixture.sh helper <sidekyk-agent built for the fixture's arch>"
+	[ -f "$1" ] || die "no helper at $1"
+	require_fixture
+	local helper
+	helper="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+	SIDEKYK_CONTAINER=$(compose ps -q distro) SIDEKYK_LINUX_HELPER="$helper" \
+		cargo test --manifest-path "$repo_root/src-tauri/Cargo.toml" -p sidekyk-agent --test container \
+		-- --ignored --nocapture
+}
+
 cmd_status() {
 	if ! docker info >/dev/null 2>&1; then
 		log "Docker engine: not reachable"
@@ -153,6 +168,7 @@ shell) cmd_shell ;;
 edit) cmd_edit ;;
 watch) cmd_watch ;;
 status) cmd_status ;;
+helper) cmd_helper "${2:-}" ;;
 down) cmd_down "${2:-}" ;;
 "" | -h | --help | help) usage ;;
 *)
