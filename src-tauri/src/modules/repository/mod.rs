@@ -13,6 +13,7 @@ mod snapshot;
 mod status;
 mod tree;
 mod version;
+mod watched;
 
 pub(crate) use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
 #[cfg(test)]
@@ -26,7 +27,8 @@ pub(crate) use diff::load_file_diff;
 pub(crate) use ignored::{IgnoredPaths, Visible};
 pub(crate) use limits::MAX_FILE_BYTES;
 pub(crate) use open::{repository_name, resolve_repository};
-pub(crate) use ports::{GitOutput, RepositoryBackend, WorktreeEntry};
+pub(crate) use ports::{GitOutput, RepositoryBackend, RepositoryWatcher, Watch, WorktreeEntry};
 pub(crate) use snapshot::{load_snapshot, load_summary};
 pub(crate) use tree::{load_file_content, load_file_tree, FileTree};
 pub(crate) use version::{load_version_text, VersionText};
+pub(crate) use watched::classify;

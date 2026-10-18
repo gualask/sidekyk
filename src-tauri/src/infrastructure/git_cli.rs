@@ -275,6 +275,14 @@ impl RepositoryBackend for LocalRepositoryBackend {
         let file = std::fs::File::open(full).ok()?;
         Some(Box::new(file))
     }
+
+    fn is_dir(&self, path: &Path) -> bool {
+        path.is_dir()
+    }
+
+    fn has_entry(&self, root: &Path, path: &Path) -> bool {
+        std::fs::symlink_metadata(root.join(path)).is_ok()
+    }
 }
 
 /// `path` (relative) under `root` and what is there, not following a link, or `None` when nothing
@@ -301,8 +309,9 @@ mod tests {
     use crate::modules::repository::{
         load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
         load_file_tree, load_recent_commits, load_snapshot, load_summary, load_version_text,
-        resolve_repository, ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
-        FileDiffRequest, FileVersion, IgnoredPaths, RepositorySnapshot, VersionText, Visible,
+        repository_name, resolve_repository, ChangeKind, Commit, CommitFileDiffRequest,
+        CommitRequest, FileContent, FileDiffRequest, FileVersion, IgnoredPaths, RepositoryInfo,
+        RepositorySnapshot, VersionText, Visible,
     };
     use crate::modules::search::{
         search, search_contents, ContentSearch, ProjectFiles, SearchRequest,
@@ -902,6 +911,19 @@ mod tests {
             .err()
             .unwrap();
         assert_eq!(err.to_string(), "not_a_repository");
+    }
+
+    #[test]
+    fn a_repository_moved_away_is_reported_as_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path().to_string_lossy().into_owned();
+        let repository = RepositoryInfo {
+            name: repository_name(&root),
+            root,
+        };
+        drop(dir);
+        let err = load_summary(&LocalRepositoryBackend::default(), &repository).unwrap_err();
+        assert_eq!(err.to_string(), "repository_missing");
     }
 
     /// The median, min and max of `runs` calls to `work`, after one warm-up call.

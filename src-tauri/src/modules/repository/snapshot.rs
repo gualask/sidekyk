@@ -214,7 +214,7 @@ pub(crate) fn load_snapshot(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RepositorySnapshot> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     // The four commands are independent, so they run together and the snapshot costs about as
     // much as the slowest one. The diff against HEAD fails before the first commit; its result
     // is only used when status reports a commit.
@@ -283,7 +283,7 @@ pub(crate) fn load_summary(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RepositorySummary> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let (status, against_head) = std::thread::scope(|scope| {
         let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
         (status(backend, root), joined(against_head))
@@ -312,6 +312,14 @@ mod tests {
     }
 
     impl RepositoryBackend for FakeFiles {
+        fn is_dir(&self, _path: &Path) -> bool {
+            unreachable!()
+        }
+
+        fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
+            unreachable!()
+        }
+
         fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
@@ -378,6 +386,14 @@ mod tests {
     }
 
     impl RepositoryBackend for FakeStatus {
+        fn is_dir(&self, _path: &Path) -> bool {
+            unreachable!()
+        }
+
+        fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
+            unreachable!()
+        }
+
         fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             Ok(GitOutput {
                 code: if self.truncated { -1 } else { 0 },

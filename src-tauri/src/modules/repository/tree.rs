@@ -99,9 +99,14 @@ impl FileTree {
     /// Whether these changed paths (relative to `root`, not ignored) may have added or removed a
     /// file: one on disk the tree does not have, or one the tree has that is gone. An edit to a
     /// file the tree has changes nothing.
-    pub(crate) fn may_have_changed(&self, root: &Path, changed: &[&Path]) -> bool {
+    pub(crate) fn may_have_changed(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &Path,
+        changed: &[&Path],
+    ) -> bool {
         changed.iter().any(|rel| {
-            let on_disk = std::fs::symlink_metadata(root.join(rel)).is_ok();
+            let on_disk = backend.has_entry(root, rel);
             git_path(rel).is_none_or(|path| on_disk != self.contains(&path))
         })
     }
@@ -217,7 +222,7 @@ pub(crate) fn load_file_tree(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
 ) -> anyhow::Result<FileTree> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let ls_files = |args: &[&str]| -> anyhow::Result<(Vec<String>, bool)> {
         let out = git_checked(backend, root, args, &[0], MAX_LS_FILES_BYTES)?;
         Ok((listed(&out.stdout, out.truncated), out.truncated))
@@ -252,7 +257,7 @@ pub(crate) fn load_file_content(
     repository: &RepositoryInfo,
     path: &str,
 ) -> anyhow::Result<FileContent> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let path = checked_path(path)?;
     let entry = backend
         .read_entry(root, Path::new(path), MAX_FILE_BYTES)
@@ -288,7 +293,11 @@ fn link_target(target: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read;
+    use std::sync::Mutex;
+
     use super::*;
+    use crate::modules::repository::GitOutput;
 
     fn names(directory: &Directory) -> Vec<(&str, &str, bool)> {
         directory
@@ -345,23 +354,60 @@ mod tests {
         );
     }
 
-    #[test]
-    fn only_a_file_added_or_removed_changes_the_tree() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path();
-        std::fs::create_dir_all(root.join("src")).unwrap();
-        std::fs::write(root.join("src/a.ts"), "").unwrap();
-        let tree = FileTree::from_paths(["src/a.ts", "src/gone.ts"]);
-        fn changed(rels: &[&'static str]) -> Vec<&'static Path> {
-            rels.iter().map(|rel| Path::new(*rel)).collect()
+    /// What is on disk under the root, as relative paths.
+    struct OnDisk(Mutex<HashSet<&'static str>>);
+
+    impl RepositoryBackend for OnDisk {
+        fn is_dir(&self, _path: &Path) -> bool {
+            unreachable!()
         }
 
-        assert!(!tree.may_have_changed(root, &changed(&["src/a.ts", "src"])));
-        assert!(tree.may_have_changed(root, &changed(&["src/gone.ts"])));
-        std::fs::write(root.join("src/new.ts"), "").unwrap();
-        assert!(tree.may_have_changed(root, &changed(&["src/a.ts", "src/new.ts"])));
+        fn has_entry(&self, _root: &Path, path: &Path) -> bool {
+            self.0.lock().unwrap().contains(path.to_str().unwrap())
+        }
+
+        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
+            unreachable!()
+        }
+
+        fn git_with_input(
+            &self,
+            _cwd: &Path,
+            _args: &[&str],
+            _input: &[u8],
+            _max: usize,
+        ) -> anyhow::Result<GitOutput> {
+            unreachable!()
+        }
+
+        fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
+            unreachable!()
+        }
+
+        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
+            unreachable!()
+        }
+
+        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn Read + Send>> {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn only_a_file_added_or_removed_changes_the_tree() {
+        let disk = OnDisk(Mutex::new(HashSet::from(["src", "src/a.ts"])));
+        let tree = FileTree::from_paths(["src/a.ts", "src/gone.ts"]);
+        let changed = |rels: &[&'static str]| {
+            let rels: Vec<&Path> = rels.iter().map(|rel| Path::new(*rel)).collect();
+            tree.may_have_changed(&disk, Path::new("/r"), &rels)
+        };
+
+        assert!(!changed(&["src/a.ts", "src"]));
+        assert!(changed(&["src/gone.ts"]));
+        disk.0.lock().unwrap().insert("src/new.ts");
+        assert!(changed(&["src/a.ts", "src/new.ts"]));
         // written and deleted again within the batch: nothing to show
-        assert!(!tree.may_have_changed(root, &changed(&["src/tmp.ts"])));
+        assert!(!changed(&["src/tmp.ts"]));
     }
 
     #[test]

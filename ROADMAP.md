@@ -36,21 +36,29 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 ## Remote projects
 
-`docs/plans/remote-projects.md`; tried on the container fixture (`docs/testing.md`).
+`docs/plans/remote-projects.md`; tried as a local child process on the Mac, Linux parts on the
+container fixture (`docs/testing.md`) once the helper builds for Linux there.
 
-- [ ] Watcher behind a port; `tree.rs` `may_have_changed` reads the disk through the backend
-- [ ] Cargo workspace: core, app, `sidekyk-agent`. **After:** watcher behind a port
-- [ ] Minimal helper over stdio, tried on the fixture (`docker exec -i`). **After:** workspace
-- [ ] WSL transport: `\\wsl.localhost\` paths, install from the installer's resources, `wsl.exe`;
-      tried on Windows (WSL2, WSL1, ARM64, stopped distro, no git in the distro). **After:**
-      minimal helper; the app verified on Windows (Platforms)
+- [ ] Cargo workspace: core, app, `sidekyk-agent`
+- [ ] Minimal helper over stdio (length-prefixed JSON), local projects through it with
+      `SIDEKYK_AGENT=local` in dev builds; cost measured against the direct path. **After:**
+      workspace
+- [ ] Projects with an `id` and a typed `location` (local, WSL); a local project's `id` stays its
+      root
+- [ ] WSL transport: folder dialog's `\\wsl.localhost\` and `\\wsl$\` paths, install from the
+      installer's resources, `wsl.exe`, stopped distro not started (`--list --verbose`), helper
+      exits 60 s after its last request off screen; tried on Windows 11 x64 (later WSL1, ARM64,
+      no git in the distro). **After:** minimal helper; project location; CI's Windows build
+- [ ] Linux build of the helper on the Mac (`cargo-zigbuild` or a Rust container), tried on the
+      fixture. On hold: metered connection (2026-10-18)
+- [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL transport
 - [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
       transport
 
 ## Platforms and release
 
 - [ ] CI with the `AGENTS.md` checks; Rust tests on macOS, Linux, Windows (end-to-end tests run a
-      real git)
+      real git); an unsigned Windows x64 installer as an artifact, to try WSL projects
 - [ ] Signed builds and self-update (as in Fyler); update check at startup or on demand only.
       **After:** CI (release builds come from it)
 - [ ] Linux watcher: one inotify watch per directory not ignored (~670 vs 33,000-47,000 for the

@@ -12,8 +12,9 @@ pub(crate) struct GitOutput {
 }
 
 /// What the repository module needs from the machine: the `git` CLI and read access to files in
-/// the working tree. Every git call is bounded: it reads at most `max_stdout` bytes of output,
-/// and fails with `git_timed_out` when git takes too long, killed either way.
+/// the working tree. The module never reads the disk itself, so the machine can be another one
+/// (a WSL distro). Every git call is bounded: it reads at most `max_stdout` bytes of output, and
+/// fails with `git_timed_out` when git takes too long, killed either way.
 pub(crate) trait RepositoryBackend: Send + Sync {
     /// Runs `git` in `cwd` and returns its output whatever the exit code.
     fn git(&self, cwd: &Path, args: &[&str], max_stdout: usize) -> anyhow::Result<GitOutput>;
@@ -38,7 +39,28 @@ pub(crate) trait RepositoryBackend: Send + Sync {
     /// The file at `path` (relative) under `root`, to read as a stream, or `None` when it is not a
     /// file there: missing, a link (never followed), a folder, or behind a folder that is a link.
     fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>>;
+
+    /// Whether `path` is a folder, following links.
+    fn is_dir(&self, path: &Path) -> bool;
+
+    /// Whether anything is at `path` (relative) under `root`, a link there not followed.
+    fn has_entry(&self, root: &Path, path: &Path) -> bool;
 }
+
+/// Watches a repository's working tree and git dir.
+pub(crate) trait RepositoryWatcher: Send + Sync {
+    /// Calls `on_change` with the paths (absolute) that changed during each quiet period, until
+    /// the returned watch is dropped. `classify` says which of them matter.
+    fn watch(
+        &self,
+        root: &Path,
+        git_dir: &Path,
+        on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
+    ) -> anyhow::Result<Watch>;
+}
+
+/// A repository being watched: watching stops when it is dropped.
+pub(crate) type Watch = Box<dyn Send>;
 
 /// A path of the working tree, as `read_entry` finds it.
 pub(crate) enum WorktreeEntry {

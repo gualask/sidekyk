@@ -106,10 +106,11 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
   `modules/repository`): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
   content (`tree.rs`), a version's whole text (`version.rs`), path checks, ignored-paths filter,
-  contracts. No Tauri; the outside world is the `RepositoryBackend` port (`git`, `read_file`,
-  `read_entry`, `open_file`). Exception to remove: `tree.rs` `may_have_changed` calls
-  `std::fs::symlink_metadata` itself (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs`, `settings_store.rs`,
+  which watched changes matter (`watched.rs`), contracts. No Tauri, no disk of its own: it
+  declares the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`,
+  `has_entry`) and the `RepositoryWatcher` port (changed paths after a quiet period), so it can
+  run on another machine (`plans/remote-projects.md`).
+- `infrastructure/`: `git_cli.rs` (bounded git), `watcher.rs` (notify), `settings_store.rs`,
   `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`.
 - `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
   `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `sync.rs`.

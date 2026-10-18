@@ -43,7 +43,7 @@ pub(crate) fn load_file_diff(
     repository: &RepositoryInfo,
     request: &FileDiffRequest,
 ) -> anyhow::Result<UnifiedDiff> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
     let base = [

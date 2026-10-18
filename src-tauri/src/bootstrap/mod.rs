@@ -10,6 +10,7 @@ use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::notes_files::NotesFiles;
+use crate::infrastructure::watcher::LocalRepositoryWatcher;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::window_theme;
@@ -77,6 +78,7 @@ pub(crate) fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(LocalRepositoryBackend::default())
+        .manage(LocalRepositoryWatcher)
         .manage(ProjectsState::default())
         .manage(NotesStore::default())
         .manage(FirstShow::default())

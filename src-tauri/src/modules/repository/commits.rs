@@ -66,7 +66,7 @@ pub(crate) fn load_recent_commits(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RecentCommits> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     // one more than listed, to know whether there are older ones
     let count = format!("-n{}", RECENT_COMMITS + 1);
     let out = git_checked(
@@ -177,7 +177,7 @@ pub(crate) fn load_commit_files(
     repository: &RepositoryInfo,
     commit: &CommitRequest,
 ) -> anyhow::Result<CommitFiles> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let args = diff_tree_args(&["-r", "-z", "--raw", "--numstat"], commit, &[])?;
     let out = git_checked(backend, root, &args, &[0], MAX_NUMSTAT_BYTES)?;
     let mut files = parse_diff_tree_z(&out.stdout, out.truncated);
@@ -192,7 +192,7 @@ pub(crate) fn load_commit_file_diff(
     repository: &RepositoryInfo,
     request: &CommitFileDiffRequest,
 ) -> anyhow::Result<UnifiedDiff> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
     // both sides of a rename, so git can pair them

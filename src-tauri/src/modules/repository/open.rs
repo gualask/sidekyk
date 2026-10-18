@@ -22,9 +22,12 @@ pub(crate) fn repository_name(root: &str) -> String {
 
 /// The root of a repository the app knows, if it is still there. A repository moved or deleted
 /// since it was added is reported as such, before git fails on a folder that does not exist.
-pub(crate) fn existing_root(repository: &RepositoryInfo) -> anyhow::Result<&Path> {
+pub(crate) fn existing_root<'a>(
+    backend: &dyn RepositoryBackend,
+    repository: &'a RepositoryInfo,
+) -> anyhow::Result<&'a Path> {
     let root = Path::new(&repository.root);
-    if root.is_dir() {
+    if backend.is_dir(root) {
         Ok(root)
     } else {
         Err(user_facing(UserFacingErrorCode::RepositoryMissing))
@@ -36,7 +39,7 @@ pub(crate) fn resolve_repository(
     backend: &dyn RepositoryBackend,
     candidate: &Path,
 ) -> anyhow::Result<ResolvedRepository> {
-    if !candidate.is_dir() {
+    if !backend.is_dir(candidate) {
         return Err(user_facing(UserFacingErrorCode::NotARepository));
     }
     let out = backend.git(
@@ -60,28 +63,4 @@ pub(crate) fn resolve_repository(
         },
         git_dir: PathBuf::from(git_dir),
     })
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::shared::error::user_facing_code;
-
-    #[test]
-    fn a_repository_moved_away_is_reported_as_missing() {
-        let dir = tempfile::tempdir().unwrap();
-        let root = dir.path().to_string_lossy().into_owned();
-        let repository = RepositoryInfo {
-            name: repository_name(&root),
-            root,
-        };
-        assert!(existing_root(&repository).is_ok());
-
-        drop(dir);
-        let error = existing_root(&repository).unwrap_err();
-        assert_eq!(
-            user_facing_code(&error),
-            Some(UserFacingErrorCode::RepositoryMissing)
-        );
-    }
 }

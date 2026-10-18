@@ -39,7 +39,7 @@ pub(crate) fn load_version_text(
     version: &FileVersion,
     limit: usize,
 ) -> anyhow::Result<VersionText> {
-    let root = existing_root(repository)?;
+    let root = existing_root(backend, repository)?;
     let path = checked_path(path)?;
     let object = match version {
         FileVersion::Worktree => {

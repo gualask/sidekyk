@@ -2,7 +2,7 @@
 //! and the one place that changes them.
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -11,12 +11,12 @@ use tauri::{Emitter, Manager};
 use super::tray;
 use crate::infrastructure::git_cli::LocalRepositoryBackend;
 use crate::infrastructure::settings_store;
-use crate::infrastructure::watcher::{RepositoryWatcher, WatchedChanges};
+use crate::infrastructure::watcher::LocalRepositoryWatcher;
 use crate::modules::projects::ProjectList;
 use crate::modules::repository::{
-    self, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths, RepositoryBackend,
-    RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, Visible,
-    REPOSITORY_CHANGED_EVENT,
+    self, classify, resolve_repository, ChangedFile, FileContent, FileTree, IgnoredPaths,
+    RepositoryBackend, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary, RepositoryWatcher, Visible, Watch, REPOSITORY_CHANGED_EVENT,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, ListMatch, NoteMatch, ProjectFiles,
@@ -77,7 +77,7 @@ struct CachedTree {
 struct Watched {
     root: String,
     /// `None` when the watcher could not start, such as a repository moved away.
-    _watcher: Option<RepositoryWatcher>,
+    _watch: Option<Watch>,
 }
 
 #[derive(Default)]
@@ -298,7 +298,13 @@ impl ProjectsState {
     }
 
     /// Whether a batch of the watcher may have added or removed a file of the tree read.
-    fn batch_changes_tree(&self, root: &str, git_dir: bool, visible: &Visible) -> bool {
+    fn batch_changes_tree(
+        &self,
+        backend: &dyn RepositoryBackend,
+        root: &str,
+        git_dir: bool,
+        visible: &Visible,
+    ) -> bool {
         let trees = lock(&self.trees);
         let Some(tree) = trees.get(root).and_then(|c| c.tree.as_ref()) else {
             // nothing read, nothing to read again
@@ -307,7 +313,7 @@ impl ProjectsState {
         git_dir
             || match visible {
                 Visible::Unknown => true,
-                Visible::Paths(paths) => tree.may_have_changed(Path::new(root), paths),
+                Visible::Paths(paths) => tree.may_have_changed(backend, Path::new(root), paths),
             }
     }
 
@@ -389,10 +395,10 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     // what the previous watcher saw is gone with it: the files are read again when asked for
     lock(&state.trees).clear();
     tray::clear(app);
-    let watcher = match start_watcher(app, &active.root) {
-        Ok(watcher) => {
+    let watch = match start_watcher(app, &active.root) {
+        Ok(watch) => {
             tracing::info!(root = %active.root, "project opened");
-            Some(watcher)
+            Some(watch)
         }
         Err(error) => {
             tracing::warn!(
@@ -405,11 +411,11 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     };
     *watched = Some(Watched {
         root: active.root,
-        _watcher: watcher,
+        _watch: watch,
     });
 }
 
-fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<RepositoryWatcher> {
+fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Watch> {
     let backend = app.state::<LocalRepositoryBackend>();
     let resolved = resolve_repository(backend.inner(), Path::new(root))?;
 
@@ -417,7 +423,16 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
     let root = resolved.info.root;
     let mut ignored = IgnoredPaths::new(root.clone().into());
     let watched_root = root.clone();
-    let on_change = move |changes: WatchedChanges| {
+    let git_dir = resolved.git_dir.clone();
+    let on_change = move |paths: Vec<PathBuf>| {
+        let changes = classify(
+            paths.iter().map(PathBuf::as_path),
+            Path::new(&watched_root),
+            &git_dir,
+        );
+        if changes.is_empty() {
+            return;
+        }
         // The index may now track a file in an ignored directory, or the excludes changed.
         if changes.git_dir {
             ignored.forget();
@@ -445,7 +460,8 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
         let backend = emitter.state::<LocalRepositoryBackend>();
         let worktree = ignored.visible(backend.inner(), &changes.worktree);
         let visible = changes.git_dir || worktree.any();
-        let files = state.batch_changes_tree(&watched_root, changes.git_dir, &worktree);
+        let files =
+            state.batch_changes_tree(backend.inner(), &watched_root, changes.git_dir, &worktree);
         if files {
             state.forget_tree(&watched_root);
         }
@@ -462,7 +478,11 @@ fn start_watcher(app: &tauri::AppHandle, root: &str) -> anyhow::Result<Repositor
             let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
         }
     };
-    RepositoryWatcher::start(root.clone().into(), resolved.git_dir, on_change)
+    app.state::<LocalRepositoryWatcher>().watch(
+        Path::new(&root),
+        &resolved.git_dir,
+        Box::new(on_change),
+    )
 }
 
 /// Adds the repository that contains `candidate` and puts it on screen.

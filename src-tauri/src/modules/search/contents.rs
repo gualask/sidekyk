@@ -265,6 +265,14 @@ mod tests {
     struct FakeFiles(HashMap<&'static str, Vec<u8>>);
 
     impl RepositoryBackend for FakeFiles {
+        fn is_dir(&self, _path: &Path) -> bool {
+            unreachable!()
+        }
+
+        fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
+            unreachable!()
+        }
+
         fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
