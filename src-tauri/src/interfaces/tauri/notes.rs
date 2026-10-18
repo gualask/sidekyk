@@ -17,15 +17,15 @@ use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
 async fn with_notes<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     work: impl FnOnce(&NotesStore, &NotesFiles, &str) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, AppError> {
     blocking(command, app, move |app| {
-        app.state::<ProjectsState>().project(&root)?;
+        app.state::<ProjectsState>().project(&project_id)?;
         work(
             &app.state::<NotesStore>(),
             &app.state::<NotesFiles>(),
-            &root,
+            &project_id,
         )
     })
     .await
@@ -35,10 +35,10 @@ async fn with_notes<T: Send + 'static>(
 /// Every note of a project, its lists and the one open.
 pub(crate) async fn get_notes(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<ProjectNotes, AppError> {
-    with_notes("get_notes", app, root, |store, files, root| {
-        store.notes(files, root)
+    with_notes("get_notes", app, project_id, |store, files, project_id| {
+        store.notes(files, project_id)
     })
     .await
 }
@@ -47,39 +47,48 @@ pub(crate) async fn get_notes(
 /// Writes a new note on top of a list.
 pub(crate) async fn add_note(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     list: String,
     text: String,
 ) -> Result<Note, AppError> {
-    with_notes("add_note", app, root, move |store, files, root| {
-        store.add_note(files, root, &list, text)
-    })
+    with_notes(
+        "add_note",
+        app,
+        project_id,
+        move |store, files, project_id| store.add_note(files, project_id, &list, text),
+    )
     .await
 }
 
 #[tauri::command]
 pub(crate) async fn set_note_text(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
     text: String,
 ) -> Result<Note, AppError> {
-    with_notes("set_note_text", app, root, move |store, files, root| {
-        store.set_note_text(files, root, &id, text)
-    })
+    with_notes(
+        "set_note_text",
+        app,
+        project_id,
+        move |store, files, project_id| store.set_note_text(files, project_id, &id, text),
+    )
     .await
 }
 
 #[tauri::command]
 pub(crate) async fn set_note_done(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
     done: bool,
 ) -> Result<Note, AppError> {
-    with_notes("set_note_done", app, root, move |store, files, root| {
-        store.set_note_done(files, root, &id, done)
-    })
+    with_notes(
+        "set_note_done",
+        app,
+        project_id,
+        move |store, files, project_id| store.set_note_done(files, project_id, &id, done),
+    )
     .await
 }
 
@@ -87,14 +96,19 @@ pub(crate) async fn set_note_done(
 /// Moves a note to a place among the open notes of a list; the notes whose place changed.
 pub(crate) async fn place_note(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
     list: String,
     index: u32,
 ) -> Result<Vec<Note>, AppError> {
-    with_notes("place_note", app, root, move |store, files, root| {
-        store.place_note(files, root, &id, &list, index as usize)
-    })
+    with_notes(
+        "place_note",
+        app,
+        project_id,
+        move |store, files, project_id| {
+            store.place_note(files, project_id, &id, &list, index as usize)
+        },
+    )
     .await
 }
 
@@ -102,24 +116,30 @@ pub(crate) async fn place_note(
 /// Puts a note back as it was (undo).
 pub(crate) async fn restore_note(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     note: Note,
 ) -> Result<Note, AppError> {
-    with_notes("restore_note", app, root, move |store, files, root| {
-        store.restore_note(files, root, note)
-    })
+    with_notes(
+        "restore_note",
+        app,
+        project_id,
+        move |store, files, project_id| store.restore_note(files, project_id, note),
+    )
     .await
 }
 
 #[tauri::command]
 pub(crate) async fn delete_note(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
 ) -> Result<(), AppError> {
-    with_notes("delete_note", app, root, move |store, files, root| {
-        store.delete_note(files, root, &id)
-    })
+    with_notes(
+        "delete_note",
+        app,
+        project_id,
+        move |store, files, project_id| store.delete_note(files, project_id, &id),
+    )
     .await
 }
 
@@ -127,25 +147,31 @@ pub(crate) async fn delete_note(
 /// A new list, last, and open.
 pub(crate) async fn add_note_list(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     name: String,
 ) -> Result<NoteList, AppError> {
-    with_notes("add_note_list", app, root, move |store, files, root| {
-        store.add_list(files, root, &name)
-    })
+    with_notes(
+        "add_note_list",
+        app,
+        project_id,
+        move |store, files, project_id| store.add_list(files, project_id, &name),
+    )
     .await
 }
 
 #[tauri::command]
 pub(crate) async fn rename_note_list(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
     name: String,
 ) -> Result<NoteList, AppError> {
-    with_notes("rename_note_list", app, root, move |store, files, root| {
-        store.rename_list(files, root, &id, &name)
-    })
+    with_notes(
+        "rename_note_list",
+        app,
+        project_id,
+        move |store, files, project_id| store.rename_list(files, project_id, &id, &name),
+    )
     .await
 }
 
@@ -153,12 +179,15 @@ pub(crate) async fn rename_note_list(
 /// Deletes a list and its notes; what comes back brings them back.
 pub(crate) async fn delete_note_list(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
 ) -> Result<DeletedList, AppError> {
-    with_notes("delete_note_list", app, root, move |store, files, root| {
-        store.delete_list(files, root, &id)
-    })
+    with_notes(
+        "delete_note_list",
+        app,
+        project_id,
+        move |store, files, project_id| store.delete_list(files, project_id, &id),
+    )
     .await
 }
 
@@ -166,12 +195,15 @@ pub(crate) async fn delete_note_list(
 /// Brings back a deleted list with its notes (undo).
 pub(crate) async fn restore_note_list(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     deleted: DeletedList,
 ) -> Result<ProjectNotes, AppError> {
-    with_notes("restore_note_list", app, root, move |store, files, root| {
-        store.restore_list(files, root, deleted)
-    })
+    with_notes(
+        "restore_note_list",
+        app,
+        project_id,
+        move |store, files, project_id| store.restore_list(files, project_id, deleted),
+    )
     .await
 }
 
@@ -179,12 +211,15 @@ pub(crate) async fn restore_note_list(
 /// Remembers the list open, for the next time the project shows.
 pub(crate) async fn open_note_list(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     id: String,
 ) -> Result<(), AppError> {
-    with_notes("open_note_list", app, root, move |store, files, root| {
-        store.open_list(files, root, &id)
-    })
+    with_notes(
+        "open_note_list",
+        app,
+        project_id,
+        move |store, files, project_id| store.open_list(files, project_id, &id),
+    )
     .await
 }
 
@@ -192,20 +227,29 @@ pub(crate) async fn open_note_list(
 /// What a project's card at all projects tells of its notes.
 pub(crate) async fn notes_summary(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<NotesSummary, AppError> {
-    with_notes("notes_summary", app, root, |store, files, root| {
-        store.summary(files, root)
-    })
+    with_notes(
+        "notes_summary",
+        app,
+        project_id,
+        |store, files, project_id| store.summary(files, project_id),
+    )
     .await
 }
 
 #[tauri::command]
 /// How many notes a project has, open and done: what removing it would delete.
-pub(crate) async fn count_notes(app: tauri::AppHandle, root: String) -> Result<u32, AppError> {
-    with_notes("count_notes", app, root, |store, files, root| {
-        Ok(store.count(files, root)? as u32)
-    })
+pub(crate) async fn count_notes(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<u32, AppError> {
+    with_notes(
+        "count_notes",
+        app,
+        project_id,
+        |store, files, project_id| Ok(store.count(files, project_id)? as u32),
+    )
     .await
 }
 
@@ -214,11 +258,11 @@ pub(crate) async fn count_notes(app: tauri::AppHandle, root: String) -> Result<u
 /// `None` when cancelled. Never inside a project's repository: Sidekyk writes in none.
 pub(crate) async fn export_notes(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<Option<String>, AppError> {
     blocking("export_notes", app, move |app| {
         let projects = app.state::<ProjectsState>();
-        let project = projects.project(&root)?;
+        let project = projects.project(&project_id)?;
         let Some(path) = app
             .dialog()
             .file()
@@ -236,7 +280,7 @@ pub(crate) async fn export_notes(
         }
         let markdown = app.state::<NotesStore>().read_notes(
             app.state::<NotesFiles>().inner(),
-            &root,
+            &project_id,
             |lists, notes| to_markdown(&project.name, lists, notes),
         )?;
         write_chosen_file(&path, markdown.as_bytes())?;

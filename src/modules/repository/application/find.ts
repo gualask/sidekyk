@@ -59,11 +59,11 @@ function finderOf(
  * selection's path; null while it is not known yet).
  */
 export function useFileFind(
-    root: string,
+    projectId: string,
     shown: string | null,
     findInFiles: (query: string) => void,
 ) {
-    const [find, setFind] = useSessionState<FileFind | null>(`find:${root}`, null);
+    const [find, setFind] = useSessionState<FileFind | null>(`find:${projectId}`, null);
     // in an effect: the session's store is outside React, and is not set while rendering
     useEffect(() => {
         if (find && shown !== null && find.file !== shown) setFind(null);

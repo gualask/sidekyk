@@ -20,13 +20,13 @@ export function RemoveProjectDialog({
     onClose: () => void;
 }) {
     const client = useQueryClient();
-    const exportNotes = useExportNotes(project.root);
+    const exportNotes = useExportNotes(project.id);
     const [exporting, setExporting] = useState(false);
-    const count = useNotesCount(project.root);
+    const count = useNotesCount(project.id);
 
     const remove = useEffectEvent(() => {
         // what was read of its notes goes too: added again, it starts with none
-        client.removeQueries({ queryKey: notesKey(project.root) });
+        client.removeQueries({ queryKey: notesKey(project.id) });
         onRemove();
         onClose();
     });

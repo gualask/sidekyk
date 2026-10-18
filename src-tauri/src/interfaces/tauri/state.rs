@@ -10,18 +10,19 @@ use super::tray;
 use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
-use sidekyk_core::modules::projects::ProjectList;
+use sidekyk_core::modules::projects::{Location, Project, ProjectList};
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
-use sidekyk_core::modules::repository::{RepositoryInfo, REPOSITORY_CHANGED_EVENT};
+use sidekyk_core::modules::repository::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::search::{self, ListMatch, NoteMatch, SearchRequest, SearchResults};
 use sidekyk_core::shared::sync::lock;
 
 pub(crate) struct ProjectsState {
     list: Mutex<ProjectList>,
-    /// The root last given to `Repositories::watch`. Held while the project on screen is read and
-    /// watched, so calls racing each other end on the project on screen after the last of them.
+    /// The id of the project last given to `Repositories::watch`. Held while the project on screen
+    /// is read and watched, so calls racing each other end on the project on screen after the
+    /// last of them.
     watching: Mutex<Option<String>>,
-    /// What reads the projects' repositories.
+    /// What reads the local projects' repositories.
     repositories: Arc<dyn Repositories>,
 }
 
@@ -56,18 +57,34 @@ impl ProjectsState {
     }
 
     /// The project on screen.
-    pub(crate) fn active(&self) -> Option<RepositoryInfo> {
+    pub(crate) fn active(&self) -> Option<Project> {
         lock(&self.list).active().cloned()
     }
 
-    /// A project the user added. Any other root is refused, so the frontend cannot point git
-    /// at a folder of its choosing.
-    pub(crate) fn project(&self, root: &str) -> anyhow::Result<RepositoryInfo> {
-        lock(&self.list).find(root).cloned()
+    /// A project the user added. Any other id is refused, so the frontend cannot point git at a
+    /// folder of its choosing.
+    pub(crate) fn project(&self, id: &str) -> anyhow::Result<Project> {
+        lock(&self.list).find(id).cloned()
     }
 
+    /// What reads this machine's repositories.
     pub(crate) fn repositories(&self) -> &dyn Repositories {
         &*self.repositories
+    }
+
+    /// The id of the project at `location`, if one is.
+    pub(crate) fn id_at(&self, location: &Location) -> Option<String> {
+        let list = lock(&self.list);
+        let project = list.projects.iter().find(|p| p.location == *location)?;
+        Some(project.id.clone())
+    }
+
+    /// What reads a project's repository, where it is.
+    pub(crate) fn repositories_of(&self, project: &Project) -> anyhow::Result<&dyn Repositories> {
+        match project.location {
+            Location::Local { .. } => Ok(self.repositories()),
+            Location::Wsl { .. } => Err(anyhow::anyhow!("WSL projects cannot be read yet")),
+        }
     }
 
     /// The palette's matches: the projects, the panels the frontend names, and the files of the
@@ -79,11 +96,13 @@ impl ProjectsState {
         notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
     ) -> SearchResults {
         let list = self.list();
-        let files_of = |root: &str| {
-            let info = list.find(root).ok()?;
-            self.repositories.search_files(info, &request.query)
+        let files_of = |id: &str| {
+            let project = list.find(id).ok()?;
+            self.repositories_of(project)
+                .ok()?
+                .search_files(&project.repository(), &request.query)
         };
-        let notes_of = |root: &str| list.find(root).ok().and_then(|_| notes_of(root));
+        let notes_of = |id: &str| list.find(id).ok().and_then(|_| notes_of(id));
         search::search(request, &list.projects, files_of, notes_of)
     }
 
@@ -99,8 +118,12 @@ impl ProjectsState {
         change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
     ) -> anyhow::Result<ProjectList> {
         let list = self.update_stored(app, change)?;
-        let roots: Vec<String> = list.projects.iter().map(|p| p.root.clone()).collect();
-        self.repositories.retain(&roots);
+        let local_roots: Vec<String> = list
+            .projects
+            .iter()
+            .filter_map(|p| p.location.local_root().map(String::from))
+            .collect();
+        self.repositories.retain(&local_roots);
         watch_active(app);
         Ok(list)
     }
@@ -127,28 +150,41 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     let state = app.state::<ProjectsState>();
     let mut watching = lock(&state.watching);
     let active = state.active();
-    let root = active.as_ref().map(|a| a.root.clone());
-    if *watching == root {
+    let id = active.as_ref().map(|a| a.id.clone());
+    if *watching == id {
         return;
     }
     // the count shown is the previous project's: cleared until the new one is read
     tray::clear(app);
-    let emitter = app.clone();
-    state.repositories.watch(
-        active.as_ref(),
-        Box::new(move |event| {
-            let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
-        }),
-    );
-    *watching = root;
+    let readable = active.filter(|project| {
+        state
+            .repositories_of(project)
+            .inspect_err(|error| tracing::warn!(error = %format!("{error:#}"), "not watched"))
+            .is_ok()
+    });
+    match readable {
+        Some(project) => {
+            let emitter = app.clone();
+            let project_id = project.id.clone();
+            state.repositories.watch(
+                Some(&project.repository()),
+                Box::new(move |change| {
+                    let event = RepositoryChangedEvent::new(&project_id, change.git_dir);
+                    let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
+                }),
+            );
+        }
+        None => state.repositories.watch(None, Box::new(|_| {})),
+    }
+    *watching = id;
 }
 
-/// Adds the repository that contains `candidate` and puts it on screen.
+/// Adds the repository that contains `candidate`, on this machine, and puts it on screen.
 pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::Result<ProjectList> {
     let state = app.state::<ProjectsState>();
-    let info = state.repositories.resolve(candidate)?;
+    let found = state.repositories.resolve(candidate)?;
     state.update(app, |list| {
-        list.add(info);
+        list.add(Project::local(found));
         Ok(())
     })
 }

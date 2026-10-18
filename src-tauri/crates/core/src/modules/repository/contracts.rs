@@ -11,23 +11,34 @@ pub struct RepositoryInfo {
     pub name: String,
 }
 
-/// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
-/// what it shows of that repository.
+/// Files or refs of the repository watched changed on disk, in a way that shows: what reads the
+/// repository tells the app, which tells the frontend (`RepositoryChangedEvent`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct RepositoryChangedEvent {
-    pub version: u8,
+pub struct RepositoryChange {
+    /// The repository's root on the machine that holds it.
     pub root: String,
     /// The index, HEAD or refs changed too: the recent commits may have, and only then are they
     /// read again.
     pub git_dir: bool,
 }
 
+/// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
+/// what it shows of that project.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepositoryChangedEvent {
+    pub version: u8,
+    pub project_id: String,
+    /// As in `RepositoryChange`.
+    pub git_dir: bool,
+}
+
 impl RepositoryChangedEvent {
-    pub fn new(root: &str, git_dir: bool) -> Self {
+    pub fn new(project_id: &str, git_dir: bool) -> Self {
         Self {
             version: 1,
-            root: root.to_string(),
+            project_id: project_id.to_string(),
             git_dir,
         }
     }
@@ -350,7 +361,7 @@ mod tests {
     fn repository_changed_event_is_versioned() {
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("/r", true)).unwrap(),
-            serde_json::json!({ "version": 1, "root": "/r", "gitDir": true })
+            serde_json::json!({ "version": 1, "projectId": "/r", "gitDir": true })
         );
     }
 

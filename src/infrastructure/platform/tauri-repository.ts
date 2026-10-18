@@ -12,15 +12,16 @@ import { onTauriEvent } from './events';
  * window's visibility in `window.rs`.
  */
 export const tauriRepository: RepositoryPort = {
-    getSnapshot: (root) => invoke('get_repository_snapshot', { root }),
-    getSummary: (root) => invoke('get_repository_summary', { root }),
-    getFileDiff: (root, request) => invoke('get_file_diff', { root, request }),
-    getRecentCommits: (root) => invoke('get_recent_commits', { root }),
-    getCommitFiles: (root, commit) => invoke('get_commit_files', { root, commit }),
-    getCommitFileDiff: (root, request) => invoke('get_commit_file_diff', { root, request }),
-    getDirectory: (root, path) => invoke('get_directory', { root, path }),
-    getFileContent: (root, path) => invoke('get_file_content', { root, path }),
-    getSyntaxColors: (root, request) => invoke('get_syntax_colors', { root, request }),
+    getSnapshot: (projectId) => invoke('get_repository_snapshot', { projectId }),
+    getSummary: (projectId) => invoke('get_repository_summary', { projectId }),
+    getFileDiff: (projectId, request) => invoke('get_file_diff', { projectId, request }),
+    getRecentCommits: (projectId) => invoke('get_recent_commits', { projectId }),
+    getCommitFiles: (projectId, commit) => invoke('get_commit_files', { projectId, commit }),
+    getCommitFileDiff: (projectId, request) =>
+        invoke('get_commit_file_diff', { projectId, request }),
+    getDirectory: (projectId, path) => invoke('get_directory', { projectId, path }),
+    getFileContent: (projectId, path) => invoke('get_file_content', { projectId, path }),
+    getSyntaxColors: (projectId, request) => invoke('get_syntax_colors', { projectId, request }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),
     setWindowVisible: (visible) =>

@@ -115,7 +115,7 @@ export function PanelTile({
             <div className="relative min-h-0 flex-1">
                 <Suspense fallback={null}>
                     <panel.Component
-                        key={project.root}
+                        key={project.id}
                         project={project}
                         header={header}
                         tileFit={tileFit}

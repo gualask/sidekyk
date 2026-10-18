@@ -1,7 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::contracts::{ProjectList, TilesLayout};
-use crate::modules::repository::RepositoryInfo;
+use super::contracts::{Project, ProjectList, TilesLayout};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A stored layout is the frontend's: panel ids are short words, and a project has a few panels.
@@ -15,45 +14,45 @@ impl ProjectList {
     /// one, so a file edited by hand cannot leave the app without a project on screen.
     pub fn normalized(mut self) -> Self {
         let mut seen = std::collections::HashSet::new();
-        self.projects.retain(|p| seen.insert(p.root.clone()));
+        self.projects.retain(|p| seen.insert(p.id.clone()));
         let projects = &self.projects;
         self.layouts
-            .retain(|root, _| projects.iter().any(|p| &p.root == root));
+            .retain(|id, _| projects.iter().any(|p| &p.id == id));
         if self.active().is_none() {
-            self.active = self.projects.first().map(|p| p.root.clone());
+            self.active = self.projects.first().map(|p| p.id.clone());
         }
         self
     }
 
-    pub fn find(&self, root: &str) -> anyhow::Result<&RepositoryInfo> {
+    pub fn find(&self, id: &str) -> anyhow::Result<&Project> {
         self.projects
             .iter()
-            .find(|p| p.root == root)
+            .find(|p| p.id == id)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))
     }
 
-    pub fn active(&self) -> Option<&RepositoryInfo> {
-        let root = self.active.as_deref()?;
-        self.projects.iter().find(|p| p.root == root)
+    pub fn active(&self) -> Option<&Project> {
+        let id = self.active.as_deref()?;
+        self.projects.iter().find(|p| p.id == id)
     }
 
     /// Adds the project at the end, unless it is already there, and puts it on screen.
-    pub fn add(&mut self, project: RepositoryInfo) {
-        if self.find(&project.root).is_err() {
+    pub fn add(&mut self, project: Project) {
+        if self.find(&project.id).is_err() {
             self.projects.push(project.clone());
         }
-        self.active = Some(project.root);
+        self.active = Some(project.id);
     }
 
-    pub fn activate(&mut self, root: &str) -> anyhow::Result<()> {
-        self.find(root)?;
-        self.active = Some(root.to_string());
+    pub fn activate(&mut self, id: &str) -> anyhow::Result<()> {
+        self.find(id)?;
+        self.active = Some(id.to_string());
         Ok(())
     }
 
     /// Keeps how a project lays out its tiles: the split within its bounds, each panel once.
-    pub fn set_layout(&mut self, root: &str, layout: TilesLayout) -> anyhow::Result<()> {
-        self.find(root)?;
+    pub fn set_layout(&mut self, id: &str, layout: TilesLayout) -> anyhow::Result<()> {
+        self.find(id)?;
         let mut seen = std::collections::HashSet::new();
         let mut minimized = layout.minimized;
         minimized.retain(|id| id.len() <= MAX_PANEL_ID && seen.insert(id.clone()));
@@ -64,13 +63,13 @@ impl ProjectList {
             EVEN_SPLIT
         };
         self.layouts
-            .insert(root.to_string(), TilesLayout { minimized, split });
+            .insert(id.to_string(), TilesLayout { minimized, split });
         Ok(())
     }
 
-    /// Whether `path` is inside a project's repository. `canonical` names a path as the file system
-    /// does (links resolved); `ignore_case` compares letters without case, as macOS and Windows
-    /// do by default.
+    /// Whether `path`, on this machine, is inside a local project's repository. `canonical` names
+    /// a path as the file system does (links resolved); `ignore_case` compares letters without
+    /// case, as macOS and Windows do by default.
     pub fn holds(
         &self,
         path: &Path,
@@ -91,52 +90,54 @@ impl ProjectList {
                 .collect()
         };
         let path = fold(path);
-        self.projects
-            .iter()
-            .any(|p| path.starts_with(&fold(Path::new(&p.root))))
+        self.projects.iter().any(|p| {
+            p.location
+                .local_root()
+                .is_some_and(|root| path.starts_with(&fold(Path::new(root))))
+        })
     }
 
-    /// A project found again at `found` (its repository moved): it takes the new root in its
-    /// place, its layout with it, and stays on screen if it was. When `found` is a project already,
-    /// the old one goes into it instead.
-    pub fn relocate(&mut self, root: &str, found: RepositoryInfo) -> anyhow::Result<()> {
+    /// A project found again at `found` (its repository moved): it takes the new place, and the
+    /// id that comes with it, in its position, its layout with it, and stays on screen if it was.
+    /// When `found` is a project already, the old one goes into it instead.
+    pub fn relocate(&mut self, id: &str, found: Project) -> anyhow::Result<()> {
         let index = self
             .projects
             .iter()
-            .position(|p| p.root == root)
+            .position(|p| p.id == id)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
-        if found.root == root {
+        if found.id == id {
             return Ok(());
         }
-        let was_active = self.active.as_deref() == Some(root);
-        let layout = self.layouts.remove(root);
-        if self.find(&found.root).is_ok() {
+        let was_active = self.active.as_deref() == Some(id);
+        let layout = self.layouts.remove(id);
+        if self.find(&found.id).is_ok() {
             self.projects.remove(index);
         } else {
             if let Some(layout) = layout {
-                self.layouts.insert(found.root.clone(), layout);
+                self.layouts.insert(found.id.clone(), layout);
             }
             self.projects[index] = found.clone();
         }
         if was_active {
-            self.active = Some(found.root);
+            self.active = Some(found.id);
         }
         Ok(())
     }
 
     /// Forgets a project; its repository is left as it is. When it was on screen, the one after
     /// it takes its place, or the one before it when it was the last.
-    pub fn remove(&mut self, root: &str) -> anyhow::Result<()> {
+    pub fn remove(&mut self, id: &str) -> anyhow::Result<()> {
         let index = self
             .projects
             .iter()
-            .position(|p| p.root == root)
+            .position(|p| p.id == id)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
         self.projects.remove(index);
-        self.layouts.remove(root);
-        if self.active.as_deref() == Some(root) {
+        self.layouts.remove(id);
+        if self.active.as_deref() == Some(id) {
             let next = self.projects.get(index).or(self.projects.last());
-            self.active = next.map(|p| p.root.clone());
+            self.active = next.map(|p| p.id.clone());
         }
         Ok(())
     }
@@ -145,13 +146,14 @@ impl ProjectList {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::projects::Location;
     use crate::shared::error::user_facing_code;
 
-    fn project(root: &str) -> RepositoryInfo {
-        RepositoryInfo {
-            root: root.into(),
-            name: root.trim_start_matches('/').into(),
-        }
+    fn project(root: &str) -> Project {
+        Project::new(
+            root.trim_start_matches('/').into(),
+            Location::Local { root: root.into() },
+        )
     }
 
     fn list(roots: &[&str], active: Option<&str>) -> ProjectList {
@@ -176,7 +178,7 @@ mod tests {
     fn only_a_known_project_can_be_activated() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
         projects.activate("/b").unwrap();
-        assert_eq!(projects.active().map(|p| p.root.as_str()), Some("/b"));
+        assert_eq!(projects.active().map(|p| p.id.as_str()), Some("/b"));
 
         let error = projects.activate("/elsewhere").unwrap_err();
         assert_eq!(
@@ -257,6 +259,20 @@ mod tests {
     }
 
     #[test]
+    fn a_wsl_project_holds_no_path_of_this_machine() {
+        let mut projects = list(&[], None);
+        projects.add(Project::new(
+            "shop".into(),
+            Location::Wsl {
+                distro: "Ubuntu".into(),
+                root: "/home/ale/shop".into(),
+            },
+        ));
+        let same = |path: &Path| path.to_path_buf();
+        assert!(!projects.holds(Path::new("/home/ale/shop/notes.md"), same, false));
+    }
+
+    #[test]
     fn a_project_found_elsewhere_keeps_its_place_and_layout() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
         projects.set_layout("/a", layout(0.3)).unwrap();
@@ -265,7 +281,7 @@ mod tests {
             projects
                 .projects
                 .iter()
-                .map(|p| p.root.as_str())
+                .map(|p| p.id.as_str())
                 .collect::<Vec<_>>(),
             ["/moved", "/b"]
         );

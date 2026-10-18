@@ -6,7 +6,7 @@ import { useNotesSummary } from '../application/notes.queries';
  * newest. Loaded with level 0.
  */
 export function NotesSummary({ project }: PanelSummaryProps) {
-    const summary = useNotesSummary(project.root).data;
+    const summary = useNotesSummary(project.id).data;
     if (!summary) return null;
     return (
         <p className="mt-auto line-clamp-2 border-t border-dashed border-ui-border pt-2.5 text-xs text-ui-text-muted">

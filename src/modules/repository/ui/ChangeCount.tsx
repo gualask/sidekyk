@@ -11,7 +11,7 @@ export function ChangeCount({
     /** The Changes panel shows the project, and its snapshot brings the count. */
     fromSnapshot: boolean;
 }) {
-    const summary = useRepositorySummary(project.root, { fromSnapshot });
+    const summary = useRepositorySummary(project.id, { fromSnapshot });
     const files = summary.data?.totals.files ?? 0;
     if (!summary.data || files === 0) return null;
 

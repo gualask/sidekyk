@@ -1,12 +1,12 @@
 const AVATAR_COLORS = 6;
 
 /**
- * The avatar color of a project, `--ui-avatar-1` to `--ui-avatar-6`. It comes from the root, not
+ * The avatar color of a project, `--ui-avatar-1` to `--ui-avatar-6`. It comes from the id, not
  * the position in the list, so a project keeps its color when another one is added or removed.
  */
-export function avatarColor(root: string): string {
+export function avatarColor(projectId: string): string {
     let hash = 0;
-    for (const char of root) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+    for (const char of projectId) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
     return `var(--ui-avatar-${(hash % AVATAR_COLORS) + 1})`;
 }
 

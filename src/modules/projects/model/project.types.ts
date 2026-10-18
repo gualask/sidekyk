@@ -8,9 +8,9 @@ import type { ProjectInfo } from '@/shared/projects/project-info';
 export interface ProjectList {
     /** In the order they were added. */
     projects: ProjectInfo[];
-    /** The root of the project on screen: null only when there are no projects. */
+    /** The id of the project on screen: null only when there are no projects. */
     active: string | null;
-    /** How each project lays out its panels' tiles, by root; one never changed is not there. */
+    /** How each project lays out its panels' tiles, by id; one never changed is not there. */
     layouts: Record<string, TilesLayout>;
 }
 

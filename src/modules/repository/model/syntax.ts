@@ -31,7 +31,7 @@ type Side = keyof ColorSides;
 
 /** What a viewer's lines are colored from: the sides of a file in a project. */
 export interface FileSyntax {
-    root: string;
+    projectId: string;
     sides: ColorSides;
 }
 

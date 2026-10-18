@@ -8,13 +8,13 @@ import { useSearchPort } from './search.port';
 export function useSearch(
     query: string,
     panels: readonly string[],
-    root: string | null,
+    projectId: string | null,
     enabled = true,
 ) {
     const port = useSearchPort();
     return useQuery({
-        queryKey: ['search', query, panels, root],
-        queryFn: () => port.search({ query, panels: [...panels], root }),
+        queryKey: ['search', query, panels, projectId],
+        queryFn: () => port.search({ query, panels: [...panels], projectId }),
         enabled,
         placeholderData: keepPreviousData,
         gcTime: 0,

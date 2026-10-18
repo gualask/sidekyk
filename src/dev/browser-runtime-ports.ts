@@ -8,6 +8,7 @@ import { fixtureFileContent, fixtureTree } from './files.fixture-data';
 import { fixtureContentSearch, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
+import { localProject, wslProject } from './projects.fixture';
 import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
 import { type FixtureTexts, fixtureColors, fixtureVersionText } from './syntax.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
@@ -21,19 +22,19 @@ export function isScenario(value: string | null): value is Scenario {
 
 /** Projects with a clean working tree, next to the scenario's own. */
 const CLEAN_PROJECTS: ProjectInfo[] = [
-    { root: '/Users/dev/Projects/docs-site', name: 'docs-site' },
-    { root: '/Users/dev/Projects/api-gateway', name: 'api-gateway' },
+    localProject('/Users/dev/Projects/docs-site', 'docs-site'),
+    localProject('/Users/dev/Projects/api-gateway', 'api-gateway'),
 ];
 
+/** In `review`: a clone of the scenario's repository in a WSL distro, clean, of the same name. */
+const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
+
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
-const MISSING_PROJECT: ProjectInfo = {
-    root: '/Users/dev/Projects/old-prototype',
-    name: 'old-prototype',
-};
+const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-prototype');
 
 function initialProjects(scenario: Scenario): ProjectInfo[] {
     if (scenario === 'no-repo') return [];
-    if (scenario === 'review') return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0]];
+    if (scenario === 'review') return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT];
     if (scenario === 'problems') return [FIXTURE_REPOSITORY, MISSING_PROJECT];
     return [FIXTURE_REPOSITORY];
 }
@@ -54,9 +55,9 @@ function failure(code: string) {
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
 export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     const projects = initialProjects(scenario);
-    let list: ProjectList = { projects, active: projects[0]?.root ?? null, layouts: {} };
-    const project = (root: string) => {
-        const found = list.projects.find((p) => p.root === root);
+    let list: ProjectList = { projects, active: projects[0]?.id ?? null, layouts: {} };
+    const project = (projectId: string) => {
+        const found = list.projects.find((p) => p.id === projectId);
         if (!found) throw failure('project_not_found');
         return found;
     };
@@ -81,36 +82,37 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         ? { kind: 'refused', keys: STORED_SHORTCUT }
         : { kind: 'active', keys: STORED_SHORTCUT, conflict: false };
     // the scenario's data belongs to its first project; any other is clean
-    const scenarioData = (root: string) => root === FIXTURE_REPOSITORY.root && scenario !== 'clean';
-    const readable = (root: string) => {
-        project(root);
-        if (root === MISSING_PROJECT.root) throw failure('repository_missing');
+    const scenarioData = (projectId: string) =>
+        projectId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
+    const readable = (projectId: string) => {
+        project(projectId);
+        if (projectId === MISSING_PROJECT.id) throw failure('repository_missing');
     };
-    const large = (root: string) => scenario === 'large' && scenarioData(root);
-    const snapshot = (root: string) => {
-        readable(root);
-        if (large(root)) return largeSnapshot();
-        return reviewSnapshot(!scenarioData(root));
+    const large = (projectId: string) => scenario === 'large' && scenarioData(projectId);
+    const snapshot = (projectId: string) => {
+        readable(projectId);
+        if (large(projectId)) return largeSnapshot();
+        return reviewSnapshot(!scenarioData(projectId));
     };
 
     // as the backend, the tree is built once and kept: the fixtures never change on disk
     const trees = new Map<string, ReturnType<typeof fixtureTree>>();
-    const tree = (root: string) => {
-        readable(root);
-        let found = trees.get(root);
+    const tree = (projectId: string) => {
+        readable(projectId);
+        let found = trees.get(projectId);
         if (!found) {
-            found = fixtureTree(large(root), snapshot(root).files);
-            trees.set(root, found);
+            found = fixtureTree(large(projectId), snapshot(projectId).files);
+            trees.set(projectId, found);
         }
         return found;
     };
 
     // as the backend, the palette searches the files of the tree, as the last snapshot found them
     // changed: none when they cannot be read
-    const searchedFiles = (root: string | null) => {
-        if (!root) return null;
+    const searchedFiles = (projectId: string | null) => {
+        if (!projectId) return null;
         try {
-            return { paths: tree(root).files, changed: snapshot(root).files };
+            return { paths: tree(projectId).files, changed: snapshot(projectId).files };
         } catch {
             return null;
         }
@@ -118,46 +120,47 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
 
     // as the backend, notes need the project in the list, not its repository: a moved one's stay
     const notes = fixtureNotes(
-        (root) => (!scenarioData(root) ? 'empty' : large(root) ? 'large' : 'review'),
-        (root) => {
-            project(root);
+        (projectId) => (!scenarioData(projectId) ? 'empty' : large(projectId) ? 'large' : 'review'),
+        (projectId) => {
+            project(projectId);
         },
     );
     // as the backend, the palette searches the notes of the project on screen
-    const searchedNotes = (root: string | null) => {
-        if (!root) return null;
+    const searchedNotes = (projectId: string | null) => {
+        if (!projectId) return null;
         try {
-            return notes.peek(root);
+            return notes.peek(projectId);
         } catch {
             return null;
         }
     };
 
     // the versions a diff compares, from the diffs and files served below
-    const texts = (root: string): FixtureTexts => ({
+    const texts = (projectId: string): FixtureTexts => ({
         changeDiff: (area, path) => {
-            if (!snapshot(root).files.some((f) => f.area === area && f.path === path)) return null;
-            const diff = large(root)
+            if (!snapshot(projectId).files.some((f) => f.area === area && f.path === path))
+                return null;
+            const diff = large(projectId)
                 ? wholeFileDiff(largeDiff())
                 : reviewDiff({ area, path, wholeFile: true });
             return diff.text;
         },
         fileText: (path) => {
-            if (!tree(root).has(path)) return null;
+            if (!tree(projectId).has(path)) return null;
             const content = fixtureFileContent(path);
             return content.kind === 'text' ? content.text : null;
         },
         commitDiff: (sha, path) => {
-            for (const { sha: commitSha, parent } of recentCommits(large(root)).commits) {
+            for (const { sha: commitSha, parent } of recentCommits(large(projectId)).commits) {
                 const side = commitSha === sha ? 'new' : parent === sha ? 'old' : null;
                 if (!side) continue;
                 const commit = { sha: commitSha, parent };
-                const file = commitFiles(large(root), commit).files.find(
+                const file = commitFiles(large(projectId), commit).files.find(
                     (f) => (side === 'new' ? f.path : (f.origPath ?? f.path)) === path,
                 );
                 if (!file) continue;
                 const request = { commit, path: file.path, origPath: file.origPath };
-                const diff = commitFileDiff(large(root), { ...request, wholeFile: true });
+                const diff = commitFileDiff(large(projectId), { ...request, wholeFile: true });
                 return { text: wholeFileDiff(diff).text, side };
             }
             return null;
@@ -172,76 +175,81 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 // the folder picked is not in a repository
                 if (scenario === 'problems') throw failure('not_a_repository');
                 const added =
-                    CLEAN_PROJECTS.find((p) => !list.projects.some((q) => q.root === p.root)) ??
+                    CLEAN_PROJECTS.find((p) => !list.projects.some((q) => q.id === p.id)) ??
                     FIXTURE_REPOSITORY;
-                const known = list.projects.some((p) => p.root === added.root);
+                const known = list.projects.some((p) => p.id === added.id);
                 return update({
                     ...list,
                     projects: known ? list.projects : [...list.projects, added],
-                    active: added.root,
+                    active: added.id,
                 });
             },
-            activateProject: async (root) => update({ ...list, active: project(root).root }),
+            activateProject: async (projectId) =>
+                update({ ...list, active: project(projectId).id }),
             // as in `src-tauri/crates/core/src/modules/projects/list.rs`: the next project shows,
             // else the previous
-            removeProject: async (root) => {
-                const index = list.projects.indexOf(project(root));
-                notes.drop(root);
-                const projects = list.projects.filter((p) => p.root !== root);
+            removeProject: async (projectId) => {
+                const index = list.projects.indexOf(project(projectId));
+                notes.drop(projectId);
+                const projects = list.projects.filter((p) => p.id !== projectId);
                 const next = projects[index] ?? projects.at(-1) ?? null;
-                const { [root]: _gone, ...layouts } = list.layouts;
+                const { [projectId]: _gone, ...layouts } = list.layouts;
                 return update({
                     projects,
-                    active: list.active === root ? (next?.root ?? null) : list.active,
+                    active: list.active === projectId ? (next?.id ?? null) : list.active,
                     layouts,
                 });
             },
             // in `problems`, the moved project is found next to where it was
-            relocateProject: async (root) => {
-                const moved = project(root);
-                const found = { root: `${moved.root}-moved`, name: moved.name };
-                notes.relink(moved.root, found.root);
-                const { [moved.root]: layout, ...layouts } = list.layouts;
+            relocateProject: async (projectId) => {
+                const moved = project(projectId);
+                const found = localProject(`${moved.location.root}-moved`, moved.name);
+                notes.relink(moved.id, found.id);
+                const { [moved.id]: layout, ...layouts } = list.layouts;
                 return update({
                     projects: list.projects.map((p) => (p === moved ? found : p)),
-                    active: list.active === moved.root ? found.root : list.active,
-                    layouts: layout ? { ...layouts, [found.root]: layout } : layouts,
+                    active: list.active === moved.id ? found.id : list.active,
+                    layouts: layout ? { ...layouts, [found.id]: layout } : layouts,
                 });
             },
-            setProjectLayout: async (root, layout) =>
-                update({ ...list, layouts: { ...list.layouts, [project(root).root]: layout } }),
+            setProjectLayout: async (projectId, layout) =>
+                update({ ...list, layouts: { ...list.layouts, [project(projectId).id]: layout } }),
             onProjectsChanged: () => () => undefined,
         },
         repository: {
-            getSnapshot: async (root) => snapshot(root),
-            getSummary: async (root) => snapshot(root).summary,
-            getFileDiff: async (root, request) => {
-                readable(root);
-                if (!large(root)) return reviewDiff(request);
+            getSnapshot: async (projectId) => snapshot(projectId),
+            getSummary: async (projectId) => snapshot(projectId).summary,
+            getFileDiff: async (projectId, request) => {
+                readable(projectId);
+                if (!large(projectId)) return reviewDiff(request);
                 return request.wholeFile ? wholeFileDiff(largeDiff()) : largeDiff();
             },
             // every project has the same history, even with a clean working tree
-            getRecentCommits: async (root) => {
-                readable(root);
-                return recentCommits(large(root));
+            getRecentCommits: async (projectId) => {
+                readable(projectId);
+                return recentCommits(large(projectId));
             },
-            getCommitFiles: async (root, commit) => {
-                readable(root);
-                return commitFiles(large(root), commit);
+            getCommitFiles: async (projectId, commit) => {
+                readable(projectId);
+                return commitFiles(large(projectId), commit);
             },
-            getCommitFileDiff: async (root, request) => {
-                readable(root);
-                const diff = commitFileDiff(large(root), request);
+            getCommitFileDiff: async (projectId, request) => {
+                readable(projectId);
+                const diff = commitFileDiff(large(projectId), request);
                 return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
-            getDirectory: async (root, path) => tree(root).directory(path),
-            getFileContent: async (root, path) => {
-                if (!tree(root).has(path)) throw failure('file_missing');
+            getDirectory: async (projectId, path) => tree(projectId).directory(path),
+            getFileContent: async (projectId, path) => {
+                if (!tree(projectId).has(path)) throw failure('file_missing');
                 return fixtureFileContent(path);
             },
-            getSyntaxColors: async (root, { path, version, first, count }) => {
-                readable(root);
-                return fixtureColors(fixtureVersionText(texts(root), path, version), first, count);
+            getSyntaxColors: async (projectId, { path, version, first, count }) => {
+                readable(projectId);
+                return fixtureColors(
+                    fixtureVersionText(texts(projectId), path, version),
+                    first,
+                    count,
+                );
             },
             onRepositoryChanged: () => () => undefined,
             setWindowVisible: async () => null,
@@ -251,14 +259,18 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 fixtureSearch(
                     request,
                     list.projects,
-                    searchedFiles(request.root),
-                    searchedNotes(request.root),
+                    searchedFiles(request.projectId),
+                    searchedNotes(request.projectId),
                 ),
-            searchContents: async (root, query, onFiles) => {
-                const { files, end } = fixtureContentSearch(tree(root).files, query, (path) => {
-                    const content = fixtureFileContent(path);
-                    return content.kind === 'text' ? content.text : null;
-                });
+            searchContents: async (projectId, query, onFiles) => {
+                const { files, end } = fixtureContentSearch(
+                    tree(projectId).files,
+                    query,
+                    (path) => {
+                        const content = fixtureFileContent(path);
+                        return content.kind === 'text' ? content.text : null;
+                    },
+                );
                 if (files.length > 0) onFiles(files);
                 return end;
             },

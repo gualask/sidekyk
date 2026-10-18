@@ -101,7 +101,7 @@ export function AppShell() {
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
     // how the project lays out its tiles: which wait in the top bar, the side column's split
-    const [layout, changeLayout] = useProjectLayout(project?.root ?? null);
+    const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
     // a tile minimized is not selected: Changes is, which is never minimized
     const selectedTile = layout.minimized.includes(panel.id) ? MAIN_TILE.panel : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell
@@ -114,7 +114,7 @@ export function AppShell() {
     const [helpOpen, setHelpOpen] = useState(false);
     const toggleHelp = () => setHelpOpen((open) => !open);
     // the file shown, whose lines found come first: worked out only while the palette is open
-    const shownFile = useShownFile(level > 0 ? (project?.root ?? null) : null);
+    const shownFile = useShownFile(level > 0 ? (project?.id ?? null) : null);
     // a problem's fix in the settings: they open in place of the palette
     const openSettings = useCallback(() => {
         setPalette(closePalette);
@@ -128,7 +128,7 @@ export function AppShell() {
     const { mutate: relocate } = useRelocateProject(rereadNotes);
     const fixProject = useMemo(
         () => ({
-            locate: (project: ProjectInfo) => relocate(project.root),
+            locate: (project: ProjectInfo) => relocate(project.id),
             remove: setRemoving,
         }),
         [relocate],
@@ -201,8 +201,8 @@ export function AppShell() {
 
     const paletteActions: PaletteActions = {
         // the project's panels, or the panel already full screen
-        openProject: (root) => {
-            activate(root);
+        openProject: (projectId) => {
+            activate(projectId);
             if (level === 0) zoom(1);
         },
         openPanel: (id) => {
@@ -318,9 +318,9 @@ export function AppShell() {
             {removing ? (
                 <Suspense fallback={null}>
                     <RemoveProjectDialog.Component
-                        key={removing.root}
+                        key={removing.id}
                         project={removing}
-                        onRemove={() => removeProject(removing.root)}
+                        onRemove={() => removeProject(removing.id)}
                         onClose={() => setRemoving(null)}
                     />
                 </Suspense>
@@ -344,7 +344,7 @@ export function AppShell() {
                         onModeChange={(mode) => setPalette((current) => ({ ...current, mode }))}
                         initialText={palette.text}
                         projectName={project?.name ?? null}
-                        root={level > 0 ? (project?.root ?? null) : null}
+                        projectId={level > 0 ? (project?.id ?? null) : null}
                         currentFile={palette.open ? shownFile() : null}
                         panels={project ? PALETTE_PANELS : NO_PANELS}
                         actions={paletteActions}
@@ -446,7 +446,7 @@ function Workspace({
                 onShowAll={() => zoom(0)}
                 badge={(other) => {
                     // the project on screen gets its count from the Changes panel's snapshot
-                    const shown = other.root === project.root;
+                    const shown = other.id === project.id;
                     return shown || idle ? (
                         <ChangeCount project={other} fromSnapshot={shown} />
                     ) : null;

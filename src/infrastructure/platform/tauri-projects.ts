@@ -11,10 +11,10 @@ import { onTauriEvent } from './events';
 export const tauriProjects: ProjectsPort = {
     getProjects: () => invoke('get_projects'),
     addProject: () => invoke('add_project'),
-    activateProject: (root) => invoke('activate_project', { root }),
-    removeProject: (root) => invoke('remove_project', { root }),
-    relocateProject: (root) => invoke('relocate_project', { root }),
-    setProjectLayout: (root, layout) => invoke('set_project_layout', { root, layout }),
+    activateProject: (projectId) => invoke('activate_project', { projectId }),
+    removeProject: (projectId) => invoke('remove_project', { projectId }),
+    relocateProject: (projectId) => invoke('relocate_project', { projectId }),
+    setProjectLayout: (projectId, layout) => invoke('set_project_layout', { projectId, layout }),
     onProjectsChanged: (listener) =>
         onTauriEvent<ProjectsChangedEvent>(PROJECTS_CHANGED_EVENT, () => listener()),
 };

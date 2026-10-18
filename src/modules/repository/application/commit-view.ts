@@ -9,11 +9,11 @@ const NO_FILES: readonly FileChange[] = [];
  * the one open, and whether the recent commits are open. Leaving it closes them too, out of the
  * way, whether by its × or by `Esc`.
  */
-export function useCommitView(root: string) {
+export function useCommitView(projectId: string) {
     const [commit, setCommit] = useState<Commit | null>(null);
     const [path, setPath] = useState<string | null>(null);
     const [listOpen, setListOpen] = useState(false);
-    const files = useCommitFiles(root, commit);
+    const files = useCommitFiles(projectId, commit);
     const list = files.data?.files ?? NO_FILES;
     // until a file is picked, and when the one picked is not listed, the first one is open
     const file = list.find((f) => f.path === path) ?? list[0] ?? null;

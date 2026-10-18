@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::modules::repository::{
-    CommitFileDiffRequest, CommitRequest, FileDiffRequest, RepositoryChangedEvent, RepositoryInfo,
+    CommitFileDiffRequest, CommitRequest, FileDiffRequest, RepositoryChange, RepositoryInfo,
 };
 use crate::modules::search::ContentFile;
 use crate::modules::syntax::SyntaxRequest;
@@ -99,7 +99,7 @@ pub enum Message {
     /// Files a search in contents (request `id`) found, before its reply.
     Contents { id: u64, files: Vec<ContentFile> },
     /// A change of the repository watched that shows.
-    Changed(RepositoryChangedEvent),
+    Changed(RepositoryChange),
 }
 
 /// A failure as the frontend gets it (`AppError`): its user-facing code, or `unknown`.
@@ -184,7 +184,10 @@ mod tests {
         write_frame(&mut stream, &request).unwrap();
         write_frame(
             &mut stream,
-            &Message::Changed(RepositoryChangedEvent::new("/r", true)),
+            &Message::Changed(RepositoryChange {
+                root: "/r".into(),
+                git_dir: true,
+            }),
         )
         .unwrap();
 

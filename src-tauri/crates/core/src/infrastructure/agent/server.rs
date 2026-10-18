@@ -13,7 +13,7 @@ use serde_json::value::RawValue;
 
 use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, WireError};
 use crate::modules::repositories::{LocalRepositories, Repositories};
-use crate::modules::repository::{RepositoryChangedEvent, RepositoryInfo};
+use crate::modules::repository::{RepositoryChange, RepositoryInfo};
 use crate::shared::sync::lock;
 
 /// Where every thread writes its frames, one whole frame at a time.
@@ -41,7 +41,10 @@ pub fn serve(
             // the app does not wait: a change missed while hidden comes up as one
             Request::SetVisible { visible } => {
                 if let Some(root) = repositories.set_visible(visible) {
-                    let event = RepositoryChangedEvent::new(&root, true);
+                    let event = RepositoryChange {
+                        root,
+                        git_dir: true,
+                    };
                     send_message(&output, &Message::Changed(event));
                 }
                 reply(&output, id, value(()));

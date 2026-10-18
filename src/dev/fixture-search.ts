@@ -69,7 +69,7 @@ export function fixtureSearch(
     };
     for (const project of projects) {
         const highlights = match(project.name, query);
-        if (highlights) results.projects.push({ ...project, highlights });
+        if (highlights) results.projects.push({ id: project.id, name: project.name, highlights });
     }
     request.panels.forEach((title, index) => {
         const highlights = match(title, query);

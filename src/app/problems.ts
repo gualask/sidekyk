@@ -4,6 +4,7 @@ import { useMissingRepositories } from '@/modules/repository';
 import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { MACOS } from '@/shared/platform/macos';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { placeName } from '@/shared/projects/project-place';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
 export interface Problem {
@@ -30,11 +31,11 @@ export function useProblems(
 
     return useMemo(() => {
         const problems: Problem[] = (list?.projects ?? [])
-            .filter((project) => missing.includes(project.root))
+            .filter((project) => missing.includes(project.id))
             .map((project) => ({
-                id: `missing:${project.root}`,
+                id: `missing:${project.id}`,
                 title: `${project.name} was moved or deleted`,
-                detail: `Nothing is left at ${project.root}. Locate its new folder: its notes and layout follow. Or remove it.`,
+                detail: `Nothing is left at ${placeName(project.location)}. Locate its new folder: its notes and layout follow. Or remove it.`,
                 fixes: [
                     { label: 'Locate…', run: () => fixProject.locate(project) },
                     { label: 'Remove', run: () => fixProject.remove(project) },

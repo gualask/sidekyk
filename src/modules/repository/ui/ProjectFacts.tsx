@@ -13,7 +13,7 @@ export function ProjectFacts({
     /** The Changes panel shows the project, and its snapshot brings the facts. */
     fromSnapshot: boolean;
 }) {
-    const summary = useRepositorySummary(project.root, { fromSnapshot });
+    const summary = useRepositorySummary(project.id, { fromSnapshot });
     if (!summary.data) return null;
     const { branch, totals } = summary.data;
 

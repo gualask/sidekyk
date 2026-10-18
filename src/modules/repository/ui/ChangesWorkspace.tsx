@@ -59,11 +59,11 @@ export function ChangesWorkspace({
         setSelection,
         change: selected,
         path: selectedPath,
-    } = useSelectedFile(project.root);
-    const commitView = useCommitView(project.root);
+    } = useSelectedFile(project.id);
+    const commitView = useCommitView(project.id);
     const { commit: viewed, file: commitFile } = commitView;
     // the file shown, whose find bar goes when another shows
-    const find = useFileFind(project.root, selected?.path ?? selectedPath, findInFiles);
+    const find = useFileFind(project.id, selected?.path ?? selectedPath, findInFiles);
     const selectedIndex = selected ? files.indexOf(selected) : -1;
     // a file of the tree that did not change, once the list says so
     const unchanged = !selected && snapshot.isSuccess ? selectedPath : null;
@@ -201,7 +201,7 @@ export function ChangesWorkspace({
                         )}
                     </div>
                     <RecentCommits
-                        root={project.root}
+                        projectId={project.id}
                         open={commitView.listOpen}
                         onOpenChange={commitView.setListOpen}
                         viewed={viewed}
@@ -232,7 +232,7 @@ export function ChangesWorkspace({
                         commitFile && commitFind ? (
                             <CommitDiffView
                                 key={`${shownKey}:${diffView.view}`}
-                                root={project.root}
+                                projectId={project.id}
                                 commit={viewed}
                                 file={commitFile}
                                 view={diffView.view}
@@ -257,7 +257,7 @@ export function ChangesWorkspace({
                     ) : selected ? (
                         <ChangeDiffView
                             key={`${shownKey}:${diffView.view}`}
-                            root={project.root}
+                            projectId={project.id}
                             file={selected}
                             view={diffView.view}
                             openOn={diffView.openOn}
@@ -283,7 +283,7 @@ export function ChangesWorkspace({
                     ) : unchanged !== null ? (
                         <TextFileView
                             key={unchanged}
-                            root={project.root}
+                            projectId={project.id}
                             path={unchanged}
                             header={header}
                             finder={find.finderFor(unchanged)}

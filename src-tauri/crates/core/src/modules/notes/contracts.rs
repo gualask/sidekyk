@@ -67,7 +67,9 @@ pub(super) const STORED_VERSION: u8 = 1;
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub(super) struct StoredProject {
     pub(super) version: u8,
-    pub(super) root: String,
+    /// The project's id; before ids, its root, which is a local project's id.
+    #[serde(alias = "root")]
+    pub(super) id: String,
 }
 
 /// `<id>.json`: one note.

@@ -232,7 +232,11 @@ export function DiffList({
         const row = rows[item.index];
         return row?.kind === 'line' ? [row.line] : [];
     });
-    const colors = useSyntaxColors(syntax.root, syntax.sides, blocksOf(shownLines, syntax.sides));
+    const colors = useSyntaxColors(
+        syntax.projectId,
+        syntax.sides,
+        blocksOf(shownLines, syntax.sides),
+    );
     useEffect(() => onTooLarge(colors.tooLarge), [colors.tooLarge, onTooLarge]);
     const brackets = hunksBetween(layout, rows, items[0]?.index ?? 0, items.at(-1)?.index ?? -1);
 

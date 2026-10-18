@@ -20,7 +20,7 @@ use crate::infrastructure::hide_console;
 use crate::modules::repositories::Repositories;
 use crate::modules::repository::{
     CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    RecentCommits, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+    RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary,
     UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
@@ -32,7 +32,7 @@ use crate::shared::sync::lock;
 /// the app read the repository on screen again, which starts the next.
 const STABLE_RUN: Duration = Duration::from_secs(10);
 
-type OnChange = Arc<dyn Fn(RepositoryChangedEvent) + Send + Sync>;
+type OnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
 
 pub struct AgentRepositories {
     /// How the helper starts: the local binary, or `wsl.exe` running it in a distro.
@@ -229,9 +229,9 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
                     let _ = sender.send(Incoming::Contents(files));
                 }
             }
-            Ok(Some(Message::Changed(event))) => {
-                if let Some(on_change) = watching(kept) {
-                    on_change(event);
+            Ok(Some(Message::Changed(change))) => {
+                if let Some(on_change) = watching(kept, &change.root) {
+                    on_change(change);
                 }
             }
             Ok(None) => break,
@@ -267,9 +267,13 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
     }
 }
 
-/// What gets the changes of the repository watched, if one is.
-fn watching(kept: &Kept) -> Option<OnChange> {
-    lock(&kept.watched).as_ref().map(|(_, f)| f.clone())
+/// What gets the changes of the repository at `root`, if it is the one watched: one the helper
+/// sent before it took the next watch is not.
+fn watching(kept: &Kept, root: &str) -> Option<OnChange> {
+    lock(&kept.watched)
+        .as_ref()
+        .filter(|(repository, _)| repository.root == root)
+        .map(|(_, f)| f.clone())
 }
 
 /// What the helper that stopped watched may have changed meanwhile: the app reads it again, which
@@ -277,7 +281,10 @@ fn watching(kept: &Kept) -> Option<OnChange> {
 fn read_again(kept: &Kept) {
     let watched = lock(&kept.watched).clone();
     if let Some((repository, on_change)) = watched {
-        on_change(RepositoryChangedEvent::new(&repository.root, true));
+        on_change(RepositoryChange {
+            root: repository.root.clone(),
+            git_dir: true,
+        });
     }
 }
 
@@ -411,7 +418,7 @@ impl Repositories for AgentRepositories {
     fn watch(
         &self,
         repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) {
         *lock(&self.kept.watched) = repository.map(|r| (r.clone(), OnChange::from(on_change)));
         let repository = repository.cloned();

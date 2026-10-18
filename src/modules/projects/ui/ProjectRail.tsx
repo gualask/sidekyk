@@ -1,6 +1,7 @@
 import { IconLayoutGrid } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { remoteName } from '@/shared/projects/project-place';
 import { useActivateProject } from '../application/projects.queries';
 import type { ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
@@ -34,15 +35,16 @@ export function ProjectRail({
             </button>
             <span className="h-px w-6 shrink-0 bg-ui-border" />
             {list.projects.map((project) => {
-                const on = project.root === list.active;
+                const on = project.id === list.active;
+                const remote = remoteName(project.location);
                 return (
                     <button
-                        key={project.root}
+                        key={project.id}
                         type="button"
                         className="group relative shrink-0 rounded-[9px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent"
-                        title={project.name}
+                        title={remote ? `${project.name} (${remote})` : project.name}
                         aria-current={on ? 'page' : undefined}
-                        onClick={() => activate(project.root)}
+                        onClick={() => activate(project.id)}
                     >
                         <ProjectAvatar
                             project={project}

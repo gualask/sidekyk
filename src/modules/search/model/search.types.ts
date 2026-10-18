@@ -11,14 +11,14 @@ export interface SearchRequest {
     /** The panels' titles, in their order: the frontend defines the panels. */
     panels: string[];
     /** The project whose files are searched: the one on screen, none when all projects show. */
-    root: string | null;
+    projectId: string | null;
 }
 
 /** Where the query's letters are in a text: UTF-16 offsets `[start, end)`. */
 export type Highlight = [start: number, end: number];
 
 interface ProjectMatch {
-    root: string;
+    id: string;
     name: string;
     /** In the name. */
     highlights: Highlight[];

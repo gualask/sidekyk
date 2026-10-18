@@ -9,8 +9,9 @@ pub struct SearchRequest {
     pub query: String,
     /// The panels' titles, in their order: the frontend defines the panels.
     pub panels: Vec<String>,
-    /// The project whose files are searched: the one on screen, none when all projects show.
-    pub root: Option<String>,
+    /// The id of the project whose files are searched: the one on screen, none when all projects
+    /// show.
+    pub project_id: Option<String>,
 }
 
 /// Where the query's letters are in a text: UTF-16 offsets `[start, end)`, as JavaScript counts.
@@ -19,7 +20,7 @@ pub type Highlight = [u32; 2];
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectMatch {
-    pub root: String,
+    pub id: String,
     pub name: String,
     /// In the name.
     pub highlights: Vec<Highlight>,
@@ -148,7 +149,7 @@ mod tests {
         let request: SearchRequest = serde_json::from_value(serde_json::json!({
             "query": "tot",
             "panels": ["Changes"],
-            "root": "/r"
+            "projectId": "/r"
         }))
         .unwrap();
         assert_eq!(
@@ -156,13 +157,13 @@ mod tests {
             SearchRequest {
                 query: "tot".into(),
                 panels: vec!["Changes".into()],
-                root: Some("/r".into()),
+                project_id: Some("/r".into()),
             }
         );
 
         let results = SearchResults {
             projects: vec![ProjectMatch {
-                root: "/r".into(),
+                id: "/r".into(),
                 name: "r".into(),
                 highlights: vec![[0, 1]],
             }],
@@ -204,7 +205,7 @@ mod tests {
         assert_eq!(
             serde_json::to_value(&results).unwrap(),
             serde_json::json!({
-                "projects": [{ "root": "/r", "name": "r", "highlights": [[0, 1]] }],
+                "projects": [{ "id": "/r", "name": "r", "highlights": [[0, 1]] }],
                 "panels": [{ "index": 0, "highlights": [] }],
                 "files": [
                     { "path": "src/total.ts", "mark": "added", "highlights": [[4, 7]] },

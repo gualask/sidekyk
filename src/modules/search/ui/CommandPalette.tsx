@@ -36,7 +36,7 @@ const MODES: { mode: PaletteMode; label: string; key: string }[] = [
 
 /** What the palette opens: the app knows how to get there. */
 export interface PaletteActions {
-    openProject: (root: string) => void;
+    openProject: (projectId: string) => void;
     openPanel: (id: string) => void;
     /** A file, or a line of it where a text was found, to look through in the viewer. */
     openFile: (path: string, find?: { query: string; line: number }) => void;
@@ -59,7 +59,7 @@ export function CommandPalette({
     onModeChange,
     initialText,
     projectName,
-    root,
+    projectId,
     currentFile,
     panels,
     actions,
@@ -73,7 +73,7 @@ export function CommandPalette({
     /** The project on screen, whose panels and files are offered; null when there is none. */
     projectName: string | null;
     /** The project whose files are searched; null when all projects show. */
-    root: string | null;
+    projectId: string | null;
     /** The file the project shows, whose lines found come first. */
     currentFile: string | null;
     panels: readonly PalettePanel[];
@@ -92,12 +92,12 @@ export function CommandPalette({
                         onModeChange={onModeChange}
                         initialText={initialText}
                         projectName={projectName}
-                        root={root}
+                        projectId={projectId}
                         currentFile={currentFile}
                         panels={panels}
                         onOpen={(item, query) => {
                             onOpenChange(false);
-                            if (item.kind === 'project') actions.openProject(item.root);
+                            if (item.kind === 'project') actions.openProject(item.projectId);
                             else if (item.kind === 'panel') actions.openPanel(item.id);
                             else if (item.kind === 'file') actions.openFile(item.path);
                             else if (item.kind === 'list') actions.openNotes(item.id, null);
@@ -120,7 +120,7 @@ function Palette({
     onModeChange,
     initialText,
     projectName,
-    root,
+    projectId,
     currentFile,
     panels,
     onOpen,
@@ -129,7 +129,7 @@ function Palette({
     onModeChange: (mode: PaletteMode) => void;
     initialText: string;
     projectName: string | null;
-    root: string | null;
+    projectId: string | null;
     currentFile: string | null;
     panels: readonly PalettePanel[];
     onOpen: (item: PaletteItem, query: string) => void;
@@ -137,8 +137,8 @@ function Palette({
     const [query, setQuery] = useState(initialText);
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
     const contents = mode === 'contents';
-    const names = useSearch(query, titles, root, !contents);
-    const found = useContentSearch(contents ? root : null, query);
+    const names = useSearch(query, titles, projectId, !contents);
+    const found = useContentSearch(contents ? projectId : null, query);
     const { items, rows } = useMemo(() => {
         if (contents)
             return found ? contentRows(found.files, currentFile) : { items: [], rows: [] };
@@ -165,7 +165,7 @@ function Palette({
         paddingEnd: 6,
     });
     const empty = contents
-        ? contentsNotice(root, query, found)
+        ? contentsNotice(projectId, query, found)
         : names.data && rows.length === 0
           ? 'Nothing found.'
           : null;
@@ -196,7 +196,7 @@ function Palette({
                 )}
                 <Autocomplete.Input
                     aria-label={contents ? 'Find in files' : 'Go to'}
-                    placeholder={placeholder(mode, root, projectName)}
+                    placeholder={placeholder(mode, projectId, projectName)}
                     spellCheck={false}
                     autoComplete="off"
                     className="h-[50px] min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ui-text outline-none placeholder:text-ui-text-muted"
@@ -264,7 +264,7 @@ function Palette({
                 <span>
                     <kbd className="kbd">Esc</kbd> close
                 </span>
-                {contents && root && query.trim().length >= MIN_CONTENT_QUERY ? (
+                {contents && projectId && query.trim().length >= MIN_CONTENT_QUERY ? (
                     <span className="ml-auto" aria-live="polite">
                         {contentsStatus(found, query)}
                     </span>
@@ -274,20 +274,25 @@ function Palette({
     );
 }
 
-function placeholder(mode: PaletteMode, root: string | null, projectName: string | null): string {
-    if (mode === 'names') return root ? 'Go to project, panel or file…' : 'Go to project or panel…';
-    return root
+function placeholder(
+    mode: PaletteMode,
+    projectId: string | null,
+    projectName: string | null,
+): string {
+    if (mode === 'names')
+        return projectId ? 'Go to project, panel or file…' : 'Go to project or panel…';
+    return projectId
         ? `Find in the files of ${projectName ?? 'the project'}…`
         : 'Open a project to find in its files';
 }
 
 /** What the list says instead of lines found: why there are none yet, or none at all. */
 function contentsNotice(
-    root: string | null,
+    projectId: string | null,
     query: string,
     found: ContentResults | null,
 ): string | null {
-    if (!root || !query.trim()) return null;
+    if (!projectId || !query.trim()) return null;
     if (query.trim().length < MIN_CONTENT_QUERY) {
         return `Type at least ${MIN_CONTENT_QUERY} characters.`;
     }

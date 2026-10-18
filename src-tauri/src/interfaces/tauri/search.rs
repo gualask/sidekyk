@@ -25,9 +25,9 @@ pub(crate) async fn search(
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
         let query = request.query.clone();
-        Ok(app.state::<ProjectsState>().search(&request, |root| {
+        Ok(app.state::<ProjectsState>().search(&request, |project_id| {
             notes
-                .with_notes(files.inner(), root, |lists, found| {
+                .with_notes(files.inner(), project_id, |lists, found| {
                     search_notes(&query, lists, found)
                 })
                 .inspect_err(
@@ -44,21 +44,16 @@ pub(crate) async fn search(
 /// (`⌘F`); a newer search stops this one.
 pub(crate) async fn search_contents(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     query: String,
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
-    on_project(
-        "search_contents",
-        app,
-        root,
-        move |_, repositories, info| {
-            repositories.search_contents(info, &query, &|files| {
-                // the page went away: nothing left to stop
-                let _ = on_files.send(files);
-            })
-        },
-    )
+    on_project("search_contents", app, project_id, move |on| {
+        on.repositories.search_contents(on.info, &query, &|files| {
+            // the page went away: nothing left to stop
+            let _ = on_files.send(files);
+        })
+    })
     .await
 }
 

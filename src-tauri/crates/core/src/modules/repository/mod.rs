@@ -20,8 +20,9 @@ pub use commits::{load_commit_file_diff, load_commit_files, load_recent_commits}
 pub use contracts::{ChangeArea, Commit};
 pub use contracts::{
     ChangeKind, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory,
-    FileContent, FileDiffRequest, FileVersion, RecentCommits, RepositoryChangedEvent,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
+    FileContent, FileDiffRequest, FileVersion, RecentCommits, RepositoryChange,
+    RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    REPOSITORY_CHANGED_EVENT,
 };
 pub use diff::load_file_diff;
 pub use ignored::{IgnoredPaths, Visible};

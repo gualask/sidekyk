@@ -2,12 +2,10 @@ import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/rep
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
 import { CHECKOUT_TS, type LongFile, ORDERS_TS } from './long.fixture-data';
+import { localProject } from './projects.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
 
-export const FIXTURE_REPOSITORY: ProjectInfo = {
-    root: '/Users/dev/Projects/shop',
-    name: 'shop',
-};
+export const FIXTURE_REPOSITORY: ProjectInfo = localProject('/Users/dev/Projects/shop', 'shop');
 
 const TOTAL_TS = `diff --git a/src/cart/total.ts b/src/cart/total.ts
 index 3f2a1c0..9b7e4d2 100644

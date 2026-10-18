@@ -23,9 +23,9 @@ function isLastChange(queryClient: QueryClient): boolean {
 }
 
 /** A project's name as the list on screen has it, for a message about a change to it. */
-function projectName(queryClient: QueryClient, root: string): string {
+function projectName(queryClient: QueryClient, projectId: string): string {
     const list = queryClient.getQueryData<ProjectList>(projectsKey);
-    return list?.projects.find((project) => project.root === root)?.name ?? root;
+    return list?.projects.find((project) => project.id === projectId)?.name ?? projectId;
 }
 
 /** The list, as every reader of it asks for it. */
@@ -83,26 +83,27 @@ export function useActivateProject() {
     const showToast = useShowToast();
     const { mutate } = useMutation({
         ...projectsChange,
-        mutationFn: (root: string) => port.activateProject(root),
-        onMutate: async (root) => {
+        mutationFn: (projectId: string) => port.activateProject(projectId),
+        onMutate: async (projectId) => {
             await queryClient.cancelQueries({ queryKey: projectsKey });
             queryClient.setQueryData<ProjectList>(projectsKey, (list) =>
-                list ? { ...list, active: root } : list,
+                list ? { ...list, active: projectId } : list,
             );
         },
         onSuccess: (list) => {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
-        onError: (error, root) => {
-            showToast(errorToast(`Could not open ${projectName(queryClient, root)}`, error));
+        onError: (error, projectId) => {
+            showToast(errorToast(`Could not open ${projectName(queryClient, projectId)}`, error));
             if (isLastChange(queryClient)) {
                 void queryClient.invalidateQueries({ queryKey: projectsKey });
             }
         },
     });
     return useCallback(
-        (root: string) => {
-            if (queryClient.getQueryData<ProjectList>(projectsKey)?.active !== root) mutate(root);
+        (projectId: string) => {
+            if (queryClient.getQueryData<ProjectList>(projectsKey)?.active !== projectId)
+                mutate(projectId);
         },
         [queryClient, mutate],
     );
@@ -115,12 +116,12 @@ export function useRemoveProject() {
     const showToast = useShowToast();
     return useMutation({
         ...projectsChange,
-        mutationFn: (root: string) => port.removeProject(root),
+        mutationFn: (projectId: string) => port.removeProject(projectId),
         onSuccess: (list) => {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
-        onError: (error, root) => {
-            showToast(errorToast(`Could not remove ${projectName(queryClient, root)}`, error));
+        onError: (error, projectId) => {
+            showToast(errorToast(`Could not remove ${projectName(queryClient, projectId)}`, error));
         },
     });
 }
@@ -135,14 +136,14 @@ export function useRelocateProject(onRelocated: () => void) {
     const showToast = useShowToast();
     return useMutation({
         ...projectsChange,
-        mutationFn: (root: string) => port.relocateProject(root),
+        mutationFn: (projectId: string) => port.relocateProject(projectId),
         onSuccess: (list) => {
             if (!list) return;
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
             onRelocated();
         },
-        onError: (error, root) => {
-            showToast(errorToast(`Could not locate ${projectName(queryClient, root)}`, error));
+        onError: (error, projectId) => {
+            showToast(errorToast(`Could not locate ${projectName(queryClient, projectId)}`, error));
         },
     });
 }
@@ -154,18 +155,18 @@ export const DEFAULT_TILES_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
  * How a project lays out its tiles, and how to change it: shown at once, stored after. A failure
  * is a toast; the layout stays as shown for the session.
  */
-export function useProjectLayout(root: string | null) {
+export function useProjectLayout(projectId: string | null) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
     const layout = useQuery({
         ...projectsQuery(port),
-        select: (list) => (root ? list.layouts[root] : undefined) ?? DEFAULT_TILES_LAYOUT,
+        select: (list) => (projectId ? list.layouts[projectId] : undefined) ?? DEFAULT_TILES_LAYOUT,
     }).data;
     const { mutate } = useMutation({
         ...projectsChange,
-        mutationFn: ({ root, layout }: { root: string; layout: TilesLayout }) =>
-            port.setProjectLayout(root, layout),
+        mutationFn: ({ projectId, layout }: { projectId: string; layout: TilesLayout }) =>
+            port.setProjectLayout(projectId, layout),
         onSuccess: (list) => {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
@@ -176,17 +177,17 @@ export function useProjectLayout(root: string | null) {
     // shown at once, in the same render: a view transition captures the layout changed
     const change = useCallback(
         (next: (current: TilesLayout) => TilesLayout) => {
-            if (!root) return;
+            if (!projectId) return;
             const list = queryClient.getQueryData<ProjectList>(projectsKey);
             if (!list) return;
-            const layout = next(list.layouts[root] ?? DEFAULT_TILES_LAYOUT);
+            const layout = next(list.layouts[projectId] ?? DEFAULT_TILES_LAYOUT);
             queryClient.setQueryData<ProjectList>(projectsKey, {
                 ...list,
-                layouts: { ...list.layouts, [root]: layout },
+                layouts: { ...list.layouts, [projectId]: layout },
             });
-            mutate({ root, layout });
+            mutate({ projectId, layout });
         },
-        [root, queryClient, mutate],
+        [projectId, queryClient, mutate],
     );
     return [layout ?? DEFAULT_TILES_LAYOUT, change] as const;
 }

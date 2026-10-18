@@ -315,6 +315,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::infrastructure::watcher::LocalRepositoryWatcher;
+    use crate::modules::projects::{Location, Project};
     use crate::modules::repositories::{LocalRepositories, Repositories};
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
@@ -1074,16 +1075,22 @@ mod tests {
         let palette: SearchRequest = serde_json::from_value(json!({
             "query": "srcmod",
             "panels": ["Changes", "Files"],
-            "root": repo.info.root,
+            "projectId": repo.info.root,
         }))
         .unwrap();
+        let project = Project::new(
+            repo.info.name.clone(),
+            Location::Local {
+                root: repo.info.root.clone(),
+            },
+        );
         println!(
             "search over {} files: {}",
             tree.files().len(),
             time(20, || {
                 search(
                     &palette,
-                    std::slice::from_ref(&repo.info),
+                    std::slice::from_ref(&project),
                     |_| {
                         Some(search_files(
                             &palette.query,

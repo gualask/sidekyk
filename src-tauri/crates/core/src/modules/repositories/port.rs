@@ -5,7 +5,7 @@ use std::path::Path;
 
 use crate::modules::repository::{
     CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    RecentCommits, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+    RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary,
     UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
@@ -86,7 +86,7 @@ pub trait Repositories: Send + Sync {
     fn watch(
         &self,
         repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     );
 
     /// Records whether the window shows. A change of the repository on screen seen meanwhile is

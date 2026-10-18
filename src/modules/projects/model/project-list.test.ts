@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { activeProject, neighbourProject } from './project-list';
 
-const project = (name: string) => ({ root: `/p/${name}`, name });
+const project = (name: string): ProjectInfo => ({
+    id: `/p/${name}`,
+    name,
+    location: { kind: 'local', root: `/p/${name}` },
+});
 const list = (active: string | null, ...names: string[]) => ({
     projects: names.map(project),
     active: active ? `/p/${active}` : null,
@@ -9,7 +14,7 @@ const list = (active: string | null, ...names: string[]) => ({
 });
 
 describe('activeProject', () => {
-    it('is the project whose root is active', () => {
+    it('is the project whose id is active', () => {
         expect(activeProject(list('b', 'a', 'b'))).toEqual(project('b'));
         expect(activeProject(list(null))).toBeNull();
     });

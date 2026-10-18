@@ -7,7 +7,7 @@ use super::blocking::blocking;
 use super::state::{self, ProjectsState};
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
-use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
+use sidekyk_core::modules::projects::{Project, ProjectList, TilesLayout};
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
@@ -38,11 +38,11 @@ pub(crate) async fn add_project(app: tauri::AppHandle) -> Result<Option<ProjectL
 /// Puts a project on screen.
 pub(crate) async fn activate_project(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("activate_project", app, move |app| {
         app.state::<ProjectsState>()
-            .update(app, |list| list.activate(&root))
+            .update(app, |list| list.activate(&project_id))
     })
     .await
 }
@@ -52,14 +52,14 @@ pub(crate) async fn activate_project(
 /// if they cannot, the project stays, so nothing is left on disk without it.
 pub(crate) async fn remove_project(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
         let projects = app.state::<ProjectsState>();
-        projects.project(&root)?;
+        projects.project(&project_id)?;
         app.state::<NotesStore>()
-            .delete_project(app.state::<NotesFiles>().inner(), &root)?;
-        projects.update(app, |list| list.remove(&root))
+            .delete_project(app.state::<NotesFiles>().inner(), &project_id)?;
+        projects.update(app, |list| list.remove(&project_id))
     })
     .await
 }
@@ -68,12 +68,12 @@ pub(crate) async fn remove_project(
 /// Keeps how a project lays out its tiles.
 pub(crate) async fn set_project_layout(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
     layout: TilesLayout,
 ) -> Result<ProjectList, AppError> {
     blocking("set_project_layout", app, move |app| {
         app.state::<ProjectsState>()
-            .update_stored(app, |list| list.set_layout(&root, layout))
+            .update_stored(app, |list| list.set_layout(&project_id, layout))
     })
     .await
 }
@@ -83,11 +83,11 @@ pub(crate) async fn set_project_layout(
 /// layout with it; into the project already there, if it is one. `None` when cancelled.
 pub(crate) async fn relocate_project(
     app: tauri::AppHandle,
-    root: String,
+    project_id: String,
 ) -> Result<Option<ProjectList>, AppError> {
     blocking("relocate_project", app, move |app| {
         let projects = app.state::<ProjectsState>();
-        let project = projects.project(&root)?;
+        let project = projects.project(&project_id)?;
         let Some(folder) = app
             .dialog()
             .file()
@@ -97,14 +97,18 @@ pub(crate) async fn relocate_project(
             return Ok(None);
         };
         let found = projects.repositories().resolve(&folder.into_path()?)?;
-        if found.root == root {
+        let found = Project::local(found);
+        if found.id == project_id {
             return Ok(Some(projects.list()));
         }
         // the notes first: if they cannot follow, the project stays where it was
-        app.state::<NotesStore>()
-            .relink(app.state::<NotesFiles>().inner(), &root, &found.root)?;
+        app.state::<NotesStore>().relink(
+            app.state::<NotesFiles>().inner(),
+            &project_id,
+            &found.id,
+        )?;
         projects
-            .update(app, |list| list.relocate(&root, found))
+            .update(app, |list| list.relocate(&project_id, found))
             .map(Some)
     })
     .await

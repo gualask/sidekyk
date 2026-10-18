@@ -102,11 +102,11 @@ fn icon(app: &AppHandle) -> Image<'static> {
 /// Shows a read of a project in the tray, when it is the project on screen: how many files
 /// changed, next to the icon on macOS and Linux and in its tooltip everywhere. A read that failed
 /// (a repository moved away) clears it.
-pub(crate) fn show_read(app: &AppHandle, root: &str, summary: Option<&RepositorySummary>) {
+pub(crate) fn show_read(app: &AppHandle, project_id: &str, summary: Option<&RepositorySummary>) {
     let Some(active) = app.state::<ProjectsState>().active() else {
         return;
     };
-    if active.root == root {
+    if active.id == project_id {
         show(
             app,
             summary.map(|summary| Shown {

@@ -63,16 +63,16 @@ export function FilesWorkspace({
     show,
     findInFiles,
 }: PanelProps) {
-    const root = project.root;
-    const [state, setState] = useSessionState<TreeState>(`tree:${root}`, CLOSED);
+    const projectId = project.id;
+    const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
     const { open, selected } = state;
     // the file shown, one for both panels: Changes selects it in its list
-    const { snapshot, files, setSelection, change, path: file } = useSelectedFile(root);
-    const find = useFileFind(root, change?.path ?? file, findInFiles);
+    const { snapshot, files, setSelection, change, path: file } = useSelectedFile(projectId);
+    const find = useFileFind(projectId, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
     const marks = useMemo(() => changeMarks(files), [files]);
-    const { read, error } = useTreeDirectories(root, open);
+    const { read, error } = useTreeDirectories(projectId, open);
     const rows = useMemo(() => treeRows(open, read), [open, read]);
     const truncated = read('')?.truncated ?? false;
 
@@ -212,7 +212,7 @@ export function FilesWorkspace({
     const viewer = change ? (
         <ChangeDiffView
             key={`${change.area}:${change.path}`}
-            root={root}
+            projectId={projectId}
             file={change}
             view="file"
             openOn={openOn?.file === change.path ? openOn.hunk : null}
@@ -240,7 +240,7 @@ export function FilesWorkspace({
     ) : !snapshot.isSuccess ? null : (
         <TextFileView
             key={file}
-            root={root}
+            projectId={projectId}
             path={file}
             header={header}
             finder={find.finderFor(file)}

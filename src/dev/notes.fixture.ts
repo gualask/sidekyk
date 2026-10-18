@@ -132,26 +132,26 @@ function largeBook(): Book {
  * the scenario's project starts with the mock's notes, any other with none.
  */
 export function fixtureNotes(
-    initial: (root: string) => 'review' | 'large' | 'empty',
-    checkRoot: (root: string) => void,
+    initial: (projectId: string) => 'review' | 'large' | 'empty',
+    checkProject: (projectId: string) => void,
 ): NotesPort & {
-    peek: (root: string) => ProjectNotes;
-    drop: (root: string) => void;
+    peek: (projectId: string) => ProjectNotes;
+    drop: (projectId: string) => void;
     relink: (from: string, to: string) => void;
 } {
     const books = new Map<string, Book>();
-    const book = (root: string): Book => {
-        checkRoot(root);
-        let found = books.get(root);
+    const book = (projectId: string): Book => {
+        checkProject(projectId);
+        let found = books.get(projectId);
         if (!found) {
-            const kind = initial(root);
+            const kind = initial(projectId);
             found =
                 kind === 'review'
                     ? bookOf(REVIEW_NOTES)
                     : kind === 'large'
                       ? largeBook()
                       : emptyBook();
-            books.set(root, found);
+            books.set(projectId, found);
         }
         return found;
     };
@@ -172,10 +172,10 @@ export function fixtureNotes(
     };
     return {
         /** The notes as they are, for the palette's search. */
-        peek: (root) => snapshot(book(root)),
+        peek: (projectId) => snapshot(book(projectId)),
         /** A project removed takes its notes, as the backend's `remove_project`. */
-        drop: (root) => {
-            books.delete(root);
+        drop: (projectId) => {
+            books.delete(projectId);
         },
         /**
          * A project found elsewhere takes its notes there, as the backend's `relink`; into the
@@ -198,9 +198,9 @@ export function fixtureNotes(
                 }
             }
         },
-        getNotes: async (root) => snapshot(book(root)),
-        addNote: async (root, listId, text) => {
-            const b = book(root);
+        getNotes: async (projectId) => snapshot(book(projectId)),
+        addNote: async (projectId, listId, text) => {
+            const b = book(projectId);
             list(b, listId);
             const now = Date.now();
             const added: Note = {
@@ -216,52 +216,52 @@ export function fixtureNotes(
             return { ...added };
         },
         // as the backend, without renumbering: positions here never run out of room
-        setNoteText: async (root, id, text) => {
-            const found = note(book(root), id);
+        setNoteText: async (projectId, id, text) => {
+            const found = note(book(projectId), id);
             if (found.text !== text) {
                 found.text = text;
                 found.edited = Date.now();
             }
             return { ...found };
         },
-        setNoteDone: async (root, id, done) => {
-            const found = note(book(root), id);
+        setNoteDone: async (projectId, id, done) => {
+            const found = note(book(projectId), id);
             if ((found.done !== null) !== done) found.done = done ? Date.now() : null;
             return { ...found };
         },
-        placeNote: async (root, id, listId, index) => {
-            const b = book(root);
+        placeNote: async (projectId, id, listId, index) => {
+            const b = book(projectId);
             list(b, listId);
             const moved = note(b, id);
             moved.position = positionAt(openNotes(b.notes, listId), id, index);
             moved.list = listId;
             return [{ ...moved }];
         },
-        restoreNote: async (root, restored) => {
-            const b = book(root);
+        restoreNote: async (projectId, restored) => {
+            const b = book(projectId);
             list(b, restored.list);
             b.notes = [...b.notes.filter((n) => n.id !== restored.id), { ...restored }];
             return { ...restored };
         },
-        deleteNote: async (root, id) => {
-            const b = book(root);
+        deleteNote: async (projectId, id) => {
+            const b = book(projectId);
             note(b, id);
             b.notes = b.notes.filter((n) => n.id !== id);
         },
-        addList: async (root, name) => {
-            const b = book(root);
+        addList: async (projectId, name) => {
+            const b = book(projectId);
             const added = { id: newId(), name: name.trim() };
             b.lists.push(added);
             b.openList = added.id;
             return { ...added };
         },
-        renameList: async (root, id, name) => {
-            const found = list(book(root), id);
+        renameList: async (projectId, id, name) => {
+            const found = list(book(projectId), id);
             found.name = name.trim();
             return { ...found };
         },
-        deleteList: async (root, id) => {
-            const b = book(root);
+        deleteList: async (projectId, id) => {
+            const b = book(projectId);
             const index = b.lists.indexOf(list(b, id));
             if (b.lists.length === 1) throw failure('unknown');
             const [gone] = b.lists.splice(index, 1);
@@ -271,16 +271,16 @@ export function fixtureNotes(
             const deleted: DeletedList = { list: gone, index, notes };
             return deleted;
         },
-        restoreList: async (root, deleted) => {
-            const b = book(root);
+        restoreList: async (projectId, deleted) => {
+            const b = book(projectId);
             b.lists.splice(Math.min(deleted.index, b.lists.length), 0, { ...deleted.list });
             b.notes.push(...deleted.notes.map((n) => ({ ...n })));
             b.openList = deleted.list.id;
             return snapshot(b);
         },
         // as the backend's `Book::summary`
-        notesSummary: async (root) => {
-            const open = book(root).notes.filter((n) => n.done === null);
+        notesSummary: async (projectId) => {
+            const open = book(projectId).notes.filter((n) => n.done === null);
             const newest = open.reduce<Note | null>(
                 (best, n) =>
                     !best ||
@@ -292,14 +292,14 @@ export function fixtureNotes(
             );
             return { open: open.length, newest: newest ? noteTitle(newest.text) : null };
         },
-        countNotes: async (root) => book(root).notes.length,
+        countNotes: async (projectId) => book(projectId).notes.length,
         // as if saved where the dialog first offers
-        exportNotes: async (root) => {
-            book(root);
-            return `${root.split('/').slice(0, 3).join('/')}/Documents/${root.split('/').pop()}-notes.md`;
+        exportNotes: async (projectId) => {
+            book(projectId);
+            return `/Users/dev/Documents/${projectId.split('/').pop()}-notes.md`;
         },
-        openList: async (root, id) => {
-            const b = book(root);
+        openList: async (projectId, id) => {
+            const b = book(projectId);
             list(b, id);
             b.openList = id;
         },

@@ -39,12 +39,12 @@ export class ChangeQueue {
 
 const queues = new Map<string, ChangeQueue>();
 
-/** The queue of a project's changes, by root. */
-export function changeQueue(root: string): ChangeQueue {
-    let queue = queues.get(root);
+/** The queue of a project's changes, by its id. */
+export function changeQueue(projectId: string): ChangeQueue {
+    let queue = queues.get(projectId);
     if (!queue) {
         queue = new ChangeQueue();
-        queues.set(root, queue);
+        queues.set(projectId, queue);
     }
     return queue;
 }

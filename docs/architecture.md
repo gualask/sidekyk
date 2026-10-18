@@ -10,8 +10,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory)
-                       └─▶ "repository-changed" { version: 1, root, gitDir }
-                             └─▶ frontend invalidates ['repository', root, …]
+                       └─▶ "repository-changed" { version: 1, projectId, gitDir }
+                             └─▶ frontend invalidates ['repository', projectId, …]
                                  (recent commits only when gitDir: index, HEAD, refs)
                                    ├─▶ get_repository_snapshot   status + numstat ×3, with summary
                                    ├─▶ get_repository_summary    level 0 only (no snapshot there)
@@ -24,7 +24,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 
 - A commit's files and diffs (`get_commit_files`, `get_commit_file_diff`) never change: cached
   under `['commit', …]`, read once.
-- Commands name a project by its root; the backend serves only roots in the project list.
+- Commands name a project by its id (`features/projects.md`); the backend serves only projects in
+  the list. The core reads a repository by its root on the machine that holds it; the app turns
+  what it reports back into the project's id.
 - Projects not on screen: not watched; their summary is read after the first paint, when the
   window shows again and when level 0 shows, only if older than 30 s (`features/projects.md`).
 - Window hidden, minimized or covered: no git (`features/background.md`).
@@ -86,8 +88,8 @@ import `app`, `infrastructure`, `dev` or another module; outside a module only i
 ### State
 
 - No client store: projects, snapshots, summaries, diffs, tree folders, notes and settings are
-  TanStack Query caches, repository keys starting with the root. A snapshot writes its summary's
-  cache.
+  TanStack Query caches, repository keys starting with the project's id. A snapshot writes its
+  summary's cache.
 - Settings changed from the app's bridges (sidebar widths, note lines) go through
   `useChangeSettings`: each change starts from the settings as they are then, so two in a row
   both stay.
@@ -115,8 +117,9 @@ In the app:
 - `bootstrap/`: plugins (single instance, dialog, store), state, commands; creates the hidden
   window in the stored theme, tray, restores projects, opens the CLI argument.
 - `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, the order of
-  watch calls, and the `Repositories` the projects are read through; the commands check a root is
-  in the list first). Blocking work on `spawn_blocking`.
+  watch calls, and the `Repositories` the projects are read through; the commands check a project
+  is in the list first, and find what reads it from its location). Blocking work on
+  `spawn_blocking`.
 
 In the core:
 

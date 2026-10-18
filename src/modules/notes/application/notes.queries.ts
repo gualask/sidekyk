@@ -11,19 +11,19 @@ import { useNotesPort } from './notes.port';
  * summary, the count before a removal): one family, so reading a project's notes again, or
  * forgetting them, takes all of it.
  */
-export const notesKey = (root: string) => ['notes', root] as const;
-const summaryKey = (root: string) => [...notesKey(root), 'summary'] as const;
-const countKey = (root: string) => [...notesKey(root), 'count'] as const;
+export const notesKey = (projectId: string) => ['notes', projectId] as const;
+const summaryKey = (projectId: string) => [...notesKey(projectId), 'summary'] as const;
+const countKey = (projectId: string) => [...notesKey(projectId), 'count'] as const;
 
 /**
  * A project's notes, read once: only the app writes them, and every change goes through the
  * cache too.
  */
-export function useProjectNotes(root: string) {
+export function useProjectNotes(projectId: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: notesKey(root),
-        queryFn: () => port.getNotes(root),
+        queryKey: notesKey(projectId),
+        queryFn: () => port.getNotes(projectId),
         staleTime: Number.POSITIVE_INFINITY,
     });
 }
@@ -34,14 +34,14 @@ export function useProjectNotes(root: string) {
  * answers were skipped behind newer changes, the notes are read again. A failure tells why and
  * reads them again too. What can be undone says so in a toast with Undo, which undoes only that.
  */
-export function useNoteActions(root: string) {
+export function useNoteActions(projectId: string) {
     const port = useNotesPort();
     const client = useQueryClient();
     const showToast = useShowToast();
 
     return useMemo(() => {
-        const key = notesKey(root);
-        const queue = changeQueue(root);
+        const key = notesKey(projectId);
+        const queue = changeQueue(projectId);
         const current = () => client.getQueryData<ProjectNotes>(key);
         const update = (change: (notes: ProjectNotes) => ProjectNotes) =>
             client.setQueryData<ProjectNotes>(key, (notes) => (notes ? change(notes) : notes));
@@ -65,7 +65,7 @@ export function useNoteActions(root: string) {
                 if (answer.kind === 'apply') shown(answer.value);
                 else if (answer.kind === 'reread') reread();
                 // the card's summary is read again when it shows
-                void client.invalidateQueries({ queryKey: summaryKey(root) });
+                void client.invalidateQueries({ queryKey: summaryKey(projectId) });
                 return answer.value;
             } catch (error) {
                 showToast(errorToast(what, error));
@@ -83,7 +83,7 @@ export function useNoteActions(root: string) {
             }
             return send(
                 'Could not move the note',
-                () => port.placeNote(root, note.id, list, index),
+                () => port.placeNote(projectId, note.id, list, index),
                 updated,
             );
         };
@@ -91,7 +91,7 @@ export function useNoteActions(root: string) {
             patch(note.id, { done: done ? Date.now() : null });
             return send(
                 'Could not change the note',
-                () => port.setNoteDone(root, note.id, done),
+                () => port.setNoteDone(projectId, note.id, done),
                 (changed) => updated([changed]),
             );
         };
@@ -100,7 +100,7 @@ export function useNoteActions(root: string) {
             update((notes) => withNotes(notes, [note]));
             await send(
                 'Could not undo',
-                () => port.restoreNote(root, note),
+                () => port.restoreNote(projectId, note),
                 (restored) => update((notes) => withNotes(notes, [restored])),
             );
         };
@@ -108,7 +108,7 @@ export function useNoteActions(root: string) {
         const remove = async (note: Note, { undoable = true } = {}) => {
             update((notes) => withoutNote(notes, note.id));
             const removed = await send('Could not delete the note', () =>
-                port.deleteNote(root, note.id).then(() => true),
+                port.deleteNote(projectId, note.id).then(() => true),
             );
             if (removed && undoable) {
                 showToast({
@@ -123,14 +123,14 @@ export function useNoteActions(root: string) {
             add: (list: string, text: string) =>
                 send(
                     'Could not add the note',
-                    () => port.addNote(root, list, text),
+                    () => port.addNote(projectId, list, text),
                     (note) => update((notes) => withNotes(notes, [note])),
                 ),
             setText: async (id: string, text: string) => {
                 patch(id, { text });
                 await send(
                     'Could not save the note',
-                    () => port.setNoteText(root, id, text),
+                    () => port.setNoteText(projectId, id, text),
                     (note) => updated([note]),
                 );
             },
@@ -164,7 +164,7 @@ export function useNoteActions(root: string) {
             addList: async (name: string) =>
                 send(
                     'Could not add the list',
-                    () => port.addList(root, name),
+                    () => port.addList(projectId, name),
                     (list) =>
                         update((notes) => ({
                             ...notes,
@@ -181,7 +181,7 @@ export function useNoteActions(root: string) {
                 rename({ id, name });
                 await send(
                     'Could not rename the list',
-                    () => port.renameList(root, id, name),
+                    () => port.renameList(projectId, id, name),
                     rename,
                 );
             },
@@ -196,7 +196,7 @@ export function useNoteActions(root: string) {
                     openList: notes.openList === id ? rest[0].id : notes.openList,
                 }));
                 const deleted = await send('Could not delete the list', () =>
-                    port.deleteList(root, id),
+                    port.deleteList(projectId, id),
                 );
                 if (!deleted) return;
                 const count = deleted.notes.length;
@@ -208,7 +208,7 @@ export function useNoteActions(root: string) {
                         run: () =>
                             void send(
                                 'Could not undo',
-                                () => port.restoreList(root, deleted),
+                                () => port.restoreList(projectId, deleted),
                                 (restored) => client.setQueryData(key, restored),
                             ),
                     },
@@ -216,10 +216,10 @@ export function useNoteActions(root: string) {
             },
             openList: (id: string) => {
                 update((notes) => ({ ...notes, openList: id }));
-                void send('Could not open the list', () => port.openList(root, id));
+                void send('Could not open the list', () => port.openList(projectId, id));
             },
         };
-    }, [root, port, client, showToast]);
+    }, [projectId, port, client, showToast]);
 }
 
 export type NoteActions = ReturnType<typeof useNoteActions>;
@@ -228,27 +228,27 @@ export type NoteActions = ReturnType<typeof useNoteActions>;
  * Saves a project's notes as Markdown where the user picks, and says where; the path, or null
  * when cancelled or failed (a toast says why).
  */
-export function useExportNotes(root: string) {
+export function useExportNotes(projectId: string) {
     const port = useNotesPort();
     const showToast = useShowToast();
     return useCallback(async () => {
         try {
-            const path = await port.exportNotes(root);
+            const path = await port.exportNotes(projectId);
             if (path) showToast({ title: 'Notes exported', description: path });
             return path;
         } catch (error) {
             showToast(errorToast('Could not export the notes', error));
             return null;
         }
-    }, [root, port, showToast]);
+    }, [projectId, port, showToast]);
 }
 
 /** How many notes a project has, counted each time it is asked: notes just written count. */
-export function useNotesCount(root: string) {
+export function useNotesCount(projectId: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: countKey(root),
-        queryFn: () => port.countNotes(root),
+        queryKey: countKey(projectId),
+        queryFn: () => port.countNotes(projectId),
         gcTime: 0,
         staleTime: 0,
     });
@@ -267,11 +267,11 @@ export function useRereadNotes() {
  * What a project's card tells of its notes, read each time all projects shows (the backend keeps
  * it in memory once read).
  */
-export function useNotesSummary(root: string) {
+export function useNotesSummary(projectId: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: summaryKey(root),
-        queryFn: () => port.notesSummary(root),
+        queryKey: summaryKey(projectId),
+        queryFn: () => port.notesSummary(projectId),
         staleTime: 0,
     });
 }

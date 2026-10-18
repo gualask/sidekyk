@@ -113,11 +113,11 @@ function DiffPane({
 
 /** A file changed in the working tree, in its area: in Changes, and in Files whole. */
 export function ChangeDiffView({
-    root,
+    projectId,
     file,
     ...shown
-}: DiffShown & { root: string; file: ChangedFile }) {
-    const diff = useFileDiff(root, {
+}: DiffShown & { projectId: string; file: ChangedFile }) {
+    const diff = useFileDiff(projectId, {
         path: file.path,
         origPath: file.origPath,
         area: file.area,
@@ -125,20 +125,20 @@ export function ChangeDiffView({
     });
     const { path, origPath, area } = file;
     const syntax = useMemo(
-        () => ({ root, sides: changeSides({ path, origPath, area }) }),
-        [root, path, origPath, area],
+        () => ({ projectId, sides: changeSides({ path, origPath, area }) }),
+        [projectId, path, origPath, area],
     );
     return <DiffPane diff={diff} file={file} commit={null} syntax={syntax} {...shown} />;
 }
 
 /** A file of a commit, against the commit's parent. */
 export function CommitDiffView({
-    root,
+    projectId,
     commit,
     file,
     ...shown
-}: DiffShown & { root: string; commit: Commit; file: FileChange }) {
-    const diff = useCommitFileDiff(root, {
+}: DiffShown & { projectId: string; commit: Commit; file: FileChange }) {
+    const diff = useCommitFileDiff(projectId, {
         commit: commitRequest(commit),
         path: file.path,
         origPath: file.origPath,
@@ -147,8 +147,8 @@ export function CommitDiffView({
     const { sha, parent } = commit;
     const { path, origPath } = file;
     const syntax = useMemo(
-        () => ({ root, sides: commitSides({ sha, parent }, { path, origPath }) }),
-        [root, sha, parent, path, origPath],
+        () => ({ projectId, sides: commitSides({ sha, parent }, { path, origPath }) }),
+        [projectId, sha, parent, path, origPath],
     );
     return (
         <DiffPane

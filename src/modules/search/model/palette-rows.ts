@@ -11,7 +11,7 @@ export interface PalettePanel {
 
 /** Something the palette opens. */
 export type PaletteItem =
-    | { kind: 'project'; root: string; label: string; highlights: Highlight[] }
+    | { kind: 'project'; projectId: string; label: string; highlights: Highlight[] }
     | { kind: 'panel'; id: string; shortcut: string; label: string; highlights: Highlight[] }
     | {
           kind: 'file';
@@ -58,7 +58,7 @@ export function paletteRows(
             label: 'Projects',
             items: results.projects.map((project) => ({
                 kind: 'project',
-                root: project.root,
+                projectId: project.id,
                 label: project.name,
                 highlights: project.highlights,
             })),

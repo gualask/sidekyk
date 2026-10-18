@@ -14,13 +14,13 @@ const NO_HUNKS: [] = [];
  * with a click as they do in a diff. A link shows where it points, never followed.
  */
 export function TextFileView({
-    root,
+    projectId,
     path,
     header,
     renderHeader,
     finder,
 }: {
-    root: string;
+    projectId: string;
     path: string;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
@@ -28,12 +28,12 @@ export function TextFileView({
     /** What the file is looked through with. */
     finder: FileFinder;
 }) {
-    const content = useFileContent(root, path);
+    const content = useFileContent(projectId, path);
     const data = content.data;
     const text = data?.kind === 'text' ? data : null;
     const { rows, widest } = useMemo(() => textRows(textLines(text?.text ?? '')), [text]);
     const source = useMemo(() => ({ path, origPath: null, commit: null }), [path]);
-    const syntax = useMemo(() => ({ root, sides: fileSides(path) }), [root, path]);
+    const syntax = useMemo(() => ({ projectId, sides: fileSides(path) }), [projectId, path]);
 
     return (
         <Pane

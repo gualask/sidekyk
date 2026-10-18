@@ -3,6 +3,7 @@ import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { useActivateProject, useAddProject } from '../application/projects.queries';
 import type { ProjectList } from '../model/project.types';
@@ -71,14 +72,14 @@ export function ProjectsOverview({
             >
                 {list.projects.map((project) => (
                     <ProjectCard
-                        key={project.root}
+                        key={project.id}
                         project={project}
-                        selected={project.root === list.active}
-                        zoomed={project.root === zoomed}
+                        selected={project.id === list.active}
+                        zoomed={project.id === zoomed}
                         onOpen={() => {
                             // named before the zoom captures the screen it leaves
-                            flushSync(() => setOpening(project.root));
-                            activate(project.root);
+                            flushSync(() => setOpening(project.id));
+                            activate(project.id);
                             onOpen();
                         }}
                         onRemove={() => onRemove(project)}
@@ -141,11 +142,14 @@ function ProjectCard({
                     >
                         {project.name}
                     </button>
-                    <div
-                        className="truncate font-mono text-xs text-ui-text-muted"
-                        title={project.root}
-                    >
-                        {project.root}
+                    <div className="flex min-w-0 items-center gap-1.5">
+                        <RemoteTag location={project.location} className="h-4 px-1.5 text-[11px]" />
+                        <div
+                            className="truncate font-mono text-xs text-ui-text-muted"
+                            title={project.location.root}
+                        >
+                            {project.location.root}
+                        </div>
                     </div>
                 </div>
             </div>

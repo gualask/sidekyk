@@ -7,7 +7,7 @@ describe('paletteRows', () => {
     it('puts the items under their groups and leaves empty groups out', () => {
         const { items, rows } = paletteRows(
             {
-                projects: [{ root: '/dev/shop', name: 'shop', highlights: [] }],
+                projects: [{ id: '/dev/shop', name: 'shop', highlights: [] }],
                 panels: [],
                 files: [{ path: 'src/total.ts', mark: 'modified', highlights: [[4, 7]] }],
                 moreFiles: 3,

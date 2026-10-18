@@ -12,7 +12,7 @@ import { LineCounts } from './LineCounts';
  * since all projects is where one looks for the projects with changes.
  */
 export function ChangesSummary({ project }: PanelSummaryProps) {
-    const summary = useRepositorySummary(project.root, { freshOnShow: true });
+    const summary = useRepositorySummary(project.id, { freshOnShow: true });
     if (summary.isError) {
         return <p className="text-xs text-ui-danger">{errorMessage(summary.error)}</p>;
     }

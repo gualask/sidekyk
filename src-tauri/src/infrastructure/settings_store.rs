@@ -2,7 +2,7 @@
 
 use tauri_plugin_store::StoreExt;
 
-use sidekyk_core::modules::projects::ProjectList;
+use sidekyk_core::modules::projects::{Project, ProjectList};
 use sidekyk_core::modules::repository::{repository_name, RepositoryInfo};
 use sidekyk_core::modules::settings::Settings;
 
@@ -29,10 +29,10 @@ pub(crate) fn load_projects(app: &tauri::AppHandle) -> ProjectList {
     let mut list = ProjectList::default();
     let last = store.get(LAST_REPOSITORY_KEY);
     if let Some(root) = last.as_ref().and_then(|root| root.as_str()) {
-        list.add(RepositoryInfo {
+        list.add(Project::local(RepositoryInfo {
             root: root.to_string(),
             name: repository_name(root),
-        });
+        }));
         if let Err(error) = save_projects(app, &list) {
             tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
         }

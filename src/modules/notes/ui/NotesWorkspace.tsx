@@ -22,10 +22,10 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
  * rest. A new note (`⌘N`, the app's key) comes as a target.
  */
 export function NotesWorkspace({ project, header, target, place, selected: hasKeys }: PanelProps) {
-    const root = project.root;
-    const { data: notes, error } = useProjectNotes(root);
-    const actions = useNoteActions(root);
-    const exportNotes = useExportNotes(root);
+    const projectId = project.id;
+    const { data: notes, error } = useProjectNotes(projectId);
+    const actions = useNoteActions(projectId);
+    const exportNotes = useExportNotes(projectId);
     // the note picked in reorder mode, or null out of it
     const [reorder, setReorder] = useState<string | null>(null);
     // a list whose field takes the focus once it shows: one just made, `⌘N`

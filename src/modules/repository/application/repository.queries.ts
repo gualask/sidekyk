@@ -31,28 +31,29 @@ import {
 } from '../model/syntax';
 import { useRepositoryPort } from './repository.port';
 
-/** Every query of a repository starts with its root, so a change on disk refetches only its own. */
+/** Every query of a repository starts with its project's id, so a change on disk refetches only its own. */
 const repositoryKeys = {
     all: ['repository'] as const,
-    of: (root: string) => [...repositoryKeys.all, root] as const,
-    snapshot: (root: string) => [...repositoryKeys.of(root), 'snapshot'] as const,
-    summary: (root: string) => [...repositoryKeys.of(root), 'summary'] as const,
-    diff: (root: string, request: FileDiffRequest) =>
+    of: (projectId: string) => [...repositoryKeys.all, projectId] as const,
+    snapshot: (projectId: string) => [...repositoryKeys.of(projectId), 'snapshot'] as const,
+    summary: (projectId: string) => [...repositoryKeys.of(projectId), 'summary'] as const,
+    diff: (projectId: string, request: FileDiffRequest) =>
         [
-            ...repositoryKeys.of(root),
+            ...repositoryKeys.of(projectId),
             'diff',
             request.area,
             request.path,
             request.origPath,
             request.wholeFile,
         ] as const,
-    commits: (root: string) => [...repositoryKeys.of(root), 'commits'] as const,
-    directory: (root: string, path: string) =>
-        [...repositoryKeys.of(root), 'directory', path] as const,
-    file: (root: string, path: string) => [...repositoryKeys.of(root), 'file', path] as const,
+    commits: (projectId: string) => [...repositoryKeys.of(projectId), 'commits'] as const,
+    directory: (projectId: string, path: string) =>
+        [...repositoryKeys.of(projectId), 'directory', path] as const,
+    file: (projectId: string, path: string) =>
+        [...repositoryKeys.of(projectId), 'file', path] as const,
     /** The working tree's, the index's or HEAD's: `[3]` is the version. */
-    colors: (root: string, { path, version }: ColorSource, first: number) =>
-        [...repositoryKeys.of(root), 'colors', version.kind, path, first] as const,
+    colors: (projectId: string, { path, version }: ColorSource, first: number) =>
+        [...repositoryKeys.of(projectId), 'colors', version.kind, path, first] as const,
 };
 
 /**
@@ -60,20 +61,20 @@ const repositoryKeys = {
  * on disk nor the window showing again reads it twice.
  */
 const commitKeys = {
-    of: (root: string, commit: CommitRequest) =>
-        ['commit', root, commit.sha, commit.parent] as const,
-    files: (root: string, commit: CommitRequest) =>
-        [...commitKeys.of(root, commit), 'files'] as const,
-    diff: (root: string, request: CommitFileDiffRequest) =>
+    of: (projectId: string, commit: CommitRequest) =>
+        ['commit', projectId, commit.sha, commit.parent] as const,
+    files: (projectId: string, commit: CommitRequest) =>
+        [...commitKeys.of(projectId, commit), 'files'] as const,
+    diff: (projectId: string, request: CommitFileDiffRequest) =>
         [
-            ...commitKeys.of(root, request.commit),
+            ...commitKeys.of(projectId, request.commit),
             'diff',
             request.path,
             request.origPath,
             request.wholeFile,
         ] as const,
-    colors: (root: string, sha: string, path: string, first: number) =>
-        ['commit', root, sha, 'colors', path, first] as const,
+    colors: (projectId: string, sha: string, path: string, first: number) =>
+        ['commit', projectId, sha, 'colors', path, first] as const,
 };
 
 /**
@@ -88,24 +89,24 @@ function isOld({ state }: { state: QueryState<unknown> }): boolean {
     return Date.now() - readAt > READ_AGAIN_AFTER_MS;
 }
 
-export function useRepositorySnapshot(root: string) {
+export function useRepositorySnapshot(projectId: string) {
     const port = useRepositoryPort();
     const queryClient = useQueryClient();
     return useQuery({
-        queryKey: repositoryKeys.snapshot(root),
+        queryKey: repositoryKeys.snapshot(projectId),
         queryFn: async () => {
-            const snapshot = await port.getSnapshot(root);
+            const snapshot = await port.getSnapshot(projectId);
             // the same git output, so the breadcrumb and the rail need no call of their own
-            queryClient.setQueryData(repositoryKeys.summary(root), snapshot.summary);
+            queryClient.setQueryData(repositoryKeys.summary(projectId), snapshot.summary);
             return snapshot;
         },
     });
 }
 
 /** A project's snapshot as last read, if any, without reading one or watching for the next. */
-export function useSnapshotOf(): (root: string) => RepositorySnapshot | undefined {
+export function useSnapshotOf(): (projectId: string) => RepositorySnapshot | undefined {
     const queryClient = useQueryClient();
-    return (root) => queryClient.getQueryData(repositoryKeys.snapshot(root));
+    return (projectId) => queryClient.getQueryData(repositoryKeys.snapshot(projectId));
 }
 
 /**
@@ -119,26 +120,26 @@ export function useSnapshotOf(): (root: string) => RepositorySnapshot | undefine
  * projects showing. The other projects are not watched: nothing runs for them while nobody looks.
  */
 export function useRepositorySummary(
-    root: string,
+    projectId: string,
     { fromSnapshot = false, freshOnShow = false } = {},
 ) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: repositoryKeys.summary(root),
-        queryFn: () => port.getSummary(root),
+        queryKey: repositoryKeys.summary(projectId),
+        queryFn: () => port.getSummary(projectId),
         enabled: !fromSnapshot,
         staleTime: Number.POSITIVE_INFINITY,
         refetchOnMount: freshOnShow ? (query) => (isOld(query) ? 'always' : false) : true,
     });
 }
 
-export function useFileDiff(root: string, request: FileDiffRequest | null) {
+export function useFileDiff(projectId: string, request: FileDiffRequest | null) {
     const port = useRepositoryPort();
     return useQuery({
         queryKey: request
-            ? repositoryKeys.diff(root, request)
-            : [...repositoryKeys.of(root), 'none'],
-        queryFn: () => (request ? port.getFileDiff(root, request) : null),
+            ? repositoryKeys.diff(projectId, request)
+            : [...repositoryKeys.of(projectId), 'none'],
+        queryFn: () => (request ? port.getFileDiff(projectId, request) : null),
         enabled: request !== null,
     });
 }
@@ -157,17 +158,17 @@ function directoriesRead(results: readonly UseQueryResult<Directory>[]) {
  * it. The backend keeps the list of files: a change on disk asks again, and only a file added or
  * removed makes it read the list again.
  */
-export function useTreeDirectories(root: string, open: ReadonlySet<string>) {
+export function useTreeDirectories(projectId: string, open: ReadonlySet<string>) {
     const port = useRepositoryPort();
     const queryClient = useQueryClient();
     // the folders read so far say which open folders show: one read brings the next
     const paths = foldersToRead(open, (path) =>
-        queryClient.getQueryData<Directory>(repositoryKeys.directory(root, path)),
+        queryClient.getQueryData<Directory>(repositoryKeys.directory(projectId, path)),
     );
     const { data, error } = useQueries({
         queries: paths.map((path) => ({
-            queryKey: repositoryKeys.directory(root, path),
-            queryFn: () => port.getDirectory(root, path),
+            queryKey: repositoryKeys.directory(projectId, path),
+            queryFn: () => port.getDirectory(projectId, path),
         })),
         combine: directoriesRead,
     });
@@ -180,11 +181,13 @@ export function useTreeDirectories(root: string, open: ReadonlySet<string>) {
 }
 
 /** A file of the tree that did not change, as the Files panel shows it. */
-export function useFileContent(root: string, path: string | null) {
+export function useFileContent(projectId: string, path: string | null) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: path ? repositoryKeys.file(root, path) : [...repositoryKeys.of(root), 'none'],
-        queryFn: () => (path ? port.getFileContent(root, path) : null),
+        queryKey: path
+            ? repositoryKeys.file(projectId, path)
+            : [...repositoryKeys.of(projectId), 'none'],
+        queryFn: () => (path ? port.getFileContent(projectId, path) : null),
         enabled: path !== null,
     });
 }
@@ -193,32 +196,32 @@ export function useFileContent(root: string, path: string | null) {
  * The last commits of the branch on screen, read only while `open`: the section is closed until
  * asked for, and costs nothing until then. Once open, a change of HEAD or refs reads it again.
  */
-export function useRecentCommits(root: string, open: boolean) {
+export function useRecentCommits(projectId: string, open: boolean) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: repositoryKeys.commits(root),
-        queryFn: () => port.getRecentCommits(root),
+        queryKey: repositoryKeys.commits(projectId),
+        queryFn: () => port.getRecentCommits(projectId),
         enabled: open,
     });
 }
 
 /** The files a commit changed, read once: a commit never changes. */
-export function useCommitFiles(root: string, commit: Commit | null) {
+export function useCommitFiles(projectId: string, commit: Commit | null) {
     const port = useRepositoryPort();
     const request = commit ? commitRequest(commit) : null;
     return useQuery({
-        queryKey: request ? commitKeys.files(root, request) : ['commit', root, 'none'],
-        queryFn: () => (request ? port.getCommitFiles(root, request) : null),
+        queryKey: request ? commitKeys.files(projectId, request) : ['commit', projectId, 'none'],
+        queryFn: () => (request ? port.getCommitFiles(projectId, request) : null),
         enabled: request !== null,
         staleTime: Number.POSITIVE_INFINITY,
     });
 }
 
-export function useCommitFileDiff(root: string, request: CommitFileDiffRequest | null) {
+export function useCommitFileDiff(projectId: string, request: CommitFileDiffRequest | null) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: request ? commitKeys.diff(root, request) : ['commit', root, 'none'],
-        queryFn: () => (request ? port.getCommitFileDiff(root, request) : null),
+        queryKey: request ? commitKeys.diff(projectId, request) : ['commit', projectId, 'none'],
+        queryFn: () => (request ? port.getCommitFileDiff(projectId, request) : null),
         enabled: request !== null,
         staleTime: Number.POSITIVE_INFINITY,
     });
@@ -239,7 +242,7 @@ const NO_COLORS: ShownColors = { colorsOf: () => undefined, tooLarge: false };
  * so colors read before a change never land on other text while the next read comes.
  */
 export function useSyntaxColors(
-    root: string,
+    projectId: string,
     sides: ColorSides,
     blocks: readonly ColorBlock[],
 ): ShownColors {
@@ -252,10 +255,10 @@ export function useSyntaxColors(
         queries: shown.map(({ source, first }) => ({
             queryKey:
                 source.version.kind === 'commit'
-                    ? commitKeys.colors(root, source.version.sha, source.path, first)
-                    : repositoryKeys.colors(root, source, first),
+                    ? commitKeys.colors(projectId, source.version.sha, source.path, first)
+                    : repositoryKeys.colors(projectId, source, first),
             queryFn: () =>
-                port.getSyntaxColors(root, {
+                port.getSyntaxColors(projectId, {
                     path: source.path,
                     version: source.version,
                     first,
@@ -278,31 +281,31 @@ export function useSyntaxColors(
     });
 }
 
-/** The roots whose last read failed as moved or deleted, joined by NUL (no path has one). */
-function missingRoots(cache: QueryCache): string {
-    const roots = new Set<string>();
+/** The projects whose last read failed as moved or deleted, by id, joined by NUL (no id has one). */
+function missingProjects(cache: QueryCache): string {
+    const ids = new Set<string>();
     for (const query of cache.findAll({ queryKey: repositoryKeys.all, type: 'all' })) {
         if (
             query.state.status === 'error' &&
             hasErrorCode(query.state.error, 'repository_missing')
         ) {
-            roots.add(query.queryKey[1] as string);
+            ids.add(query.queryKey[1] as string);
         }
     }
-    return [...roots].sort().join('\0');
+    return [...ids].sort().join('\0');
 }
 
 /**
- * The repositories found moved or deleted, from what was already read of them: nothing is
- * fetched to know it. One reads well again, and it leaves the list.
+ * The ids of the projects whose repository was found moved or deleted, from what was already read
+ * of them: nothing is fetched to know it. One reads well again, and it leaves the list.
  */
 export function useMissingRepositories(): readonly string[] {
     const cache = useQueryClient().getQueryCache();
-    const roots = useSyncExternalStore(
+    const ids = useSyncExternalStore(
         (onChange) => cache.subscribe(onChange),
-        () => missingRoots(cache),
+        () => missingProjects(cache),
     );
-    return useMemo(() => (roots ? roots.split('\0') : []), [roots]);
+    return useMemo(() => (ids ? ids.split('\0') : []), [ids]);
 }
 
 /**
@@ -320,9 +323,9 @@ export function useRepositoryChangeSubscription() {
     const queryClient = useQueryClient();
     useEffect(
         () =>
-            port.onRepositoryChanged(({ root, gitDir }) => {
+            port.onRepositoryChanged(({ projectId, gitDir }) => {
                 void queryClient.invalidateQueries({
-                    queryKey: repositoryKeys.of(root),
+                    queryKey: repositoryKeys.of(projectId),
                     // files written in the working tree make no commit, and change neither the
                     // index nor HEAD
                     predicate: ({ queryKey: [, , kind, version] }) =>

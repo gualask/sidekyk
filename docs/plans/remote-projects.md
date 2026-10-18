@@ -62,6 +62,23 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
   root.
 - No `user`: the distro's default user, the one the agent runs as (Zed has an optional one).
 - Later: `sidekyk .` from a WSL shell, a script reading `$WSL_DISTRO_NAME` as both do.
+- Built: `Project { id, name, location }` (`../features/projects.md`); the id is made from the
+  location, opaque to the frontend. The app routes a project to what reads it by its location
+  (`ProjectsState::repositories_of`): a WSL project is refused until the transport.
+
+### How a WSL project shows (2026-10-18)
+
+Agreed on previews. Built: `WSL: Ubuntu` before the folder on the card, after the name in the top
+bar, in the rail's tooltip (`shop (WSL: Ubuntu)`); no middle dot, the form VS Code's remote
+indicator uses. With the transport:
+
+- A stopped distro's card: a `stopped` chip instead of the counts, and "Ubuntu is not running.
+  Open the project to start it."
+- Opening it the first time (distro, helper copied): the panels' own loading state, with
+  "Starting Ubuntu…".
+- Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Remove);
+  no git in the distro, "git is not installed in Ubuntu" with `sudo apt install git` (Try again);
+  the helper fails, "Sidekyk could not start in Ubuntu" (Try again, details in the log).
 
 ### Protocol (2026-10-18)
 
@@ -95,7 +112,9 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
   read the repository on screen again (when the window shows), which starts the next; one that
   stops or fails to start sooner is not started again for 10 s. A request that panics, or whose
   answer is too long to send, still gets a reply: the app waits for each. Watches run on one
-  thread, in the order they came.
+  thread, in the order they came. A change names the repository by the root it was watched by
+  (not the folder git resolves), and one of a repository no longer watched is dropped: the
+  helper may send one before it takes the next watch.
 
 ### Lifecycle (2026-10-18)
 
@@ -138,7 +157,10 @@ and `docker exec` are child processes, in `infrastructure/` behind a port.
 - On Windows 11 x64, from `build.yml`'s unsigned build: the protocol's cost through `wsl.exe`;
   `wsl.exe`'s start time; `--list --verbose` leaves a stopped distro stopped; distro names and
   case; the folder dialog's form of a WSL path.
-- How a WSL project shows in the list and on its card (a preview first).
+- The palette lists two `shop`s alike (a local and a WSL clone): name the distro there too? Ask
+  with a preview first.
+- Export of notes: refuse a path inside a WSL project's repository (`\\wsl.localhost\…`), as
+  `ProjectList::holds` does for local ones.
 
 ## Sources
 

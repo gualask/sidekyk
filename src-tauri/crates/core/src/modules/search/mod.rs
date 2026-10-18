@@ -20,7 +20,8 @@ use std::sync::Arc;
 use contracts::{ChangeMark, PanelMatch, ProjectMatch};
 use rank::{Ranker, Texts};
 
-use crate::modules::repository::{ChangeKind, ChangedFile, FileTree, RepositoryInfo};
+use crate::modules::projects::Project;
+use crate::modules::repository::{ChangeKind, ChangedFile, FileTree};
 
 /// At most this many files go back: the palette shows the best, the rest are counted.
 const FILE_LIMIT: usize = 500;
@@ -47,7 +48,7 @@ pub struct ProjectFiles {
 /// each ranks them where they are kept (`search_files`, `search_notes`).
 pub fn search(
     request: &SearchRequest,
-    projects: &[RepositoryInfo],
+    projects: &[Project],
     files_of: impl FnOnce(&str) -> Option<FileMatches>,
     notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
 ) -> SearchResults {
@@ -58,7 +59,7 @@ pub fn search(
     let projects = ranked
         .into_iter()
         .map(|r| ProjectMatch {
-            root: projects[r.index].root.clone(),
+            id: projects[r.index].id.clone(),
             name: projects[r.index].name.clone(),
             highlights: r.highlights,
         })
@@ -74,12 +75,12 @@ pub fn search(
         })
         .collect();
 
-    let root = request.root.as_deref().filter(|_| !names.is_empty());
+    let project = request.project_id.as_deref().filter(|_| !names.is_empty());
     let FileMatches {
         files,
         more: more_files,
-    } = root.and_then(files_of).unwrap_or_default();
-    let (lists, notes) = root.and_then(notes_of).unwrap_or_default();
+    } = project.and_then(files_of).unwrap_or_default();
+    let (lists, notes) = project.and_then(notes_of).unwrap_or_default();
 
     SearchResults {
         projects,
@@ -147,13 +148,16 @@ fn marks_by_path(changed: &[ChangedFile]) -> HashMap<&str, ChangeMark> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::projects::Location;
     use crate::modules::repository::ChangeArea;
 
-    fn project(name: &str) -> RepositoryInfo {
-        RepositoryInfo {
-            root: format!("/dev/{name}"),
-            name: name.into(),
-        }
+    fn project(name: &str) -> Project {
+        Project::new(
+            name.into(),
+            Location::Local {
+                root: format!("/dev/{name}"),
+            },
+        )
     }
 
     fn change(path: &str, area: ChangeArea, kind: ChangeKind) -> ChangedFile {
@@ -172,7 +176,7 @@ mod tests {
         SearchRequest {
             query: query.into(),
             panels: vec!["Changes".into(), "Files".into()],
-            root: Some("/dev/shop".into()),
+            project_id: Some("/dev/shop".into()),
         }
     }
 
@@ -205,8 +209,8 @@ mod tests {
         let results = search(
             &request("ch"),
             &[project("shop"), project("cache-hub")],
-            |root| {
-                assert_eq!(root, "/dev/shop");
+            |project| {
+                assert_eq!(project, "/dev/shop");
                 Some(files("ch", &["src/cart/checkout.ts", "README.md"], &[]))
             },
             |_| None,
@@ -253,7 +257,7 @@ mod tests {
     #[test]
     fn without_a_project_no_file_is_searched() {
         let mut all = request("ts");
-        all.root = None;
+        all.project_id = None;
         let results = search(
             &all,
             &[project("shop")],

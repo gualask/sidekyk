@@ -6,8 +6,7 @@ use std::sync::atomic::Ordering;
 
 use super::LocalRepositories;
 use crate::modules::repository::{
-    classify, resolve_repository, IgnoredPaths, RepositoryChangedEvent, RepositoryInfo, Visible,
-    Watch,
+    classify, resolve_repository, IgnoredPaths, RepositoryChange, RepositoryInfo, Visible, Watch,
 };
 use crate::shared::sync::lock;
 
@@ -15,6 +14,15 @@ pub(super) struct Watched {
     root: String,
     /// `None` when the watcher could not start, such as a repository moved away.
     _watch: Option<Watch>,
+}
+
+/// The repository a watcher watches.
+struct Watching {
+    /// As the caller names it: what is kept of the repository is by this root.
+    root: String,
+    /// As git names it, where the watcher's paths are.
+    folder: PathBuf,
+    git_dir: PathBuf,
 }
 
 /// While the window is minimized, hidden or covered, as the app tells, the watcher keeps watching
@@ -31,7 +39,7 @@ impl LocalRepositories {
     pub(super) fn watch_on_screen(
         &self,
         repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) {
         let mut watched = lock(&self.watched);
         let Some(repository) = repository else {
@@ -83,46 +91,48 @@ impl LocalRepositories {
         missed
     }
 
+    /// Watches the repository at `root`, the root the caller names it by: what is kept of it and
+    /// the changes it reports go by that root, the files watched by the folder git names.
     fn start_watch(
         &self,
         root: &str,
         generation: u64,
-        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) -> anyhow::Result<Watch> {
         let resolved = resolve_repository(&*self.backend, Path::new(root))?;
-        let root = resolved.info.root;
+        let folder = PathBuf::from(resolved.info.root);
         let git_dir = resolved.git_dir;
-        let mut ignored = IgnoredPaths::new(root.clone().into());
+        let mut ignored = IgnoredPaths::new(folder.clone());
         // the watch is kept in `self`: a strong reference here would keep both alive
         let repositories = self.this.clone();
-        let (watched_root, watched_git_dir) = (root.clone(), git_dir.clone());
+        let watched = Watching {
+            root: root.to_string(),
+            folder: folder.clone(),
+            git_dir: git_dir.clone(),
+        };
         let on_paths = move |paths: Vec<PathBuf>| {
             if let Some(repositories) = repositories.upgrade() {
-                repositories.batch(
-                    generation,
-                    &watched_root,
-                    &watched_git_dir,
-                    &mut ignored,
-                    &paths,
-                    &on_change,
-                );
+                repositories.batch(generation, &watched, &mut ignored, &paths, &on_change);
             }
         };
-        self.watcher
-            .watch(Path::new(&root), &git_dir, Box::new(on_paths))
+        self.watcher.watch(&folder, &git_dir, Box::new(on_paths))
     }
 
     /// One batch of the watcher, on its thread; dropped once another repository is put on screen.
     fn batch(
         &self,
         generation: u64,
-        root: &str,
-        git_dir: &Path,
+        watched: &Watching,
         ignored: &mut IgnoredPaths,
         paths: &[PathBuf],
-        on_change: &dyn Fn(RepositoryChangedEvent),
+        on_change: &dyn Fn(RepositoryChange),
     ) {
-        let changes = classify(paths.iter().map(PathBuf::as_path), Path::new(root), git_dir);
+        let root = watched.root.as_str();
+        let changes = classify(
+            paths.iter().map(PathBuf::as_path),
+            &watched.folder,
+            &watched.git_dir,
+        );
         if changes.is_empty() {
             return;
         }
@@ -155,7 +165,7 @@ impl LocalRepositories {
         drop(visibility);
         let worktree = ignored.visible(&*self.backend, &changes.worktree);
         let visible = changes.git_dir || worktree.any();
-        let files = self.batch_changes_tree(root, changes.git_dir, &worktree);
+        let files = self.batch_changes_tree(watched, changes.git_dir, &worktree);
         if files {
             self.forget_tree(root);
         }
@@ -168,14 +178,17 @@ impl LocalRepositories {
         );
         if visible {
             self.forget_contents();
-            on_change(RepositoryChangedEvent::new(root, changes.git_dir));
+            on_change(RepositoryChange {
+                root: root.to_string(),
+                git_dir: changes.git_dir,
+            });
         }
     }
 
     /// Whether a batch of the watcher may have added or removed a file of the tree read.
-    fn batch_changes_tree(&self, root: &str, git_dir: bool, visible: &Visible) -> bool {
+    fn batch_changes_tree(&self, watched: &Watching, git_dir: bool, visible: &Visible) -> bool {
         let trees = lock(&self.trees);
-        let Some(tree) = trees.get(root).and_then(|c| c.tree.as_ref()) else {
+        let Some(tree) = trees.get(&watched.root).and_then(|c| c.tree.as_ref()) else {
             // nothing read, nothing to read again
             return false;
         };
@@ -183,7 +196,7 @@ impl LocalRepositories {
             || match visible {
                 Visible::Unknown => true,
                 Visible::Paths(paths) => {
-                    tree.may_have_changed(&*self.backend, Path::new(root), paths)
+                    tree.may_have_changed(&*self.backend, &watched.folder, paths)
                 }
             }
     }

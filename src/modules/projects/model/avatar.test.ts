@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { avatarColor, avatarLetter } from './avatar';
 
 describe('avatarColor', () => {
-    it('is one of the six avatar tokens, always the same for a root', () => {
+    it('is one of the six avatar tokens, always the same for an id', () => {
         const color = avatarColor('/Users/dev/Projects/shop');
         expect(color).toMatch(/^var\(--ui-avatar-[1-6]\)$/);
         expect(avatarColor('/Users/dev/Projects/shop')).toBe(color);

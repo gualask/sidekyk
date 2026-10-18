@@ -12,7 +12,7 @@ export function ProjectAvatar({
         <span
             aria-hidden="true"
             className={`grid shrink-0 place-items-center rounded-lg font-bold text-ui-accent-on-solid ${className}`}
-            style={{ backgroundColor: avatarColor(project.root) }}
+            style={{ backgroundColor: avatarColor(project.id) }}
         >
             {avatarLetter(project.name)}
         </span>

@@ -14,8 +14,8 @@ use std::sync::{Arc, Mutex, Weak};
 
 use crate::modules::repository::{
     self, ChangedFile, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryChangedEvent,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
+    FileDiffRequest, FileTree, RecentCommits, RepositoryBackend, RepositoryChange, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -337,7 +337,7 @@ impl Repositories for LocalRepositories {
     fn watch(
         &self,
         repository: Option<&RepositoryInfo>,
-        on_change: Box<dyn Fn(RepositoryChangedEvent) + Send + Sync>,
+        on_change: Box<dyn Fn(RepositoryChange) + Send + Sync>,
     ) {
         self.watch_on_screen(repository, on_change);
     }
