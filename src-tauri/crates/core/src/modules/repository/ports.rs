@@ -1,15 +1,10 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-pub struct GitOutput {
-    /// -1 when git was killed: it wrote more than the call reads, or did not end in time.
-    pub code: i32,
-    pub stdout: Vec<u8>,
-    pub stderr: String,
-    /// git wrote more than `max_stdout` bytes: `stdout` is its first `max_stdout`, cut anywhere,
-    /// and git was killed instead of read to the end.
-    pub truncated: bool,
-}
+use crate::shared::process::ProcessOutput;
+
+/// What a git call wrote, and how it ended.
+pub type GitOutput = ProcessOutput;
 
 /// What the repository module needs from the machine: the `git` CLI and read access to files in
 /// the working tree. The module never reads the disk itself, so the machine can be another one

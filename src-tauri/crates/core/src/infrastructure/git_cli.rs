@@ -110,18 +110,12 @@ fn run(
     max_stdout: usize,
     timeout: Duration,
 ) -> anyhow::Result<GitOutput> {
-    let output = process::run(command, input, max_stdout, timeout).map_err(|error| {
+    process::run(command, input, max_stdout, timeout).map_err(|error| {
         if error.is::<TimedOut>() {
             user_facing(UserFacingErrorCode::GitTimedOut)
         } else {
             error
         }
-    })?;
-    Ok(GitOutput {
-        code: output.code,
-        stdout: output.stdout,
-        stderr: output.stderr,
-        truncated: output.truncated,
     })
 }
 

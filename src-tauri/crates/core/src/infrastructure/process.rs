@@ -7,18 +7,10 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
+use crate::shared::process::ProcessOutput;
+
 /// What a child writes to stderr past this is read and dropped: its start says what went wrong.
 const MAX_STDERR_BYTES: usize = 64 * 1024;
-
-/// What a child wrote, and how it ended.
-pub(crate) struct Output {
-    /// -1 when it was killed: it wrote more than the call reads.
-    pub(crate) code: i32,
-    pub(crate) stdout: Vec<u8>,
-    pub(crate) stderr: String,
-    /// It wrote more than `max_stdout` bytes: `stdout` is its first `max_stdout`, cut anywhere.
-    pub(crate) truncated: bool,
-}
 
 /// The child did not end in time, and was killed.
 #[derive(Debug, thiserror::Error)]
@@ -34,7 +26,7 @@ pub(crate) fn run(
     input: Option<&[u8]>,
     max_stdout: usize,
     timeout: Duration,
-) -> anyhow::Result<Output> {
+) -> anyhow::Result<ProcessOutput> {
     let deadline = Instant::now() + timeout;
     let mut child = command
         .stdin(if input.is_some() {
@@ -94,7 +86,7 @@ pub(crate) fn run(
         // both pipes closed: the child has ended, or is ending, so this wait is short
         child.wait()?.code().unwrap_or(-1)
     };
-    Ok(Output {
+    Ok(ProcessOutput {
         code,
         stdout: stdout.bytes,
         stderr: String::from_utf8_lossy(&stderr).into_owned(),
