@@ -307,12 +307,12 @@ mod tests {
         load_file_tree, load_recent_commits, load_snapshot, load_summary, load_version_text,
         repository_name, resolve_repository, ChangeKind, Commit, CommitFileDiffRequest,
         CommitRequest, FileContent, FileDiffRequest, FileVersion, IgnoredPaths, RepositoryInfo,
-        RepositorySnapshot, VersionText, Visible,
+        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
     };
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
 
     use crate::infrastructure::watcher::LocalRepositoryWatcher;
     use crate::modules::repositories::{LocalRepositories, Repositories};
@@ -913,6 +913,29 @@ mod tests {
         assert_eq!(err.to_string(), "not_a_repository");
     }
 
+    /// The local watcher, keeping every path it reports: a failure tells what the system sent.
+    #[derive(Default)]
+    struct RecordingWatcher(Arc<Mutex<Vec<PathBuf>>>);
+
+    impl RepositoryWatcher for RecordingWatcher {
+        fn watch(
+            &self,
+            root: &Path,
+            git_dir: &Path,
+            mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
+        ) -> anyhow::Result<Watch> {
+            let seen = self.0.clone();
+            LocalRepositoryWatcher.watch(
+                root,
+                git_dir,
+                Box::new(move |paths| {
+                    seen.lock().unwrap().extend(paths.iter().cloned());
+                    on_change(paths);
+                }),
+            )
+        }
+    }
+
     #[test]
     fn the_watched_repository_tells_what_shows_and_marks_it_while_hidden() {
         // past the watcher's quiet period (250 ms) and the system's own delay
@@ -920,10 +943,10 @@ mod tests {
         const DEADLINE: Duration = Duration::from_secs(10);
         let dir = scratch_repo();
         write(dir.path(), ".gitignore", "build/\n");
-        let repositories = LocalRepositories::new(
-            Arc::new(LocalRepositoryBackend::default()),
-            Arc::new(LocalRepositoryWatcher),
-        );
+        let watcher = Arc::new(RecordingWatcher::default());
+        let seen = watcher.0.clone();
+        let repositories =
+            LocalRepositories::new(Arc::new(LocalRepositoryBackend::default()), watcher);
         let info = repositories.resolve(dir.path()).unwrap();
         let root = Path::new(&info.root);
         let (sent, received) = std::sync::mpsc::channel();
@@ -942,11 +965,14 @@ mod tests {
         };
         settle();
 
+        seen.lock().unwrap().clear();
         write(root, "build/out.o", "");
-        assert!(
-            received.recv_timeout(QUIET).is_err(),
-            "a path git ignores shows nothing"
-        );
+        if let Ok(event) = received.recv_timeout(QUIET) {
+            panic!(
+                "a path git ignores shows nothing: {event:?} from {:?}",
+                seen.lock().unwrap()
+            );
+        }
 
         write(root, "src/cart.ts", "changed\n");
         let event = received.recv_timeout(DEADLINE).unwrap();
