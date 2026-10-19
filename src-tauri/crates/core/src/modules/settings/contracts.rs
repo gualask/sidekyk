@@ -31,6 +31,16 @@ pub enum DiffScrollbar {
     Wide,
 }
 
+/// How the viewer shows a line of code longer than its width, in diffs and files alike: on one
+/// row, scrolled sideways (as in VS Code and Zed), or wrapped at the edge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CodeLines {
+    #[default]
+    Scroll,
+    Wrap,
+}
+
 /// How a note's long lines show: wrapped at the panel's edge, or on one line, scrolled sideways.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,6 +110,7 @@ pub struct Settings {
     pub global_shortcut: GlobalShortcut,
     pub diff_view: DiffView,
     pub diff_scrollbar: DiffScrollbar,
+    pub code_lines: CodeLines,
     pub copy_template: CopyTemplate,
     /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`, `notes`);
     /// one missing takes its default.
@@ -146,6 +157,7 @@ mod tests {
             },
             diff_view: DiffView::File,
             diff_scrollbar: DiffScrollbar::Wide,
+            code_lines: CodeLines::Wrap,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
             sidebar_widths: BTreeMap::from([("files".to_string(), 320)]),
             note_lines: NoteLines::Scroll,
@@ -155,6 +167,7 @@ mod tests {
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "diffView": "file",
             "diffScrollbar": "wide",
+            "codeLines": "wrap",
             "copyTemplate": "Look at {row}:\n{text}",
             "sidebarWidths": { "files": 320 },
             "noteLines": "scroll",
@@ -175,6 +188,7 @@ mod tests {
                 },
                 diff_view: DiffView::Changes,
                 diff_scrollbar: DiffScrollbar::Narrow,
+                code_lines: CodeLines::Scroll,
                 copy_template: CopyTemplate::default(),
                 sidebar_widths: BTreeMap::new(),
                 note_lines: NoteLines::Wrap,

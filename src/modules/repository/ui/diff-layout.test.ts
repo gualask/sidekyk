@@ -6,13 +6,16 @@ import {
     changeMarks,
     diffLayout,
     HUNK_ROW_HEIGHT,
+    heightOf,
     hunkFrom,
     hunkStepped,
     hunksBetween,
     LINE_ROW_HEIGHT,
+    lineRowBox,
+    offsetBelow,
     openingOffset,
     rowAt,
-    rowWithin,
+    shownWhole,
     spanBox,
     trackMarks,
 } from './diff-layout';
@@ -39,7 +42,7 @@ describe('diff layout', () => {
             { first: 4, last: 7 },
         ]);
         expect(layout.total).toBe(2 * HUNK_ROW_HEIGHT + 6 * LINE_ROW_HEIGHT);
-        expect(spanBox(layout, CHANGES, { first: 4, last: 7 })).toEqual({ top: 84, height: 84 });
+        expect(spanBox(layout, { first: 4, last: 7 })).toEqual({ top: 84, height: 84 });
     });
 
     it('marks the lines of the hunks on screen, without their headers', () => {
@@ -127,12 +130,44 @@ describe('diff layout', () => {
         expect(hunkFrom(file, WHOLE, 11)).toBe(0);
     });
 
-    it('tells a row shown whole between two offsets, as the find bar leaves them to read', () => {
+    it('places wrapped lines by the rows they take', () => {
+        // the added line takes three rows, the line after it two
+        const layout = diffLayout(CHANGES, (index) => (index === 2 ? 3 : index === 3 ? 2 : 1));
+        expect(layout.starts.slice(0, 5)).toEqual([0, 24, 44, 104, 144]);
+        expect(heightOf(layout, 2)).toBe(3 * LINE_ROW_HEIGHT);
+        expect(heightOf(layout, 7)).toBe(LINE_ROW_HEIGHT);
+        expect(layout.total).toBe(2 * HUNK_ROW_HEIGHT + 9 * LINE_ROW_HEIGHT);
+        expect(spanBox(layout, { first: 1, last: 3 })).toEqual({ top: 24, height: 120 });
+        expect(changeMarks(layout, CHANGES)[0]).toEqual({
+            hunk: 0,
+            top: 44,
+            height: 3 * LINE_ROW_HEIGHT,
+            kind: 'add',
+        });
+        // the second row of the wrapped line
+        expect(lineRowBox(layout, 2, 1)).toEqual({ top: 64, height: LINE_ROW_HEIGHT });
+    });
+
+    it('counts the lines above a hunk and below the top as lines, however they wrap', () => {
+        // the whole file's hunk starts on row 2; the two lines above it take three rows each
+        const file = diffLayout(WHOLE, (index) => (index < 2 ? 3 : 1));
+        expect(openingOffset(file, 0, 2)).toBe(0);
+        expect(openingOffset(file, 0, 1)).toBe(3 * LINE_ROW_HEIGHT);
+        // two lines below the top, as far into their row as the top is into its own
+        expect(offsetBelow(file, 5, 2)).toBe(6 * LINE_ROW_HEIGHT + 5);
+        // unwrapped, the same as two rows' height further down
+        expect(offsetBelow(diffLayout(WHOLE), 45, 2)).toBe(85);
+        // past the last row: the last
+        expect(offsetBelow(diffLayout(WHOLE), 0, 100)).toBe(11 * LINE_ROW_HEIGHT);
+    });
+
+    it('tells a box shown whole between two offsets, as the find bar leaves them to read', () => {
         const layout = diffLayout(CHANGES);
         // row 2 runs from 44 to 64
-        expect(rowWithin(layout, CHANGES, 2, 40, 70)).toBe(true);
-        expect(rowWithin(layout, CHANGES, 2, 44, 64)).toBe(true);
-        expect(rowWithin(layout, CHANGES, 2, 50, 100)).toBe(false);
-        expect(rowWithin(layout, CHANGES, 2, 0, 60)).toBe(false);
+        const row = spanBox(layout, { first: 2, last: 2 });
+        expect(shownWhole(row, 40, 70)).toBe(true);
+        expect(shownWhole(row, 44, 64)).toBe(true);
+        expect(shownWhole(row, 50, 100)).toBe(false);
+        expect(shownWhole(row, 0, 60)).toBe(false);
     });
 });

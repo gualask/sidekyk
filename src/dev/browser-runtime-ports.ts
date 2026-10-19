@@ -85,6 +85,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
         diffView: 'changes',
         diffScrollbar: 'narrow',
+        codeLines: 'scroll',
         copyTemplate: DEFAULT_COPY_TEMPLATE,
         sidebarWidths: {},
         noteLines: 'wrap',

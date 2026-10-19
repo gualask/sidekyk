@@ -1,8 +1,11 @@
+import { Fragment, memo } from 'react';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 import type { SyntaxTone } from '../model/repository.types';
+import type { LineBreaks } from '../model/soft-wrap';
 import { type LineSpans, textParts } from '../model/syntax';
 import {
     BRACKET_WIDTH,
+    LINE_ROW_HEIGHT,
     NUMBER_WIDTH,
     SIGN_WIDTH,
     TEXT_PADDING_LEFT,
@@ -44,7 +47,10 @@ export function HunkHeaderRow({
                 first ? '' : 'border-t border-ui-border'
             }`}
         >
-            <span className="whitespace-pre">{hunk.header}</span>
+            {/* cut at the edge while lines wrap; otherwise the list is as wide as the widest */}
+            <span className="min-w-0 overflow-hidden text-ellipsis whitespace-pre">
+                {hunk.header}
+            </span>
         </button>
     );
 }
@@ -77,39 +83,45 @@ const TONE_CLASS: Record<SyntaxTone, string> = {
     deleted: 'text-ui-syntax-deleted',
 };
 
-/** A line's text in its colors, with the text looked for marked over them. */
+/** A line's text in its colors, with the text looked for marked over them, on its rows. */
 function LineText({
     text,
     colors,
     found,
+    wrap,
 }: {
     text: string;
     colors: LineSpans;
     found: LineFound | undefined;
+    wrap: LineBreaks | undefined;
 }) {
+    const indent = ' '.repeat(wrap?.indent ?? 0);
     let at = 0;
-    return textParts(text, colors, found?.ranges ?? []).map((part) => {
+    return textParts(text, colors, found?.ranges ?? [], wrap?.breaks).map((part) => {
         const key = at;
         at += part.text.length;
         const tone = part.tone ? TONE_CLASS[part.tone] : undefined;
-        if (part.found === null) {
-            return tone ? (
-                <span key={key} className={tone}>
-                    {part.text}
-                </span>
+        const shown =
+            part.found === null ? (
+                tone ? (
+                    <span className={tone}>{part.text}</span>
+                ) : (
+                    part.text
+                )
             ) : (
-                part.text
+                <mark
+                    className={`rounded-[2px] ${tone ?? 'text-current'} ${
+                        part.found === found?.current ? 'bg-ui-find-current' : 'bg-ui-find-match'
+                    }`}
+                >
+                    {part.text}
+                </mark>
             );
-        }
         return (
-            <mark
-                key={key}
-                className={`rounded-[2px] ${tone ?? 'text-current'} ${
-                    part.found === found?.current ? 'bg-ui-find-current' : 'bg-ui-find-match'
-                }`}
-            >
-                {part.text}
-            </mark>
+            <Fragment key={key}>
+                {part.breakBefore ? <span className="soft-break" data-indent={indent} /> : null}
+                {shown}
+            </Fragment>
         );
     });
 }
@@ -118,19 +130,28 @@ function LineText({
  * A line, its number and sign in the gutter (`data-part="gutter"`, which a click turns into a
  * copy of the whole hunk): its number in the file now, or for a removed line where it was, as a
  * copy names it. Its text in its syntax colors, if read; `found` marks the text looked for in it.
+ * While long lines wrap, `wrap` says where its rows start; the gutter runs along all of them.
+ * Rendered again only when what it shows changes: a scroll leaves the rows already on screen as
+ * they are, and a new width the lines that fit it (they share one `LineBreaks`).
  */
-export function DiffLineRow({
+export const DiffLineRow = memo(function DiffLineRow({
     line,
     colors,
     found,
+    wrap,
 }: {
     line: DiffLine;
     colors?: LineSpans | undefined;
     found?: LineFound | undefined;
+    wrap?: LineBreaks | undefined;
 }) {
     const gutter = `shrink-0 select-none ${GUTTER_TONE[line.kind]}`;
+    const rows = (wrap?.breaks.length ?? 0) + 1;
     return (
-        <div className={`relative flex h-5 cursor-pointer leading-5 ${ROW_TONE[line.kind]}`}>
+        <div
+            className={`relative flex cursor-pointer leading-5 ${ROW_TONE[line.kind]}`}
+            style={{ height: rows * LINE_ROW_HEIGHT }}
+        >
             <span data-part="gutter" className="flex shrink-0">
                 {/* where a hunk's bracket goes */}
                 <span className={gutter} style={{ width: BRACKET_WIDTH }} />
@@ -145,16 +166,19 @@ export function DiffLineRow({
                     {SIGN[line.kind]}
                 </span>
             </span>
+            {/* wrapped, the spaces hanging past the edge are cut, not scrolled to */}
             <span
-                className={`flex-1 whitespace-pre ${line.kind === 'note' ? '' : 'text-ui-syntax-text'}`}
+                className={`flex-1 whitespace-pre ${wrap ? 'min-w-0 overflow-hidden' : ''} ${
+                    line.kind === 'note' ? '' : 'text-ui-syntax-text'
+                }`}
                 style={{ paddingLeft: TEXT_PADDING_LEFT, paddingRight: TEXT_PADDING_RIGHT }}
             >
-                {colors || found ? (
-                    <LineText text={line.text} colors={colors ?? []} found={found} />
+                {colors || found || rows > 1 ? (
+                    <LineText text={line.text} colors={colors ?? []} found={found} wrap={wrap} />
                 ) : (
                     line.text
                 )}
             </span>
         </div>
     );
-}
+});

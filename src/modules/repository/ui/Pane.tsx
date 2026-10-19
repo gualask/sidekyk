@@ -11,6 +11,7 @@ import type { DiffHunk } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
 import type { FileSyntax } from '../model/syntax';
+import { useLineWrapper } from './code-wrap';
 import { DiffList, type HunkReader } from './DiffList';
 import { diffLayout, FIND_BAR_SPACE } from './diff-layout';
 import { FindBar } from './FindBar';
@@ -66,7 +67,7 @@ function lineOf(rows: readonly DiffRow[], match: FindMatch | undefined): number 
  * header what `renderHeader` puts there. `⌘F` opens a bar over the rows that goes through a text
  * in the file, from its top; `⌘F` again, in the bar, looks for it in all the project's files.
  * `Esc` closes the bar before anything else. With `onPastEnd`, `n`/`p` go to the next or previous
- * change.
+ * change. Long lines scroll sideways or wrap at the viewer's width, as the settings say.
  */
 export function Pane({
     header,
@@ -105,14 +106,15 @@ export function Pane({
     onPastEnd?: (step: 1 | -1) => void;
     children: ReactNode;
 }) {
-    const { copyTemplate, scrollbar } = useRepositorySettings();
-    const layout = useMemo(() => diffLayout(rows), [rows]);
-    // the hunk gone to (`n`/`p`, a mark of the map), else the one opened on
-    const [stepped, setStepped] = useState<number | null>(null);
-    const current = stepped ?? openedOn(openOn, hunks.length);
+    const { copyTemplate, scrollbar, codeLines } = useRepositorySettings();
     // state, not a ref: React attaches a parent's ref after its children's effects, so lines
     // mounted with it, from a file already read, would find no element to scroll
     const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+    const wrapper = useLineWrapper(scrollElement, rows, codeLines === 'wrap');
+    const layout = useMemo(() => diffLayout(rows, wrapper?.rowsOf), [rows, wrapper]);
+    // the hunk gone to (`n`/`p`, a mark of the map), else the one opened on
+    const [stepped, setStepped] = useState<number | null>(null);
+    const current = stepped ?? openedOn(openOn, hunks.length);
     const bars = useScrollbars(scrollElement);
     const reader = useRef<HunkReader | null>(null);
     const { copied, copy } = useCopyToClipboard();
@@ -197,10 +199,12 @@ export function Pane({
                 ) : null}
                 {/* the list keeps its rows in place itself as the room above it changes: no
                     browser scroll anchoring (Chromium's) on top of it. Its own scrollbars are the
-                    map beside it and the bar below */}
+                    map beside it and the bar below; wrapped lines never scroll sideways */}
                 <div
                     ref={setScrollElement}
-                    className="min-h-0 flex-1 overflow-auto [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    className={`min-h-0 flex-1 overflow-y-auto [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                        wrapper ? 'overflow-x-hidden' : 'overflow-x-auto'
+                    }`}
                 >
                     {scrollElement && rows.length > 0 ? (
                         <DiffList
@@ -219,6 +223,7 @@ export function Pane({
                             topSpace={topSpace}
                             syntax={syntax}
                             onTooLarge={setUncolored}
+                            wrapper={wrapper}
                         />
                     ) : null}
                     {children}

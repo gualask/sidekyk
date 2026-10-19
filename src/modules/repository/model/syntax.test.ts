@@ -99,17 +99,28 @@ describe('textParts', () => {
                 [[2, 9]],
             ),
         ).toEqual([
-            { text: 'le', tone: 'keyword', found: null },
-            { text: 't', tone: 'keyword', found: 0 },
-            { text: ' total', tone: null, found: 0 },
-            { text: ' = ', tone: null, found: null },
-            { text: '1', tone: 'literal', found: null },
-            { text: ';', tone: null, found: null },
+            { text: 'le', tone: 'keyword', found: null, breakBefore: false },
+            { text: 't', tone: 'keyword', found: 0, breakBefore: false },
+            { text: ' total', tone: null, found: 0, breakBefore: false },
+            { text: ' = ', tone: null, found: null, breakBefore: false },
+            { text: '1', tone: 'literal', found: null, breakBefore: false },
+            { text: ';', tone: null, found: null, breakBefore: false },
+        ]);
+    });
+
+    it('cuts a wrapped line where its rows start too', () => {
+        expect(textParts('let total = 1;', [[0, 3, 'keyword']], [], [6, 12])).toEqual([
+            { text: 'let', tone: 'keyword', found: null, breakBefore: false },
+            { text: ' to', tone: null, found: null, breakBefore: false },
+            { text: 'tal = ', tone: null, found: null, breakBefore: true },
+            { text: '1;', tone: null, found: null, breakBefore: true },
         ]);
     });
 
     it('keeps a line without colors or matches whole', () => {
-        expect(textParts('plain', [], [])).toEqual([{ text: 'plain', tone: null, found: null }]);
+        expect(textParts('plain', [], [])).toEqual([
+            { text: 'plain', tone: null, found: null, breakBefore: false },
+        ]);
         expect(textParts('', [], [])).toEqual([]);
     });
 });

@@ -1,4 +1,5 @@
 import type { DiffHunk, DiffLine } from './diff-parser';
+import { lineWidth, TAB_SIZE } from './soft-wrap';
 import type { WholeFile } from './whole-file';
 
 /**
@@ -24,22 +25,12 @@ export function wholeFileRows({ lines, hunkOf }: WholeFile): DiffRow[] {
     return lines.map((line, index) => ({ kind: 'line', line, hunkIndex: hunkOf[index] ?? -1 }));
 }
 
-/** Matches the browser's default `tab-size`. */
-const TAB_SIZE = 8;
-
-function columns(text: string): number {
-    let width = 0;
-    for (const char of text)
-        width = char === '\t' ? width + TAB_SIZE - (width % TAB_SIZE) : width + 1;
-    return width;
-}
-
 /** The widest of these lines, or `widest` if none is wider, in monospace columns. */
 function widestOf(lines: readonly DiffLine[], widest = 0): number {
     let found = widest;
     for (const line of lines) {
         // most lines are short: skip the tab-aware count when it cannot win
-        if (line.text.length * TAB_SIZE > found) found = Math.max(found, columns(line.text));
+        if (line.text.length * TAB_SIZE > found) found = Math.max(found, lineWidth(line.text));
     }
     return found;
 }
@@ -50,7 +41,8 @@ function widestOf(lines: readonly DiffLine[], widest = 0): number {
  */
 export function widestLine(hunks: readonly DiffHunk[]): number {
     let widest = 0;
-    for (const hunk of hunks) widest = widestOf(hunk.lines, Math.max(widest, columns(hunk.header)));
+    for (const hunk of hunks)
+        widest = widestOf(hunk.lines, Math.max(widest, lineWidth(hunk.header)));
     return widest;
 }
 

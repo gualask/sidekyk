@@ -1,4 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
+import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 
@@ -10,6 +11,8 @@ export interface RepositorySettings {
     copyTemplate: string;
     /** How wide the scrollbar beside a diff is. */
     scrollbar: DiffScrollbar;
+    /** Whether lines longer than the viewer scroll sideways or wrap. */
+    codeLines: CodeLines;
 }
 
 const RepositorySettingsContext = createContext<RepositorySettings | null>(null);

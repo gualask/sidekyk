@@ -67,6 +67,12 @@
         @apply text-ui-danger;
     }
 
+    /* Where a wrapped line of code goes on to its next row (`soft-wrap.ts`), at its indentation:
+       generated text, which a copy of the line leaves out. */
+    .soft-break::after {
+        content: "\A" attr(data-indent);
+    }
+
     /* A copy's confirmation: what was copied lights up, then fades. Kept, without the fade, while
        motion is reduced. */
     .copy-flash,

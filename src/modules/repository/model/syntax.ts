@@ -127,26 +127,37 @@ export function lineColors(read: ReadBlocks, line: DiffLine): LineSpans | undefi
     return colors?.check === lineCheck(line.text) ? colors.spans : undefined;
 }
 
-/** A part of a line: its tone (null for the text's own color), and the match it is in, if any. */
+/**
+ * A part of a line: its tone (null for the text's own color), the match it is in, if any, and
+ * whether a wrapped row starts with it.
+ */
 export interface TextPart {
     text: string;
     tone: SyntaxTone | null;
     /** The index of the match it is in, among the line's. */
     found: number | null;
+    breakBefore: boolean;
 }
 
 type Range = readonly [start: number, end: number];
 
 /**
  * A line cut where its colors and the matches of the find bar start and end, so a match marks the
- * colored text under it. Both lists are in order and without overlaps.
+ * colored text under it, and where its wrapped rows start (`breaks`, see `soft-wrap.ts`). Every
+ * list is in order and without overlaps.
  */
-export function textParts(text: string, spans: LineSpans, found: readonly Range[]): TextPart[] {
-    const cuts = new Set([0, text.length]);
+export function textParts(
+    text: string,
+    spans: LineSpans,
+    found: readonly Range[],
+    breaks: readonly number[] = [],
+): TextPart[] {
+    const cuts = new Set([0, text.length, ...breaks]);
     for (const [start, end] of [...spans, ...found]) {
         cuts.add(Math.min(start, text.length));
         cuts.add(Math.min(end, text.length));
     }
+    let nextBreak = 0;
     const parts: TextPart[] = [];
     let span = 0;
     let match = 0;
@@ -157,10 +168,13 @@ export function textParts(text: string, spans: LineSpans, found: readonly Range[
         while ((found[match]?.[1] ?? Number.POSITIVE_INFINITY) <= start) match++;
         const toned = spans[span];
         const inMatch = found[match];
+        const breakBefore = breaks[nextBreak] === start;
+        if (breakBefore) nextBreak++;
         parts.push({
             text: text.slice(start, end),
             tone: toned && toned[0] <= start ? toned[2] : null,
             found: inMatch && inMatch[0] <= start ? match : null,
+            breakBefore,
         });
         start = end;
     }

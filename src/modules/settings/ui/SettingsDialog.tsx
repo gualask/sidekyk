@@ -4,6 +4,7 @@ import { RadioGroup } from '@base-ui/react/radio-group';
 import { IconX } from '@tabler/icons-react';
 import { type ReactNode, type RefObject, useId, useRef } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { NoteLines } from '@/shared/notes/note-lines';
@@ -26,6 +27,11 @@ const DIFF_VIEWS: { value: DiffView; label: string }[] = [
 const DIFF_SCROLLBARS: { value: DiffScrollbar; label: string }[] = [
     { value: 'narrow', label: 'Narrow' },
     { value: 'wide', label: 'Wide' },
+];
+
+const CODE_LINES: { value: CodeLines; label: string }[] = [
+    { value: 'scroll', label: 'Scroll' },
+    { value: 'wrap', label: 'Wrap' },
 ];
 
 const NOTE_LINES: { value: NoteLines; label: string }[] = [
@@ -114,6 +120,21 @@ export function SettingsDialog({
                                     value={settings.diffScrollbar}
                                     onChange={(diffScrollbar) =>
                                         update.mutate({ ...settings, diffScrollbar })
+                                    }
+                                />
+                            )}
+                        </Setting>
+                        <Setting
+                            label="Long lines"
+                            description="Keep them on one line and scroll sideways, or wrap them at the edge, in diffs and files alike."
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={CODE_LINES}
+                                    value={settings.codeLines}
+                                    onChange={(codeLines) =>
+                                        update.mutate({ ...settings, codeLines })
                                     }
                                 />
                             )}

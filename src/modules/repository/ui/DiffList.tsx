@@ -1,6 +1,14 @@
 import { IconCheck, IconCopy, IconCopyOff } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+    type RefObject,
+    useEffect,
+    useEffectEvent,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useSyntaxColors } from '../application/repository.queries';
 import { useRepositorySettings } from '../application/repository-settings';
@@ -16,21 +24,24 @@ import {
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 import type { DiffRow } from '../model/diff-rows';
 import type { FindMatch } from '../model/find';
+import type { LineWrapper } from '../model/soft-wrap';
 import { blocksOf, type FileSyntax } from '../model/syntax';
 import { DiffLineRow, HunkHeaderRow, type LineFound } from './DiffRows';
 import {
     BRACKET_WIDTH,
+    CODE_TEXT,
     type DiffLayout,
+    heightOf,
     hunkFrom,
     hunkStepped,
     hunksBetween,
     LINE_CHROME_WIDTH,
-    LINE_ROW_HEIGHT,
+    lineRowBox,
+    offsetBelow,
     openingOffset,
     rowAt,
-    rowHeight,
-    rowWithin,
     type Span,
+    shownWhole,
     spanBox,
 } from './diff-layout';
 import { type Target, targetSpan } from './diff-target';
@@ -61,7 +72,7 @@ type Flash = Span & { label: string; right: number; key: number };
  * `found` marks the text looked for, and brings the match being read on screen. `topSpace` leaves
  * room above the first row, under the find bar floating over the list, as VS Code does. The lines
  * on screen take the colors of `syntax`, read a block at a time; `onTooLarge` says when a version
- * is too large to color.
+ * is too large to color. With `wrapper`, long lines wrap where it says, as `layout` placed them.
  */
 export function DiffList({
     source,
@@ -79,6 +90,7 @@ export function DiffList({
     topSpace,
     syntax,
     onTooLarge,
+    wrapper,
 }: {
     source: CopySource;
     rows: readonly DiffRow[];
@@ -99,13 +111,15 @@ export function DiffList({
     topSpace: number;
     syntax: FileSyntax;
     onTooLarge: (tooLarge: boolean) => void;
+    /** Where long lines wrap; null while they scroll sideways. */
+    wrapper: LineWrapper | null;
 }) {
     const { copyTemplate } = useRepositorySettings();
     const listRef = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
         count: rows.length,
         getScrollElement: () => scrollElement,
-        estimateSize: (index) => rowHeight(rows[index]),
+        estimateSize: (index) => heightOf(layout, index),
         overscan: 30,
         // the rows start below the room left above them
         scrollMargin: topSpace,
@@ -118,7 +132,7 @@ export function DiffList({
     useEffect(() => {
         // the line being read: `linesAbove` lines below the top, as a hunk opens
         const reading = () =>
-            Math.max(0, scrollElement.scrollTop - topSpace + linesAbove * LINE_ROW_HEIGHT);
+            offsetBelow(layout, Math.max(0, scrollElement.scrollTop - topSpace), linesAbove);
         const goTo = (hunk: number) => {
             onCurrent(hunk);
             scrollElement.scrollTop = openingOffset(layout, hunk, linesAbove) + topSpace;
@@ -127,7 +141,7 @@ export function DiffList({
         const shown = () => {
             const span = current === null ? undefined : layout.hunks[current];
             if (!span) return null;
-            const { top, height } = spanBox(layout, rows, span);
+            const { top, height } = spanBox(layout, span);
             const screen = scrollElement.scrollTop - topSpace;
             return top < screen + scrollElement.clientHeight && top + height > screen
                 ? current
@@ -154,6 +168,34 @@ export function DiffList({
         };
     }, [reader, scrollElement, layout, rows, linesAbove, topSpace, current, onCurrent]);
 
+    // the rows laid out again (the list's width, long lines switched, the file read again): the
+    // virtualizer takes their new heights, and the same rows keep the one at the top where it
+    // is, as an editor keeps the line it shows as it wraps again. Where the screen was is taken
+    // as it last scrolled: once the new heights are in, a shorter list has already pulled
+    // `scrollTop` back
+    const scrolledTo = useRef(scrollElement.scrollTop);
+    useEffect(() => {
+        const keep = () => {
+            scrolledTo.current = scrollElement.scrollTop;
+        };
+        scrollElement.addEventListener('scroll', keep, { passive: true });
+        return () => scrollElement.removeEventListener('scroll', keep);
+    }, [scrollElement]);
+    const laidOut = useRef({ layout, rows });
+    useLayoutEffect(() => {
+        const before = laidOut.current;
+        if (before.layout === layout) return;
+        laidOut.current = { layout, rows };
+        virtualizer.measure();
+        const offset = scrolledTo.current - topSpace;
+        if (before.rows !== rows || offset <= 0) return;
+        const row = rowAt(before.layout, offset);
+        const into = offset - (before.layout.starts[row] ?? 0);
+        const top = (layout.starts[row] ?? 0) + Math.min(into, heightOf(layout, row) - 1);
+        scrollElement.scrollTop = top + topSpace;
+        scrolledTo.current = scrollElement.scrollTop;
+    }, [layout, rows, virtualizer, scrollElement, topSpace]);
+
     // the room above comes and goes without moving the rows on screen, but at the top, where it
     // shows
     const shownSpace = useRef(topSpace);
@@ -164,7 +206,7 @@ export function DiffList({
     }, [topSpace, scrollElement]);
 
     // the text looked for, row by row, and the match being read, centred when it is off screen or
-    // under the find bar
+    // under the find bar: the row of a wrapped line it is on
     const foundRows = useMemo(() => {
         const byRow = new Map<number, [number, number][]>();
         for (const { row, start, end } of found?.matches ?? []) {
@@ -175,15 +217,21 @@ export function DiffList({
         return byRow;
     }, [found?.matches]);
     const currentMatch = found ? found.matches[found.current] : undefined;
-    useEffect(() => {
-        if (!currentMatch) return;
+    // only when the match changes: a list laid out again (a sidebar dragged) does not scroll back
+    const bringToView = useEffectEvent((match: FindMatch) => {
         // in the list's offsets the screen starts `topSpace` above `scrollTop`, and the bar covers
         // that band
         const { scrollTop, clientHeight } = scrollElement;
-        const bottom = scrollTop + clientHeight - topSpace;
-        if (rowWithin(layout, rows, currentMatch.row, scrollTop, bottom)) return;
-        virtualizer.scrollToIndex(currentMatch.row, { align: 'center' });
-    }, [currentMatch, virtualizer, layout, rows, topSpace, scrollElement]);
+        const shown = clientHeight - topSpace;
+        const breaks = wrapper?.breaksOf(match.row).breaks ?? [];
+        const line = breaks.filter((at) => at <= match.start).length;
+        const box = lineRowBox(layout, match.row, line);
+        if (shownWhole(box, scrollTop, scrollTop + shown)) return;
+        scrollElement.scrollTop = box.top + box.height / 2 - shown / 2;
+    });
+    useEffect(() => {
+        if (currentMatch) bringToView(currentMatch);
+    }, [currentMatch]);
     const lineFound = (index: number): LineFound | undefined => {
         const ranges = foundRows.get(index);
         if (!ranges) return undefined;
@@ -240,7 +288,8 @@ export function DiffList({
     useEffect(() => onTooLarge(colors.tooLarge), [colors.tooLarge, onTooLarge]);
     const brackets = hunksBetween(layout, rows, items[0]?.index ?? 0, items.at(-1)?.index ?? -1);
 
-    const minWidth = `calc(${LINE_CHROME_WIDTH}px + ${widest}ch)`;
+    // wrapped, the rows are as wide as the list; otherwise as the widest line
+    const minWidth = wrapper ? undefined : `calc(${LINE_CHROME_WIDTH}px + ${widest}ch)`;
     return (
         <>
             {topSpace > 0 ? (
@@ -248,7 +297,7 @@ export function DiffList({
             ) : null}
             <div
                 ref={listRef}
-                className="relative border-b border-ui-border bg-ui-surface font-mono text-xs"
+                className={`relative border-b border-ui-border bg-ui-surface ${CODE_TEXT}`}
                 style={{
                     height: layout.total,
                     minWidth,
@@ -275,6 +324,7 @@ export function DiffList({
                                     line={row.line}
                                     colors={colors.colorsOf(row.line)}
                                     found={lineFound(item.index)}
+                                    wrap={wrapper?.breaksOf(item.index)}
                                 />
                             )}
                         </div>
@@ -291,7 +341,7 @@ export function DiffList({
                                 ? 'text-ui-accent'
                                 : 'text-ui-text-muted opacity-50'
                         }`}
-                        style={{ ...spanBox(layout, rows, lines), width: BRACKET_WIDTH }}
+                        style={{ ...spanBox(layout, lines), width: BRACKET_WIDTH }}
                     >
                         <IconCopy size={11} className="absolute top-[4.5px] left-[2.5px]" />
                         {lines.last > lines.first ? (
@@ -308,7 +358,7 @@ export function DiffList({
                                 ? 'bg-ui-accent/8 ring-ui-accent'
                                 : 'bg-ui-accent/6 ring-ui-accent-muted/50'
                         }`}
-                        style={spanBox(layout, rows, hoveredSpan)}
+                        style={spanBox(layout, hoveredSpan)}
                     />
                 ) : null}
                 <div role="status" className="contents">
@@ -319,7 +369,7 @@ export function DiffList({
                                 className={`pointer-events-none absolute left-0 w-full ${
                                     copied.ok ? 'copy-flash' : 'copy-flash-failed'
                                 }`}
-                                style={spanBox(layout, rows, flash)}
+                                style={spanBox(layout, flash)}
                             />
                             <span
                                 className={`copied-chip pointer-events-none absolute z-10 mt-0.5 flex h-4 items-center gap-1 rounded px-1.5 font-sans text-[10.5px] font-semibold shadow-sm ${
