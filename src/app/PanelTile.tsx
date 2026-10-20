@@ -1,5 +1,6 @@
 import { IconArrowsMaximize, IconMinus } from '@tabler/icons-react';
 import { type CSSProperties, Suspense, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
@@ -51,11 +52,13 @@ export function PanelTile({
     onSelect?: () => void;
 }) {
     const shortcut = panelShortcut(panel);
+    const { t } = useTranslation();
+    const title = t(panel.title);
     const [header, setHeader] = useState<HTMLElement | null>(null);
 
     return (
         <section
-            aria-label={panel.title}
+            aria-label={title}
             data-panel={panel.id}
             // a tile zooms in on itself under the pointer (⌘+scroll), and grows to full screen
             data-zoom={onZoomIn ? '' : undefined}
@@ -79,8 +82,8 @@ export function PanelTile({
                     <span
                         role="img"
                         className="grid shrink-0 place-items-center text-ui-text-muted"
-                        title={`${panel.title} (${shortcut})`}
-                        aria-label={panel.title}
+                        title={`${title} (${shortcut})`}
+                        aria-label={title}
                     >
                         <panel.icon size={15} stroke={1.75} />
                     </span>
@@ -91,8 +94,8 @@ export function PanelTile({
                         <button
                             type="button"
                             className="btn-icon ml-auto h-[26px] w-[26px]"
-                            title={`Minimize ${panel.title} to the top bar`}
-                            aria-label={`Minimize ${panel.title}`}
+                            title={t('tile.minimizeTitle', { panel: title })}
+                            aria-label={t('tile.minimize', { panel: title })}
                             onClick={onMinimize}
                         >
                             <IconMinus size={14} />
@@ -102,8 +105,8 @@ export function PanelTile({
                         type="button"
                         data-zoom-in
                         className={`btn-icon h-[26px] w-[26px] ${onMinimize ? '' : 'ml-auto'}`}
-                        title={`Zoom into ${panel.title} (${shortcut})`}
-                        aria-label={`Zoom into ${panel.title}`}
+                        title={`${t('tile.zoomInto', { panel: title })} (${shortcut})`}
+                        aria-label={t('tile.zoomInto', { panel: title })}
                         onClick={onZoomIn}
                     >
                         <IconArrowsMaximize size={14} />

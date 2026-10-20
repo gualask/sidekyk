@@ -1,3 +1,4 @@
+import type { Translator } from '@/shared/i18n';
 import type { Commit, CommitRequest } from './repository.types';
 
 /** The abbreviated hash the UI shows, as long as the branch's commit in the summary. */
@@ -11,6 +12,6 @@ export function commitRequest(commit: Commit): CommitRequest {
 }
 
 /** When a commit was made, in full, for a tooltip. */
-export function commitDate(commit: Commit): string {
-    return new Date(commit.time * 1000).toLocaleString();
+export function commitDate(commit: Commit, { formatTag }: Translator): string {
+    return new Date(commit.time * 1000).toLocaleString(formatTag);
 }

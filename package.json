@@ -11,6 +11,7 @@
     "scripts": {
         "format": "biome format --write .",
         "boundaries:check": "node scripts/check-boundaries.mjs",
+        "i18n:check": "node scripts/check-i18n.mjs",
         "knip": "knip",
         "lint": "biome check .",
         "test": "vitest run",

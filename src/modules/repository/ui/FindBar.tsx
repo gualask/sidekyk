@@ -6,6 +6,7 @@ import {
     IconX,
 } from '@tabler/icons-react';
 import { type RefObject, useEffect } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { shortcutKey, shortcutLabel } from '@/shared/platform/shortcut';
 import { FIND_BAR_HEIGHT, FIND_BAR_INSET } from './diff-layout';
 
@@ -41,6 +42,7 @@ export function FindBar({
 }) {
     // the bar opens to be read through, and typed in, at once
     useEffect(() => field.current?.focus(), [field]);
+    const { t } = useTranslation();
 
     return (
         <div
@@ -54,7 +56,7 @@ export function FindBar({
             <IconSearch size={14} className="shrink-0 text-ui-text-muted" aria-hidden />
             <input
                 ref={field}
-                aria-label="Find in file"
+                aria-label={t('find.inFile')}
                 value={query}
                 spellCheck={false}
                 autoComplete="off"
@@ -70,13 +72,13 @@ export function FindBar({
                 className="h-full min-w-0 flex-1 border-0 bg-transparent font-mono text-xs text-ui-text outline-none"
             />
             <span className="shrink-0 text-xs text-ui-text-muted tabular-nums" aria-live="polite">
-                {count === 0 ? 'No results' : `${current + 1}/${count}`}
+                {count === 0 ? t('find.none') : `${current + 1}/${count}`}
             </span>
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title="Previous match (⇧↵)"
-                aria-label="Previous match"
+                title={`${t('find.previous')} (⇧↵)`}
+                aria-label={t('find.previous')}
                 disabled={count === 0}
                 onClick={() => onStep(-1)}
             >
@@ -85,8 +87,8 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title="Next match (↵)"
-                aria-label="Next match"
+                title={`${t('find.next')} (↵)`}
+                aria-label={t('find.next')}
                 disabled={count === 0}
                 onClick={() => onStep(1)}
             >
@@ -95,8 +97,8 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title={`Find in files (${shortcutLabel('F')})`}
-                aria-label="Find in files"
+                title={`${t('common.findInFiles')} (${shortcutLabel('F')})`}
+                aria-label={t('common.findInFiles')}
                 onClick={onFindInFiles}
             >
                 <IconFileSearch size={15} />
@@ -104,8 +106,8 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title="Close (Esc)"
-                aria-label="Close"
+                title={`${t('common.close')} (Esc)`}
+                aria-label={t('common.close')}
                 onClick={onClose}
             >
                 <IconX size={15} />

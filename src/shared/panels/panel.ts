@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { MessageKey } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
 
@@ -68,7 +69,7 @@ export interface PanelSummaryProps {
 export interface PanelDefinition {
     /** Stable: names the panel in shortcuts, saved layouts and the command palette. */
     id: string;
-    title: string;
+    title: MessageKey;
     icon: ComponentType<{ size?: number; stroke?: number; className?: string }>;
     /** As a tile beside another, the least width it keeps while the window has room. */
     tileMinWidth?: number;

@@ -3,7 +3,7 @@ import { definePanel } from '@/shared/panels/panel';
 
 export const notesPanel = definePanel({
     id: 'notes',
-    title: 'Notes',
+    title: 'panel.notes',
     icon: IconNotes,
     // cards need the room: a few words a line at least
     tileMinWidth: 320,

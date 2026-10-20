@@ -1,5 +1,6 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { ProjectList, TilesLayout } from '../model/project.types';
 import { type ProjectsPort, useProjectsPort } from './projects.port';
@@ -58,6 +59,7 @@ export function useAddProject(onAdded: () => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     return useMutation({
         ...projectsChange,
         mutationFn: () => port.addProject(),
@@ -67,7 +69,7 @@ export function useAddProject(onAdded: () => void) {
             onAdded();
         },
         onError: (error) => {
-            showToast(errorToast('Could not add the repository', error));
+            showToast(errorToast(i18n.t('projects.addFailed'), error, i18n));
         },
     });
 }
@@ -81,6 +83,7 @@ export function useActivateProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     const { mutate } = useMutation({
         ...projectsChange,
         mutationFn: (projectId: string) => port.activateProject(projectId),
@@ -94,7 +97,13 @@ export function useActivateProject() {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
         onError: (error, projectId) => {
-            showToast(errorToast(`Could not open ${projectName(queryClient, projectId)}`, error));
+            showToast(
+                errorToast(
+                    i18n.t('projects.openFailed', { name: projectName(queryClient, projectId) }),
+                    error,
+                    i18n,
+                ),
+            );
             if (isLastChange(queryClient)) {
                 void queryClient.invalidateQueries({ queryKey: projectsKey });
             }
@@ -114,6 +123,7 @@ export function useRemoveProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     return useMutation({
         ...projectsChange,
         mutationFn: (projectId: string) => port.removeProject(projectId),
@@ -121,7 +131,13 @@ export function useRemoveProject() {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
         onError: (error, projectId) => {
-            showToast(errorToast(`Could not remove ${projectName(queryClient, projectId)}`, error));
+            showToast(
+                errorToast(
+                    i18n.t('projects.removeFailed', { name: projectName(queryClient, projectId) }),
+                    error,
+                    i18n,
+                ),
+            );
         },
     });
 }
@@ -134,6 +150,7 @@ export function useRelocateProject(onRelocated: () => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     return useMutation({
         ...projectsChange,
         mutationFn: (projectId: string) => port.relocateProject(projectId),
@@ -143,7 +160,13 @@ export function useRelocateProject(onRelocated: () => void) {
             onRelocated();
         },
         onError: (error, projectId) => {
-            showToast(errorToast(`Could not locate ${projectName(queryClient, projectId)}`, error));
+            showToast(
+                errorToast(
+                    i18n.t('projects.locateFailed', { name: projectName(queryClient, projectId) }),
+                    error,
+                    i18n,
+                ),
+            );
         },
     });
 }
@@ -159,6 +182,7 @@ export function useProjectLayout(projectId: string | null) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     const layout = useQuery({
         ...projectsQuery(port),
         select: (list) => (projectId ? list.layouts[projectId] : undefined) ?? DEFAULT_TILES_LAYOUT,
@@ -171,7 +195,7 @@ export function useProjectLayout(projectId: string | null) {
             if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
         },
         onError: (error) => {
-            showToast(errorToast('Could not keep the layout', error));
+            showToast(errorToast(i18n.t('projects.layoutFailed'), error, i18n));
         },
     });
     // shown at once, in the same render: a view transition captures the layout changed

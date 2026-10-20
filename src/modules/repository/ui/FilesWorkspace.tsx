@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
@@ -63,6 +64,7 @@ export function FilesWorkspace({
     show,
     findInFiles,
 }: PanelProps) {
+    const i18n = useTranslation();
     const projectId = project.id;
     const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
     const { open, selected } = state;
@@ -137,8 +139,8 @@ export function FilesWorkspace({
                   <button
                       type="button"
                       className="btn-icon h-[26px] w-[26px]"
-                      title="Collapse folders"
-                      aria-label="Collapse folders"
+                      title={i18n.t('files.collapse')}
+                      aria-label={i18n.t('files.collapse')}
                       disabled={open.size === 0}
                       onClick={() => setState((current) => ({ ...current, open: new Set() }))}
                   >
@@ -152,7 +154,7 @@ export function FilesWorkspace({
         <div className="flex h-full flex-col">
             {error ? (
                 <div className="px-3 py-2 font-sans text-sm text-ui-danger">
-                    {errorMessage(error)}
+                    {errorMessage(error, i18n)}
                 </div>
             ) : null}
             <div className="min-h-0 flex-1">
@@ -160,7 +162,7 @@ export function FilesWorkspace({
                     rows={rows}
                     marks={marks}
                     selected={selected}
-                    label={`Files of ${project.name}`}
+                    label={i18n.t('files.of', { name: project.name })}
                     onClick={(row) => {
                         if (row.kind === 'folder') toggle(row.path);
                         else openFile(row.path);
@@ -171,8 +173,7 @@ export function FilesWorkspace({
     );
     const tooMany = truncated ? (
         <div className="border-b border-ui-border bg-ui-warning-soft px-3 py-2 text-sm text-ui-warning-soft-text">
-            Too many files: only the first 200,000 are in the tree. A folder such as node_modules
-            may be missing from .gitignore.
+            {i18n.t('files.tooMany')}
         </div>
     ) : null;
 
@@ -222,7 +223,7 @@ export function FilesWorkspace({
                 <FileHeader
                     path={change.path}
                     uncolored={pane.uncolored}
-                    badge={{ label: CHANGE_AREA_LABEL[change.area] }}
+                    badge={{ label: i18n.t(CHANGE_AREA_LABEL[change.area]) }}
                     counts={change}
                     showIn={{
                         panel: 'changes',
@@ -234,8 +235,8 @@ export function FilesWorkspace({
     ) : !file ? (
         <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-ui-text-muted">
             <IconFileText size={32} stroke={1.5} />
-            <p className="text-sm">Pick a file.</p>
-            <p className="text-xs">Read only: edits happen in your editor.</p>
+            <p className="text-sm">{i18n.t('files.pick')}</p>
+            <p className="text-xs">{i18n.t('files.readOnly')}</p>
         </div>
     ) : !snapshot.isSuccess ? null : (
         <TextFileView

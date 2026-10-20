@@ -1,32 +1,30 @@
+import type { MessageKey, Translator } from '@/shared/i18n';
+
 /** The `{ code, message }` payload every native command fails with. */
 interface AppErrorPayload {
     code: string;
     message: string;
 }
 
-const USER_MESSAGES: Record<string, string> = {
-    distro_missing:
-        "This project's WSL distro is not installed anymore: see the top bar's warning.",
-    distro_stopped: "This project's WSL distro is not running. Open the project to start it.",
-    export_in_repository:
-        'Sidekyk never writes inside a repository: pick a folder outside your projects.',
-    file_missing: 'This file is no longer in the repository: it was moved or deleted.',
-    git_not_found: 'Git is not installed. Install it (for example with xcode-select --install).',
-    git_timed_out:
-        'Git took more than 30 seconds to answer and was stopped. Is the repository on a slow or unreachable drive?',
-    helper_failed:
-        "Sidekyk could not start in this project's WSL distro: see the top bar's warning.",
-    invalid_commit: 'That is not a commit of this repository.',
-    invalid_shortcut: 'That is not a keyboard shortcut Sidekyk can register.',
-    not_a_repository: 'That folder is not inside a git repository.',
-    note_list_missing: 'That list of notes is no longer there.',
-    note_missing: 'That note is no longer there.',
-    note_too_long: 'That note is too long: a note holds at most 1 MB of text.',
-    path_outside_repository: 'That path is outside the repository.',
-    project_not_found: 'That repository is no longer in Sidekyk.',
-    repository_missing:
-        "This repository was moved or deleted. Locate its new folder from the top bar's warning, or remove it.",
-    shortcut_taken: 'Another app or the system already uses that shortcut. Pick another.',
+/** The message of each code the backend sends; any other shows the backend's own. */
+const USER_MESSAGES: Record<string, MessageKey> = {
+    distro_missing: 'error.distroMissing',
+    distro_stopped: 'error.distroStopped',
+    export_in_repository: 'error.exportInRepository',
+    file_missing: 'error.fileMissing',
+    git_not_found: 'error.gitNotFound',
+    git_timed_out: 'error.gitTimedOut',
+    helper_failed: 'error.helperFailed',
+    invalid_commit: 'error.invalidCommit',
+    invalid_shortcut: 'error.invalidShortcut',
+    not_a_repository: 'error.notARepository',
+    note_list_missing: 'error.noteListMissing',
+    note_missing: 'error.noteMissing',
+    note_too_long: 'error.noteTooLong',
+    path_outside_repository: 'error.pathOutsideRepository',
+    project_not_found: 'error.projectNotFound',
+    repository_missing: 'error.repositoryMissing',
+    shortcut_taken: 'error.shortcutTaken',
 };
 
 function isAppErrorPayload(error: unknown): error is AppErrorPayload {
@@ -43,8 +41,11 @@ export function hasErrorCode(error: unknown, code: string): boolean {
     return isAppErrorPayload(error) && error.code === code;
 }
 
-export function errorMessage(error: unknown): string {
-    if (isAppErrorPayload(error)) return USER_MESSAGES[error.code] ?? error.message;
+export function errorMessage(error: unknown, i18n: Translator): string {
+    if (isAppErrorPayload(error)) {
+        const key = USER_MESSAGES[error.code];
+        return key ? i18n.t(key) : error.message;
+    }
     if (error instanceof Error) return error.message;
     return String(error);
 }

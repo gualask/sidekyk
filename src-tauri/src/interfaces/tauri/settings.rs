@@ -1,9 +1,13 @@
 //! Tauri adapters for the settings.
 
+use tauri::Manager;
+
 use super::blocking::blocking;
-use super::shortcut;
+use super::texts::{self, Texts};
+use super::{shortcut, tray};
 use crate::infrastructure::settings_store;
-use sidekyk_core::modules::settings::{Settings, Theme};
+use sidekyk_core::modules::notes::NotesStore;
+use sidekyk_core::modules::settings::{Language, Settings, Theme};
 use sidekyk_core::shared::error::AppError;
 
 /// The window's theme for a setting. The pages follow it too: a webview's
@@ -13,6 +17,15 @@ pub(crate) fn window_theme(theme: Theme) -> tauri::Theme {
         Theme::Dark => tauri::Theme::Dark,
         Theme::Light => tauri::Theme::Light,
     }
+}
+
+/// What the backend writes for the user, in the language of the settings: the tray (once it is
+/// up), the first list of a project read from now on. Dialogs and exports read it as they open.
+pub(crate) fn apply_language(app: &tauri::AppHandle, language: Option<Language>) -> &'static Texts {
+    let texts = texts::texts(language);
+    app.state::<NotesStore>().name_first_lists(texts.first_list);
+    tray::speak(app, texts);
+    texts
 }
 
 #[tauri::command]
@@ -31,6 +44,7 @@ pub(crate) async fn set_settings(
     blocking("set_settings", app, move |app| {
         shortcut::apply(app, &settings.global_shortcut)?;
         app.set_theme(Some(window_theme(settings.theme)));
+        apply_language(app, settings.language);
         if let Err(error) = settings_store::save_settings(app, &settings) {
             tracing::warn!(error = %format!("{error:#}"), "could not store the settings");
         }

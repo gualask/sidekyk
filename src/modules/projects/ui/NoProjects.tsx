@@ -1,4 +1,5 @@
 import { IconFolderOpen, IconGitCommit } from '@tabler/icons-react';
+import { useTranslation } from '@/shared/i18n';
 import { useAddProject } from '../application/projects.queries';
 
 /** What the app shows before the first repository is added. */
@@ -9,6 +10,7 @@ export function NoProjects({
     onOpen: () => void;
 }) {
     const add = useAddProject(onOpen);
+    const { t } = useTranslation();
 
     return (
         <div className="flex h-full flex-col items-center justify-center gap-5 p-8 text-center">
@@ -16,11 +18,8 @@ export function NoProjects({
                 <IconGitCommit size={28} stroke={1.75} />
             </div>
             <div className="max-w-sm space-y-1.5">
-                <h1 className="text-lg font-semibold">Add a repository to review</h1>
-                <p className="text-sm text-ui-text-muted">
-                    Sidekyk watches the working tree and shows what changed since the last commit,
-                    while your agent keeps working.
-                </p>
+                <h1 className="text-lg font-semibold">{t('projects.empty.title')}</h1>
+                <p className="text-sm text-ui-text-muted">{t('projects.empty.text')}</p>
             </div>
             <button
                 type="button"
@@ -29,7 +28,7 @@ export function NoProjects({
                 onClick={() => add.mutate()}
             >
                 <IconFolderOpen size={18} />
-                Add a repository
+                {t('projects.add')}
             </button>
         </div>
     );

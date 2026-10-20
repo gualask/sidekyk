@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from '@/shared/i18n';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { type CopyState, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -118,18 +119,19 @@ export function Pane({
     const bars = useScrollbars(scrollElement);
     const reader = useRef<HunkReader | null>(null);
     const { copied, copy } = useCopyToClipboard();
+    const i18n = useTranslation();
     const [uncolored, setUncolored] = useState(false);
     const pane = useMemo<PaneHeader>(
         () => ({
             copyFile:
                 hunks.length > 0
-                    ? () => void copy('file', fileText(copyTemplate, source, hunks))
+                    ? () => void copy('file', fileText(copyTemplate, source, hunks, i18n))
                     : null,
             fileCopied: copied?.id === 'file' ? copied : null,
             currentHunk: () => reader.current?.current() ?? 0,
             uncolored,
         }),
-        [hunks, copy, copyTemplate, source, copied, uncolored],
+        [hunks, copy, copyTemplate, source, copied, uncolored, i18n],
     );
 
     // the matches of the text looked for; a new text, or the file read again, starts from the

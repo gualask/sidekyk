@@ -1,3 +1,5 @@
+import type { Translator } from '@/shared/i18n';
+
 /**
  * A global shortcut's combination, in the form the settings store it: modifiers in a fixed order,
  * then the key's `KeyboardEvent.code`, joined by `+`, such as `Control+Alt+Space` or
@@ -112,11 +114,14 @@ export function pendingShortcut(event: KeyboardEventLike, mac: boolean): string 
 }
 
 /** The modifiers one of which a shortcut needs, as a sentence names them: `⌃, ⌥ or ⌘`. */
-export function neededModifiers(mac: boolean): string {
+export function neededModifiers(mac: boolean, i18n: Translator): string {
     const labels = MODIFIERS.filter((modifier) => TAKES_NO_CHARACTER.includes(modifier.name)).map(
         (modifier) => modifierLabel(modifier, mac),
     );
-    return `${labels.slice(0, -1).join(', ')} or ${labels.at(-1)}`;
+    return i18n.t('shortcut.either', {
+        some: labels.slice(0, -1).join(', '),
+        last: labels.at(-1) ?? '',
+    });
 }
 
 /**

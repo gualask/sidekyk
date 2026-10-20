@@ -8,10 +8,11 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 ## Try in the app
 
 - [ ] Syntax colors in the running app (`pnpm tauri:dev`; `docs/features/syntax-colors.md`)
+- [ ] Languages in the running app: the first start's language, the tray menu and tooltip as the
+      setting changes, dialog titles, an export (`docs/features/languages.md`)
 
 ## App
 
-- [ ] Italian and English UI (as in Fyler)
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
 - [ ] Copy or reveal the log for bug reports
 
@@ -56,6 +57,9 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
     git-dir check, case included; snapshot timings (process start, Defender); a repo on `C:\`
     edited from WSL (`/mnt/c`): events reach the watcher, Linux and Windows git on one index
     (stat data, filemode, autocrlf)
+  - Linux and Windows: `navigator.languages` gives the system's language at the first start
+    (WebKitGTK from `LANG`?, WebView2 from the display language?); the tray menu's text changes
+    with the setting (`set_text`)
   - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
     runs View Transitions
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;

@@ -9,6 +9,7 @@ import {
     useRef,
     useState,
 } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useSyntaxColors } from '../application/repository.queries';
 import { useRepositorySettings } from '../application/repository-settings';
@@ -56,7 +57,7 @@ export interface HunkReader {
     goTo: (hunk: number) => void;
 }
 
-/** A copy's confirmation: its rows, what it took, and how far the list runs right of the screen. */
+/** A copy's confirmation: its rows, what it says, and how far the list runs right of the screen. */
 type Flash = Span & { label: string; right: number; key: number };
 
 /**
@@ -245,6 +246,7 @@ export function DiffList({
     // what was copied flashes and says what it was, in the part of the list on screen; a new key
     // each time replays both
     const { copied, copy } = useCopyToClipboard();
+    const i18n = useTranslation();
     const [flash, setFlash] = useState<Flash | null>(null);
     const copyRows = (copiedValue: Copied, span: Span, label: string) => {
         const width = listRef.current?.offsetWidth ?? 0;
@@ -257,11 +259,11 @@ export function DiffList({
         const row = target.kind === 'line' ? rows[target.row] : undefined;
         const hunk = target.kind === 'hunk' ? hunks[target.hunk] : undefined;
         const copiedValue = hunk
-            ? hunkCopied(source, hunk)
+            ? hunkCopied(source, hunk, i18n)
             : row?.kind === 'line'
-              ? lineCopied(source, row.line)
+              ? lineCopied(source, row.line, i18n)
               : null;
-        if (span && copiedValue) copyRows(copiedValue, span, copiedLabel(copiedValue));
+        if (span && copiedValue) copyRows(copiedValue, span, copiedLabel(copiedValue, i18n));
     };
     const hovered = useDiffPointer(listRef, rows, {
         click: copyTarget,
@@ -269,7 +271,11 @@ export function DiffList({
             const lines = rows
                 .slice(span.first, span.last + 1)
                 .flatMap((row): DiffLine[] => (row.kind === 'line' ? [row.line] : []));
-            copyRows(selectionCopied(source, lines, text), span, 'selection');
+            copyRows(
+                selectionCopied(source, lines, text, i18n),
+                span,
+                i18n.t('copy.copiedSelection'),
+            );
         },
     });
 
@@ -383,7 +389,7 @@ export function DiffList({
                                 }}
                             >
                                 {copied.ok ? <IconCheck size={11} /> : <IconCopyOff size={11} />}
-                                {copied.ok ? `Copied ${flash.label}` : 'Copy failed'}
+                                {copied.ok ? flash.label : i18n.t('copy.failed')}
                             </span>
                         </div>
                     ) : null}

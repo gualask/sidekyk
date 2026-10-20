@@ -1,6 +1,7 @@
 import { IconCircleCheck } from '@tabler/icons-react';
 import { useRef, useState } from 'react';
 import type { DiffView } from '@/shared/git/diff-view';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
@@ -51,6 +52,7 @@ export function ChangesWorkspace({
     show,
     findInFiles,
 }: PanelProps) {
+    const i18n = useTranslation();
     // the file shown, one for both panels: the tree of Files reveals it
     const {
         snapshot,
@@ -142,7 +144,7 @@ export function ChangesWorkspace({
                 return;
             }
         }
-        showToast({ title: step > 0 ? 'Last change' : 'First change' });
+        showToast({ title: i18n.t(step > 0 ? 'changes.last' : 'changes.first') });
     };
 
     // the file in the tree, and in Files full screen at the hunk being read
@@ -165,14 +167,15 @@ export function ChangesWorkspace({
         <div className="flex h-full flex-col">
             {snapshot.isError ? (
                 <div className="border-b border-ui-border bg-ui-danger-soft px-4 py-2 text-sm text-ui-danger-soft-text">
-                    {projectErrorMessage(snapshot.error, project.location)}
+                    {projectErrorMessage(snapshot.error, project.location, i18n)}
                 </div>
             ) : null}
             {/* about the working tree: not shown while its files make room for a commit's */}
             {snapshot.data?.summary.truncated && !viewed ? (
                 <div className="border-b border-ui-border bg-ui-warning-soft px-4 py-2 text-sm text-ui-warning-soft-text">
-                    Too many changes: only the first {snapshot.data.summary.totals.files} changed
-                    files are listed. A folder such as node_modules may be missing from .gitignore.
+                    {i18n.t('changes.tooMany', {
+                        count: snapshot.data.summary.totals.files.toLocaleString(i18n.formatTag),
+                    })}
                 </div>
             ) : null}
             <div className="flex min-h-0 flex-1">
@@ -292,8 +295,8 @@ export function ChangesWorkspace({
                                     path={unchanged}
                                     uncolored={pane.uncolored}
                                     badge={{
-                                        label: 'Unchanged',
-                                        title: 'Opened from Files; Esc goes back to the changes',
+                                        label: i18n.t('changes.unchanged'),
+                                        title: i18n.t('changes.unchangedTitle'),
                                     }}
                                     showIn={showInFiles(unchanged, () => null)}
                                 />
@@ -302,12 +305,12 @@ export function ChangesWorkspace({
                     ) : snapshot.isSuccess ? (
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-ui-text-muted">
                             <IconCircleCheck size={32} stroke={1.5} />
-                            <p className="text-sm">Nothing to review. The working tree is clean.</p>
+                            <p className="text-sm">{i18n.t('changes.nothing')}</p>
                         </div>
                     ) : snapshot.isPending && project.location.kind === 'wsl' ? (
                         // the first read may start the distro and Sidekyk's helper in it
                         <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
-                            Starting {project.location.distro}…
+                            {i18n.t('changes.starting', { distro: project.location.distro })}
                         </div>
                     ) : null}
                 </main>

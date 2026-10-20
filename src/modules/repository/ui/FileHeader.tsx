@@ -1,5 +1,6 @@
-import { IconFolder, IconGitCompare } from '@tabler/icons-react';
+import { type Icon, IconFolder, IconGitCompare } from '@tabler/icons-react';
 import type { DiffView } from '@/shared/git/diff-view';
+import { type MessageKey, useTranslation } from '@/shared/i18n';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import {
     type CopyState,
@@ -9,20 +10,24 @@ import {
 import type { FileChange } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
 
-const VIEWS: { value: DiffView; label: string; title: string }[] = [
-    { value: 'changes', label: 'Changes', title: 'Only the changed lines' },
-    { value: 'file', label: 'Full file', title: 'The whole file, changes highlighted' },
+const VIEWS: { value: DiffView; label: MessageKey; title: MessageKey }[] = [
+    { value: 'changes', label: 'diffView.changes', title: 'fileHeader.changesTitle' },
+    { value: 'file', label: 'diffView.file', title: 'fileHeader.fileTitle' },
 ];
 
 /** The way to the other panel, with the same file. */
-const SHOW_IN = {
-    files: { label: 'Show in Files', title: 'Show in Files, in the tree', Icon: IconFolder },
+const SHOW_IN: Record<'files' | 'changes', { label: MessageKey; title: MessageKey; Icon: Icon }> = {
+    files: {
+        label: 'fileHeader.showInFiles',
+        title: 'fileHeader.showInFilesTitle',
+        Icon: IconFolder,
+    },
     changes: {
-        label: 'Show in Changes',
-        title: 'Show in Changes, change by change',
+        label: 'fileHeader.showInChanges',
+        title: 'fileHeader.showInChangesTitle',
         Icon: IconGitCompare,
     },
-} as const;
+};
 
 const ICON_BUTTON = 'btn-icon h-[26px] w-[26px]';
 
@@ -60,18 +65,17 @@ export function FileHeader({
 }) {
     const shown = origPath ? `${origPath} → ${path}` : path;
     const pathCopy = useCopyToClipboard();
+    const i18n = useTranslation();
+    const { t } = i18n;
     const copy = copyDiff
         ? {
               ...copyDiff,
-              title: copyLabel(
-                  copyDiff.copied,
-                  'Copy the diff of this file, ready to paste to your agent',
-              ),
+              title: copyLabel(copyDiff.copied, t('fileHeader.copyDiff'), i18n),
           }
         : {
               copied: pathCopy.copied,
               onCopy: () => void pathCopy.copy('path', path),
-              title: copyLabel(pathCopy.copied, 'Copy the path'),
+              title: copyLabel(pathCopy.copied, t('fileHeader.copyPath'), i18n),
           };
     const other = showIn ? SHOW_IN[showIn.panel] : null;
 
@@ -101,28 +105,28 @@ export function FileHeader({
                 {uncolored ? (
                     <span
                         className="shrink-0 font-sans text-[11px] font-normal text-ui-text-muted"
-                        title="Larger than 1 MiB: shown without syntax colors"
+                        title={t('fileHeader.uncoloredTitle')}
                     >
-                        No colors
+                        {t('fileHeader.uncolored')}
                     </span>
                 ) : null}
             </span>
             {view ? (
                 // plain buttons styled as segments: Base UI stays out of the first paint
-                <fieldset className="seg" aria-label="Diff view">
+                <fieldset className="seg" aria-label={t('fileHeader.diffView')}>
                     {VIEWS.map((option) => (
                         <button
                             key={option.value}
                             type="button"
                             className="seg-item py-0.5 font-semibold"
-                            title={option.title}
+                            title={t(option.title)}
                             aria-pressed={option.value === view.value}
                             data-checked={option.value === view.value ? '' : undefined}
                             onClick={() => {
                                 if (option.value !== view.value) view.onChange(option.value);
                             }}
                         >
-                            {option.label}
+                            {t(option.label)}
                         </button>
                     ))}
                 </fieldset>
@@ -131,8 +135,8 @@ export function FileHeader({
                 <button
                     type="button"
                     className={ICON_BUTTON}
-                    title={other.title}
-                    aria-label={other.label}
+                    title={t(other.title)}
+                    aria-label={t(other.label)}
                     onClick={showIn.onShow}
                 >
                     <other.Icon size={14} />

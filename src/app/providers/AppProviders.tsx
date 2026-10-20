@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
 import { NotesProvider, NotesSettingsProvider } from '@/modules/notes';
@@ -8,6 +8,7 @@ import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/reposi
 import { SearchProvider } from '@/modules/search';
 import { SettingsProvider, useChangeSettings, useSettingsWhenRead } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import { createTranslator, detectLocale, formatTag, TranslationProvider } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
 import { createAppQueryClient } from './query-client';
@@ -31,26 +32,51 @@ export function AppProviders({
             <ShowWindowProvider value={runtime.showWindow}>
                 <TitleBarProvider value={runtime.titleBar}>
                     <SettingsProvider value={runtime.settings}>
-                        <ProjectsProvider value={runtime.projects}>
-                            <RepositoryProvider value={runtime.repository}>
-                                <RepositorySettingsBridge>
-                                    <SidebarWidthsBridge>
-                                        <SearchProvider value={runtime.search}>
-                                            <NotesProvider value={runtime.notes}>
-                                                <NotesSettingsBridge>
-                                                    <ToastsHost>{children}</ToastsHost>
-                                                </NotesSettingsBridge>
-                                            </NotesProvider>
-                                        </SearchProvider>
-                                    </SidebarWidthsBridge>
-                                </RepositorySettingsBridge>
-                            </RepositoryProvider>
-                        </ProjectsProvider>
+                        <TranslationBridge>
+                            <ProjectsProvider value={runtime.projects}>
+                                <RepositoryProvider value={runtime.repository}>
+                                    <RepositorySettingsBridge>
+                                        <SidebarWidthsBridge>
+                                            <SearchProvider value={runtime.search}>
+                                                <NotesProvider value={runtime.notes}>
+                                                    <NotesSettingsBridge>
+                                                        <ToastsHost>{children}</ToastsHost>
+                                                    </NotesSettingsBridge>
+                                                </NotesProvider>
+                                            </SearchProvider>
+                                        </SidebarWidthsBridge>
+                                    </RepositorySettingsBridge>
+                                </RepositoryProvider>
+                            </ProjectsProvider>
+                        </TranslationBridge>
                     </SettingsProvider>
                 </TitleBarProvider>
             </ShowWindowProvider>
         </QueryClientProvider>
     );
+}
+
+/**
+ * The UI's language: the settings', else the system's, which the first start stores (the tray and
+ * the backend's dialogs speak the stored one). The window shows once the settings are read
+ * (`AppShell`), so its first frame is in the right language.
+ */
+function TranslationBridge({ children }: { children: ReactNode }) {
+    const settings = useSettingsWhenRead();
+    const change = useChangeSettings();
+    const locale = settings?.language ?? detectLocale(navigator.languages);
+    const translator = useMemo(
+        () => createTranslator(locale, formatTag(locale, navigator.languages)),
+        [locale],
+    );
+    const unstored = settings !== undefined && settings.language === null;
+    useEffect(() => {
+        if (unstored) change((current) => ({ ...current, language: locale }));
+    }, [unstored, change, locale]);
+    useEffect(() => {
+        document.documentElement.lang = locale;
+    }, [locale]);
+    return <TranslationProvider value={translator}>{children}</TranslationProvider>;
 }
 
 /**

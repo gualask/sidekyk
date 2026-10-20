@@ -8,6 +8,7 @@ import {
     useState,
 } from 'react';
 import { DEFAULT_TILES_LAYOUT } from '@/modules/projects';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps } from '@/shared/panels/panel';
 import { trackDrag } from '@/shared/ui/pointer-drag';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
@@ -137,10 +138,11 @@ function RowSplitter({
     onSplit: (split: number) => void;
     onReset: () => void;
 }) {
+    const { t } = useTranslation();
     return (
         <div
             aria-hidden
-            title="Drag to resize; double click to even them"
+            title={t('splitter.even')}
             className="group relative z-[2] h-2 shrink-0 cursor-row-resize"
             onPointerDown={(event) => {
                 const top = upper.current;

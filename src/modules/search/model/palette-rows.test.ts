@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import { contentRows, highlightParts, paletteRows } from './palette-rows';
+
+const en = createTranslator('en', 'en');
 
 const PANELS = [{ id: 'changes', title: 'Changes', shortcut: '1' }];
 
@@ -16,6 +19,7 @@ describe('paletteRows', () => {
             },
             PANELS,
             'shop',
+            en,
         );
         expect(items.map((item) => item.label)).toEqual(['shop', 'src/total.ts']);
         expect(rows).toEqual([
@@ -58,6 +62,7 @@ describe('paletteRows', () => {
             },
             PANELS,
             'shop',
+            en,
         );
         expect(rows.flatMap((row) => (row.kind === 'group' ? [row.label] : []))).toEqual([
             'Note lists in shop',
@@ -89,6 +94,7 @@ describe('paletteRows', () => {
             },
             PANELS,
             'shop',
+            en,
         );
         expect(items).toEqual([
             {
@@ -127,14 +133,14 @@ describe('contentRows', () => {
     ];
 
     it('lists the lines under their files', () => {
-        const { items, rows } = contentRows(files, null);
+        const { items, rows } = contentRows(files, null, en);
         expect(items.map((item) => item.label)).toEqual(['line 1', 'line 3', 'line 9']);
         expect(rows.map((row) => row.kind)).toEqual(['file', 'item', 'file', 'item', 'item']);
         expect(rows[2]).toEqual({ kind: 'file', path: 'b.ts', count: 2 });
     });
 
     it('puts the lines of the file shown first', () => {
-        const { items, rows } = contentRows(files, 'b.ts');
+        const { items, rows } = contentRows(files, 'b.ts', en);
         expect(items.map((item) => item.label)).toEqual(['line 3', 'line 9', 'line 1']);
         expect(rows.slice(0, 1)).toEqual([{ kind: 'group', label: 'In this file' }]);
         expect(rows[3]).toEqual({ kind: 'group', label: 'Other files' });

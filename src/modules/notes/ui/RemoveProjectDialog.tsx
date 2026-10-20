@@ -1,6 +1,7 @@
 import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { notesKey, useExportNotes, useNotesCount } from '../application/notes.queries';
 
@@ -23,6 +24,7 @@ export function RemoveProjectDialog({
     const exportNotes = useExportNotes(project.id);
     const [exporting, setExporting] = useState(false);
     const count = useNotesCount(project.id);
+    const { t, tp } = useTranslation();
 
     const remove = useEffectEvent(() => {
         // what was read of its notes goes too: added again, it starts with none
@@ -48,19 +50,15 @@ export function RemoveProjectDialog({
                 <AlertDialog.Backdrop className="dialog-backdrop" />
                 <AlertDialog.Popup className="dialog-popup top-[22vh] w-[min(440px,calc(100vw-32px))] p-4">
                     <AlertDialog.Title className="text-[15px] font-bold">
-                        Remove {project.name}?
+                        {t('remove.title', { name: project.name })}
                     </AlertDialog.Title>
                     <AlertDialog.Description className="mt-1.5 text-ui-text-secondary">
-                        {notes === null
-                            ? 'Its notes are'
-                            : notes === 1
-                              ? 'Its note is'
-                              : `Its ${notes} notes are`}{' '}
-                        deleted with it. Export them first to keep them. The repository stays as it
-                        is.
+                        {notes === null ? t('remove.notes') : tp('remove.notesCount', notes)}
                     </AlertDialog.Description>
                     <div className="mt-4 flex flex-wrap justify-end gap-2">
-                        <AlertDialog.Close className="btn-ghost-sm">Cancel</AlertDialog.Close>
+                        <AlertDialog.Close className="btn-ghost-sm">
+                            {t('common.cancel')}
+                        </AlertDialog.Close>
                         <button
                             type="button"
                             className="btn-ghost-sm"
@@ -72,7 +70,7 @@ export function RemoveProjectDialog({
                                 if (path) remove();
                             }}
                         >
-                            Export notes…
+                            {t('notes.export')}
                         </button>
                         <button
                             type="button"
@@ -80,7 +78,7 @@ export function RemoveProjectDialog({
                             disabled={exporting}
                             onClick={remove}
                         >
-                            Remove and delete notes
+                            {t('remove.confirm')}
                         </button>
                     </div>
                 </AlertDialog.Popup>

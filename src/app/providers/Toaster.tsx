@@ -1,6 +1,7 @@
 import { Toast } from '@base-ui/react/toast';
 import { IconX } from '@tabler/icons-react';
 import { useEffect } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { ToastRequest } from '@/shared/ui/toasts';
 import type { ToastQueue } from './toast-queue';
 
@@ -67,6 +68,7 @@ function QueueFeed({ queue }: { queue: ToastQueue }) {
 /** The newest first: the viewport stacks them upwards from the bottom edge. */
 function ToastList() {
     const { toasts } = Toast.useToastManager();
+    const { t } = useTranslation();
     return toasts.map((toast) => {
         const error = toast.type === 'error';
         return (
@@ -87,7 +89,10 @@ function ToastList() {
                     <Toast.Action className="btn-ghost-sm min-h-[26px] px-2 font-semibold" />
                 ) : null}
                 {error ? (
-                    <Toast.Close className="btn-icon h-[22px] w-[22px]" aria-label="Dismiss">
+                    <Toast.Close
+                        className="btn-icon h-[22px] w-[22px]"
+                        aria-label={t('toast.dismiss')}
+                    >
                         <IconX size={12} />
                     </Toast.Close>
                 ) : null}

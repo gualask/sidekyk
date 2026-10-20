@@ -13,9 +13,19 @@ fn texts(notes: &[&Note]) -> String {
     texts.join(BETWEEN)
 }
 
+/// The words an export adds to the notes, in the UI's language.
+pub struct ExportWords {
+    /// After the project's name, in the title: `# shop: notes`.
+    pub notes: &'static str,
+    /// A list without notes.
+    pub no_notes: &'static str,
+    /// Over a list's done notes.
+    pub done: &'static str,
+}
+
 /// The Markdown of a project's notes, `name` its title.
-pub fn to_markdown(name: &str, lists: &[NoteList], notes: &[Note]) -> String {
-    let mut out = format!("# {name}: notes\n\n");
+pub fn to_markdown(name: &str, lists: &[NoteList], notes: &[Note], words: &ExportWords) -> String {
+    let mut out = format!("# {name}: {}\n\n", words.notes);
     for list in lists {
         let mut open: Vec<&Note> = notes
             .iter()
@@ -29,13 +39,13 @@ pub fn to_markdown(name: &str, lists: &[NoteList], notes: &[Note]) -> String {
         done.sort_by_key(|n| std::cmp::Reverse(n.done));
         out.push_str(&format!("## {}\n\n", list.name));
         if open.is_empty() && done.is_empty() {
-            out.push_str("No notes.\n\n");
+            out.push_str(&format!("{}\n\n", words.no_notes));
         }
         if !open.is_empty() {
             out.push_str(&format!("{}\n\n", texts(&open)));
         }
         if !done.is_empty() {
-            out.push_str(&format!("### Done\n\n{}\n\n", texts(&done)));
+            out.push_str(&format!("### {}\n\n{}\n\n", words.done, texts(&done)));
         }
     }
     out.truncate(out.trim_end().len());
@@ -46,6 +56,12 @@ pub fn to_markdown(name: &str, lists: &[NoteList], notes: &[Note]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const WORDS: ExportWords = ExportWords {
+        notes: "notes",
+        no_notes: "No notes.",
+        done: "Done",
+    };
 
     fn note(list: &str, position: f64, text: &str, done: Option<u64>) -> Note {
         Note {
@@ -78,7 +94,7 @@ mod tests {
             note("g", 4.0, "Older", Some(0)),
         ];
         assert_eq!(
-            to_markdown("shop", &lists, &notes),
+            to_markdown("shop", &lists, &notes, &WORDS),
             "# shop: notes\n\n\
              ## General\n\n\
              First\nwith a line\n\n---\n\nSecond\n\n\

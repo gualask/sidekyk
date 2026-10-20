@@ -7,6 +7,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
+use super::texts;
 use crate::infrastructure::notes_files::{resolved_path, write_chosen_file, NotesFiles};
 use sidekyk_core::infrastructure::wsl::wsl_path;
 use sidekyk_core::modules::notes::{
@@ -264,11 +265,12 @@ pub(crate) async fn export_notes(
     blocking("export_notes", app, move |app| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
+        let texts = texts::current(app);
         let Some(path) = app
             .dialog()
             .file()
-            .set_title("Export notes")
-            .set_file_name(format!("{}-notes.md", project.name))
+            .set_title(texts.export_notes)
+            .set_file_name(texts.export_file.replace("{name}", &project.name))
             .add_filter("Markdown", &["md"])
             .blocking_save_file()
         else {
@@ -287,7 +289,7 @@ pub(crate) async fn export_notes(
         let markdown = app.state::<NotesStore>().read_notes(
             app.state::<NotesFiles>().inner(),
             &project_id,
-            |lists, notes| to_markdown(&project.name, lists, notes),
+            |lists, notes| to_markdown(&project.name, lists, notes, &texts.export),
         )?;
         write_chosen_file(&path, markdown.as_bytes())?;
         Ok(Some(path.to_string_lossy().into_owned()))

@@ -6,7 +6,8 @@ hidden.
 ## Behaviour
 
 - Tray icon with the change count of the project on screen (next to the icon on macOS/Linux,
-  tooltip everywhere); menu: show, quit. Closing the window hides it to the tray.
+  tooltip everywhere); menu: show, quit, in the UI's language (`languages.md`). Closing the
+  window hides it to the tray.
 - Global shortcut shows the window when hidden/minimized/behind, hides it in front (on macOS the
   whole app). Default `⌃⌥Space`, provisional. On Linux the desktop's shortcut runs
   `sidekyk --toggle`.

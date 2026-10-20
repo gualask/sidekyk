@@ -25,6 +25,8 @@ use super::contracts::{
 use super::ports::NotesStorage;
 use crate::shared::sync::lock;
 
+/// The list a project starts with, until `name_first_lists` names it in the UI's language.
+const FIRST_LIST_NAME: &str = "General";
 const PROJECT_FILE: &str = "project.json";
 const LISTS_FILE: &str = "lists.json";
 const STATE_FILE: &str = "state.json";
@@ -127,9 +129,16 @@ pub struct NotesStore {
     open: Mutex<Option<OpenBook>>,
     /// What the projects' cards tell, by project id, once read: notes change only through here.
     summaries: Mutex<HashMap<String, NotesSummary>>,
+    /// The name of a project's first list, `FIRST_LIST_NAME` until named.
+    first_list_name: Mutex<Option<&'static str>>,
 }
 
 impl NotesStore {
+    /// Names the list a project starts with from now on; lists already there keep theirs.
+    pub fn name_first_lists(&self, name: &'static str) {
+        *lock(&self.first_list_name) = Some(name);
+    }
+
     /// The folder of each project, from their `project.json`.
     fn folder_of(
         &self,
@@ -201,7 +210,12 @@ impl NotesStore {
                 }
             }
         }
-        let (book, pending) = Book::mended(lists, notes, open_list, new_id);
+        let name = lock(&self.first_list_name).unwrap_or(FIRST_LIST_NAME);
+        let first_list = || NoteList {
+            id: new_id(),
+            name: name.into(),
+        };
+        let (book, pending) = Book::mended(lists, notes, open_list, first_list);
         tracing::debug!(
             notes = book.notes.len(),
             ms = started.elapsed().as_millis() as u64,
@@ -627,6 +641,17 @@ pub mod tests {
         assert_eq!(notes.lists[0].name, "General");
         assert!(notes.notes.is_empty());
         assert!(storage.names().is_empty());
+    }
+
+    #[test]
+    fn the_first_list_takes_the_name_given() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        store.name_first_lists("Generale");
+        assert_eq!(
+            store.notes(&storage, PROJECT).unwrap().lists[0].name,
+            "Generale"
+        );
     }
 
     #[test]

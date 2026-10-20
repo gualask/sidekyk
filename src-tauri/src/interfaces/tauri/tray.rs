@@ -10,6 +10,7 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 use tauri::{AppHandle, Manager};
 
 use super::state::ProjectsState;
+use super::texts::Texts;
 use super::window::show_main_window;
 use sidekyk_core::modules::repository::RepositorySummary;
 use sidekyk_core::shared::sync::lock;
@@ -20,9 +21,17 @@ const QUIT: &str = "quit";
 /// Managed once the icon is in the tray.
 struct Tray {
     icon: TrayIcon,
+    show: MenuItem<tauri::Wry>,
+    quit: MenuItem<tauri::Wry>,
     /// What the icon shows, so a read that changed nothing touches nothing. Only the main thread,
     /// where every update runs, uses it.
-    shown: Mutex<Option<Shown>>,
+    showing: Mutex<Showing>,
+}
+
+/// What the icon shows, and in which language.
+struct Showing {
+    shown: Option<Shown>,
+    texts: &'static Texts,
 }
 
 /// The project on screen, as the tray shows it.
@@ -36,12 +45,14 @@ struct Shown {
 
 /// Puts the icon in the tray. On Linux, Tauri loads libayatana-appindicator3 (or
 /// libappindicator3) at runtime and panics without it: the app then goes on with no tray.
-pub(crate) fn start(app: &AppHandle) {
-    match catch_unwind(AssertUnwindSafe(|| build(app))) {
-        Ok(Ok(icon)) => {
+pub(crate) fn start(app: &AppHandle, texts: &'static Texts) {
+    match catch_unwind(AssertUnwindSafe(|| build(app, texts))) {
+        Ok(Ok((icon, show, quit))) => {
             app.manage(Tray {
                 icon,
-                shown: Mutex::default(),
+                show,
+                quit,
+                showing: Mutex::new(Showing { shown: None, texts }),
             });
         }
         Ok(Err(error)) => tracing::warn!(error = %format!("{error:#}"), "no tray icon"),
@@ -54,11 +65,13 @@ pub(crate) fn is_up(app: &AppHandle) -> bool {
     app.try_state::<Tray>().is_some()
 }
 
-fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
-    let show = MenuItem::with_id(app, SHOW, "Show Sidekyk", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, QUIT, "Quit Sidekyk", true, None::<&str>)?;
+type Built = (TrayIcon, MenuItem<tauri::Wry>, MenuItem<tauri::Wry>);
+
+fn build(app: &AppHandle, texts: &Texts) -> tauri::Result<Built> {
+    let show = MenuItem::with_id(app, SHOW, texts.show, true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, QUIT, texts.quit, true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &quit])?;
-    TrayIconBuilder::new()
+    let icon = TrayIconBuilder::new()
         .icon(icon(app))
         // drawn by macOS in the menu bar's colors; elsewhere the app's icon, in color
         .icon_as_template(cfg!(target_os = "macos"))
@@ -84,7 +97,8 @@ fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
                 }
             }
         })
-        .build(app)
+        .build(app)?;
+    Ok((icon, show, quit))
 }
 
 /// A monochrome glyph on macOS, where the menu bar wants a template; the app's icon elsewhere.
@@ -126,44 +140,71 @@ pub(crate) fn clear(app: &AppHandle) {
 /// Updates the icon on the main thread, where Tauri changes it anyway: the caller does not wait,
 /// and updates apply in the order they were asked for.
 fn show(app: &AppHandle, next: Option<Shown>) {
+    on_main_thread(app, move |tray, showing| {
+        if showing.shown != next {
+            let texts = showing.texts;
+            set_label(tray, showing, next, texts);
+        }
+    });
+}
+
+/// The menu and the tooltip in another language, from the settings just changed.
+pub(crate) fn speak(app: &AppHandle, texts: &'static Texts) {
+    on_main_thread(app, move |tray, showing| {
+        if std::ptr::eq(showing.texts, texts) {
+            return;
+        }
+        let result = tray
+            .show
+            .set_text(texts.show)
+            .and_then(|()| tray.quit.set_text(texts.quit));
+        if let Err(error) = result {
+            tracing::warn!(%error, "could not update the tray menu");
+        }
+        let shown = showing.shown.take();
+        set_label(tray, showing, shown, texts);
+    });
+}
+
+fn on_main_thread(app: &AppHandle, update: impl FnOnce(&Tray, &mut Showing) + Send + 'static) {
     if !is_up(app) {
         return;
     }
     let handle = app.clone();
     let queued = app.run_on_main_thread(move || {
         let tray = handle.state::<Tray>();
-        let mut shown = lock(&tray.shown);
-        if *shown == next {
-            return;
-        }
-        let (title, tooltip) = label(next.as_ref());
-        let result = tray
-            .icon
-            .set_title(title)
-            .and_then(|()| tray.icon.set_tooltip(Some(tooltip)));
-        match result {
-            Ok(()) => {
-                tracing::debug!(files = next.as_ref().map(|shown| shown.files), "tray");
-                *shown = next;
-            }
-            Err(error) => tracing::warn!(%error, "could not update the tray icon"),
-        }
+        update(&tray, &mut lock(&tray.showing));
     });
     if let Err(error) = queued {
         tracing::warn!(%error, "could not update the tray icon");
     }
 }
 
+fn set_label(tray: &Tray, showing: &mut Showing, next: Option<Shown>, texts: &'static Texts) {
+    let (title, tooltip) = label(next.as_ref(), texts);
+    let result = tray
+        .icon
+        .set_title(title)
+        .and_then(|()| tray.icon.set_tooltip(Some(tooltip)));
+    match result {
+        Ok(()) => {
+            tracing::debug!(files = next.as_ref().map(|shown| shown.files), "tray");
+            *showing = Showing { shown: next, texts };
+        }
+        Err(error) => tracing::warn!(%error, "could not update the tray icon"),
+    }
+}
+
 /// The text next to the icon, none without changes, and the tooltip.
-fn label(shown: Option<&Shown>) -> (Option<String>, String) {
+fn label(shown: Option<&Shown>, texts: &Texts) -> (Option<String>, String) {
     let Some(Shown { name, files, more }) = shown else {
         return (None, "Sidekyk".to_string());
     };
     let count = format!("{files}{}", if *more { "+" } else { "" });
     let changes = match (files, more) {
-        (0, _) => "no changes".to_string(),
-        (1, false) => "1 changed file".to_string(),
-        _ => format!("{count} changed files"),
+        (0, _) => texts.no_changes.to_string(),
+        (1, false) => texts.one_changed_file.to_string(),
+        _ => texts.changed_files.replace("{count}", &count),
     };
     (
         (*files > 0).then_some(count),
@@ -174,6 +215,8 @@ fn label(shown: Option<&Shown>) -> (Option<String>, String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::interfaces::tauri::texts;
+    use sidekyk_core::modules::settings::Language;
 
     fn shown(files: u32) -> Option<Shown> {
         Some(Shown {
@@ -181,6 +224,10 @@ mod tests {
             files,
             more: false,
         })
+    }
+
+    fn label(shown: Option<&Shown>) -> (Option<String>, String) {
+        super::label(shown, texts::texts(None))
     }
 
     #[test]
@@ -214,6 +261,19 @@ mod tests {
                 Some("10000+".to_string()),
                 "Sidekyk · shop: 10000+ changed files".to_string()
             )
+        );
+    }
+
+    #[test]
+    fn the_tooltip_speaks_the_settings_language() {
+        let italian = texts::texts(Some(Language::It));
+        assert_eq!(
+            super::label(shown(1).as_ref(), italian).1,
+            "Sidekyk · shop: 1 file modificato"
+        );
+        assert_eq!(
+            super::label(shown(12).as_ref(), italian).1,
+            "Sidekyk · shop: 12 file modificati"
         );
     }
 }

@@ -1,3 +1,4 @@
+import { useTranslation } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useRepositorySummary } from '../application/repository.queries';
 import type { RepositorySummary } from '../model/repository.types';
@@ -28,10 +29,11 @@ export function ProjectFacts({
 /** How many files and lines changed against HEAD, `8 changed +54 −27`, or "clean". */
 function ChangeCounts({ summary }: { summary: RepositorySummary }) {
     const { totals } = summary;
-    if (totals.files === 0) return <span>clean</span>;
+    const { t, tp } = useTranslation();
+    if (totals.files === 0) return <span>{t('changes.clean')}</span>;
     return (
         <span className="inline-flex items-center gap-2 whitespace-nowrap">
-            {changedCount(summary)} changed
+            {tp('changes.changedCount', totals.files, { count: changedCount(summary) })}
             {totals.additions + totals.deletions > 0 ? (
                 <TrackedLines additions={totals.additions} deletions={totals.deletions} />
             ) : null}

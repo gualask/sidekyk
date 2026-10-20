@@ -1,19 +1,28 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import { errorMessage, hasErrorCode } from './app-error';
+
+const en = createTranslator('en', 'en');
 
 describe('errorMessage', () => {
     it('maps known codes and falls back to the backend message', () => {
-        expect(errorMessage({ code: 'not_a_repository', message: 'not_a_repository' })).toBe(
+        expect(errorMessage({ code: 'not_a_repository', message: 'not_a_repository' }, en)).toBe(
             'That folder is not inside a git repository.',
         );
-        expect(errorMessage({ code: 'unknown', message: 'git status exited with code 128' })).toBe(
-            'git status exited with code 128',
-        );
+        expect(
+            errorMessage({ code: 'unknown', message: 'git status exited with code 128' }, en),
+        ).toBe('git status exited with code 128');
+        expect(
+            errorMessage(
+                { code: 'not_a_repository', message: 'not_a_repository' },
+                createTranslator('it', 'it'),
+            ),
+        ).toBe('Quella cartella non è dentro un repository git.');
     });
 
     it('reads plain errors and strings', () => {
-        expect(errorMessage(new Error('boom'))).toBe('boom');
-        expect(errorMessage('denied')).toBe('denied');
+        expect(errorMessage(new Error('boom'), en)).toBe('boom');
+        expect(errorMessage('denied', en)).toBe('denied');
     });
 });
 

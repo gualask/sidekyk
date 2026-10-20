@@ -3,6 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
+import { useTranslation } from '@/shared/i18n';
 import type { FileFinder } from '../application/find';
 import { useCommitFileDiff, useFileDiff } from '../application/repository.queries';
 import { commitRequest, shortSha } from '../model/commits';
@@ -49,6 +50,7 @@ function DiffPane({
     commit: string | null;
     syntax: FileSyntax;
 }) {
+    const i18n = useTranslation();
     const parsed = useMemo(
         () => (diff.data ? parseUnifiedDiff(diff.data.text) : null),
         [diff.data],
@@ -85,27 +87,23 @@ function DiffPane({
             // until the diff is read there are no changes to go through: the keys wait
             onPastEnd={diff.isPending ? undefined : onPastEnd}
         >
-            {diff.isPending ? <Notice>Loading diff…</Notice> : null}
+            {diff.isPending ? <Notice>{i18n.t('view.loadingDiff')}</Notice> : null}
             {diff.isError ? (
                 <Notice>
-                    <span className="text-ui-danger">{errorMessage(diff.error)}</span>
+                    <span className="text-ui-danger">{errorMessage(diff.error, i18n)}</span>
                 </Notice>
             ) : null}
             {parsed?.binary ? (
                 <Notice>
                     <IconFileOff size={28} stroke={1.5} />
-                    Binary file, no text to show.
+                    {i18n.t('view.binary')}
                 </Notice>
             ) : null}
             {parsed && !parsed.binary && hunks.length === 0 ? (
-                <Notice>No line changes (only mode or metadata changed).</Notice>
+                <Notice>{i18n.t('view.noLineChanges')}</Notice>
             ) : null}
             {diff.data?.truncated ? (
-                <Notice>
-                    {view === 'file'
-                        ? 'The file is too large to show whole: it was cut here.'
-                        : 'The diff is too large and was cut. Open the file to see the rest.'}
-                </Notice>
+                <Notice>{i18n.t(view === 'file' ? 'view.fileCut' : 'view.diffCut')}</Notice>
             ) : null}
         </Pane>
     );

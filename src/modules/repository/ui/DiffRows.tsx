@@ -1,4 +1,5 @@
 import { Fragment, memo } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
 import type { SyntaxTone } from '../model/repository.types';
 import type { LineBreaks } from '../model/soft-wrap';
@@ -38,11 +39,12 @@ export function HunkHeaderRow({
     first: boolean;
     onCopy: () => void;
 }) {
+    const { t } = useTranslation();
     return (
         <button
             type="button"
             onClick={onCopy}
-            title="Copy this hunk"
+            title={t('view.copyHunk')}
             className={`flex h-6 w-full cursor-pointer items-center gap-3 bg-ui-diff-hunk-bg px-4 text-left text-ui-diff-hunk-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted focus-visible:ring-inset ${
                 first ? '' : 'border-t border-ui-border'
             }`}

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import { hunkCopied } from './copied';
 import { parseUnifiedDiff } from './diff-parser';
 import { wholeFile } from './whole-file';
@@ -80,7 +81,10 @@ describe('wholeFile', () => {
     it('copies a hunk as the Changes view does', () => {
         const [derived] = wholeFile(parse(WHOLE)).hunks;
         const [git] = parse(GIT_HUNKS);
-        expect(derived && hunkCopied(SOURCE, derived)).toEqual(git && hunkCopied(SOURCE, git));
+        const en = createTranslator('en', 'en');
+        expect(derived && hunkCopied(SOURCE, derived, en)).toEqual(
+            git && hunkCopied(SOURCE, git, en),
+        );
     });
 
     it('numbers a side with no line from the line before', () => {

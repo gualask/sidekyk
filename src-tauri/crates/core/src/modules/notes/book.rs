@@ -8,8 +8,6 @@ use crate::shared::error::{user_facing, UserFacingErrorCode};
 pub const MAX_NOTE_BYTES: usize = 1024 * 1024;
 /// The longest list name, in characters.
 const MAX_LIST_NAME: usize = 200;
-/// The list a project starts with.
-pub(super) const FIRST_LIST_NAME: &str = "General";
 /// Below this gap between two positions, a note moved between them renumbers its list instead.
 const MIN_GAP: f64 = 1e-9;
 
@@ -88,16 +86,13 @@ impl Book {
         mut lists: Vec<NoteList>,
         mut notes: Vec<Note>,
         open_list: Option<String>,
-        first_list: impl FnOnce() -> String,
+        first_list: impl FnOnce() -> NoteList,
     ) -> (Self, Vec<Touched>) {
         let mut touched = Vec::new();
         let mut seen = std::collections::HashSet::new();
         lists.retain(|l| is_id(&l.id) && seen.insert(l.id.clone()));
         if lists.is_empty() {
-            lists.push(NoteList {
-                id: first_list(),
-                name: FIRST_LIST_NAME.into(),
-            });
+            lists.push(first_list());
             touched.push(Touched::Lists);
         }
         for note in &mut notes {
@@ -487,8 +482,12 @@ mod tests {
             edited: 1,
             done: None,
         };
-        let (book, touched) = Book::mended(Vec::new(), vec![stray], None, || GENERAL.into());
-        assert_eq!(book.lists[0].name, FIRST_LIST_NAME);
+        let first = || NoteList {
+            id: GENERAL.into(),
+            name: "General".into(),
+        };
+        let (book, touched) = Book::mended(Vec::new(), vec![stray], None, first);
+        assert_eq!(book.lists[0].name, "General");
         assert_eq!(book.notes[0].list, GENERAL);
         assert_eq!(book.open_list, GENERAL);
         assert_eq!(touched, vec![Touched::Lists, Touched::Note(id(1))]);

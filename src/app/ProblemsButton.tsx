@@ -1,5 +1,6 @@
 import { Popover } from '@base-ui/react/popover';
 import { IconAlertTriangle } from '@tabler/icons-react';
+import { useTranslation } from '@/shared/i18n';
 import type { Problem } from './problems';
 
 /**
@@ -8,12 +9,13 @@ import type { Problem } from './problems';
  */
 export function ProblemsButton({ problems }: { problems: Problem[] }) {
     const count = problems.length;
+    const { t, tp } = useTranslation();
     return (
         <Popover.Root>
             <Popover.Trigger
                 className="flex h-[26px] items-center gap-1.5 rounded-[7px] bg-ui-warning-soft px-2.5 text-xs font-bold text-ui-warning-soft-text outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
-                title="Something needs your attention"
-                aria-label={count === 1 ? '1 problem' : `${count} problems`}
+                title={t('problem.attention')}
+                aria-label={tp('problem.count', count)}
             >
                 <IconAlertTriangle size={14} stroke={2} />
                 {count}
@@ -21,7 +23,7 @@ export function ProblemsButton({ problems }: { problems: Problem[] }) {
             <Popover.Portal>
                 <Popover.Positioner sideOffset={6} align="end" collisionPadding={10}>
                     <Popover.Popup className="w-[340px] max-w-[calc(100vw-20px)] rounded-xl border border-ui-border-hover bg-ui-surface p-1.5 shadow-[0_16px_40px_var(--ui-shadow-soft)] outline-none">
-                        <Popover.Title className="sr-only">Problems</Popover.Title>
+                        <Popover.Title className="sr-only">{t('problem.list')}</Popover.Title>
                         <ul className="divide-y divide-ui-border">
                             {problems.map((problem) => (
                                 <li key={problem.id} className="flex items-start gap-2.5 p-2.5">

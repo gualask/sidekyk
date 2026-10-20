@@ -1,6 +1,7 @@
 import { Menu } from '@base-ui/react/menu';
 import { IconCheck, IconDots, IconTrash } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
@@ -42,13 +43,16 @@ export function NoteCard({
 }) {
     const done = note.done !== null;
     const others = lists.filter((list) => list.id !== note.list);
+    const i18n = useTranslation();
+    const { t } = i18n;
+    const copyTitle = copyLabel(copied, t('notes.copy'), i18n);
 
     return (
         <article
             className={`group/card relative grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-2.5 gap-y-0.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
                 editing ? 'border-ui-accent' : 'border-ui-border hover:border-ui-border-hover'
             } ${flash ? 'note-flash' : ''}`}
-            aria-label="Note"
+            aria-label={t('notes.note')}
         >
             <button
                 type="button"
@@ -57,8 +61,8 @@ export function NoteCard({
                         ? 'border-ui-success bg-ui-success text-ui-surface'
                         : 'border-ui-text-muted text-transparent hover:border-ui-success hover:text-ui-success'
                 }`}
-                title={done ? 'Not done' : 'Done'}
-                aria-label={done ? 'Mark as not done' : 'Mark as done'}
+                title={t(done ? 'notes.notDone' : 'notes.done')}
+                aria-label={t(done ? 'notes.markNotDone' : 'notes.markDone')}
                 onClick={() => void actions.setDone(note, !done)}
             >
                 <IconCheck size={11} stroke={3} />
@@ -71,21 +75,21 @@ export function NoteCard({
                     className={`line-clamp-4 min-w-0 cursor-text text-left text-[13px]/[1.5] break-words whitespace-pre-wrap focus-visible:outline-none ${
                         done ? 'text-ui-text-muted' : 'text-ui-text-secondary'
                     }`}
-                    title="Click to edit"
+                    title={t('notes.clickToEdit')}
                     onClick={() => onEdit(true)}
                 >
                     {note.text}
                 </button>
             )}
             <div className="col-start-2 text-[11.5px] text-ui-text-muted">
-                {noteMeta(note, Date.now())}
+                {noteMeta(note, Date.now(), i18n)}
             </div>
             <div className="col-start-3 row-span-2 row-start-1 -mt-0.5 -mr-0.5 flex items-start">
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"
-                    title={copyLabel(copied, 'Copy note')}
-                    aria-label={copyLabel(copied, 'Copy note')}
+                    title={copyTitle}
+                    aria-label={copyTitle}
                     onClick={onCopy}
                 >
                     <CopyIcon copied={copied} />
@@ -93,8 +97,8 @@ export function NoteCard({
                 <Menu.Root>
                     <Menu.Trigger
                         className="btn-icon h-6 w-6 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
-                        title="More"
-                        aria-label="More for this note"
+                        title={t('common.more')}
+                        aria-label={t('notes.moreForNote')}
                     >
                         <IconDots size={14} />
                     </Menu.Trigger>
@@ -108,11 +112,11 @@ export function NoteCard({
                                                 className="menu-item"
                                                 onClick={order.moveToTop}
                                             >
-                                                Move to top
+                                                {t('notes.moveToTop')}
                                             </Menu.Item>
                                         )}
                                         <Menu.Item className="menu-item" onClick={order.reorder}>
-                                            Reorder…
+                                            {t('notes.reorder')}
                                         </Menu.Item>
                                         <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
                                     </>
@@ -121,7 +125,7 @@ export function NoteCard({
                                     <>
                                         <Menu.Group>
                                             <Menu.GroupLabel className="px-3 pt-1 pb-0.5 text-[11px] tracking-[.04em] text-ui-text-muted uppercase">
-                                                Move to
+                                                {t('notes.moveTo')}
                                             </Menu.GroupLabel>
                                             {others.map((list) => (
                                                 <Menu.Item
@@ -141,7 +145,7 @@ export function NoteCard({
                                     onClick={() => void actions.remove(note)}
                                 >
                                     <IconTrash size={14} />
-                                    Delete
+                                    {t('notes.delete')}
                                 </Menu.Item>
                             </Menu.Popup>
                         </Menu.Positioner>
@@ -171,6 +175,7 @@ function NoteEditor({
 }) {
     const [text, setText] = useState(note.text);
     const settings = useNotesSettings();
+    const { t } = useTranslation();
     // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
     useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     const field = useRef<HTMLTextAreaElement>(null);
@@ -212,7 +217,7 @@ function NoteEditor({
             ref={field}
             value={text}
             spellCheck={false}
-            aria-label="Note text"
+            aria-label={t('notes.text')}
             className={`block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text outline-none ${linesClass(settings.lines)}`}
             onChange={(event) => {
                 setText(event.target.value);

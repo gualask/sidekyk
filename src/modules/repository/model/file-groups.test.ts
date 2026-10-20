@@ -31,9 +31,9 @@ describe('file groups', () => {
 
     it('orders areas as changes, new files, staged and sorts paths inside each', () => {
         expect(groupFiles(files).map((g) => [g.label, g.files.map((f) => f.path)])).toEqual([
-            ['Changes', ['a.ts', 'b.ts']],
-            ['New files', ['new.md']],
-            ['Staged', ['z.ts']],
+            ['changes.group.unstaged', ['a.ts', 'b.ts']],
+            ['changes.group.untracked', ['new.md']],
+            ['changes.group.staged', ['z.ts']],
         ]);
     });
 
@@ -58,12 +58,12 @@ describe('file groups', () => {
                     : fileKey(row.file),
             ),
         ).toEqual([
-            'Changes (2) first',
+            'changes.group.unstaged (2) first',
             'unstaged:a.ts',
             'unstaged:b.ts',
-            'New files (1)',
+            'changes.group.untracked (1)',
             'untracked:new.md',
-            'Staged (1)',
+            'changes.group.staged (1)',
             'staged:z.ts',
         ]);
     });

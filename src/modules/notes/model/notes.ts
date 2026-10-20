@@ -1,4 +1,5 @@
-import { relativeTime } from '@/shared/time/relative-time';
+import type { Translator } from '@/shared/i18n';
+import { timeAgo } from '@/shared/time/relative-time';
 import type { Note, ProjectNotes } from './notes.types';
 
 /** A card shows this many lines until it is opened. */
@@ -43,12 +44,15 @@ export function noteTitle(text: string): string {
 }
 
 /** What a card says under its text: when it was written or done, and its length once cut. */
-export function noteMeta(note: Note, now: number): string {
+export function noteMeta(note: Note, now: number, i18n: Translator): string {
+    const { t } = i18n;
     const at = note.done ?? note.edited;
-    const ago = relativeTime(Math.floor(at / 1000), Math.floor(now / 1000));
-    const when = ago === 'now' ? 'just now' : `${ago} ago`;
+    const when = timeAgo(Math.floor(at / 1000), Math.floor(now / 1000), i18n);
     const lines = lineCount(note.text);
-    return [note.done === null ? when : `done ${when}`, lines > SHOWN_LINES ? `${lines} lines` : '']
+    return [
+        note.done === null ? when : t('notes.doneWhen', { when }),
+        lines > SHOWN_LINES ? t('notes.lines', { count: lines }) : '',
+    ]
         .filter(Boolean)
         .join(' · ');
 }

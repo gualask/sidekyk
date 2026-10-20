@@ -13,5 +13,6 @@ pub(crate) mod search;
 pub(crate) mod settings;
 pub(crate) mod shortcut;
 pub(crate) mod state;
+pub(crate) mod texts;
 pub(crate) mod tray;
 pub(crate) mod window;

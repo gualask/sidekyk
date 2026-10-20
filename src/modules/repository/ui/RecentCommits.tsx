@@ -1,6 +1,8 @@
 import { IconChevronRight } from '@tabler/icons-react';
+import { useMemo } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
-import { relativeTime } from '@/shared/time/relative-time';
+import { useTranslation } from '@/shared/i18n';
+import { relativeTime, relativeTimeWidth } from '@/shared/time/relative-time';
 import { useRecentCommits } from '../application/repository.queries';
 import { commitDate, shortSha } from '../model/commits';
 import type { Commit } from '../model/repository.types';
@@ -43,6 +45,7 @@ function CommitRow({
     above,
     below,
     now,
+    timeWidth,
     onView,
 }: {
     commit: Commit;
@@ -50,13 +53,16 @@ function CommitRow({
     above: boolean;
     below: boolean;
     now: number;
+    /** The time column's width, in characters. */
+    timeWidth: number;
     onView: () => void;
 }) {
+    const i18n = useTranslation();
     return (
         <button
             type="button"
             aria-current={viewed ? 'true' : undefined}
-            title={`${commit.subject}\n${shortSha(commit.sha)} · ${commit.author} · ${commitDate(commit)}`}
+            title={`${commit.subject}\n${shortSha(commit.sha)} · ${commit.author} · ${commitDate(commit, i18n)}`}
             onClick={onView}
             className={`flex h-8 w-full items-center gap-2.5 pr-4 pl-4 text-left text-sm transition-colors ${
                 viewed ? 'bg-ui-accent-soft text-ui-accent-on-soft' : 'hover:bg-ui-surface-hover'
@@ -67,8 +73,11 @@ function CommitRow({
             <span className="max-w-16 shrink-0 truncate text-xs text-ui-text-muted">
                 {commit.author}
             </span>
-            <span className="w-7 shrink-0 text-right font-mono text-[11px] text-ui-text-muted tabular-nums">
-                {relativeTime(commit.time, now)}
+            <span
+                className="shrink-0 text-right font-mono text-[11px] whitespace-nowrap text-ui-text-muted tabular-nums"
+                style={{ width: `${timeWidth}ch` }}
+            >
+                {relativeTime(commit.time, now, i18n)}
             </span>
         </button>
     );
@@ -93,6 +102,8 @@ export function RecentCommits({
     viewed: Commit | null;
     onView: (commit: Commit) => void;
 }) {
+    const i18n = useTranslation();
+    const timeWidth = useMemo(() => relativeTimeWidth(i18n), [i18n]);
     const log = useRecentCommits(projectId, open);
     const commits = log.data?.commits ?? [];
     const more = log.data?.more ?? false;
@@ -107,7 +118,7 @@ export function RecentCommits({
 
     return (
         <section
-            aria-label="Recent commits"
+            aria-label={i18n.t('commit.recent')}
             // open, 40% of the list's height: the files above stay the main thing
             className={`flex shrink-0 flex-col border-t border-ui-border ${open ? 'min-h-0 basis-2/5' : ''}`}
         >
@@ -123,17 +134,19 @@ export function RecentCommits({
                         open ? 'rotate-90' : ''
                     }`}
                 />
-                Recent commits
+                {i18n.t('commit.recent')}
             </button>
             {open ? (
                 <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
                     {log.isError ? (
                         <p className="px-4 py-1.5 text-xs text-ui-danger">
-                            {errorMessage(log.error)}
+                            {errorMessage(log.error, i18n)}
                         </p>
                     ) : null}
                     {log.isSuccess && commits.length === 0 ? (
-                        <p className="px-4 py-1.5 text-xs text-ui-text-muted">No commits yet.</p>
+                        <p className="px-4 py-1.5 text-xs text-ui-text-muted">
+                            {i18n.t('commit.none')}
+                        </p>
                     ) : null}
                     <VirtualItems virtualizer={virtualizer}>
                         {(index) => {
@@ -145,6 +158,7 @@ export function RecentCommits({
                                     above={index > 0}
                                     below={index < commits.length - 1 || more}
                                     now={now}
+                                    timeWidth={timeWidth}
                                     onView={() => onView(commit)}
                                 />
                             ) : (
@@ -152,7 +166,7 @@ export function RecentCommits({
                                     <span className="flex h-full w-3.5 shrink-0 justify-center">
                                         <span className="h-1/2 w-0.5 bg-ui-accent-muted opacity-30" />
                                     </span>
-                                    The last {commits.length} commits.
+                                    {i18n.t('commit.last', { count: commits.length })}
                                 </p>
                             );
                         }}

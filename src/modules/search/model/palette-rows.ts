@@ -1,4 +1,5 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
+import type { Translator } from '@/shared/i18n';
 import type { ContentFile, Highlight, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
@@ -52,10 +53,12 @@ export function paletteRows(
     results: SearchResults,
     panels: readonly PalettePanel[],
     projectName: string | null,
+    { t }: Translator,
 ): { items: PaletteItem[]; rows: PaletteRow[] } {
+    const name = projectName ?? '';
     const groups: { label: string; items: PaletteItem[] }[] = [
         {
-            label: 'Projects',
+            label: t('palette.projects'),
             items: results.projects.map((project) => ({
                 kind: 'project',
                 projectId: project.id,
@@ -64,7 +67,7 @@ export function paletteRows(
             })),
         },
         {
-            label: projectName ? `Panels in ${projectName}` : 'Panels',
+            label: projectName ? t('palette.panelsIn', { name }) : t('palette.panels'),
             items: results.panels.flatMap((match): PaletteItem[] => {
                 const panel = panels[match.index];
                 return panel
@@ -82,7 +85,7 @@ export function paletteRows(
         },
         // before the files, which a few letters match by the hundred
         {
-            label: projectName ? `Note lists in ${projectName}` : 'Note lists',
+            label: projectName ? t('palette.listsIn', { name }) : t('palette.lists'),
             items: results.lists.map((list) => ({
                 kind: 'list',
                 id: list.id,
@@ -91,18 +94,18 @@ export function paletteRows(
             })),
         },
         {
-            label: projectName ? `Notes in ${projectName}` : 'Notes',
+            label: projectName ? t('palette.notesIn', { name }) : t('panel.notes'),
             items: results.notes.map((note) => ({
                 kind: 'note',
                 id: note.id,
                 list: note.list,
-                hint: note.done ? `${note.listName} · done` : note.listName,
+                hint: note.done ? t('palette.noteDone', { list: note.listName }) : note.listName,
                 label: note.snippet?.text ?? note.title,
                 highlights: note.snippet?.highlights ?? note.highlights,
             })),
         },
         {
-            label: projectName ? `Files in ${projectName}` : 'Files',
+            label: projectName ? t('palette.filesIn', { name }) : t('panel.files'),
             items: results.files.map((file) => ({
                 kind: 'file',
                 path: file.path,
@@ -134,6 +137,7 @@ export function paletteRows(
 export function contentRows(
     files: readonly ContentFile[],
     current: string | null,
+    { t }: Translator,
 ): { items: PaletteItem[]; rows: PaletteRow[] } {
     const items: PaletteItem[] = [];
     const rows: PaletteRow[] = [];
@@ -152,11 +156,11 @@ export function contentRows(
     };
     const shown = files.find((file) => file.path === current);
     if (shown) {
-        rows.push({ kind: 'group', label: 'In this file' });
+        rows.push({ kind: 'group', label: t('palette.inThisFile') });
         addLines(shown);
     }
     const others = files.filter((file) => file !== shown);
-    if (shown && others.length > 0) rows.push({ kind: 'group', label: 'Other files' });
+    if (shown && others.length > 0) rows.push({ kind: 'group', label: t('palette.otherFiles') });
     for (const file of others) {
         rows.push({ kind: 'file', path: file.path, count: file.lines.length });
         addLines(file);

@@ -1,3 +1,4 @@
+import { useTranslation } from '@/shared/i18n';
 import { compactCount } from '../model/summary';
 
 /**
@@ -15,12 +16,13 @@ export function LineCounts({
     binary?: boolean;
     compact?: boolean;
 }) {
+    const { t } = useTranslation();
     if (binary) {
-        return <span className="text-ui-text-muted">binary</span>;
+        return <span className="text-ui-text-muted">{t('lines.binary')}</span>;
     }
     if (additions === null && deletions === null) {
         return (
-            <span className="text-ui-text-muted" title="Lines not counted">
+            <span className="text-ui-text-muted" title={t('lines.notCounted')}>
                 —
             </span>
         );
@@ -36,8 +38,9 @@ export function LineCounts({
 
 /** The lines of tracked files that changed against HEAD, kept short, exact in the tooltip. */
 export function TrackedLines({ additions, deletions }: { additions: number; deletions: number }) {
+    const { t } = useTranslation();
     return (
-        <span title={`Lines of tracked files: +${additions} −${deletions}`}>
+        <span title={t('lines.tracked', { additions, deletions })}>
             <LineCounts additions={additions} deletions={deletions} compact />
         </span>
     );

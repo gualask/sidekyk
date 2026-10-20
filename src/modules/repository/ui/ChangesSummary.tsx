@@ -1,4 +1,5 @@
 import { hasErrorCode } from '@/shared/errors/app-error';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { Stat } from '@/shared/ui/Stat';
@@ -40,6 +41,7 @@ function BranchLine({ project }: { project: ProjectInfo }) {
 
 function Counts({ project }: { project: ProjectInfo }) {
     const summary = useCardSummary(project);
+    const { t, tp } = useTranslation();
     if (!summary.data) return null;
     const { totals } = summary.data;
     const lines = totals.additions + totals.deletions > 0;
@@ -47,7 +49,7 @@ function Counts({ project }: { project: ProjectInfo }) {
         <>
             <Stat
                 value={changedCount(summary.data)}
-                label={totals.files === 1 ? 'file changed' : 'files changed'}
+                label={tp('changes.filesChanged', totals.files)}
                 quiet={totals.files === 0}
             />
             <Stat
@@ -58,7 +60,7 @@ function Counts({ project }: { project: ProjectInfo }) {
                         '—'
                     )
                 }
-                label="lines"
+                label={t('changes.lines')}
                 quiet={!lines}
             />
         </>
@@ -68,6 +70,7 @@ function Counts({ project }: { project: ProjectInfo }) {
 /** The week of commits, or why the repository could not be read in its place. */
 function WeekOrProblem({ project }: { project: ProjectInfo }) {
     const summary = useCardSummary(project);
+    const i18n = useTranslation();
     // never started for a card: it says so
     if (
         summary.isError &&
@@ -77,7 +80,7 @@ function WeekOrProblem({ project }: { project: ProjectInfo }) {
         return (
             <CardWell>
                 <WellMessage>
-                    {project.location.distro} is not running. Open the project to start it.
+                    {i18n.t('changes.distroStopped', { distro: project.location.distro })}
                 </WellMessage>
             </CardWell>
         );
@@ -86,7 +89,7 @@ function WeekOrProblem({ project }: { project: ProjectInfo }) {
         return (
             <CardWell>
                 <WellMessage className="text-ui-danger">
-                    {projectErrorMessage(summary.error, project.location)}
+                    {projectErrorMessage(summary.error, project.location, i18n)}
                 </WellMessage>
             </CardWell>
         );

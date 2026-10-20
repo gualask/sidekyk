@@ -5,6 +5,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMemo, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
+import { type MessageKey, RichText, type Translator, useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import {
     type ContentResults,
@@ -29,9 +30,9 @@ const LINE_HEIGHT = 28;
 /** What the palette looks for: places to go by name (`⌘K`), or a text in the files (`⌘F`). */
 export type PaletteMode = 'names' | 'contents';
 
-const MODES: { mode: PaletteMode; label: string; key: string }[] = [
-    { mode: 'names', label: 'Go to', key: 'K' },
-    { mode: 'contents', label: 'Find in files', key: 'F' },
+const MODES: { mode: PaletteMode; label: MessageKey; key: string }[] = [
+    { mode: 'names', label: 'common.goTo', key: 'K' },
+    { mode: 'contents', label: 'common.findInFiles', key: 'F' },
 ];
 
 /** What the palette opens: the app knows how to get there. */
@@ -79,12 +80,13 @@ export function CommandPalette({
     panels: readonly PalettePanel[];
     actions: PaletteActions;
 }) {
+    const { t } = useTranslation();
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
             <Dialog.Portal>
                 <Dialog.Backdrop className="dialog-backdrop" />
                 <Dialog.Popup
-                    aria-label="Command palette"
+                    aria-label={t('palette.label')}
                     className="dialog-popup top-[14vh] flex w-[min(680px,calc(100vw-32px))] flex-col overflow-hidden"
                 >
                     <Palette
@@ -135,15 +137,19 @@ function Palette({
     onOpen: (item: PaletteItem, query: string) => void;
 }) {
     const [query, setQuery] = useState(initialText);
+    const i18n = useTranslation();
+    const { t } = i18n;
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
     const contents = mode === 'contents';
     const names = useSearch(query, titles, projectId, !contents);
     const found = useContentSearch(contents ? projectId : null, query);
     const { items, rows } = useMemo(() => {
         if (contents)
-            return found ? contentRows(found.files, currentFile) : { items: [], rows: [] };
-        return names.data ? paletteRows(names.data, panels, projectName) : { items: [], rows: [] };
-    }, [contents, found, currentFile, names.data, panels, projectName]);
+            return found ? contentRows(found.files, currentFile, i18n) : { items: [], rows: [] };
+        return names.data
+            ? paletteRows(names.data, panels, projectName, i18n)
+            : { items: [], rows: [] };
+    }, [contents, found, currentFile, names.data, panels, projectName, i18n]);
     // the row of each item, to bring the one highlighted into view
     const itemRows = useMemo(
         () => rows.flatMap((row, rowIndex) => (row.kind === 'item' ? [rowIndex] : [])),
@@ -165,9 +171,9 @@ function Palette({
         paddingEnd: 6,
     });
     const empty = contents
-        ? contentsNotice(projectId, query, found)
+        ? contentsNotice(projectId, query, found, i18n)
         : names.data && rows.length === 0
-          ? 'Nothing found.'
+          ? t('palette.nothingFound')
           : null;
 
     return (
@@ -195,8 +201,8 @@ function Palette({
                     <IconSearch size={16} className="shrink-0 text-ui-text-muted" aria-hidden />
                 )}
                 <Autocomplete.Input
-                    aria-label={contents ? 'Find in files' : 'Go to'}
-                    placeholder={placeholder(mode, projectId, projectName)}
+                    aria-label={t(contents ? 'common.findInFiles' : 'common.goTo')}
+                    placeholder={placeholder(mode, projectId, projectName, i18n)}
                     spellCheck={false}
                     autoComplete="off"
                     className="h-[50px] min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ui-text outline-none placeholder:text-ui-text-muted"
@@ -214,7 +220,7 @@ function Palette({
                         <button
                             key={choice.mode}
                             type="button"
-                            title={`${choice.label} (${shortcutLabel(choice.key)})`}
+                            title={`${t(choice.label)} (${shortcutLabel(choice.key)})`}
                             aria-pressed={choice.mode === mode}
                             onClick={() => onModeChange(choice.mode)}
                             className={`h-6 rounded px-2 text-xs ${
@@ -223,7 +229,7 @@ function Palette({
                                     : 'text-ui-text-muted hover:text-ui-text'
                             }`}
                         >
-                            {choice.label}
+                            {t(choice.label)}
                         </button>
                     ))}
                 </div>
@@ -256,17 +262,29 @@ function Palette({
             </Autocomplete.List>
             <div className="dialog-foot">
                 <span>
-                    <kbd className="kbd">↑</kbd> <kbd className="kbd">↓</kbd> move
+                    <RichText
+                        text={t('palette.move')}
+                        parts={{
+                            up: <kbd className="kbd">↑</kbd>,
+                            down: <kbd className="kbd">↓</kbd>,
+                        }}
+                    />
                 </span>
                 <span>
-                    <kbd className="kbd">↵</kbd> open
+                    <RichText
+                        text={t('palette.open')}
+                        parts={{ enter: <kbd className="kbd">↵</kbd> }}
+                    />
                 </span>
                 <span>
-                    <kbd className="kbd">Esc</kbd> close
+                    <RichText
+                        text={t('common.escCloses')}
+                        parts={{ esc: <kbd className="kbd">Esc</kbd> }}
+                    />
                 </span>
                 {contents && projectId && query.trim().length >= MIN_CONTENT_QUERY ? (
                     <span className="ml-auto" aria-live="polite">
-                        {contentsStatus(found, query)}
+                        {contentsStatus(found, query, i18n)}
                     </span>
                 ) : null}
             </div>
@@ -278,12 +296,15 @@ function placeholder(
     mode: PaletteMode,
     projectId: string | null,
     projectName: string | null,
+    { t }: Translator,
 ): string {
-    if (mode === 'names')
-        return projectId ? 'Go to project, panel or file…' : 'Go to project or panel…';
-    return projectId
-        ? `Find in the files of ${projectName ?? 'the project'}…`
-        : 'Open a project to find in its files';
+    if (mode === 'names') {
+        return t(projectId ? 'palette.placeholder.names' : 'palette.placeholder.namesNoProject');
+    }
+    if (!projectId) return t('palette.placeholder.contentsNoProject');
+    return projectName
+        ? t('palette.placeholder.contents', { name: projectName })
+        : t('palette.placeholder.contentsUnnamed');
 }
 
 /** What the list says instead of lines found: why there are none yet, or none at all. */
@@ -291,26 +312,34 @@ function contentsNotice(
     projectId: string | null,
     query: string,
     found: ContentResults | null,
+    i18n: Translator,
 ): string | null {
     if (!projectId || !query.trim()) return null;
     if (query.trim().length < MIN_CONTENT_QUERY) {
-        return `Type at least ${MIN_CONTENT_QUERY} characters.`;
+        return i18n.t('palette.typeMore', { count: MIN_CONTENT_QUERY });
     }
     if (!found || found.files.length > 0) return null;
-    if (found.status === 'failed') return errorMessage(found.error);
-    return found.status === 'done' && found.query === query ? 'Nothing found.' : null;
+    if (found.status === 'failed') return errorMessage(found.error, i18n);
+    return found.status === 'done' && found.query === query ? i18n.t('palette.nothingFound') : null;
 }
 
 /** How far the search went: still reading, or what it found. */
-function contentsStatus(found: ContentResults | null, query: string): string {
-    if (!found || found.status === 'searching' || found.query !== query) return 'Searching…';
+function contentsStatus(
+    found: ContentResults | null,
+    query: string,
+    { t, tp, formatTag }: Translator,
+): string {
+    if (!found || found.status === 'searching' || found.query !== query) {
+        return t('palette.searching');
+    }
     if (found.status === 'failed') return '';
     const lines = found.files.reduce((sum, file) => sum + file.lines.length, 0);
     const files = found.files.length;
-    const count = found.more
-        ? `${lines.toLocaleString()}+ lines`
-        : `${lines.toLocaleString()} ${lines === 1 ? 'line' : 'lines'}`;
-    return `${count} in ${files} ${files === 1 ? 'file' : 'files'}`;
+    const count = lines.toLocaleString(formatTag);
+    const linesFound = found.more
+        ? t('palette.linesMore', { count })
+        : tp('palette.lines', lines, { count });
+    return tp('palette.inFiles', files, { lines: linesFound });
 }
 
 function Row({
@@ -326,6 +355,7 @@ function Row({
     size: number;
     onOpen: (item: PaletteItem) => void;
 }) {
+    const { t, tp } = useTranslation();
     const style = {
         position: 'absolute',
         top: 0,
@@ -367,7 +397,7 @@ function Row({
                 style={style}
                 className="flex items-center px-[18px] text-xs text-ui-text-muted"
             >
-                {row.count === 1 ? '1 more file' : `${row.count} more files`}: type more to narrow
+                {tp('palette.moreFiles', row.count)}
             </div>
         );
     }
@@ -394,7 +424,7 @@ function Row({
                     mono={item.kind === 'file' || item.kind === 'line'}
                 />
                 <span className="ml-auto shrink-0 text-xs text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft">
-                    {hint(item)}
+                    {hint(item, t)}
                 </span>
             </Autocomplete.Item>
         </div>
@@ -405,11 +435,11 @@ function Row({
  * What a row says on its right: a panel's key, how a file changed, a note's list; nothing for a
  * project or a list.
  */
-function hint(item: PaletteItem) {
+function hint(item: PaletteItem, t: Translator['t']) {
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
     if (item.kind === 'note') return item.hint;
     if (item.kind !== 'file' || !item.mark) return null;
-    return <span className={CHANGE_MARK_TONE[item.mark]}>{CHANGE_MARK_WORD[item.mark]}</span>;
+    return <span className={CHANGE_MARK_TONE[item.mark]}>{t(CHANGE_MARK_WORD[item.mark])}</span>;
 }
 
 /** The item's text, with the letters the query matched in bold. */

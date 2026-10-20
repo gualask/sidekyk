@@ -1,5 +1,6 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import { errorMessage } from '../errors/app-error';
+import type { Translator } from '../i18n';
 
 /** A passing event, told at the bottom of the window. */
 export interface ToastRequest {
@@ -12,8 +13,8 @@ export interface ToastRequest {
 }
 
 /** A failure, told by what failed and why. */
-export function errorToast(title: string, error: unknown): ToastRequest {
-    return { kind: 'error', title, description: errorMessage(error) };
+export function errorToast(title: string, error: unknown, i18n: Translator): ToastRequest {
+    return { kind: 'error', title, description: errorMessage(error, i18n) };
 }
 
 type ShowToast = (toast: ToastRequest) => void;

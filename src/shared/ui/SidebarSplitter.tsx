@@ -1,5 +1,12 @@
 import type { RefObject } from 'react';
+import { type MessageKey, useTranslation } from '@/shared/i18n';
 import type { SidebarWidth } from './sidebar-width';
+
+const TITLES: Record<'column' | 'tree' | 'list', MessageKey> = {
+    column: 'splitter.column',
+    tree: 'splitter.tree',
+    list: 'splitter.list',
+};
 
 /**
  * The splitter of a sidebar: a drag resizes the sidebar, a double click fits what it shows and a
@@ -22,13 +29,14 @@ export function SidebarSplitter({
      * nothing to fit: the double click goes back to the default width.
      */
     fitting: (box: HTMLElement) => number | null;
-    /** What the sidebar shows, for the tooltip: "tree", "list". */
-    what: string;
+    /** What the sidebar shows, for the tooltip. */
+    what: keyof typeof TITLES;
 }) {
+    const { t } = useTranslation();
     return (
         <div
             aria-hidden
-            title={`Drag to resize; double click to fit the whole ${what}, again to go back`}
+            title={t(TITLES[what])}
             className={`group z-[2] cursor-col-resize ${
                 place === 'edge' ? 'relative -ml-1 w-2 shrink-0' : 'absolute inset-0'
             }`}

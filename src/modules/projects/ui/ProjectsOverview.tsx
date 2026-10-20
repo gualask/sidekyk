@@ -2,6 +2,7 @@ import { Menu } from '@base-ui/react/menu';
 import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from '@/shared/i18n';
 import type { SummaryPart } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
@@ -55,6 +56,7 @@ export function ProjectsOverview({
     summary: (project: ProjectInfo, part: SummaryPart) => ReactNode;
 }) {
     const add = useAddProject(onOpen);
+    const { t } = useTranslation();
     const activate = useActivateProject();
     // the card the zoom grows from: the one being opened, else the project on screen
     const [opening, setOpening] = useState<string | null>(null);
@@ -66,7 +68,7 @@ export function ProjectsOverview({
     }, []);
 
     return (
-        <section aria-label="All projects" className="h-full overflow-auto p-4">
+        <section aria-label={t('common.allProjects')} className="h-full overflow-auto p-4">
             <div
                 ref={grid}
                 className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4"
@@ -96,7 +98,7 @@ export function ProjectsOverview({
                     onClick={() => add.mutate()}
                 >
                     <IconPlus size={16} />
-                    Add a repository
+                    {t('projects.add')}
                 </button>
             </div>
         </section>
@@ -119,6 +121,7 @@ function ProjectCard({
     onRemove: () => void;
     summary: (part: SummaryPart) => ReactNode;
 }) {
+    const { t } = useTranslation();
     return (
         <article
             data-zoom
@@ -157,8 +160,8 @@ function ProjectCard({
             <Menu.Root>
                 <Menu.Trigger
                     className="btn-icon absolute top-2 right-2 h-7 w-7 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
-                    title="More"
-                    aria-label={`More for ${project.name}`}
+                    title={t('common.more')}
+                    aria-label={t('projects.moreFor', { name: project.name })}
                 >
                     <IconDots size={16} />
                 </Menu.Trigger>
@@ -167,7 +170,7 @@ function ProjectCard({
                         <Menu.Popup className="menu-popup">
                             <Menu.Item className="menu-item danger" onClick={onRemove}>
                                 <IconTrash size={14} />
-                                Remove
+                                {t('common.remove')}
                             </Menu.Item>
                         </Menu.Popup>
                     </Menu.Positioner>

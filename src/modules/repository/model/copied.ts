@@ -1,4 +1,5 @@
 import { fillCopyTemplate } from '@/shared/copy/copy-template';
+import type { Translator } from '@/shared/i18n';
 import type { DiffHunk, DiffLine } from './diff-parser';
 
 /** The file a copy comes from, as `{row}` names it. */
@@ -35,10 +36,18 @@ function span(numbers: readonly number[]): string {
 }
 
 /** `{row}` for lines of the new side, or for lines that were only removed. */
-function located(source: CopySource, lines: string, removed: boolean): Copied['row'] {
+function located(
+    source: CopySource,
+    lines: string,
+    removed: boolean,
+    { t }: Translator,
+): Copied['row'] {
     const path = removed ? (source.origPath ?? source.path) : source.path;
     const where = lines ? `${path}:${lines}` : path;
-    if (removed) return `${where} (removed${source.commit ? ` in ${source.commit}` : ''})`;
+    if (removed) {
+        const commit = source.commit;
+        return `${where} (${commit ? t('copy.removedIn', { commit }) : t('copy.removed')})`;
+    }
     return source.commit ? `${where} (${source.commit})` : where;
 }
 
@@ -46,27 +55,31 @@ function located(source: CopySource, lines: string, removed: boolean): Copied['r
  * Where lines sit, on the new side; lines that are only removed have no new side, so they point
  * at the old one instead.
  */
-function placed(source: CopySource, lines: readonly DiffLine[]): Pick<Copied, 'row' | 'lines'> {
+function placed(
+    source: CopySource,
+    lines: readonly DiffLine[],
+    i18n: Translator,
+): Pick<Copied, 'row' | 'lines'> {
     const now = lines.flatMap((line) => (line.newNumber === null ? [] : [line.newNumber]));
-    if (now.length > 0) return { row: located(source, span(now), false), lines: span(now) };
+    if (now.length > 0) return { row: located(source, span(now), false, i18n), lines: span(now) };
     const old = lines.flatMap((line) => (line.oldNumber === null ? [] : [line.oldNumber]));
-    if (old.length > 0) return { row: located(source, span(old), true), lines: span(old) };
-    return { row: located(source, '', false), lines: '' };
+    if (old.length > 0) return { row: located(source, span(old), true, i18n), lines: span(old) };
+    return { row: located(source, '', false, i18n), lines: '' };
 }
 
 /** A hunk: where it sits, and its lines with their `+` and `-`. */
-export function hunkCopied(source: CopySource, hunk: DiffHunk): Copied {
+export function hunkCopied(source: CopySource, hunk: DiffHunk, i18n: Translator): Copied {
     const removed = hunk.newLines === 0;
     const lines = removed
         ? lineRange(hunk.oldStart, hunk.oldLines)
         : lineRange(hunk.newStart, hunk.newLines);
     const text = hunk.lines.map((line) => `${PREFIX[line.kind]}${line.text}`).join('\n');
-    return { row: located(source, lines, removed), text, lines };
+    return { row: located(source, lines, removed, i18n), text, lines };
 }
 
 /** One line: where it is, and its text as in the file. */
-export function lineCopied(source: CopySource, line: DiffLine): Copied {
-    return { ...placed(source, [line]), text: line.text };
+export function lineCopied(source: CopySource, line: DiffLine, i18n: Translator): Copied {
+    return { ...placed(source, [line], i18n), text: line.text };
 }
 
 /** Text selected with the mouse, exactly, and the lines it spans. */
@@ -74,13 +87,16 @@ export function selectionCopied(
     source: CopySource,
     lines: readonly DiffLine[],
     text: string,
+    i18n: Translator,
 ): Copied {
-    return { ...placed(source, lines), text };
+    return { ...placed(source, lines, i18n), text };
 }
 
-/** What a copy took, as its confirmation names it: "line 14", "lines 13–17". */
-export function copiedLabel({ lines }: Copied): string {
-    return lines.includes('-') ? `lines ${lines.replace('-', '–')}` : `line ${lines}`;
+/** The confirmation of a copy, naming what it took: "Copied line 14", "Copied lines 13–17". */
+export function copiedLabel({ lines }: Copied, { t }: Translator): string {
+    return lines.includes('-')
+        ? t('copy.copiedLines', { lines: lines.replace('-', '–') })
+        : t('copy.copiedLine', { lines });
 }
 
 /** Through the user's template. */
@@ -89,6 +105,11 @@ export function copiedText(template: string, copied: Copied): string {
 }
 
 /** Every hunk of a file through the template, one after the other. */
-export function fileText(template: string, source: CopySource, hunks: readonly DiffHunk[]): string {
-    return hunks.map((hunk) => copiedText(template, hunkCopied(source, hunk))).join('\n\n');
+export function fileText(
+    template: string,
+    source: CopySource,
+    hunks: readonly DiffHunk[],
+    i18n: Translator,
+): string {
+    return hunks.map((hunk) => copiedText(template, hunkCopied(source, hunk, i18n))).join('\n\n');
 }

@@ -14,6 +14,7 @@ reason, numbers, sources.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`
   - `background.md`: tray, global shortcut, hidden window.
+  - `languages.md`: English and Italian, catalogs, `i18n:check`.
 - `plans/`: designs agreed but not built; `ROADMAP.md` items point here.
 - `testing.md`: what the checks, fixtures and timing tests cover; the container fixture.
 

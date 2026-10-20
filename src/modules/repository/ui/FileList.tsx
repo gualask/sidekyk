@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { fileKey, fileListRows } from '../model/file-groups';
 import type { ChangedFile } from '../model/repository.types';
 import { FILE_ROW_HEIGHT, FileRow } from './FileRow';
@@ -22,6 +23,7 @@ export function FileList({
     onSelect: (file: ChangedFile) => void;
 }) {
     const rows = useMemo(() => fileListRows(files), [files]);
+    const { t } = useTranslation();
     const { scrollRef, virtualizer } = useVirtualRows<HTMLElement>({
         count: rows.length,
         size: (index) => {
@@ -36,7 +38,11 @@ export function FileList({
     });
 
     return (
-        <nav ref={scrollRef} aria-label="Changed files" className="h-full overflow-y-auto">
+        <nav
+            ref={scrollRef}
+            aria-label={t('changes.changedFiles')}
+            className="h-full overflow-y-auto"
+        >
             <VirtualItems virtualizer={virtualizer}>
                 {(index) => {
                     const row = rows[index];
@@ -47,7 +53,7 @@ export function FileList({
                                 row.first ? 'h-7' : 'h-9'
                             }`}
                         >
-                            {row.label}
+                            {t(row.label)}
                             <span className="font-mono tabular-nums">{row.count}</span>
                         </h2>
                     ) : (

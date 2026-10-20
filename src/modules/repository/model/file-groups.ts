@@ -1,16 +1,17 @@
+import type { MessageKey } from '@/shared/i18n';
 import type { ChangeArea, ChangedFile } from './repository.types';
 
 export interface FileGroup {
     area: ChangeArea;
-    label: string;
+    label: MessageKey;
     files: ChangedFile[];
 }
 
 /** What the agent left in the working tree first; staged work is what was already reviewed. */
-const AREAS: readonly { area: ChangeArea; label: string }[] = [
-    { area: 'unstaged', label: 'Changes' },
-    { area: 'untracked', label: 'New files' },
-    { area: 'staged', label: 'Staged' },
+const AREAS: readonly { area: ChangeArea; label: MessageKey }[] = [
+    { area: 'unstaged', label: 'changes.group.unstaged' },
+    { area: 'untracked', label: 'changes.group.untracked' },
+    { area: 'staged', label: 'changes.group.staged' },
 ];
 
 /** Same order as `localeCompare`, without setting up the comparison on every call. */
@@ -31,7 +32,7 @@ export function orderedFiles(files: readonly ChangedFile[]): ChangedFile[] {
 
 /** The sidebar as one flat list, so only the rows on screen are rendered. */
 export type FileListRow =
-    | { kind: 'group'; area: ChangeArea; label: string; count: number; first: boolean }
+    | { kind: 'group'; area: ChangeArea; label: MessageKey; count: number; first: boolean }
     | { kind: 'file'; file: ChangedFile };
 
 export function fileListRows(files: readonly ChangedFile[]): FileListRow[] {

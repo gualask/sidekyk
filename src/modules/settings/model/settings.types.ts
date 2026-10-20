@@ -6,6 +6,7 @@
 import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
+import type { Locale } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 
 /** The app's colors. Dark by default; it no longer follows the system's. */
@@ -22,6 +23,8 @@ export interface GlobalShortcut {
 }
 
 export interface Settings {
+    /** The UI's language; null until the system's is stored, at the first start. */
+    language: Locale | null;
     theme: Theme;
     globalShortcut: GlobalShortcut;
     /** The view a diff opens in. */

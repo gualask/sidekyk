@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
@@ -38,8 +39,10 @@ export function useNoteActions(projectId: string) {
     const port = useNotesPort();
     const client = useQueryClient();
     const showToast = useShowToast();
+    const i18n = useTranslation();
 
     return useMemo(() => {
+        const { t } = i18n;
         const key = notesKey(projectId);
         const queue = changeQueue(projectId);
         const current = () => client.getQueryData<ProjectNotes>(key);
@@ -68,7 +71,7 @@ export function useNoteActions(projectId: string) {
                 void client.invalidateQueries({ queryKey: summaryKey(projectId) });
                 return answer.value;
             } catch (error) {
-                showToast(errorToast(what, error));
+                showToast(errorToast(what, error, i18n));
                 reread();
                 return undefined;
             }
@@ -82,7 +85,7 @@ export function useNoteActions(projectId: string) {
                 patch(note.id, { list, position });
             }
             return send(
-                'Could not move the note',
+                t('notes.moveFailed'),
                 () => port.placeNote(projectId, note.id, list, index),
                 updated,
             );
@@ -90,7 +93,7 @@ export function useNoteActions(projectId: string) {
         const setDone = async (note: Note, done: boolean) => {
             patch(note.id, { done: done ? Date.now() : null });
             return send(
-                'Could not change the note',
+                t('notes.changeFailed'),
                 () => port.setNoteDone(projectId, note.id, done),
                 (changed) => updated([changed]),
             );
@@ -99,7 +102,7 @@ export function useNoteActions(projectId: string) {
         const restore = async (note: Note) => {
             update((notes) => withNotes(notes, [note]));
             await send(
-                'Could not undo',
+                t('notes.undoFailed'),
                 () => port.restoreNote(projectId, note),
                 (restored) => update((notes) => withNotes(notes, [restored])),
             );
@@ -107,13 +110,13 @@ export function useNoteActions(projectId: string) {
         /** Deletes a note; `undoable`, the toast brings it back as it was. */
         const remove = async (note: Note, { undoable = true } = {}) => {
             update((notes) => withoutNote(notes, note.id));
-            const removed = await send('Could not delete the note', () =>
+            const removed = await send(t('notes.deleteFailed'), () =>
                 port.deleteNote(projectId, note.id).then(() => true),
             );
             if (removed && undoable) {
                 showToast({
-                    title: 'Note deleted',
-                    action: { label: 'Undo', run: () => void restore(note) },
+                    title: t('notes.deleted'),
+                    action: { label: t('notes.undo'), run: () => void restore(note) },
                 });
             }
         };
@@ -122,14 +125,14 @@ export function useNoteActions(projectId: string) {
             /** A note on top of a list; the note as stored, or undefined when it failed. */
             add: (list: string, text: string) =>
                 send(
-                    'Could not add the note',
+                    t('notes.addFailed'),
                     () => port.addNote(projectId, list, text),
                     (note) => update((notes) => withNotes(notes, [note])),
                 ),
             setText: async (id: string, text: string) => {
                 patch(id, { text });
                 await send(
-                    'Could not save the note',
+                    t('notes.saveFailed'),
                     () => port.setNoteText(projectId, id, text),
                     (note) => updated([note]),
                 );
@@ -139,8 +142,8 @@ export function useNoteActions(projectId: string) {
                 const changed = await setDone(note, done);
                 if (changed && done) {
                     showToast({
-                        title: 'Done',
-                        action: { label: 'Undo', run: () => void setDone(changed, false) },
+                        title: t('notes.done'),
+                        action: { label: t('notes.undo'), run: () => void setDone(changed, false) },
                     });
                 }
             },
@@ -153,9 +156,9 @@ export function useNoteActions(projectId: string) {
                 const moved = await place(note, list.id, 0);
                 if (!moved) return;
                 showToast({
-                    title: `Moved to ${list.name}`,
+                    title: t('notes.moved', { list: list.name }),
                     action: {
-                        label: 'Undo',
+                        label: t('notes.undo'),
                         run: () => void place(note, note.list, Math.max(0, from)),
                     },
                 });
@@ -163,7 +166,7 @@ export function useNoteActions(projectId: string) {
             remove,
             addList: async (name: string) =>
                 send(
-                    'Could not add the list',
+                    t('notes.addListFailed'),
                     () => port.addList(projectId, name),
                     (list) =>
                         update((notes) => ({
@@ -180,7 +183,7 @@ export function useNoteActions(projectId: string) {
                     }));
                 rename({ id, name });
                 await send(
-                    'Could not rename the list',
+                    t('notes.renameListFailed'),
                     () => port.renameList(projectId, id, name),
                     rename,
                 );
@@ -195,19 +198,19 @@ export function useNoteActions(projectId: string) {
                     notes: notes.notes.filter((n) => n.list !== id),
                     openList: notes.openList === id ? rest[0].id : notes.openList,
                 }));
-                const deleted = await send('Could not delete the list', () =>
+                const deleted = await send(t('notes.deleteListFailed'), () =>
                     port.deleteList(projectId, id),
                 );
                 if (!deleted) return;
                 const count = deleted.notes.length;
                 showToast({
-                    title: `“${deleted.list.name}” deleted`,
-                    description: count ? `${count} ${count === 1 ? 'note' : 'notes'} with it` : '',
+                    title: t('notes.listDeleted', { list: deleted.list.name }),
+                    description: count ? i18n.tp('notes.listDeletedNotes', count) : '',
                     action: {
-                        label: 'Undo',
+                        label: t('notes.undo'),
                         run: () =>
                             void send(
-                                'Could not undo',
+                                t('notes.undoFailed'),
                                 () => port.restoreList(projectId, deleted),
                                 (restored) => client.setQueryData(key, restored),
                             ),
@@ -216,10 +219,10 @@ export function useNoteActions(projectId: string) {
             },
             openList: (id: string) => {
                 update((notes) => ({ ...notes, openList: id }));
-                void send('Could not open the list', () => port.openList(projectId, id));
+                void send(t('notes.openListFailed'), () => port.openList(projectId, id));
             },
         };
-    }, [projectId, port, client, showToast]);
+    }, [projectId, port, client, showToast, i18n]);
 }
 
 export type NoteActions = ReturnType<typeof useNoteActions>;
@@ -231,16 +234,17 @@ export type NoteActions = ReturnType<typeof useNoteActions>;
 export function useExportNotes(projectId: string) {
     const port = useNotesPort();
     const showToast = useShowToast();
+    const i18n = useTranslation();
     return useCallback(async () => {
         try {
             const path = await port.exportNotes(projectId);
-            if (path) showToast({ title: 'Notes exported', description: path });
+            if (path) showToast({ title: i18n.t('notes.exported'), description: path });
             return path;
         } catch (error) {
-            showToast(errorToast('Could not export the notes', error));
+            showToast(errorToast(i18n.t('notes.exportFailed'), error, i18n));
             return null;
         }
-    }, [projectId, port, showToast]);
+    }, [projectId, port, showToast, i18n]);
 }
 
 /** How many notes a project has, counted each time it is asked: notes just written count. */

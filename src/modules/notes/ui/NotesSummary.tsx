@@ -1,3 +1,4 @@
+import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { Stat } from '@/shared/ui/Stat';
@@ -10,11 +11,12 @@ export function NotesSummary({ project, part }: PanelSummaryProps) {
 
 function NotesCount({ project }: { project: ProjectInfo }) {
     const summary = useNotesSummary(project.id).data;
+    const { tp } = useTranslation();
     if (!summary) return null;
     return (
         <Stat
             value={summary.open}
-            label={summary.open === 1 ? 'note' : 'notes'}
+            label={tp('notes.stat', summary.open)}
             quiet={summary.open === 0}
         />
     );

@@ -1,4 +1,5 @@
 import { IconX } from '@tabler/icons-react';
+import { type MessageKey, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
 import { altLabel, shortcutLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -7,36 +8,39 @@ import { PALETTE_PANELS } from './panels';
 
 /** A shortcut: what it does, and its keys, each its own key cap. */
 interface Shortcut {
-    label: string;
+    label: MessageKey;
     keys: string[];
     /** Words after the keys, such as another way to do it. */
-    also?: string;
+    also?: MessageKey;
 }
 
-const SHORTCUTS: Shortcut[] = [
-    { label: 'Zoom in / out', keys: ['↵', 'Esc'], also: MACOS ? '⌘+scroll, pinch' : 'Ctrl+scroll' },
-    { label: 'Move among tiles', keys: ['←', '→'] },
-    { label: 'Move in a list', keys: ['j', 'k'], also: 'arrows full screen' },
-    { label: 'Next / previous change, across files', keys: ['n', 'p'] },
+/** In the list's order, from big moves to small; `panels`: the keys that open each panel. */
+const SHORTCUTS: (Shortcut | 'panels')[] = [
     {
-        label: PALETTE_PANELS.map((panel) => panel.title).join(', '),
-        keys: PALETTE_PANELS.map((panel) => panel.shortcut),
+        label: 'shortcuts.zoom',
+        keys: ['↵', 'Esc'],
+        also: MACOS ? 'shortcuts.zoomAlsoMac' : 'shortcuts.zoomAlso',
     },
-    { label: 'Previous / next project', keys: ['[', ']'] },
-    { label: 'Go to project, panel or file', keys: [shortcutLabel('K')] },
-    { label: 'Find in the file open', keys: [shortcutLabel('F')] },
-    { label: 'Find in files', keys: [shortcutLabel('F')], also: 'again, from the find bar' },
-    { label: 'Next / previous match, find bar', keys: ['↵', '⇧↵'] },
-    { label: 'Files tree, full screen', keys: ['←', '→', '↑', '↓', '↵'] },
-    { label: 'New note', keys: [shortcutLabel('N')] },
-    { label: 'Wrap long lines, in a note', keys: [altLabel('Z')] },
-    { label: 'Close the note you edit', keys: ['Esc', shortcutLabel('↵')] },
+    { label: 'shortcuts.tiles', keys: ['←', '→'] },
+    { label: 'shortcuts.list', keys: ['j', 'k'], also: 'shortcuts.listAlso' },
+    { label: 'shortcuts.changes', keys: ['n', 'p'] },
+    'panels',
+    { label: 'shortcuts.projects', keys: ['[', ']'] },
+    { label: 'shortcuts.goTo', keys: [shortcutLabel('K')] },
+    { label: 'shortcuts.findInFile', keys: [shortcutLabel('F')] },
     {
-        label: "Reorder notes (from a note's ⋯)",
-        keys: [altLabel('↑'), altLabel('↓')],
+        label: 'common.findInFiles',
+        keys: [shortcutLabel('F')],
+        also: 'shortcuts.findInFilesAlso',
     },
-    { label: 'Settings', keys: [shortcutLabel(',')] },
-    { label: 'Show or hide this', keys: ['?'] },
+    { label: 'shortcuts.matches', keys: ['↵', '⇧↵'] },
+    { label: 'shortcuts.tree', keys: ['←', '→', '↑', '↓', '↵'] },
+    { label: 'shortcuts.newNote', keys: [shortcutLabel('N')] },
+    { label: 'shortcuts.wrapNote', keys: [altLabel('Z')] },
+    { label: 'shortcuts.closeNote', keys: ['Esc', shortcutLabel('↵')] },
+    { label: 'shortcuts.reorderNotes', keys: [altLabel('↑'), altLabel('↓')] },
+    { label: 'shortcuts.settings', keys: [shortcutLabel(',')] },
+    { label: 'shortcuts.help', keys: ['?'] },
 ];
 
 /**
@@ -54,28 +58,42 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
         },
         { capture: true },
     );
+    const { t } = useTranslation();
+    const rows = SHORTCUTS.map((shortcut) =>
+        shortcut === 'panels'
+            ? {
+                  label: PALETTE_PANELS.map((panel) => t(panel.title)).join(', '),
+                  keys: PALETTE_PANELS.map((panel) => panel.shortcut),
+                  also: undefined,
+              }
+            : {
+                  label: t(shortcut.label),
+                  keys: shortcut.keys,
+                  also: shortcut.also ? t(shortcut.also) : undefined,
+              },
+    );
 
     return (
         <aside
-            aria-label="Shortcuts"
+            aria-label={t('common.shortcuts')}
             className="fixed right-4 bottom-4 z-10 w-[320px] rounded-xl border border-ui-border-hover bg-ui-surface px-3.5 pt-2.5 pb-3 text-[12.5px] shadow-[0_12px_32px_var(--ui-shadow-soft)]"
         >
             <div className="mb-1.5 flex items-center justify-between">
                 <h2 className="text-[11px] font-semibold tracking-[.04em] text-ui-text-muted uppercase">
-                    Shortcuts
+                    {t('common.shortcuts')}
                 </h2>
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"
-                    title="Close (Esc)"
-                    aria-label="Close"
+                    title={`${t('common.close')} (Esc)`}
+                    aria-label={t('common.close')}
                     onClick={onClose}
                 >
                     <IconX size={14} />
                 </button>
             </div>
             <dl>
-                {SHORTCUTS.map((shortcut) => (
+                {rows.map((shortcut) => (
                     <div
                         key={shortcut.label}
                         className="flex items-baseline justify-between gap-3 py-[3px]"

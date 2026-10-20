@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import type { ProjectList } from '@/modules/projects';
 import { type ProjectFailure, useProjectFailures } from '@/modules/repository';
 import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
+import { type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
@@ -36,23 +37,24 @@ export function useProblems(
 ): Problem[] {
     const failures = useProjectFailures();
     const shortcut = useGlobalShortcutStatus().data;
+    const i18n = useTranslation();
 
     return useMemo(() => {
         const problems = (list?.projects ?? []).flatMap((project) => {
             const failure = failures.get(project.id);
-            const problem = failure ? projectProblem(project, failure, fixProject) : null;
+            const problem = failure ? projectProblem(project, failure, fixProject, i18n) : null;
             return problem ? [problem] : [];
         });
-        const shortcutIssue = shortcutProblem(shortcut, MACOS);
+        const shortcutIssue = shortcutProblem(shortcut, MACOS, i18n);
         if (shortcutIssue) {
             problems.push({
                 id: 'global-shortcut',
                 ...shortcutIssue,
-                fixes: [{ label: 'Change shortcut', run: openSettings }],
+                fixes: [{ label: i18n.t('problem.changeShortcut'), run: openSettings }],
             });
         }
         return problems;
-    }, [list, failures, fixProject, shortcut, openSettings]);
+    }, [list, failures, fixProject, shortcut, openSettings, i18n]);
 }
 
 /** A project's failure as a problem; none for one that tells nothing more than its panels do. */
@@ -60,16 +62,18 @@ function projectProblem(
     project: ProjectInfo,
     failure: ProjectFailure,
     fixes: ProjectFixes,
+    { t }: Translator,
 ): Problem | null {
     const id = `${failure}:${project.id}`;
-    const locate = { label: 'Locate…', run: () => fixes.locate(project) };
-    const remove = { label: 'Remove', run: () => fixes.remove(project) };
-    const retry = { label: 'Try again', run: () => fixes.retry(project) };
+    const locate = { label: t('problem.locate'), run: () => fixes.locate(project) };
+    const remove = { label: t('common.remove'), run: () => fixes.remove(project) };
+    const retry = { label: t('problem.retry'), run: () => fixes.retry(project) };
+    const name = project.name;
     if (failure === 'repository_missing') {
         return {
             id,
-            title: `${project.name} was moved or deleted`,
-            detail: `Nothing is left at ${placeName(project.location)}. Locate its new folder: its notes and layout follow. Or remove it.`,
+            title: t('problem.moved.title', { name }),
+            detail: t('problem.moved.detail', { place: placeName(project.location) }),
             fixes: [locate, remove],
         };
     }
@@ -79,23 +83,23 @@ function projectProblem(
     if (failure === 'distro_missing') {
         return {
             id,
-            title: `${distro} is not installed`,
-            detail: `${project.name} is in the WSL distro ${distro}, which is not on this computer anymore. Install it again and try again, or remove the project.`,
+            title: t('problem.distroMissing.title', { distro }),
+            detail: t('problem.distroMissing.detail', { name, distro }),
             fixes: [retry, remove],
         };
     }
     if (failure === 'git_not_found') {
         return {
             id,
-            title: `Git is not installed in ${distro}`,
-            detail: `Sidekyk reads ${project.name} with the git of ${distro}. Install it there with its package manager (sudo apt install git on Ubuntu and Debian), then try again.`,
+            title: t('problem.noGit.title', { distro }),
+            detail: t('problem.noGit.detail', { name, distro }),
             fixes: [retry],
         };
     }
     return {
         id,
-        title: `Sidekyk could not start in ${distro}`,
-        detail: `${project.name} is read by a small helper Sidekyk puts in ${distro}, which did not start. The details are in Sidekyk's log.`,
+        title: t('problem.helper.title', { distro }),
+        detail: t('problem.helper.detail', { name, distro }),
         fixes: [retry],
     };
 }

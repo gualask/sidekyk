@@ -1,6 +1,7 @@
 import { Switch } from '@base-ui/react/switch';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
+import { RichText, type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { copyLabel, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
@@ -32,12 +33,13 @@ export function GlobalShortcutSetting() {
     const update = useUpdateSettings();
     const status = useGlobalShortcutStatus().data;
     const id = useId();
+    const i18n = useTranslation();
     const shortcut = settings.globalShortcut;
 
     if (!status) return null;
     if (status.kind === 'command') return <ToggleCommand command={status.command} />;
     if (status.kind === 'unavailable') {
-        return <Row id={id} description="This system offers Sidekyk no global shortcut." />;
+        return <Row id={id} description={i18n.t('shortcut.unavailable')} />;
     }
 
     const change = (globalShortcut: GlobalShortcut) =>
@@ -45,13 +47,13 @@ export function GlobalShortcutSetting() {
     // the change that failed says why; otherwise what the shortcut registered has against it
     const warning =
         update.isError && update.variables
-            ? shortcutChangeError(update.error, update.variables.globalShortcut.keys, MACOS)
-            : (shortcutProblem(status, MACOS)?.detail ?? null);
+            ? shortcutChangeError(update.error, update.variables.globalShortcut.keys, MACOS, i18n)
+            : (shortcutProblem(status, MACOS, i18n)?.detail ?? null);
 
     return (
         <div className="py-2">
             <div className="flex items-center gap-4">
-                <Row id={id} description="Global shortcut, from any app." />
+                <Row id={id} description={i18n.t('shortcut.description')} />
                 <Switch.Root
                     aria-labelledby={id}
                     className="switch"
@@ -85,26 +87,25 @@ export function GlobalShortcutSetting() {
 
 /** The setting's name and what it does. */
 function Row({ id, description }: { id: string; description: string }) {
+    const { t } = useTranslation();
     return (
         <div className="min-w-0 flex-1">
             <div id={id} className="font-semibold">
-                Show and hide Sidekyk
+                {t('shortcut.label')}
             </div>
             <div className="mt-0.5 text-xs text-ui-text-muted">{description}</div>
         </div>
     );
 }
 
-const NEEDED = neededModifiers(MACOS);
-
 /** What the field says under itself while a combination is typed. */
-const HINTS: Record<ShortcutHint | 'start', string> = {
-    start: `Hold ${NEEDED} and press a key, or press a function key alone.${
-        MACOS ? ' Shortcuts macOS uses never reach Sidekyk.' : ''
-    }`,
-    needsModifier: `Hold ${NEEDED} too: a key alone would be taken from every app.`,
-    unsupportedKey: 'End with a letter, a digit, F1–F20, Space or an arrow.',
-};
+function hintText(hint: ShortcutHint | null, i18n: Translator): string {
+    const needed = neededModifiers(MACOS, i18n);
+    if (hint === 'needsModifier') return i18n.t('shortcut.hint.needsModifier', { needed });
+    if (hint === 'unsupportedKey') return i18n.t('shortcut.hint.unsupportedKey');
+    const start = i18n.t('shortcut.hint.start', { needed });
+    return MACOS ? `${start} ${i18n.t('shortcut.hint.macos')}` : start;
+}
 
 /**
  * The combination, and a new one typed after a click: modifiers and a key, `Esc` to keep the
@@ -127,6 +128,7 @@ function ShortcutRecorder({
     const [pending, setPending] = useState<string | null>(null);
     const [hint, setHint] = useState<ShortcutHint | null>(null);
     const setBackendRecording = useShortcutRecording();
+    const i18n = useTranslation();
     // a combination ending with Space would press the button when Space comes up
     const swallowKeyUp = useRef(false);
 
@@ -187,7 +189,7 @@ function ShortcutRecorder({
                 id={id}
                 aria-labelledby={`${labelId} ${id}`}
                 aria-describedby={recording ? hintId : undefined}
-                title={recording ? undefined : 'Click, then press the new shortcut'}
+                title={recording ? undefined : i18n.t('shortcut.recordTitle')}
                 className={`flex h-8 min-w-[132px] items-center justify-center rounded-lg border px-3 text-[13px] font-medium tracking-wide outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted ${
                     recording
                         ? 'border-ui-accent bg-ui-accent-tint text-ui-text-muted'
@@ -209,11 +211,17 @@ function ShortcutRecorder({
                     record(false);
                 }}
             >
-                {recording ? (pending ?? 'Press keys…') : formatShortcut(keys, MACOS)}
+                {recording
+                    ? (pending ?? i18n.t('shortcut.pressKeys'))
+                    : formatShortcut(keys, MACOS)}
             </button>
             {recording ? (
                 <p id={hintId} role="status" className="text-right text-xs text-ui-text-muted">
-                    {HINTS[hint ?? 'start']} <kbd className="kbd">Esc</kbd> cancels.
+                    {hintText(hint, i18n)}{' '}
+                    <RichText
+                        text={i18n.t('shortcut.escCancels')}
+                        parts={{ esc: <kbd className="kbd">Esc</kbd> }}
+                    />
                 </p>
             ) : null}
         </div>
@@ -224,12 +232,10 @@ function ShortcutRecorder({
 function ToggleCommand({ command }: { command: string }) {
     const id = useId();
     const { copied, copy } = useCopyToClipboard();
+    const i18n = useTranslation();
     return (
         <div className="py-2">
-            <Row
-                id={id}
-                description="Add a shortcut in your desktop's keyboard settings that runs:"
-            />
+            <Row id={id} description={i18n.t('shortcut.linux')} />
             <div className="mt-2 flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface-subtle py-1 pr-1 pl-3">
                 <code className="min-w-0 flex-1 truncate font-mono text-[12.5px]" title={command}>
                     {command}
@@ -240,7 +246,7 @@ function ToggleCommand({ command }: { command: string }) {
                     onClick={() => void copy('command', command)}
                 >
                     <CopyIcon copied={copied} />
-                    {copyLabel(copied, 'Copy')}
+                    {copyLabel(copied, i18n.t('copy.copy'), i18n)}
                 </button>
             </div>
         </div>

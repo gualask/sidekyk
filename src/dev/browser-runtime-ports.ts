@@ -81,6 +81,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     // a browser tab follows the system's theme, or the one the devtools emulate: the setting is
     // only kept
     let settings: Settings = {
+        language: null,
         theme: 'dark',
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
         diffView: 'changes',

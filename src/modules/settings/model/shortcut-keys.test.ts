@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import {
     formatShortcut,
     neededModifiers,
@@ -6,6 +7,8 @@ import {
     shortcutFromEvent,
     shortcutHint,
 } from './shortcut-keys';
+
+const en = createTranslator('en', 'en');
 
 const press = (
     code: string,
@@ -101,7 +104,8 @@ describe('pendingShortcut', () => {
 
 describe('neededModifiers', () => {
     it('names the modifiers one of which a shortcut needs', () => {
-        expect(neededModifiers(true)).toBe('⌃, ⌥ or ⌘');
-        expect(neededModifiers(false)).toBe('Ctrl, Alt or Win');
+        expect(neededModifiers(true, en)).toBe('⌃, ⌥ or ⌘');
+        expect(neededModifiers(false, en)).toBe('Ctrl, Alt or Win');
+        expect(neededModifiers(false, createTranslator('it', 'it'))).toBe('Ctrl, Alt o Win');
     });
 });

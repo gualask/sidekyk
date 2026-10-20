@@ -1,6 +1,7 @@
 import { IconChevronDown } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
@@ -48,6 +49,7 @@ export function NoteCards({
     const [showDone, setShowDone] = useState(false);
     const [editing, setEditing] = useState<string | null>(null);
     const { copied, copy } = useCopyToClipboard();
+    const { t } = useTranslation();
 
     const open = useMemo(() => openNotes(notes.notes, list.id), [notes.notes, list.id]);
     const done = useMemo(() => doneNotes(notes.notes, list.id), [notes.notes, list.id]);
@@ -138,7 +140,7 @@ export function NoteCards({
                                                 showDone ? '' : '-rotate-90'
                                             }`}
                                         />
-                                        Done ({item.count})
+                                        {t('notes.doneCount', { count: item.count })}
                                     </button>
                                 ) : (
                                     <NoteCard
@@ -194,6 +196,7 @@ function Composer({
     const [text, setText] = useState('');
     const field = useRef<HTMLTextAreaElement>(null);
     const settings = useNotesSettings();
+    const { t } = useTranslation();
     // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
     useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     useEffect(() => {
@@ -225,8 +228,8 @@ function Composer({
                 rows={1}
                 value={text}
                 spellCheck={false}
-                placeholder={`Write or paste a note in ${list.name}…  ${shortcutLabel('N')}`}
-                aria-label={`New note in ${list.name}`}
+                placeholder={`${t('notes.composer', { list: list.name })}  ${shortcutLabel('N')}`}
+                aria-label={t('notes.newNoteIn', { list: list.name })}
                 className={`block max-h-[132px] w-full resize-none rounded-lg border border-ui-border bg-ui-surface-subtle px-2.5 py-[7px] text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${linesClass(settings.lines)}`}
                 onChange={(event) => {
                     setText(event.target.value);
@@ -250,7 +253,7 @@ function Composer({
             />
             {hint ? (
                 <p className="px-0.5 pt-1 text-[11.5px] text-ui-text-muted">
-                    Things to try, or what the agent said, to paste back later.
+                    {t('notes.composerHint')}
                 </p>
             ) : null}
         </div>

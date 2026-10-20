@@ -1,6 +1,7 @@
 import { IconFileOff, IconFolder, IconLink } from '@tabler/icons-react';
 import { type ReactNode, useMemo } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import { RichText, useTranslation } from '@/shared/i18n';
 import type { FileFinder } from '../application/find';
 import { useFileContent } from '../application/repository.queries';
 import { textLines, textRows } from '../model/diff-rows';
@@ -28,6 +29,7 @@ export function TextFileView({
     /** What the file is looked through with. */
     finder: FileFinder;
 }) {
+    const i18n = useTranslation();
     const content = useFileContent(projectId, path);
     const data = content.data;
     const text = data?.kind === 'text' ? data : null;
@@ -48,33 +50,35 @@ export function TextFileView({
             finder={finder}
             syntax={syntax}
         >
-            {content.isPending ? <Notice>Loading file…</Notice> : null}
+            {content.isPending ? <Notice>{i18n.t('view.loadingFile')}</Notice> : null}
             {content.isError ? (
                 <Notice>
-                    <span className="text-ui-danger">{errorMessage(content.error)}</span>
+                    <span className="text-ui-danger">{errorMessage(content.error, i18n)}</span>
                 </Notice>
             ) : null}
-            {text && rows.length === 0 ? <Notice>The file is empty.</Notice> : null}
-            {text?.truncated ? (
-                <Notice>The file is too large to show whole: it was cut here.</Notice>
-            ) : null}
+            {text && rows.length === 0 ? <Notice>{i18n.t('view.empty')}</Notice> : null}
+            {text?.truncated ? <Notice>{i18n.t('view.fileCut')}</Notice> : null}
             {data?.kind === 'binary' ? (
                 <Notice>
                     <IconFileOff size={28} stroke={1.5} />
-                    Binary file, no text to show.
+                    {i18n.t('view.binary')}
                 </Notice>
             ) : null}
             {data?.kind === 'link' ? (
                 <Notice>
                     <IconLink size={28} stroke={1.5} />
                     <span>
-                        A link to <span className="font-mono">{data.target}</span>
+                        <RichText
+                            text={i18n.t('view.link')}
+                            parts={{ target: <span className="font-mono">{data.target}</span> }}
+                        />
                     </span>
                 </Notice>
             ) : null}
             {data?.kind === 'folder' ? (
                 <Notice>
-                    <IconFolder size={28} stroke={1.5} />A repository of its own (a submodule).
+                    <IconFolder size={28} stroke={1.5} />
+                    {i18n.t('view.submodule')}
                 </Notice>
             ) : null}
         </Pane>

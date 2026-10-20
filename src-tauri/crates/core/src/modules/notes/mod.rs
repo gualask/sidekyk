@@ -9,6 +9,6 @@ mod store;
 
 pub use book::note_title;
 pub use contracts::{DeletedList, Note, NoteList, NotesSummary, ProjectNotes};
-pub use markdown::to_markdown;
+pub use markdown::{to_markdown, ExportWords};
 pub use ports::NotesStorage;
 pub use store::NotesStore;

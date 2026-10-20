@@ -12,7 +12,7 @@ use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
-use crate::interfaces::tauri::settings::window_theme;
+use crate::interfaces::tauri::settings::{apply_language, window_theme};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::interfaces::tauri::tray;
@@ -99,7 +99,9 @@ pub(crate) fn run() {
             shortcut::start(app.handle(), &settings.global_shortcut);
             create_windows(app.handle(), settings.theme)?;
             show_by_deadline(app.handle());
-            tray::start(app.handle());
+            // before the tray, which starts in the language returned
+            let texts = apply_language(app.handle(), settings.language);
+            tray::start(app.handle(), texts);
             app.state::<ProjectsState>()
                 .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();

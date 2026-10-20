@@ -2,6 +2,7 @@ import { IconX } from '@tabler/icons-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import { useTranslation } from '@/shared/i18n';
 import { relativeTime } from '@/shared/time/relative-time';
 import { commitDate, shortSha } from '../model/commits';
 import type { Commit, CommitFiles, FileChange } from '../model/repository.types';
@@ -37,6 +38,7 @@ export function CommitFileList({
     onSelect: (file: FileChange) => void;
     onBack: () => void;
 }) {
+    const i18n = useTranslation();
     const list = files.data?.files ?? [];
     // the commit's age is reckoned from when it was opened
     const [openedAt] = useState(() => Date.now() / 1000);
@@ -54,7 +56,7 @@ export function CommitFileList({
                 <div className="min-w-0 flex-1">
                     <p
                         className="flex items-center gap-1.5 text-[11px] text-ui-text-muted"
-                        title={commitDate(commit)}
+                        title={commitDate(commit, i18n)}
                     >
                         <span className="shrink-0 font-mono text-ui-accent-text">
                             {shortSha(commit.sha)}
@@ -63,7 +65,7 @@ export function CommitFileList({
                         <span className="min-w-0 truncate">{commit.author}</span>
                         <span aria-hidden="true">·</span>
                         <span className="shrink-0 font-mono tabular-nums">
-                            {relativeTime(commit.time, openedAt)}
+                            {relativeTime(commit.time, openedAt, i18n)}
                         </span>
                     </p>
                     <p
@@ -76,8 +78,8 @@ export function CommitFileList({
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"
-                    title="Back to the working tree (Esc)"
-                    aria-label="Back to the working tree"
+                    title={`${i18n.t('commit.back')} (Esc)`}
+                    aria-label={i18n.t('commit.back')}
                     onClick={onBack}
                 >
                     <IconX size={14} />
@@ -85,12 +87,14 @@ export function CommitFileList({
             </div>
             <nav
                 ref={scrollRef}
-                aria-label={`Files of commit ${shortSha(commit.sha)}`}
+                aria-label={i18n.t('commit.files', { sha: shortSha(commit.sha) })}
                 className="min-h-0 flex-1 overflow-y-auto"
             >
-                {files.isPending ? <Note>Loading…</Note> : null}
-                {files.isError ? <Note danger>{errorMessage(files.error)}</Note> : null}
-                {files.isSuccess && list.length === 0 ? <Note>No file changes.</Note> : null}
+                {files.isPending ? <Note>{i18n.t('common.loading')}</Note> : null}
+                {files.isError ? <Note danger>{errorMessage(files.error, i18n)}</Note> : null}
+                {files.isSuccess && list.length === 0 ? (
+                    <Note>{i18n.t('commit.noFiles')}</Note>
+                ) : null}
                 <VirtualItems virtualizer={virtualizer}>
                     {(index) => {
                         const file = list[index];
@@ -104,7 +108,11 @@ export function CommitFileList({
                     }}
                 </VirtualItems>
                 {files.data?.truncated ? (
-                    <Note>Only the first {list.length.toLocaleString('en')} files are listed.</Note>
+                    <Note>
+                        {i18n.t('commit.truncated', {
+                            count: list.length.toLocaleString(i18n.formatTag),
+                        })}
+                    </Note>
                 ) : null}
             </nav>
         </div>

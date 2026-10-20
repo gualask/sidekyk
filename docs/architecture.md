@@ -62,7 +62,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
   `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type and its
   place (`project-place.ts`, `RemoteTag`), change areas, panel contract, sidebar widths
-  (`ui/sidebar-width.ts`).
+  (`ui/sidebar-width.ts`), the UI's text (`i18n/`, `features/languages.md`).
 - `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
 
 ### Dependency rules
@@ -150,8 +150,8 @@ In the core:
   `linux_helper.rs` (the helper installed and started on a `LinuxMachine`), `wsl.rs` (distros,
   `WslRepositories`), `machines.rs` (which machine reads a project, and what every machine is
   told).
-- `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its message in
-  `app-error.ts`), `coalesce.rs` (one run in flight, later callers share the next), `process.rs`
+- `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its key in
+  `app-error.ts` and its message in both catalogs), `coalesce.rs` (one run in flight, later callers share the next), `process.rs`
   (what a child wrote, `GitOutput` to the repository module), `sync.rs`.
 
 ### Git

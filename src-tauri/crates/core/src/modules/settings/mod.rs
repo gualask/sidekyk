@@ -7,7 +7,7 @@ mod global_shortcut;
 #[cfg(any(target_os = "macos", windows))]
 pub mod shortcut_keys;
 
-pub use contracts::{GlobalShortcut, GlobalShortcutStatus, Settings, Theme};
+pub use contracts::{GlobalShortcut, GlobalShortcutStatus, Language, Settings, Theme};
 #[cfg(any(target_os = "macos", windows))]
 pub use global_shortcut::{GlobalShortcuts, RegisterError, ShortcutRegistrar};
 #[cfg(any(target_os = "macos", windows))]

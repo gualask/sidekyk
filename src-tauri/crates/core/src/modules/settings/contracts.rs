@@ -13,6 +13,15 @@ pub enum Theme {
     Light,
 }
 
+/// The language of the UI, and of the text the backend writes for it (the tray, dialogs, an
+/// export).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Language {
+    En,
+    It,
+}
+
 /// The view a diff opens in: only the changed lines, or the whole file with its changes marked.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,6 +115,8 @@ impl Default for GlobalShortcut {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
+    /// `None` until the frontend stores the system's language, at the first start.
+    pub language: Option<Language>,
     pub theme: Theme,
     pub global_shortcut: GlobalShortcut,
     pub diff_view: DiffView,
@@ -150,6 +161,7 @@ mod tests {
     #[test]
     fn settings_serialize_with_the_frontend_field_names() {
         let settings = Settings {
+            language: Some(Language::It),
             theme: Theme::Light,
             global_shortcut: GlobalShortcut {
                 enabled: false,
@@ -163,6 +175,7 @@ mod tests {
             note_lines: NoteLines::Scroll,
         };
         let json = serde_json::json!({
+            "language": "it",
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "diffView": "file",
@@ -181,6 +194,7 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<Settings>(serde_json::json!({ "theme": "light" })).unwrap(),
             Settings {
+                language: None,
                 theme: Theme::Light,
                 global_shortcut: GlobalShortcut {
                     enabled: true,

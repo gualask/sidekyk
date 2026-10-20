@@ -17,7 +17,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - `pnpm tauri:dev`: the desktop app; its log is `sidekyk-dev.log` in the app's log directory (macOS: `~/Library/Logs/io.github.gualask.sidekyk/`).
 - `pnpm dev`: the frontend on fixtures, `http://localhost:1420/?dev=app&scenario=review|clean|no-repo|large|problems` (`src/dev/`). Check UI changes there, in light and dark.
 - UI work with the maintainer: start `pnpm dev` in the background once and keep it running until the maintainer asks to stop it; Vite reloads every change, so never restart it between edits. Open the fixture page in the Playwright browser with the dark theme emulated (`prefers-color-scheme: dark`) and leave it there, so the maintainer watches each change live in that window. Say when you change the emulation or the page, since it is the maintainer's view too.
-- Checks: `pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm boundaries:check`; `cargo test`, `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, all with `--manifest-path src-tauri/Cargo.toml`.
+- Checks: `pnpm lint && pnpm typecheck && pnpm test && pnpm knip && pnpm boundaries:check && pnpm i18n:check`; `cargo test`, `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, all with `--manifest-path src-tauri/Cargo.toml`.
 - Container fixture (a WSL stand-in on Colima, `docs/testing.md`): `scripts/container-fixture.sh up|edit|watch|shell|status|down`.
 - Backend timings: `SIDEKYK_BENCH_REPO=<repo> cargo test --release --manifest-path src-tauri/Cargo.toml backend_timings -- --ignored --nocapture`; through the helper against the direct path: same with `-p sidekyk-agent agent_timings`.
 - Local projects through the helper (dev builds): `cargo build --manifest-path src-tauri/Cargo.toml -p sidekyk-agent`, then `SIDEKYK_AGENT=local pnpm tauri:dev`.
@@ -35,7 +35,10 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Biome and rustfmt own formatting. Conditional JSX uses `cond ? (…) : null`, not `&&`. No `biome-ignore` or other suppressions: fix the root cause, or ask.
 - Layers (`pnpm boundaries:check`): `@tauri-apps/*` only in `src/infrastructure/`; modules reach the backend through ports from React context; `modules` never import `app`, `infrastructure` or another module; outside a module only its `index.ts` is imported; `shared` imports only `shared`. In Rust, `src-tauri/crates/core` (modules, shared, git, watcher) has no Tauri; its `modules/` reach git and the disk only through ports (`RepositoryBackend`, `RepositoryWatcher`).
 - Colors only from the `--ui-*` tokens (`*-ui-*` in Tailwind).
-- A contract change (`contracts.rs`, `repository.types.ts`) also updates the Tauri adapter, the fixtures and the serialization tests; a new error code needs its message in `app-error.ts`.
+- UI text only from the catalogs (`src/shared/i18n/messages/`), English and Italian together;
+  keys written whole, never built (`docs/features/languages.md`). Rust text for the user:
+  `interfaces/tauri/texts.rs`.
+- A contract change (`contracts.rs`, `repository.types.ts`) also updates the Tauri adapter, the fixtures and the serialization tests; a new error code needs its key in `app-error.ts` and its message in both catalogs.
 - Hot-path logs are `debug`; `info` and above only for rare events and problems.
 - Docs and code comments in English. `ROADMAP.md` holds only what is left to do; a built item leaves it for `docs/features/` in the same commit (`docs/README.md` says where things go).
 

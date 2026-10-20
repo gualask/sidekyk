@@ -1,6 +1,7 @@
 import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { RichText, useTranslation } from '@/shared/i18n';
 import { altLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { InlineField } from '@/shared/ui/InlineField';
@@ -41,6 +42,7 @@ export function ReorderNotes({
     const at = open.findIndex((note) => note.id === selected);
     // the note whose position is being typed
     const [typing, setTyping] = useState<string | null>(null);
+    const { t } = useTranslation();
 
     const scroller = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
@@ -104,15 +106,20 @@ export function ReorderNotes({
         <div className="flex h-full min-w-0 flex-1 flex-col">
             <div className="flex items-center gap-2.5 px-3 pt-2.5 pb-1 text-[12.5px]">
                 <span className="min-w-0 truncate">
-                    Reorder <b>{list.name}</b>
+                    <RichText text={t('reorder.title')} parts={{ list: <b>{list.name}</b> }} />
                 </span>
                 <span className="text-[11.5px] text-ui-text-muted">
-                    <kbd className="kbd">{UP}</kbd> <kbd className="kbd">{DOWN}</kbd> or click a
-                    number
+                    <RichText
+                        text={t('reorder.hint')}
+                        parts={{
+                            up: <kbd className="kbd">{UP}</kbd>,
+                            down: <kbd className="kbd">{DOWN}</kbd>,
+                        }}
+                    />
                 </span>
                 <span className="flex-1" />
                 <button type="button" className="btn-ghost-sm" onClick={onDone}>
-                    Done
+                    {t('reorder.done')}
                 </button>
             </div>
             <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-3">
@@ -138,8 +145,8 @@ export function ReorderNotes({
                                         type="button"
                                         className="btn-icon h-6 w-6"
                                         disabled={row.index === 0}
-                                        title={`Move up (${UP})`}
-                                        aria-label="Move up"
+                                        title={`${t('reorder.up')} (${UP})`}
+                                        aria-label={t('reorder.up')}
                                         onClick={() => move(note.id, row.index - 1)}
                                     >
                                         <IconChevronUp size={13} />
@@ -157,8 +164,13 @@ export function ReorderNotes({
                                         <button
                                             type="button"
                                             className="h-6 min-w-8 rounded-md px-1 font-mono text-xs text-ui-text-secondary hover:bg-ui-surface-hover"
-                                            title={`Type a position (1–${open.length})`}
-                                            aria-label={`Position ${row.index + 1} of ${open.length}`}
+                                            title={t('reorder.typePosition', {
+                                                count: open.length,
+                                            })}
+                                            aria-label={t('reorder.positionOf', {
+                                                position: row.index + 1,
+                                                count: open.length,
+                                            })}
                                             onClick={() => {
                                                 pick(note.id);
                                                 setTyping(note.id);
@@ -171,8 +183,8 @@ export function ReorderNotes({
                                         type="button"
                                         className="btn-icon h-6 w-6"
                                         disabled={row.index === open.length - 1}
-                                        title={`Move down (${DOWN})`}
-                                        aria-label="Move down"
+                                        title={`${t('reorder.down')} (${DOWN})`}
+                                        aria-label={t('reorder.down')}
                                         onClick={() => move(note.id, row.index + 1)}
                                     >
                                         <IconChevronDown size={13} />
@@ -205,6 +217,7 @@ function PositionInput({
     count: number;
     onEnd: (position: number | null) => void;
 }) {
+    const { t } = useTranslation();
     return (
         <InlineField
             initial={String(position)}
@@ -215,7 +228,7 @@ function PositionInput({
             type="number"
             min={1}
             max={count}
-            aria-label="Position"
+            aria-label={t('reorder.position')}
             className="h-6 w-12 rounded-md border border-ui-accent bg-ui-surface px-1 text-center font-mono text-xs outline-none"
         />
     );

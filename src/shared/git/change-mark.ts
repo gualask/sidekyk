@@ -3,13 +3,15 @@
  * tree and the palette mark it. The backend's search sends it (`ChangeMark` in
  * `src-tauri/crates/core/src/modules/search/contracts.rs`).
  */
+import type { MessageKey } from '@/shared/i18n';
+
 export type ChangeMark = 'modified' | 'added' | 'deleted';
 
 /** The mark in words, for tooltips and hints. */
-export const CHANGE_MARK_WORD: Record<ChangeMark, string> = {
-    modified: 'Modified',
-    added: 'New',
-    deleted: 'Deleted',
+export const CHANGE_MARK_WORD: Record<ChangeMark, MessageKey> = {
+    modified: 'changeMark.modified',
+    added: 'changeMark.added',
+    deleted: 'changeMark.deleted',
 };
 
 /** The mark's color, as VS Code's explorer: amber, green for new. */

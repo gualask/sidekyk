@@ -27,8 +27,9 @@ import {
     useShownFile,
 } from '@/modules/repository';
 import { loadCommandPalette, type PaletteActions, type PaletteMode } from '@/modules/search';
-import { loadSettingsDialog } from '@/modules/settings';
+import { loadSettingsDialog, useSettingsWhenRead } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
@@ -67,7 +68,7 @@ const ShortcutsHelp = lazy(() =>
 );
 
 /** Without a project, the palette offers no panel. */
-const NO_PANELS: typeof PALETTE_PANELS = [];
+const NO_PANELS: readonly { id: string; title: string; shortcut: string }[] = [];
 
 /** The command palette: whether it is open, what it looks for, and the text it opens with. */
 interface PaletteState {
@@ -95,6 +96,12 @@ export function AppShell() {
     useProjectsChangeSubscription();
     useRepositoryChangeSubscription();
     const projects = useProjects();
+    const i18n = useTranslation();
+    // the panels as the palette offers them, by their titles in the UI's language
+    const palettePanels = useMemo(
+        () => PALETTE_PANELS.map((panel) => ({ ...panel, title: i18n.t(panel.title) })),
+        [i18n],
+    );
     // the app opens on the project it showed last, with its panels
     const [level, setLevel] = useState<ZoomLevel>(1);
     // the panel full screen at level 2, and the tile selected at level 1
@@ -106,8 +113,10 @@ export function AppShell() {
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
     // a tile minimized is not selected: Changes is, which is never minimized
     const selectedTile = layout.minimized.includes(panel.id) ? MAIN_TILE.panel : panel;
-    // the window, created hidden, shows with the workspace laid out, not an empty shell
-    useShowWindowWhen(!projects.isPending);
+    // the window, created hidden, shows with the workspace laid out, not an empty shell, and in
+    // the language of the settings
+    const settingsRead = useSettingsWhenRead() !== undefined;
+    useShowWindowWhen(!projects.isPending && settingsRead);
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
     const [settingsOpen, setSettingsOpen] = useState<boolean | null>(null);
     const [palette, setPalette] = useState(PALETTE_UNOPENED);
@@ -295,7 +304,7 @@ export function AppShell() {
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
                     <div className="flex h-full items-center justify-center p-8 text-sm text-ui-danger">
-                        {errorMessage(projects.error)}
+                        {errorMessage(projects.error, i18n)}
                     </div>
                 ) : projects.data ? (
                     <Workspace
@@ -346,7 +355,7 @@ export function AppShell() {
                         projectName={project?.name ?? null}
                         projectId={level > 0 ? (project?.id ?? null) : null}
                         currentFile={palette.open ? shownFile() : null}
-                        panels={project ? PALETTE_PANELS : NO_PANELS}
+                        panels={project ? palettePanels : NO_PANELS}
                         actions={paletteActions}
                     />
                 </Suspense>

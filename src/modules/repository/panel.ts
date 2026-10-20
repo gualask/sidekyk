@@ -4,7 +4,7 @@ import { FILES_TREE_WIDTH } from './ui/tree-layout';
 
 export const changesPanel = definePanel({
     id: 'changes',
-    title: 'Changes',
+    title: 'panel.changes',
     icon: IconGitCompare,
     load: () => import('./ui/ChangesWorkspace'),
     pick: (module) => module.ChangesWorkspace,
@@ -16,7 +16,7 @@ export const changesPanel = definePanel({
 
 export const filesPanel = definePanel({
     id: 'files',
-    title: 'Files',
+    title: 'panel.files',
     icon: IconFolder,
     tileMinWidth: FILES_TREE_WIDTH.min,
     load: () => import('./ui/FilesWorkspace'),

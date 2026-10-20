@@ -2,6 +2,7 @@ import { Tooltip } from '@base-ui/react/tooltip';
 import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { DEFAULT_COPY_TEMPLATE, isCopyTemplate } from '@/shared/copy/copy-template';
+import { RichText, useTranslation } from '@/shared/i18n';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 
 /** A pause in typing after which the template is stored. */
@@ -17,6 +18,7 @@ export function CopyTemplateSetting() {
     const update = useUpdateSettings();
     const id = useId();
     const errorId = useId();
+    const { t } = useTranslation();
     const [draft, setDraft] = useState(settings.copyTemplate);
     const valid = isCopyTemplate(draft);
 
@@ -41,7 +43,7 @@ export function CopyTemplateSetting() {
         <div className="py-2">
             <div className="flex items-center gap-1.5">
                 <label htmlFor={id} className="font-semibold">
-                    Copy as
+                    {t('copyTemplate.label')}
                 </label>
                 <PlaceholdersHelp />
                 <button
@@ -50,12 +52,10 @@ export function CopyTemplateSetting() {
                     disabled={draft === DEFAULT_COPY_TEMPLATE}
                     onClick={() => setDraft(DEFAULT_COPY_TEMPLATE)}
                 >
-                    Reset
+                    {t('copyTemplate.reset')}
                 </button>
             </div>
-            <div className="mt-0.5 text-xs text-ui-text-muted">
-                What a click on a line, a hunk or a selection puts on the clipboard.
-            </div>
+            <div className="mt-0.5 text-xs text-ui-text-muted">{t('copyTemplate.description')}</div>
             <textarea
                 id={id}
                 rows={3}
@@ -76,9 +76,7 @@ export function CopyTemplateSetting() {
                 >
                     <IconAlertTriangle size={14} className="mt-px shrink-0 text-ui-warning" />
                     <span>
-                        Add <code className="font-mono">{'{row}'}</code> or{' '}
-                        <code className="font-mono">{'{text}'}</code>: without them every copy would
-                        be the same text. It is not saved until then.
+                        <RichText text={t('copyTemplate.missing')} parts={PLACEHOLDERS} />
                     </span>
                 </p>
             )}
@@ -86,14 +84,20 @@ export function CopyTemplateSetting() {
     );
 }
 
+const PLACEHOLDERS = {
+    row: <code className="font-mono">{'{row}'}</code>,
+    text: <code className="font-mono">{'{text}'}</code>,
+};
+
 /** What the placeholders become, with examples, in a tooltip of the app's own. */
 function PlaceholdersHelp() {
+    const { t } = useTranslation();
     return (
         <Tooltip.Root>
             <Tooltip.Trigger
                 delay={150}
                 className="btn-icon h-5 w-5 text-ui-text-muted"
-                aria-label="What the placeholders become"
+                aria-label={t('copyTemplate.help')}
             >
                 <IconInfoCircle size={14} />
             </Tooltip.Trigger>
@@ -101,19 +105,36 @@ function PlaceholdersHelp() {
                 <Tooltip.Positioner side="bottom" align="start" sideOffset={6} className="z-30">
                     <Tooltip.Popup className="menu-popup max-w-80 space-y-1.5 px-3 py-2 text-xs leading-relaxed">
                         <p>
-                            <code className="font-mono font-semibold">{'{row}'}</code> where the
-                            text is: <code className="font-mono">src/cart/total.ts:14</code>, or{' '}
-                            <code className="font-mono">:12-15</code> for several lines.
+                            <RichText
+                                text={t('copyTemplate.helpRow')}
+                                parts={{
+                                    row: <code className="font-mono font-semibold">{'{row}'}</code>,
+                                    file: <code className="font-mono">src/cart/total.ts:14</code>,
+                                    lines: <code className="font-mono">:12-15</code>,
+                                }}
+                            />
                         </p>
                         <p>
-                            <code className="font-mono font-semibold">{'{text}'}</code> what is
-                            copied: a line as it is, a hunk with its + and −, a selection exactly.
+                            <RichText
+                                text={t('copyTemplate.helpText')}
+                                parts={{
+                                    text: (
+                                        <code className="font-mono font-semibold">{'{text}'}</code>
+                                    ),
+                                }}
+                            />
                         </p>
                         <p className="text-ui-text-muted">
-                            For example:{' '}
-                            <code className="font-mono">
-                                {'Check this, it looks wrong: {row} -> {text}'}
-                            </code>
+                            <RichText
+                                text={t('copyTemplate.helpExample')}
+                                parts={{
+                                    example: (
+                                        <code className="font-mono">
+                                            {t('copyTemplate.example')}
+                                        </code>
+                                    ),
+                                }}
+                            />
                         </p>
                     </Tooltip.Popup>
                 </Tooltip.Positioner>

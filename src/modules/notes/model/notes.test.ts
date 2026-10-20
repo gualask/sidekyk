@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import {
     doneNotes,
     lineCount,
@@ -12,6 +13,8 @@ import {
     withUpdated,
 } from './notes';
 import type { Note, ProjectNotes } from './notes.types';
+
+const en = createTranslator('en', 'en');
 
 function note(id: string, position: number, extra: Partial<Note> = {}): Note {
     return {
@@ -54,11 +57,16 @@ describe('notes', () => {
 
     it('says when a note was written or done, and its length past four lines', () => {
         const now = 10 * 3600_000;
-        expect(noteMeta(note('a', 0, { edited: now - 1000 }), now)).toBe('just now');
-        expect(noteMeta(note('a', 0, { edited: now - 3 * 3600_000 }), now)).toBe('3h ago');
-        expect(noteMeta(note('a', 0, { done: now - 120_000, text: '1\n2\n3\n4\n5' }), now)).toBe(
-            'done 2m ago · 5 lines',
-        );
+        expect(noteMeta(note('a', 0, { edited: now - 1000 }), now, en)).toBe('just now');
+        expect(noteMeta(note('a', 0, { edited: now - 3 * 3600_000 }), now, en)).toBe('3h ago');
+        expect(
+            noteMeta(note('a', 0, { done: now - 120_000, text: '1\n2\n3\n4\n5' }), now, en),
+        ).toBe('done 2m ago · 5 lines');
+        const it_ = createTranslator('it', 'it');
+        expect(noteMeta(note('a', 0, { edited: now - 1000 }), now, it_)).toBe('adesso');
+        expect(
+            noteMeta(note('a', 0, { done: now - 120_000, text: '1\n2\n3\n4\n5' }), now, it_),
+        ).toBe('completata 2 min fa · 5 righe');
     });
 
     it('updates notes in place, never bringing back one deleted', () => {

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Translator } from '@/shared/i18n';
 
 export type CopyState = { id: string; ok: boolean } | null;
 
 /** What a copy control says: `idle` until used, then whether it worked. */
-export function copyLabel(copied: CopyState, idle: string): string {
+export function copyLabel(copied: CopyState, idle: string, i18n: Translator): string {
     if (!copied) return idle;
-    return copied.ok ? 'Copied' : 'Copy failed';
+    return i18n.t(copied.ok ? 'copy.done' : 'copy.failed');
 }
 
 /**

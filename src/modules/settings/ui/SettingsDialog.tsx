@@ -7,6 +7,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
+import { type Locale, type MessageKey, RichText, useTranslation } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { altLabel } from '@/shared/platform/shortcut';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
@@ -14,29 +15,35 @@ import type { Theme } from '../model/settings.types';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
 
-const THEMES: { value: Theme; label: string }[] = [
-    { value: 'dark', label: 'Dark' },
-    { value: 'light', label: 'Light' },
+/** Each language by its own name, as anyone looking for theirs reads it. */
+const LANGUAGES: { value: Locale; label: string }[] = [
+    { value: 'en', label: 'English' },
+    { value: 'it', label: 'Italiano' },
 ];
 
-const DIFF_VIEWS: { value: DiffView; label: string }[] = [
-    { value: 'changes', label: 'Changes' },
-    { value: 'file', label: 'Full file' },
+const THEMES: { value: Theme; label: MessageKey }[] = [
+    { value: 'dark', label: 'settings.theme.dark' },
+    { value: 'light', label: 'settings.theme.light' },
 ];
 
-const DIFF_SCROLLBARS: { value: DiffScrollbar; label: string }[] = [
-    { value: 'narrow', label: 'Narrow' },
-    { value: 'wide', label: 'Wide' },
+const DIFF_VIEWS: { value: DiffView; label: MessageKey }[] = [
+    { value: 'changes', label: 'diffView.changes' },
+    { value: 'file', label: 'diffView.file' },
 ];
 
-const CODE_LINES: { value: CodeLines; label: string }[] = [
-    { value: 'scroll', label: 'Scroll' },
-    { value: 'wrap', label: 'Wrap' },
+const DIFF_SCROLLBARS: { value: DiffScrollbar; label: MessageKey }[] = [
+    { value: 'narrow', label: 'settings.scrollbar.narrow' },
+    { value: 'wide', label: 'settings.scrollbar.wide' },
 ];
 
-const NOTE_LINES: { value: NoteLines; label: string }[] = [
-    { value: 'wrap', label: 'Wrap' },
-    { value: 'scroll', label: 'Scroll' },
+const CODE_LINES: { value: CodeLines; label: MessageKey }[] = [
+    { value: 'scroll', label: 'settings.lines.scroll' },
+    { value: 'wrap', label: 'settings.lines.wrap' },
+];
+
+const NOTE_LINES: { value: NoteLines; label: MessageKey }[] = [
+    { value: 'wrap', label: 'settings.lines.wrap' },
+    { value: 'scroll', label: 'settings.lines.scroll' },
 ];
 
 /**
@@ -54,6 +61,10 @@ export function SettingsDialog({
     const settings = useSettings().data;
     const update = useUpdateSettings();
     const current = useRef<HTMLElement>(null);
+    const i18n = useTranslation();
+    const { t } = i18n;
+    const translated = <T extends string>(options: { value: T; label: MessageKey }[]) =>
+        options.map((option) => ({ value: option.value, label: t(option.label) }));
 
     return (
         <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -65,43 +76,61 @@ export function SettingsDialog({
                 >
                     <div className="flex items-center gap-2 border-b border-ui-border py-3 pr-3 pl-4">
                         <Dialog.Title className="flex-1 text-[15px] font-bold">
-                            Settings
+                            {t('settings.title')}
                         </Dialog.Title>
                         <Dialog.Close
                             className="btn-icon h-7 w-7"
-                            title="Close (Esc)"
-                            aria-label="Close"
+                            title={`${t('common.close')} (Esc)`}
+                            aria-label={t('common.close')}
                         >
                             <IconX size={16} />
                         </Dialog.Close>
                     </div>
                     {update.isError ? (
                         <p role="alert" className="px-4 pt-3 text-ui-danger">
-                            {errorMessage(update.error)}
+                            {errorMessage(update.error, i18n)}
                         </p>
                     ) : null}
-                    <Section title="Appearance">
-                        <Setting label="Theme" description="Dark by default.">
+                    <Section title={t('settings.appearance')}>
+                        <Setting
+                            label={t('settings.theme.label')}
+                            description={t('settings.theme.description')}
+                        >
                             {(labelId) => (
                                 <Choice
                                     labelId={labelId}
-                                    options={THEMES}
+                                    options={translated(THEMES)}
                                     value={settings.theme}
                                     current={current}
                                     onChange={(theme) => update.mutate({ ...settings, theme })}
                                 />
                             )}
                         </Setting>
-                    </Section>
-                    <Section title="Diff">
                         <Setting
-                            label="Open diffs as"
-                            description="Only the changed lines, or the whole file with the changes highlighted. The panel's header switches it any time."
+                            label={t('settings.language.label')}
+                            description={t('settings.language.description')}
                         >
                             {(labelId) => (
                                 <Choice
                                     labelId={labelId}
-                                    options={DIFF_VIEWS}
+                                    options={LANGUAGES}
+                                    value={i18n.locale}
+                                    onChange={(language) =>
+                                        update.mutate({ ...settings, language })
+                                    }
+                                />
+                            )}
+                        </Setting>
+                    </Section>
+                    <Section title={t('settings.diff')}>
+                        <Setting
+                            label={t('settings.diffView.label')}
+                            description={t('settings.diffView.description')}
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={translated(DIFF_VIEWS)}
                                     value={settings.diffView}
                                     onChange={(diffView) =>
                                         update.mutate({ ...settings, diffView })
@@ -110,13 +139,13 @@ export function SettingsDialog({
                             )}
                         </Setting>
                         <Setting
-                            label="Scrollbar"
-                            description="Beside a diff, a map of its changes: a click on a mark goes to that change. Wide is easier to click."
+                            label={t('settings.scrollbar.label')}
+                            description={t('settings.scrollbar.description')}
                         >
                             {(labelId) => (
                                 <Choice
                                     labelId={labelId}
-                                    options={DIFF_SCROLLBARS}
+                                    options={translated(DIFF_SCROLLBARS)}
                                     value={settings.diffScrollbar}
                                     onChange={(diffScrollbar) =>
                                         update.mutate({ ...settings, diffScrollbar })
@@ -125,13 +154,13 @@ export function SettingsDialog({
                             )}
                         </Setting>
                         <Setting
-                            label="Long lines"
-                            description="Keep them on one line and scroll sideways, or wrap them at the edge, in diffs and files alike."
+                            label={t('settings.lines.label')}
+                            description={t('settings.codeLines.description')}
                         >
                             {(labelId) => (
                                 <Choice
                                     labelId={labelId}
-                                    options={CODE_LINES}
+                                    options={translated(CODE_LINES)}
                                     value={settings.codeLines}
                                     onChange={(codeLines) =>
                                         update.mutate({ ...settings, codeLines })
@@ -141,15 +170,17 @@ export function SettingsDialog({
                         </Setting>
                         <CopyTemplateSetting />
                     </Section>
-                    <Section title="Notes">
+                    <Section title={t('panel.notes')}>
                         <Setting
-                            label="Long lines"
-                            description={`Wrap them at the panel's edge, or keep them on one line and scroll sideways. ${altLabel('Z')} switches it from a note.`}
+                            label={t('settings.lines.label')}
+                            description={t('settings.noteLines.description', {
+                                key: altLabel('Z'),
+                            })}
                         >
                             {(labelId) => (
                                 <Choice
                                     labelId={labelId}
-                                    options={NOTE_LINES}
+                                    options={translated(NOTE_LINES)}
                                     value={settings.noteLines}
                                     onChange={(noteLines) =>
                                         update.mutate({ ...settings, noteLines })
@@ -158,13 +189,16 @@ export function SettingsDialog({
                             )}
                         </Setting>
                     </Section>
-                    <Section title="Shortcuts">
+                    <Section title={t('common.shortcuts')}>
                         <GlobalShortcutSetting />
                     </Section>
                     <div className="dialog-foot">
-                        <span>Changes apply at once</span>
+                        <span>{t('settings.applyAtOnce')}</span>
                         <span>
-                            <kbd className="kbd">Esc</kbd> close
+                            <RichText
+                                text={t('common.escCloses')}
+                                parts={{ esc: <kbd className="kbd">Esc</kbd> }}
+                            />
                         </span>
                     </div>
                 </Dialog.Popup>

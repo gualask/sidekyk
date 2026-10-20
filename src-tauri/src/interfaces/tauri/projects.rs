@@ -5,6 +5,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::state::{self, ProjectsState};
+use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
@@ -24,7 +25,7 @@ pub(crate) async fn add_project(app: tauri::AppHandle) -> Result<Option<ProjectL
         let Some(folder) = app
             .dialog()
             .file()
-            .set_title("Add a repository")
+            .set_title(texts::current(app).add_repository)
             .blocking_pick_folder()
         else {
             return Ok(None);
@@ -91,7 +92,7 @@ pub(crate) async fn relocate_project(
         let Some(folder) = app
             .dialog()
             .file()
-            .set_title(format!("Locate {}", project.name))
+            .set_title(texts::current(app).locate.replace("{name}", &project.name))
             .blocking_pick_folder()
         else {
             return Ok(None);

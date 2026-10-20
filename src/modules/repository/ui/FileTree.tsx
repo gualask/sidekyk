@@ -1,5 +1,6 @@
 import { IconChevronRight } from '@tabler/icons-react';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
+import { type Translator, useTranslation } from '@/shared/i18n';
 import type { TreeRow } from '../model/file-tree';
 import {
     TREE_INDENT,
@@ -11,11 +12,13 @@ import {
 import { useVirtualRows } from './use-virtual-rows';
 import { VirtualItems } from './VirtualItems';
 
-function tooltip(row: Exclude<TreeRow, { kind: 'more' }>, mark: ChangeMark | undefined): string {
+function tooltip(
+    row: Exclude<TreeRow, { kind: 'more' }>,
+    mark: ChangeMark | undefined,
+    t: Translator['t'],
+): string {
     if (!mark) return row.path;
-    return row.kind === 'folder'
-        ? `${row.path} · has changes`
-        : `${row.path} · ${CHANGE_MARK_WORD[mark]}`;
+    return `${row.path} · ${t(row.kind === 'folder' ? 'tree.hasChanges' : CHANGE_MARK_WORD[mark])}`;
 }
 
 /** A name of the tree; a folder sharing its row with the folders inside it shows their `/`. */
@@ -53,6 +56,7 @@ export function FileTree({
     label: string;
     onClick: (row: Exclude<TreeRow, { kind: 'more' }>) => void;
 }) {
+    const { t, formatTag } = useTranslation();
     const selectedIndex = rows.findIndex((row) => row.kind !== 'more' && row.path === selected);
     const { scrollRef, virtualizer } = useVirtualRows<HTMLDivElement>({
         count: rows.length,
@@ -79,7 +83,7 @@ export function FileTree({
                                 className="flex h-[22px] items-center truncate font-sans text-xs text-ui-text-muted italic"
                                 style={{ paddingLeft: indent + TREE_TWISTY }}
                             >
-                                {row.count.toLocaleString()} more, not listed
+                                {t('tree.more', { count: row.count.toLocaleString(formatTag) })}
                             </div>
                         );
                     }
@@ -98,7 +102,7 @@ export function FileTree({
                             aria-level={row.depth + 1}
                             aria-expanded={row.kind === 'folder' ? row.open : undefined}
                             aria-selected={isSelected}
-                            title={tooltip(row, mark)}
+                            title={tooltip(row, mark, t)}
                             onClick={() => onClick(row)}
                             className={`flex h-[22px] w-full items-center text-left ${
                                 isSelected ? 'bg-ui-accent-soft' : 'hover:bg-ui-surface-hover'

@@ -1,4 +1,5 @@
 import { IconGitBranch } from '@tabler/icons-react';
+import { useTranslation } from '@/shared/i18n';
 import { branchLabel } from '../model/branch';
 import type { BranchStatus } from '../model/repository.types';
 
@@ -10,20 +11,22 @@ export function BranchName({
     branch: BranchStatus;
     className?: string;
 }) {
-    const label = branchLabel(branch);
+    const i18n = useTranslation();
+    const { t } = i18n;
+    const label = branchLabel(branch, i18n);
     return (
         <span
             className={`inline-flex min-w-0 items-center gap-1 font-mono ${className}`}
-            title={
+            title={`${label} (${
                 branch.upstream
-                    ? `${label} (tracking ${branch.upstream})`
-                    : `${label} (no upstream)`
-            }
+                    ? t('branch.tracking', { upstream: branch.upstream })
+                    : t('branch.noUpstream')
+            })`}
         >
             <IconGitBranch size={13} className="shrink-0" />
             <span className="truncate">{label}</span>
-            {branch.ahead > 0 ? <span title="Commits not pushed">↑{branch.ahead}</span> : null}
-            {branch.behind > 0 ? <span title="Commits not pulled">↓{branch.behind}</span> : null}
+            {branch.ahead > 0 ? <span title={t('branch.notPushed')}>↑{branch.ahead}</span> : null}
+            {branch.behind > 0 ? <span title={t('branch.notPulled')}>↓{branch.behind}</span> : null}
         </span>
     );
 }

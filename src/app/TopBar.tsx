@@ -1,6 +1,7 @@
 import { IconHelp, IconSearch, IconSettings } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { ProjectFacts } from '@/modules/repository';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import type { ProjectInfo } from '@/shared/projects/project-info';
@@ -67,6 +68,7 @@ export function TopBar({
     minimized: readonly PanelDefinition[];
     onRestore: (panel: PanelDefinition) => void;
 }) {
+    const { t } = useTranslation();
     const overlaid = useTitleBarOverlaid();
     const separator = <span className="font-normal text-ui-text-muted">/</span>;
 
@@ -79,10 +81,12 @@ export function TopBar({
         >
             {project ? (
                 <nav
-                    aria-label="Where you are"
+                    aria-label={t('topBar.whereYouAre')}
                     className="flex min-w-0 items-center gap-1.5 text-sm font-semibold"
                 >
-                    <Crumb onClick={level === 0 ? undefined : () => onZoom(0)}>All projects</Crumb>
+                    <Crumb onClick={level === 0 ? undefined : () => onZoom(0)}>
+                        {t('common.allProjects')}
+                    </Crumb>
                     {level >= 1 ? (
                         <>
                             {separator}
@@ -95,7 +99,7 @@ export function TopBar({
                     {level === 2 ? (
                         <>
                             {separator}
-                            <Crumb>{panel.title}</Crumb>
+                            <Crumb>{t(panel.title)}</Crumb>
                         </>
                     ) : null}
                 </nav>
@@ -106,7 +110,10 @@ export function TopBar({
             ) : null}
             <div className="ml-auto flex items-center gap-1.5">
                 {minimized.length > 0 ? (
-                    <nav className="mr-1 flex items-center gap-1.5" aria-label="Minimized panels">
+                    <nav
+                        className="mr-1 flex items-center gap-1.5"
+                        aria-label={t('topBar.minimized')}
+                    >
                         {minimized.map((panel) => (
                             <button
                                 key={panel.id}
@@ -115,7 +122,10 @@ export function TopBar({
                                 // into the other
                                 style={{ viewTransitionName: ZOOM_NAMES.panel(panel.id) }}
                                 className="flex h-[26px] items-center gap-1.5 rounded-[7px] border border-ui-border bg-ui-surface-subtle px-2.5 text-xs font-semibold text-ui-text-secondary hover:border-ui-border-hover hover:text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
-                                title={`Restore ${panel.title} (${panelShortcut(panel)} opens it full screen)`}
+                                title={t('topBar.restore', {
+                                    panel: t(panel.title),
+                                    key: panelShortcut(panel),
+                                })}
                                 onClick={() => onRestore(panel)}
                             >
                                 <panel.icon
@@ -123,7 +133,7 @@ export function TopBar({
                                     stroke={1.75}
                                     className="text-ui-text-muted"
                                 />
-                                {panel.title}
+                                {t(panel.title)}
                             </button>
                         ))}
                     </nav>
@@ -131,8 +141,8 @@ export function TopBar({
                 <button
                     type="button"
                     className="flex h-[26px] items-center gap-1.5 rounded-[7px] border border-ui-border pr-1.5 pl-2 text-xs text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
-                    title="Go to a project, a panel or a file"
-                    aria-label="Go to"
+                    title={t('topBar.goToTitle')}
+                    aria-label={t('common.goTo')}
                     onClick={onOpenPalette}
                 >
                     <IconSearch size={13} />
@@ -146,8 +156,8 @@ export function TopBar({
                 <button
                     type="button"
                     className="btn-icon h-7 w-7"
-                    title={`Settings (${shortcutLabel(',')})`}
-                    aria-label="Settings"
+                    title={`${t('topBar.settings')} (${shortcutLabel(',')})`}
+                    aria-label={t('topBar.settings')}
                     onClick={onOpenSettings}
                 >
                     <IconSettings size={16} />
@@ -155,8 +165,8 @@ export function TopBar({
                 <button
                     type="button"
                     className="btn-icon h-7 w-7"
-                    title="Shortcuts (?)"
-                    aria-label="Shortcuts"
+                    title={`${t('common.shortcuts')} (?)`}
+                    aria-label={t('common.shortcuts')}
                     aria-pressed={helpOpen}
                     onClick={onToggleHelp}
                 >

@@ -1,5 +1,6 @@
 import { type CSSProperties, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
+import { useTranslation } from '@/shared/i18n';
 import type { DiffRow } from '../model/diff-rows';
 import { changeMarks, type DiffLayout, trackMarks } from './diff-layout';
 import { dragThumb } from './scrollbars';
@@ -36,6 +37,7 @@ export function ChangeMap({
     width: DiffScrollbar;
     onGoTo: (hunk: number) => void;
 }) {
+    const { t } = useTranslation();
     const track = useRef<HTMLDivElement>(null);
     // the track's height: marks share it, each with room for a click
     const [height, setHeight] = useState(0);
@@ -79,7 +81,7 @@ export function ChangeMap({
                         key={mark.hunk}
                         type="button"
                         tabIndex={-1}
-                        aria-label={`Go to change ${mark.hunk + 1}`}
+                        aria-label={t('view.goToChange', { number: mark.hunk + 1 })}
                         className="absolute inset-x-0"
                         style={{ top: mark.hitTop, height: mark.hitHeight }}
                         onClick={() => onGoTo(mark.hunk)}

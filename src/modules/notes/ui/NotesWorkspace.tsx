@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
+import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
@@ -53,10 +54,13 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
 
     const width = useSidebarWidth('notes', LISTS_WIDTH);
     const listsBox = useRef<HTMLDivElement>(null);
+    const i18n = useTranslation();
 
     if (error) {
         return (
-            <div className="px-3 py-2 font-sans text-sm text-ui-danger">{errorMessage(error)}</div>
+            <div className="px-3 py-2 font-sans text-sm text-ui-danger">
+                {errorMessage(error, i18n)}
+            </div>
         );
     }
     if (!notes) return null;
