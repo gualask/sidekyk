@@ -88,7 +88,7 @@
     "shortcuts.findInFile": "Find in the file open",
     "common.findInFiles": "Find in files",
     "shortcuts.findInFilesAlso": "again, from the find bar",
-    "shortcuts.matches": "Next / previous match, find bar",
+    "shortcuts.matches": "Next / previous match",
     "shortcuts.tree": "Files tree, full screen",
     "shortcuts.newNote": "New note",
     "shortcuts.wrapNote": "Wrap long lines, in a note",
@@ -327,5 +327,10 @@
     "files.pick": "Pick a file.",
     "files.readOnly": "Read only: edits happen in your editor.",
     "palette.move": "{up} {down} move",
-    "palette.open": "{enter} open"
+    "palette.open": "{enter} open",
+    "shortcuts.section.navigate": "Move around",
+    "shortcuts.section.find": "Find",
+    "shortcuts.section.changes": "Changes and files",
+    "shortcuts.section.app": "App",
+    "shortcuts.matchesAlso": "in the find bar"
 }

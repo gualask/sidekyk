@@ -88,7 +88,7 @@
     "shortcuts.findInFile": "Trova nel file aperto",
     "common.findInFiles": "Trova nei file",
     "shortcuts.findInFilesAlso": "di nuovo, dalla barra di ricerca",
-    "shortcuts.matches": "Risultato successivo / precedente, barra di ricerca",
+    "shortcuts.matches": "Risultato successivo / precedente",
     "shortcuts.tree": "Albero dei file, a schermo intero",
     "shortcuts.newNote": "Nuova nota",
     "shortcuts.wrapNote": "A capo nelle righe lunghe, in una nota",
@@ -327,5 +327,10 @@
     "files.pick": "Scegli un file.",
     "files.readOnly": "Solo lettura: le modifiche si fanno nel tuo editor.",
     "palette.move": "{up} {down} sposta",
-    "palette.open": "{enter} apri"
+    "palette.open": "{enter} apri",
+    "shortcuts.section.navigate": "Navigazione",
+    "shortcuts.section.find": "Ricerca",
+    "shortcuts.section.changes": "Modifiche e file",
+    "shortcuts.section.app": "App",
+    "shortcuts.matchesAlso": "nella barra di ricerca"
 }

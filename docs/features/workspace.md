@@ -40,7 +40,8 @@ problems. Why semantic zoom: `../product.md`.
   projects; `←`/`→` tiles at level 1 (the selected tile takes `j`/`k`); `⌘`+scroll and pinch
   (macOS) zoom under the pointer.
 - `⌘K` / `⌘F` the palette (`search.md`), `⌘,` settings, `⌘N` a new note (`notes.md`).
-- `?` (and the top bar's `?`) shows the shortcuts in a card, bottom right, as the mock.
+- `?` (and the top bar's `?`) shows the shortcuts in a card, bottom right: sections with a title
+  and a thin line (move around, find, changes and files, notes, app), two columns, 13.5 px.
 
 ## How it is built
 
