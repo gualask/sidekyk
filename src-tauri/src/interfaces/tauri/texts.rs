@@ -5,8 +5,9 @@
 
 use sidekyk_core::modules::notes::ExportWords;
 use sidekyk_core::modules::settings::Language;
+use tauri::Manager;
 
-use crate::infrastructure::settings_store;
+use super::settings::AppliedSettings;
 
 pub(crate) struct Texts {
     pub(crate) show: &'static str,
@@ -70,7 +71,7 @@ pub(crate) fn texts(language: Option<Language>) -> &'static Texts {
     }
 }
 
-/// In the language of the stored settings.
+/// In the language of the settings in effect.
 pub(crate) fn current(app: &tauri::AppHandle) -> &'static Texts {
-    texts(settings_store::load_settings(app).language)
+    texts(app.state::<AppliedSettings>().current().language)
 }

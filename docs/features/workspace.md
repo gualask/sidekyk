@@ -31,6 +31,12 @@ problems. Why semantic zoom: `../product.md`.
 - Settings: modal (`⌘,`, gear), applies at once: theme, language (`languages.md`), diff view and
   scrollbar width, long lines in code (scroll or wrap), copy template, long lines in notes,
   global shortcut.
+- The settings in effect live in one place in memory (`AppliedSettings`), read from the store
+  at startup and written back on each change; `get_settings` and the backend's texts read them.
+- `set_settings` applies only what differs from the settings in effect (2026-10-21): a sidebar
+  dragged or a view preference switched only stores the file; the theme (every window on
+  Windows, GTK on Linux) and language are set again only when they change, the shortcut only
+  when not registered as asked, and the same settings again do nothing.
 
 ## Keys
 

@@ -12,7 +12,7 @@ use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
-use crate::interfaces::tauri::settings::{apply_language, window_theme};
+use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
 use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
 use crate::interfaces::tauri::tray;
@@ -95,6 +95,8 @@ pub(crate) fn run() {
                 });
             app.manage(ProjectsState::new(helper));
             let settings = settings_store::load_settings(app.handle());
+            // before the windows, whose pages may change the settings as they load; applied below
+            app.manage(AppliedSettings::new(settings.clone()));
             // before the windows: their pages reach the shortcut's state as they load
             shortcut::start(app.handle(), &settings.global_shortcut);
             create_windows(app.handle(), settings.theme)?;

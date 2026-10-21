@@ -64,8 +64,6 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 No measuring code in the app: a question below is measured with a temporary setup when it
 becomes a problem (decided 2026-10-21).
 
-- [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
-      written, shortcut status read again): a lighter path for layout-only settings?
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
 - [ ] Tray count while hidden: watcher mark only, or a throttled `git status`
 - [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
