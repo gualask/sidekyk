@@ -1,5 +1,6 @@
-//! Fuzzy ranking, by `nucleo-matcher`: fzf's scoring, which favours letters that follow each other
-//! and the starts of words (and, for paths, of file and folder names).
+//! Ranking, by `nucleo-matcher`: fzf's scoring, which favours letters that follow each other and
+//! the starts of words (and, for paths, of file and folder names). Names and paths match fuzzily;
+//! prose by the words typed, as letters scattered over a sentence would match almost any.
 
 use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
 use nucleo_matcher::{Config, Matcher, Utf32Str};
@@ -13,23 +14,33 @@ use super::threads;
 /// at each key typed (200,000 paths: ~80 ms on one thread).
 const PARALLEL_FROM: usize = 20_000;
 
-/// What the texts ranked are: names, or paths with `/` between their parts.
+/// What the texts ranked are: names, paths with `/` between their parts, or prose (notes).
 #[derive(Clone, Copy)]
 pub enum Texts {
     Names,
     Paths,
+    Prose,
 }
 
-/// A text that matched: its position among those ranked, and where the query's letters are in it.
+/// A text that matched: its position among those ranked, and how well it matched (comparable
+/// across the texts a query ranks).
+#[derive(Debug, PartialEq, Eq)]
+pub struct Scored {
+    pub index: usize,
+    pub score: u32,
+}
+
+/// A text that matched, and where the query's letters are in it.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Ranked {
     pub index: usize,
+    pub score: u32,
     pub highlights: Vec<Highlight>,
 }
 
-/// A query typed in the palette. Each of its words must match, in any order; a word's letters
-/// must appear in order, not necessarily together. Case is ignored, and a plain letter matches
-/// its accented forms.
+/// A query typed in the palette. Each of its words must match, in any order: in names and paths a
+/// word's letters in order, not necessarily together; in prose the word itself. Case is ignored,
+/// and a plain letter matches its accented forms.
 pub struct Ranker {
     pattern: Pattern,
     config: Config,
@@ -39,17 +50,18 @@ pub struct Ranker {
 
 impl Ranker {
     pub fn new(query: &str, texts: Texts) -> Self {
+        // prose scored as paths, whose word starts weigh a little less than in names: a word in a
+        // sentence ranks under the same word naming a file, which ranks under a list or panel
         let config = match texts {
             Texts::Names => Config::DEFAULT,
-            Texts::Paths => Config::DEFAULT.match_paths(),
+            Texts::Paths | Texts::Prose => Config::DEFAULT.match_paths(),
+        };
+        let kind = match texts {
+            Texts::Names | Texts::Paths => AtomKind::Fuzzy,
+            Texts::Prose => AtomKind::Substring,
         };
         Self {
-            pattern: Pattern::new(
-                query,
-                CaseMatching::Ignore,
-                Normalization::Smart,
-                AtomKind::Fuzzy,
-            ),
+            pattern: Pattern::new(query, CaseMatching::Ignore, Normalization::Smart, kind),
             matcher: Matcher::new(config.clone()),
             config,
             chars: Vec::new(),
@@ -62,8 +74,8 @@ impl Ranker {
     }
 
     /// The best `limit` texts that match, best first (ties keep the texts' order), and how many
-    /// matched in all. Only the texts kept get their highlights.
-    pub fn rank(&mut self, texts: &[&str], limit: usize) -> (Vec<Ranked>, usize) {
+    /// matched in all.
+    pub fn best(&mut self, texts: &[&str], limit: usize) -> (Vec<Scored>, usize) {
         let mut scored = self.scores(texts);
         let total = scored.len();
         // the best first, equal scores in the texts' order; only the ones kept are sorted
@@ -73,22 +85,43 @@ impl Ranker {
             scored.truncate(limit);
         }
         scored.sort_unstable_by_key(order);
-
-        let mut indices = Vec::new();
-        let ranked = scored
+        let best = scored
             .into_iter()
-            .map(|(_, index)| {
-                indices.clear();
-                let haystack = Utf32Str::new(texts[index], &mut self.chars);
-                self.pattern
-                    .indices(haystack, &mut self.matcher, &mut indices);
-                Ranked {
-                    index,
-                    highlights: highlights(texts[index], &mut indices),
-                }
+            .map(|(score, index)| Scored { index, score })
+            .collect();
+        (best, total)
+    }
+
+    /// As `best`, each with its highlights: only the texts kept get them.
+    pub fn rank(&mut self, texts: &[&str], limit: usize) -> (Vec<Ranked>, usize) {
+        let (best, total) = self.best(texts, limit);
+        let ranked = best
+            .into_iter()
+            .map(|Scored { index, score }| Ranked {
+                index,
+                score,
+                highlights: self.highlights(texts[index]).unwrap_or_default(),
             })
             .collect();
         (ranked, total)
+    }
+
+    /// The characters of `text` the query's letters are, in order, if it matches.
+    pub fn matched(&mut self, text: &str) -> Option<Vec<u32>> {
+        let mut indices = Vec::new();
+        let haystack = Utf32Str::new(text, &mut self.chars);
+        self.pattern
+            .indices(haystack, &mut self.matcher, &mut indices)?;
+        // each word of the query adds its own, unsorted
+        indices.sort_unstable();
+        indices.dedup();
+        Some(indices)
+    }
+
+    /// Where the query's letters are in `text`, if it matches.
+    pub fn highlights(&mut self, text: &str) -> Option<Vec<Highlight>> {
+        let indices = self.matched(text)?;
+        Some(highlights(text, &indices))
     }
 
     /// The score of every text that matches, with its position, in the texts' order.
@@ -137,19 +170,15 @@ fn score(
         .collect()
 }
 
-/// Turns the code points that matched into runs of UTF-16 offsets, as JavaScript counts them.
-fn highlights(text: &str, indices: &mut [u32]) -> Vec<Highlight> {
-    // each word of the query adds its own, unsorted
-    indices.sort_unstable();
+/// Turns the code points that matched, in order, into runs of UTF-16 offsets, as JavaScript
+/// counts them.
+fn highlights(text: &str, indices: &[u32]) -> Vec<Highlight> {
     let mut wanted = indices.iter().copied().peekable();
     let mut runs: Vec<Highlight> = Vec::new();
     let mut offset = 0u32;
     for (index, char) in (0u32..).zip(text.chars()) {
         let width = char.len_utf16() as u32;
-        if wanted.peek() == Some(&index) {
-            while wanted.peek() == Some(&index) {
-                wanted.next();
-            }
+        if wanted.next_if_eq(&index).is_some() {
             match runs.last_mut() {
                 Some(run) if run[1] == offset => run[1] += width,
                 _ => runs.push([offset, offset + width]),
@@ -261,6 +290,29 @@ mod tests {
         let mut ranker = Ranker::new("ab", Texts::Names);
         let (ranked, _) = ranker.rank(&["é𝒳a-b"], usize::MAX);
         assert_eq!(ranked[0].highlights, vec![[3, 4], [5, 6]]);
+    }
+
+    #[test]
+    fn prose_matches_the_words_not_letters_scattered_over_it() {
+        let sentence = "Golden rule: measure before and after, nothing runs while idle";
+        assert!(rank("seed", Texts::Names, &[sentence]).len() == 1);
+        assert!(rank("seed", Texts::Prose, &[sentence]).is_empty());
+        assert_eq!(
+            rank("idle rule", Texts::Prose, &[sentence, "a rule"]),
+            vec![sentence]
+        );
+    }
+
+    #[test]
+    fn a_name_ranks_over_a_file_over_a_sentence_for_one_word() {
+        let score = |query: &str, texts: Texts, text: &str| {
+            let (ranked, _) = Ranker::new(query, texts).rank(&[text], 1);
+            ranked[0].score
+        };
+        let list = score("seed", Texts::Names, "Seed data");
+        let file = score("seed", Texts::Paths, "db/seed.sql");
+        let note = score("seed", Texts::Prose, "Add seed data for the e2e tests");
+        assert!(list > file && file > note, "{list} {file} {note}");
     }
 
     #[test]

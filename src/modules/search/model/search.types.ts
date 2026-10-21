@@ -1,4 +1,5 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
+import type { ProjectLocation } from '@/shared/projects/project-info';
 
 /**
  * Wire contracts with the Rust backend (`src-tauri/crates/core/src/modules/search/contracts.rs`).
@@ -20,6 +21,10 @@ export type Highlight = [start: number, end: number];
 interface ProjectMatch {
     id: string;
     name: string;
+    /** Where it is, so two of one name can be told apart. */
+    location: ProjectLocation;
+    /** How well it matched, comparable with the query's other matches: the palette mixes them. */
+    score: number;
     /** In the name. */
     highlights: Highlight[];
 }
@@ -27,6 +32,8 @@ interface ProjectMatch {
 interface PanelMatch {
     /** The panel's position in the request. */
     index: number;
+    /** As `ProjectMatch.score`. */
+    score: number;
     /** In the title. */
     highlights: Highlight[];
 }
@@ -36,6 +43,8 @@ interface FileMatch {
     path: string;
     /** Null when it did not change. */
     mark: ChangeMark | null;
+    /** As `ProjectMatch.score`. */
+    score: number;
     /** In the path. */
     highlights: Highlight[];
 }
@@ -44,6 +53,8 @@ interface FileMatch {
 interface ListMatch {
     id: string;
     name: string;
+    /** As `ProjectMatch.score`. */
+    score: number;
     /** In the name. */
     highlights: Highlight[];
 }
@@ -54,23 +65,25 @@ interface Snippet {
     highlights: Highlight[];
 }
 
-/** A note of the project searched: its first line matched, or it holds the text typed. */
+/** A note of the project searched, holding every word typed. */
 interface NoteMatch {
     id: string;
     list: string;
     listName: string;
     /** Its first line that is not blank. */
     title: string;
-    /** In the title; none when the note was found by its text. */
+    /** As `ProjectMatch.score`. */
+    score: number;
+    /** In the title; none when the words are not all in it. */
     highlights: Highlight[];
-    /** Where the text typed is in the note, when found that way. */
+    /** Where the first word is in the note, when they are not all in the title. */
     snippet: Snippet | null;
-    done: boolean;
 }
 
 /**
- * The matches, best first in each group. With nothing typed: every project and panel, no files,
- * lists or notes.
+ * The matches, best first in each group. Projects only when no project is searched, its own
+ * files, lists and notes then. With nothing typed: every project or panel, no files, lists or
+ * notes.
  */
 export interface SearchResults {
     projects: ProjectMatch[];

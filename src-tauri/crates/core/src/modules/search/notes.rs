@@ -1,8 +1,7 @@
-//! The palette's notes and lists, in the project searched: lists by name, notes by their first
-//! line (fuzzy) or, failing that, by the text typed anywhere in them (a plain substring, case
-//! ignored: fuzzy letters over a whole note would match almost any).
+//! The palette's notes and lists, in the project searched: lists by name (fuzzy), notes by the
+//! words typed, anywhere in them (fuzzy letters over a whole note would match almost any).
 
-use super::contracts::{Highlight, ListMatch, NoteMatch, Snippet};
+use super::contracts::{ListMatch, NoteMatch, Snippet};
 use super::rank::{Ranker, Texts};
 use crate::modules::notes::{note_title as title, Note, NoteList};
 
@@ -12,26 +11,19 @@ pub(super) const NOTE_LIMIT: usize = 50;
 const BEFORE: usize = 24;
 const AFTER: usize = 48;
 /// The least text looked for inside notes: one letter is in every note.
-const MIN_SUBSTRING: usize = 2;
+const MIN_QUERY: usize = 2;
 
 /// The UTF-16 length of some characters, as the frontend counts offsets.
 fn utf16(chars: &[char]) -> u32 {
     chars.iter().map(|c| c.len_utf16() as u32).sum()
 }
 
-fn folded(c: char) -> char {
-    c.to_lowercase().next().unwrap_or(c)
-}
-
-/// Where `query` first is in `text`, case ignored: the part around it on one line, `…` where cut,
-/// and where the query is in that part.
-fn snippet(text: &str, query: &[char]) -> Option<Snippet> {
+/// The part of `text` around its characters `at..at + len` on one line, `…` where cut, and where
+/// they are in that part.
+fn snippet(text: &str, at: usize, len: usize) -> Snippet {
     let chars: Vec<char> = text.chars().collect();
-    let at = chars
-        .windows(query.len())
-        .position(|window| window.iter().zip(query).all(|(&a, &b)| folded(a) == b))?;
     let start = at.saturating_sub(BEFORE);
-    let end = (at + query.len() + AFTER).min(chars.len());
+    let end = (at + len + AFTER).min(chars.len());
     // whitespace, line breaks included, as single spaces; the match's offsets follow
     let mut shown = Vec::new();
     let mut found = [0, 0];
@@ -46,20 +38,30 @@ fn snippet(text: &str, query: &[char]) -> Option<Snippet> {
         if !(space && shown.last().is_some_and(|l: &char| l.is_whitespace())) {
             shown.push(if space { ' ' } else { c });
         }
-        if i + 1 == at + query.len() {
+        if i + 1 == at + len {
             found[1] = utf16(&shown);
         }
     }
     if end < chars.len() {
         shown.push('…');
     }
-    Some(Snippet {
+    Snippet {
         text: shown.into_iter().collect(),
         highlights: vec![found],
-    })
+    }
 }
 
-fn note_match(note: &Note, lists: &[NoteList], highlights: Vec<Highlight>) -> NoteMatch {
+/// The first run of characters the query matched in a note: where it starts, and how long it is.
+fn first_run(matched: &[u32]) -> Option<(usize, usize)> {
+    let at = *matched.first()?;
+    let len = (at..)
+        .zip(matched)
+        .take_while(|(want, &got)| *want == got)
+        .count();
+    Some((at as usize, len))
+}
+
+fn note_match(note: &Note, lists: &[NoteList], score: u32) -> NoteMatch {
     NoteMatch {
         id: note.id.clone(),
         list: note.list.clone(),
@@ -69,14 +71,15 @@ fn note_match(note: &Note, lists: &[NoteList], highlights: Vec<Highlight>) -> No
             .map(|l| l.name.clone())
             .unwrap_or_default(),
         title: title(&note.text),
-        highlights,
+        score,
+        highlights: Vec::new(),
         snippet: None,
-        done: note.done.is_some(),
     }
 }
 
-/// The lists whose names match, and the notes found, best first: first lines that match, then
-/// notes holding the text typed, open before done, in the user's order.
+/// The lists whose names match, and the notes holding every word typed, best first, equal ones
+/// open before done, in the user's order. A note shows its first line, with the words in it, or
+/// else the part around the first word.
 pub fn search_notes(
     query: &str,
     lists: &[NoteList],
@@ -90,10 +93,15 @@ pub fn search_notes(
         .map(|r| ListMatch {
             id: lists[r.index].id.clone(),
             name: lists[r.index].name.clone(),
+            score: r.score,
             highlights: r.highlights,
         })
         .collect();
 
+    let query = query.trim();
+    if query.chars().count() < MIN_QUERY {
+        return (list_matches, Vec::new());
+    }
     // the user's order: open notes before done ones, list by list, open ones by place within
     // their list (a place means nothing across lists), done ones the last done first
     let mut ordered: Vec<(Option<usize>, &Note)> = notes
@@ -111,34 +119,28 @@ pub fn search_notes(
             })
     });
     let ordered: Vec<&Note> = ordered.into_iter().map(|(_, note)| note).collect();
-    let titles: Vec<String> = ordered.iter().map(|n| title(&n.text)).collect();
-    let title_refs: Vec<&str> = titles.iter().map(String::as_str).collect();
-    let (ranked, _) = names.rank(&title_refs, NOTE_LIMIT);
-    let mut found: Vec<bool> = vec![false; ordered.len()];
-    let mut matches: Vec<NoteMatch> = ranked
+    let mut words = Ranker::new(query, Texts::Prose);
+    let texts: Vec<&str> = ordered.iter().map(|n| n.text.as_str()).collect();
+    let (best, _) = words.best(&texts, NOTE_LIMIT);
+    let matches = best
         .into_iter()
-        .map(|r| {
-            found[r.index] = true;
-            note_match(ordered[r.index], lists, r.highlights)
+        .map(|found| {
+            let note = ordered[found.index];
+            let mut found = note_match(note, lists, found.score);
+            if let Some(highlights) = words.highlights(&found.title) {
+                found.highlights = highlights;
+            } else if let Some((at, len)) = words.matched(&note.text).as_deref().and_then(first_run)
+            {
+                // every word the part shows, or the first alone
+                let mut part = snippet(&note.text, at, len);
+                if let Some(highlights) = words.highlights(&part.text) {
+                    part.highlights = highlights;
+                }
+                found.snippet = Some(part);
+            }
+            found
         })
         .collect();
-
-    let query: Vec<char> = query.trim().chars().map(folded).collect();
-    if query.len() >= MIN_SUBSTRING {
-        for (index, note) in ordered.iter().enumerate() {
-            if matches.len() >= NOTE_LIMIT {
-                break;
-            }
-            if found[index] {
-                continue;
-            }
-            if let Some(snippet) = snippet(&note.text, &query) {
-                let mut found = note_match(note, lists, Vec::new());
-                found.snippet = Some(snippet);
-                matches.push(found);
-            }
-        }
-    }
     (list_matches, matches)
 }
 
@@ -204,27 +206,47 @@ mod tests {
     }
 
     #[test]
-    fn notes_match_by_first_line_then_by_their_text() {
+    fn notes_match_by_the_words_in_their_first_line_or_their_text() {
         let (_, found) = notes().search("watcher");
         let ids: Vec<&str> = found.iter().map(|n| n.id.as_str()).collect();
-        // both first lines match; the open one first
+        // both first lines hold it; the open one first
         assert_eq!(ids, ["a", "d"]);
         assert_eq!(found[0].title, "Watcher plan");
+        assert_eq!(found[0].highlights, vec![[0, 7]]);
         assert_eq!(found[0].list_name, "Architecture");
-        assert!(found[1].done);
 
-        let (_, found) = notes().search("per dir");
+        let (_, found) = notes().search("dir per");
         assert_eq!(found.len(), 1);
         let snippet = found[0].snippet.as_ref().unwrap();
         // cut before, line breaks as spaces, nothing cut after
         assert!(snippet.text.starts_with('…'), "{}", snippet.text);
         assert!(snippet.text.ends_with(" 1. coalesce events per directory"));
-        let [start, end] = snippet.highlights[0];
         let shown: Vec<u16> = snippet.text.encode_utf16().collect();
-        assert_eq!(
-            String::from_utf16(&shown[start as usize..end as usize]).unwrap(),
-            "per dir"
-        );
+        let words: Vec<String> = snippet
+            .highlights
+            .iter()
+            .map(|&[start, end]| String::from_utf16(&shown[start as usize..end as usize]).unwrap())
+            .collect();
+        assert_eq!(words, ["per", "dir"]);
+    }
+
+    #[test]
+    fn a_word_without_its_accent_finds_the_part_of_the_note_where_it_is() {
+        let mut found = notes();
+        found
+            .notes
+            .push(note("c", 3.0, "Menu\nthe café opens late", None));
+        let (_, found) = found.search("cafe");
+        let snippet = found[0].snippet.as_ref().unwrap();
+        assert_eq!(snippet.text, "Menu the café opens late");
+        assert_eq!(snippet.highlights, vec![[9, 13]]);
+    }
+
+    #[test]
+    fn letters_scattered_over_a_note_do_not_match_it() {
+        // s…e…e…d over "Wide scrollbar setting": no word of it
+        let (_, found) = notes().search("seed");
+        assert!(found.is_empty());
     }
 
     #[test]
@@ -239,7 +261,7 @@ mod tests {
         // first in its list, but its list comes second
         found.notes.push(Note {
             list: "l2".into(),
-            ..note("r", -9.0, "Watcher release note", None)
+            ..note("r", -9.0, "A watcher release note", None)
         });
         let ids: Vec<String> = found
             .search("watcher")

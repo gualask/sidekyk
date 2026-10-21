@@ -41,9 +41,9 @@ pub struct ProjectFiles {
     pub changed: Arc<[ChangedFile]>,
 }
 
-/// Ranks the projects, the panels and the files, lists and notes of the project the request names
-/// against the query. With nothing typed, every project and panel in their order and nothing of
-/// the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
+/// Ranks the panels and the files, lists and notes of the project the request names against the
+/// query, or the projects when it names none. With nothing typed, every panel or project in their
+/// order and nothing of the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
 /// something is typed, as listing a project's files may run git and its notes be read from disk;
 /// each ranks them where they are kept (`search_files`, `search_notes`).
 pub fn search(
@@ -54,16 +54,22 @@ pub fn search(
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
 
-    let project_names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
-    let (ranked, _) = names.rank(&project_names, usize::MAX);
-    let projects = ranked
-        .into_iter()
-        .map(|r| ProjectMatch {
-            id: projects[r.index].id.clone(),
-            name: projects[r.index].name.clone(),
-            highlights: r.highlights,
-        })
-        .collect();
+    let projects = if request.project_id.is_some() {
+        Vec::new()
+    } else {
+        let project_names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
+        let (ranked, _) = names.rank(&project_names, usize::MAX);
+        ranked
+            .into_iter()
+            .map(|r| ProjectMatch {
+                id: projects[r.index].id.clone(),
+                name: projects[r.index].name.clone(),
+                location: projects[r.index].location.clone(),
+                score: r.score,
+                highlights: r.highlights,
+            })
+            .collect()
+    };
 
     let panel_titles: Vec<&str> = request.panels.iter().map(String::as_str).collect();
     let (ranked, _) = names.rank(&panel_titles, usize::MAX);
@@ -71,6 +77,7 @@ pub fn search(
         .into_iter()
         .map(|r| PanelMatch {
             index: r.index as u32,
+            score: r.score,
             highlights: r.highlights,
         })
         .collect();
@@ -119,6 +126,7 @@ pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
         .map(|r| FileMatch {
             path: paths[r.index].to_string(),
             mark: marks.get(paths[r.index]).copied(),
+            score: r.score,
             highlights: r.highlights,
         })
         .collect();
@@ -190,22 +198,43 @@ mod tests {
     }
 
     #[test]
-    fn nothing_typed_lists_projects_and_panels_but_no_files() {
+    fn nothing_typed_lists_the_panels_but_no_files() {
         let results = search(
             &request(" "),
             &[project("shop"), project("docs")],
             |_| panic!("nothing typed lists no file"),
             |_| panic!("nothing typed reads no note"),
         );
-        let names: Vec<_> = results.projects.iter().map(|p| p.name.as_str()).collect();
-        assert_eq!(names, vec!["shop", "docs"]);
+        assert!(results.projects.is_empty());
         assert_eq!(results.panels.len(), 2);
         assert!(results.files.is_empty());
         assert_eq!(results.more_files, 0);
     }
 
     #[test]
-    fn a_query_ranks_every_group() {
+    fn without_a_project_the_projects_are_ranked() {
+        let mut all = request(" ");
+        all.project_id = None;
+        let mut found = |query: &str| {
+            all.query = query.into();
+            let results = search(
+                &all,
+                &[project("shop"), project("cache-hub")],
+                |_| None,
+                |_| None,
+            );
+            results
+                .projects
+                .into_iter()
+                .map(|p| p.name)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(found(" "), ["shop", "cache-hub"]);
+        assert_eq!(found("ch"), ["cache-hub"]);
+    }
+
+    #[test]
+    fn a_query_ranks_the_panels_and_the_files_but_no_project() {
         let results = search(
             &request("ch"),
             &[project("shop"), project("cache-hub")],
@@ -215,8 +244,7 @@ mod tests {
             },
             |_| None,
         );
-        assert_eq!(results.projects.len(), 1);
-        assert_eq!(results.projects[0].name, "cache-hub");
+        assert!(results.projects.is_empty());
         assert_eq!(results.panels.len(), 1);
         assert_eq!(results.panels[0].index, 0);
         assert_eq!(results.files.len(), 1);

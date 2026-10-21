@@ -67,6 +67,7 @@ export const SUMMARIES = PANELS.flatMap((panel) =>
 export const PALETTE_PANELS = PANELS.map((panel) => ({
     id: panel.id,
     title: panel.title,
+    icon: panel.icon,
     shortcut: panelShortcut(panel),
 }));
 

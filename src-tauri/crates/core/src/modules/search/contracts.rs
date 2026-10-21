@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::modules::projects::Location;
+
 /// What the command palette asks for, at every key typed.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,6 +24,11 @@ pub type Highlight = [u32; 2];
 pub struct ProjectMatch {
     pub id: String,
     pub name: String,
+    /// Where it is, so two of one name can be told apart.
+    pub location: Location,
+    /// How well it matched, comparable with the other matches of the query: the palette mixes
+    /// them by it.
+    pub score: u32,
     /// In the name.
     pub highlights: Vec<Highlight>,
 }
@@ -31,6 +38,8 @@ pub struct ProjectMatch {
 pub struct PanelMatch {
     /// The panel's position in the request.
     pub index: u32,
+    /// As `ProjectMatch::score`.
+    pub score: u32,
     /// In the title.
     pub highlights: Vec<Highlight>,
 }
@@ -52,6 +61,8 @@ pub struct FileMatch {
     pub path: String,
     /// None when it did not change.
     pub mark: Option<ChangeMark>,
+    /// As `ProjectMatch::score`.
+    pub score: u32,
     /// In the path.
     pub highlights: Vec<Highlight>,
 }
@@ -98,6 +109,8 @@ pub struct ContentEnd {
 pub struct ListMatch {
     pub id: String,
     pub name: String,
+    /// As `ProjectMatch::score`.
+    pub score: u32,
     /// In the name.
     pub highlights: Vec<Highlight>,
 }
@@ -110,7 +123,7 @@ pub struct Snippet {
     pub highlights: Vec<Highlight>,
 }
 
-/// A note of the project searched: its first line matched, or it holds the text typed.
+/// A note of the project searched, holding every word typed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteMatch {
@@ -119,15 +132,17 @@ pub struct NoteMatch {
     pub list_name: String,
     /// Its first line that is not blank.
     pub title: String,
-    /// In the title; none when the note was found by its text.
+    /// As `ProjectMatch::score`.
+    pub score: u32,
+    /// In the title; none when the words are not all in it.
     pub highlights: Vec<Highlight>,
-    /// Where the text typed is in the note, when found that way.
+    /// Where the first word is in the note, when they are not all in the title.
     pub snippet: Option<Snippet>,
-    pub done: bool,
 }
 
-/// The matches, best first in each group. With nothing typed: every project and panel, no files,
-/// lists or notes.
+/// The matches, best first in each group. Projects only when no project is searched, its own
+/// files, lists and notes then: one leaves a project by zooming out, not by searching. With
+/// nothing typed: every project or panel, no files, lists or notes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResults {
@@ -165,21 +180,29 @@ mod tests {
             projects: vec![ProjectMatch {
                 id: "/r".into(),
                 name: "r".into(),
+                location: Location::Wsl {
+                    distro: "Ubuntu".into(),
+                    root: "/r".into(),
+                },
+                score: 30,
                 highlights: vec![[0, 1]],
             }],
             panels: vec![PanelMatch {
                 index: 0,
+                score: 0,
                 highlights: vec![],
             }],
             files: vec![
                 FileMatch {
                     path: "src/total.ts".into(),
                     mark: Some(ChangeMark::Added),
+                    score: 70,
                     highlights: vec![[4, 7]],
                 },
                 FileMatch {
                     path: "README.md".into(),
                     mark: None,
+                    score: 0,
                     highlights: vec![],
                 },
             ],
@@ -187,6 +210,7 @@ mod tests {
             lists: vec![ListMatch {
                 id: "l1".into(),
                 name: "Release".into(),
+                score: 40,
                 highlights: vec![[0, 2]],
             }],
             notes: vec![NoteMatch {
@@ -194,33 +218,39 @@ mod tests {
                 list: "l1".into(),
                 list_name: "Release".into(),
                 title: "Bump version".into(),
+                score: 50,
                 highlights: vec![],
                 snippet: Some(Snippet {
                     text: "…the version…".into(),
                     highlights: vec![[5, 12]],
                 }),
-                done: false,
             }],
         };
         assert_eq!(
             serde_json::to_value(&results).unwrap(),
             serde_json::json!({
-                "projects": [{ "id": "/r", "name": "r", "highlights": [[0, 1]] }],
-                "panels": [{ "index": 0, "highlights": [] }],
+                "projects": [{
+                    "id": "/r",
+                    "name": "r",
+                    "location": { "kind": "wsl", "distro": "Ubuntu", "root": "/r" },
+                    "score": 30,
+                    "highlights": [[0, 1]]
+                }],
+                "panels": [{ "index": 0, "score": 0, "highlights": [] }],
                 "files": [
-                    { "path": "src/total.ts", "mark": "added", "highlights": [[4, 7]] },
-                    { "path": "README.md", "mark": null, "highlights": [] }
+                    { "path": "src/total.ts", "mark": "added", "score": 70, "highlights": [[4, 7]] },
+                    { "path": "README.md", "mark": null, "score": 0, "highlights": [] }
                 ],
                 "moreFiles": 2,
-                "lists": [{ "id": "l1", "name": "Release", "highlights": [[0, 2]] }],
+                "lists": [{ "id": "l1", "name": "Release", "score": 40, "highlights": [[0, 2]] }],
                 "notes": [{
                     "id": "n1",
                     "list": "l1",
                     "listName": "Release",
                     "title": "Bump version",
+                    "score": 50,
                     "highlights": [],
-                    "snippet": { "text": "…the version…", "highlights": [[5, 12]] },
-                    "done": false
+                    "snippet": { "text": "…the version…", "highlights": [[5, 12]] }
                 }]
             })
         );

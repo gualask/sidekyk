@@ -1,105 +1,180 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from '@/shared/i18n';
 import { contentRows, highlightParts, paletteRows } from './palette-rows';
+import type { SearchResults } from './search.types';
 
 const en = createTranslator('en', 'en');
 
-const PANELS = [{ id: 'changes', title: 'Changes', shortcut: '1' }];
+const PANELS = [{ id: 'changes', title: 'Changes', icon: () => null, shortcut: '1' }];
+
+const NONE: SearchResults = {
+    projects: [],
+    panels: [],
+    files: [],
+    moreFiles: 0,
+    lists: [],
+    notes: [],
+};
+
+const file = (path: string, score: number): SearchResults['files'][number] => ({
+    path,
+    mark: null,
+    score,
+    highlights: [],
+});
+
+const note = (id: string, score: number): SearchResults['notes'][number] => ({
+    id,
+    list: 'l1',
+    listName: 'General',
+    title: `Note ${id}`,
+    score,
+    highlights: [],
+    snippet: null,
+});
 
 describe('paletteRows', () => {
-    it('puts the items under their groups and leaves empty groups out', () => {
+    it('with nothing typed, puts the projects or the panels under their title', () => {
+        const projects = paletteRows(
+            {
+                ...NONE,
+                projects: [
+                    {
+                        id: '/dev/shop',
+                        name: 'shop',
+                        location: { kind: 'local', root: '/dev/shop' },
+                        score: 0,
+                        highlights: [],
+                    },
+                ],
+            },
+            [],
+            null,
+            false,
+            en,
+        );
+        expect(projects.rows).toEqual([
+            { kind: 'group', label: 'Projects' },
+            { kind: 'item', item: projects.items[0], index: 0 },
+        ]);
+
+        const panels = paletteRows(
+            { ...NONE, panels: [{ index: 0, score: 0, highlights: [] }] },
+            PANELS,
+            'shop',
+            false,
+            en,
+        );
+        expect(panels.rows.map((row) => (row.kind === 'group' ? row.label : row.kind))).toEqual([
+            'Panels in shop',
+            'item',
+        ]);
+    });
+
+    it('typed, mixes the kinds by score, with no titles, the files left counted last', () => {
         const { items, rows } = paletteRows(
             {
-                projects: [{ id: '/dev/shop', name: 'shop', highlights: [] }],
-                panels: [],
-                files: [{ path: 'src/total.ts', mark: 'modified', highlights: [[4, 7]] }],
+                ...NONE,
+                files: [file('db/seed.sql', 110)],
                 moreFiles: 3,
-                lists: [],
-                notes: [],
+                notes: [note('a', 60)],
             },
             PANELS,
             'shop',
+            true,
             en,
         );
-        expect(items.map((item) => item.label)).toEqual(['shop', 'src/total.ts']);
+        expect(items.map((item) => item.label)).toEqual(['db/seed.sql', 'Note a']);
         expect(rows).toEqual([
-            { kind: 'group', label: 'Projects' },
             { kind: 'item', item: items[0], index: 0 },
-            { kind: 'group', label: 'Files in shop' },
             { kind: 'item', item: items[1], index: 1 },
             { kind: 'more', count: 3 },
         ]);
     });
 
-    it('puts lists and notes before files, a note by its first line or the text found', () => {
-        const { items, rows } = paletteRows(
+    it('typed, puts the best two of each kind first, so many notes hide no file', () => {
+        const { items } = paletteRows(
             {
-                projects: [],
-                panels: [],
-                files: [{ path: 'notes.md', mark: null, highlights: [] }],
-                moreFiles: 0,
-                lists: [{ id: 'l1', name: 'Release', highlights: [[0, 2]] }],
+                ...NONE,
+                files: [file('src/watcher.rs', 80), file('src/watcher/filter.rs', 70)],
+                notes: [note('a', 100), note('b', 95), note('c', 90), note('d', 85)],
+            },
+            PANELS,
+            'shop',
+            true,
+            en,
+        );
+        expect(items.map((item) => item.label)).toEqual([
+            'Note a',
+            'Note b',
+            'src/watcher.rs',
+            'src/watcher/filter.rs',
+            'Note c',
+            'Note d',
+        ]);
+    });
+
+    it('typed, breaks a tie by kind: a panel, a list, a file, then a note', () => {
+        const { items } = paletteRows(
+            {
+                ...NONE,
+                panels: [{ index: 0, score: 50, highlights: [] }],
+                files: [file('changes.md', 50)],
+                lists: [{ id: 'l1', name: 'Changes log', score: 50, highlights: [] }],
+                notes: [note('a', 50)],
+            },
+            PANELS,
+            'shop',
+            true,
+            en,
+        );
+        expect(items.map((item) => item.kind)).toEqual(['panel', 'list', 'file', 'note']);
+    });
+
+    it('shows a note by its first line, or by the part where the words are', () => {
+        const { items } = paletteRows(
+            {
+                ...NONE,
                 notes: [
+                    { ...note('a', 60), title: 'Bump version', highlights: [[0, 4]] },
                     {
-                        id: 'n1',
-                        list: 'l1',
-                        listName: 'Release',
-                        title: 'Bump version',
-                        highlights: [[0, 2]],
-                        snippet: null,
-                        done: false,
-                    },
-                    {
-                        id: 'n2',
-                        list: 'l1',
-                        listName: 'Release',
-                        title: 'Smoke test',
-                        highlights: [],
+                        ...note('b', 50),
                         snippet: { text: '…the downloads…', highlights: [[5, 14]] },
-                        done: true,
                     },
                 ],
             },
             PANELS,
             'shop',
+            true,
             en,
         );
-        expect(rows.flatMap((row) => (row.kind === 'group' ? [row.label] : []))).toEqual([
-            'Note lists in shop',
-            'Notes in shop',
-            'Files in shop',
-        ]);
-        expect(items[2]).toEqual({
-            kind: 'note',
-            id: 'n2',
-            list: 'l1',
-            hint: 'Release · done',
+        expect(items[0]).toMatchObject({ label: 'Bump version', highlights: [[0, 4]] });
+        expect(items[1]).toMatchObject({
             label: '…the downloads…',
             highlights: [[5, 14]],
+            listName: 'General',
         });
     });
 
     it('names a panel by its definition and skips one it does not know', () => {
         const { items } = paletteRows(
             {
-                projects: [],
+                ...NONE,
                 panels: [
-                    { index: 0, highlights: [[0, 2]] },
-                    { index: 5, highlights: [] },
+                    { index: 0, score: 40, highlights: [[0, 2]] },
+                    { index: 5, score: 30, highlights: [] },
                 ],
-                files: [],
-                moreFiles: 0,
-                lists: [],
-                notes: [],
             },
             PANELS,
             'shop',
+            true,
             en,
         );
         expect(items).toEqual([
             {
                 kind: 'panel',
                 id: 'changes',
+                icon: PANELS[0].icon,
                 shortcut: '1',
                 label: 'Changes',
                 highlights: [[0, 2]],

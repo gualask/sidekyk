@@ -1,12 +1,20 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { Dialog } from '@base-ui/react/dialog';
-import { IconFileSearch, IconSearch } from '@tabler/icons-react';
+import {
+    IconFile,
+    IconFileSearch,
+    IconFolderCode,
+    IconList,
+    IconNote,
+    IconSearch,
+} from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMemo, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { type MessageKey, RichText, type Translator, useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
+import { RemoteTag } from '@/shared/projects/RemoteTag';
 import {
     type ContentResults,
     MIN_CONTENT_QUERY,
@@ -24,6 +32,8 @@ import {
 import type { Highlight } from '../model/search.types';
 
 const ROW_HEIGHT = { group: 28, item: 34, more: 30, file: 28 } as const;
+/** A project: its name, and its folder under it. */
+const PROJECT_HEIGHT = 46;
 /** A line found in a file: lower than a place to go, many come at once. */
 const LINE_HEIGHT = 28;
 
@@ -146,8 +156,10 @@ function Palette({
     const { items, rows } = useMemo(() => {
         if (contents)
             return found ? contentRows(found.files, currentFile, i18n) : { items: [], rows: [] };
-        return names.data
-            ? paletteRows(names.data, panels, projectName, i18n)
+        // typed or not as the query the matches on screen answer, not the one still coming
+        const shown = names.data;
+        return shown
+            ? paletteRows(shown.results, panels, projectName, shown.query.trim() !== '', i18n)
             : { items: [], rows: [] };
     }, [contents, found, currentFile, names.data, panels, projectName, i18n]);
     // the row of each item, to bring the one highlighted into view
@@ -162,9 +174,9 @@ function Palette({
         getScrollElement: () => scroller.current,
         estimateSize: (index) => {
             const row = rows[index];
-            return row.kind === 'item' && row.item.kind === 'line'
-                ? LINE_HEIGHT
-                : ROW_HEIGHT[row.kind];
+            if (row.kind !== 'item') return ROW_HEIGHT[row.kind];
+            if (row.item.kind === 'project') return PROJECT_HEIGHT;
+            return row.item.kind === 'line' ? LINE_HEIGHT : ROW_HEIGHT.item;
         },
         overscan: 8,
         paddingStart: 6,
@@ -417,12 +429,21 @@ function Row({
                     <span className="w-9 shrink-0 text-right font-mono text-[11px] text-ui-text-muted tabular-nums group-data-highlighted:text-ui-accent-on-soft">
                         {item.number}
                     </span>
-                ) : null}
-                <Label
-                    text={item.label}
-                    highlights={item.highlights}
-                    mono={item.kind === 'file' || item.kind === 'line'}
-                />
+                ) : (
+                    <KindIcon item={item} />
+                )}
+                {item.kind === 'project' ? (
+                    <span className="flex min-w-0 flex-col">
+                        <Label text={item.label} highlights={item.highlights} mono={false} />
+                        <Folder path={item.location.root} />
+                    </span>
+                ) : (
+                    <Label
+                        text={item.label}
+                        highlights={item.highlights}
+                        mono={item.kind === 'file' || item.kind === 'line'}
+                    />
+                )}
                 <span className="ml-auto shrink-0 text-xs text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft">
                     {hint(item, t)}
                 </span>
@@ -431,13 +452,44 @@ function Row({
     );
 }
 
+const KIND_ICONS = { project: IconFolderCode, file: IconFile, list: IconList, note: IconNote };
+
+/** What a row opens, at a glance: a project, a panel (its tile's icon), a file, a list, a note. */
+function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' }> }) {
+    const Icon = item.kind === 'panel' ? item.icon : KIND_ICONS[item.kind];
+    return (
+        <Icon
+            size={16}
+            stroke={1.75}
+            className="shrink-0 text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft"
+        />
+    );
+}
+
 /**
- * What a row says on its right: a panel's key, how a file changed, a note's list; nothing for a
- * project or a list.
+ * A project's folder, cut at its start when too long: its end tells two projects apart. The
+ * isolate keeps the path's own order inside the right-to-left box that cuts it on the left.
+ */
+function Folder({ path }: { path: string }) {
+    return (
+        <span
+            dir="rtl"
+            title={path}
+            className="truncate text-left text-[11.5px] text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft"
+        >
+            <bdi dir="ltr">{path}</bdi>
+        </span>
+    );
+}
+
+/**
+ * What a row says on its right: a panel's key, how a file changed, a note's list, a project's
+ * machine when not this one; nothing for a list.
  */
 function hint(item: PaletteItem, t: Translator['t']) {
+    if (item.kind === 'project') return <RemoteTag location={item.location} />;
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
-    if (item.kind === 'note') return item.hint;
+    if (item.kind === 'note') return item.listName;
     if (item.kind !== 'file' || !item.mark) return null;
     return <span className={CHANGE_MARK_TONE[item.mark]}>{t(CHANGE_MARK_WORD[item.mark])}</span>;
 }

@@ -4,13 +4,22 @@ The palette is the only search; panels have no filter.
 
 ## Behaviour
 
-- `⌘K` by name: projects, panels, the project's files, note lists and notes. `⌘F` in the project's
-  files' contents, its open file first. `⌘K`/`⌘F` switch mode inside the palette, text kept. With a
+- `⌘K` by name: in a project its panels, files, note lists and notes; at level 0 the projects
+  (2026-10-21: inside a project one leaves by `Esc` or `[`/`]`, a project row there was noise).
+  `⌘F` in the project's files' contents, its open file first. `⌘K`/`⌘F` switch mode inside the palette, text kept. With a
   file open `⌘F` opens its find bar first (`changes.md`).
+- Nothing typed: where to go under its title (Projects, or Panels in the project). Typed: one list
+  by score, no titles (2026-10-21), the best 2 of each kind first so a kind found by the dozen
+  hides no other, `↵` on the best; equal scores: panel or list, then file, then note. Every row
+  starts with an icon of what it opens: project, panel (its tile's), file, list, note. A project shows its folder under its name (cut at
+  the start when long), and its machine's tag when not this one (`WSL: Ubuntu`), as in the top bar:
+  a local and a WSL clone of one name are told apart. As Zed's recent projects (name, paths under).
 - By name: every file of the project on screen (the tree plus deleted files), never other
-  projects' files (switching project is searching its name), none at level 0. A change is marked
+  projects' files (another project's: zoom out first), none at level 0. A change is marked
   by a quiet word, not a colored name. `↵` goes through the shared selection (`files.md`).
-- Notes: lists and notes before files; `↵` opens Notes at the same zoom on the list, the note
+- Notes by the words typed, anywhere in them, not by letters scattered over a sentence (which
+  matched almost any note); its row says its list, not whether it is done (2026-10-21: opening
+  unfolds a done one's group anyway, open ones come first on equal scores); `↵` opens Notes at the same zoom on the list, the note
   scrolled to and lit up (a done one's group unfolded), its tile back from the top bar if
   minimized.
 - In contents: results streamed, the file shown first; `↵` opens the file with the find bar at the
@@ -18,17 +27,22 @@ The palette is the only search; panels have no filter.
 
 ## How it is built
 
-- `search` runs at every key: projects, panel titles (sent by the frontend) and, once something is
-  typed, the files of the project the request names: the cached tree (read if missing) plus
+- `search` runs at every key: panel titles (sent by the frontend) and, once something is typed,
+  the files of the project the request names, or the projects when it names none: the cached tree (read if missing) plus
   deleted files, each marked from the last snapshot (modified > added > deleted). Words match
   independently, case ignored; matched letters return as UTF-16 offsets; at most 500 files, the
   best picked without sorting the rest. From 20,000 paths scoring runs on up to 8 threads (Zed's
   4,366: 0.37 ms, 0.34 ms when the palette ranked changed files only; 200,000 synthetic:
-  80 → 14 ms).
+  80 → 14 ms). Each match carries its score; `palette-rows.ts` mixes the kinds by it. Names
+  score fuzzy (`nucleo` default), paths and notes in path mode, whose word starts weigh a little
+  less: for one word, a list or panel ranks over a file over a note (`rank.rs` test, measured on
+  `seed`, `watcher`, `arch`, `mod`, `note`, `rel`).
 - Notes (`modules/search/notes.rs`, ranked where `NotesStore` keeps them, no copy; read first if
-  not in memory; only a project of the list): lists by name; notes by first line (fuzzy), else by
-  the text typed anywhere in them (substring, case ignored, 2 characters at least) with the part
-  around it on one line; open before done, at most 50. 1,000 notes: 3.5 ms a key. Target:
+  not in memory; only a project of the list): lists by name (fuzzy); notes holding every word
+  (`nucleo` substring atoms, case and accents ignored, 2 characters at least), shown by their
+  first line when it holds them all, else by the part around the first word on one line; best
+  first, equal ones open before done, at most 50. 1,000 notes of ~470 characters, release:
+  0.07-0.42 ms a key (before, fuzzy first lines then a substring scan: 0.3-2.4 ms). Target:
   `notesTarget`.
 - `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
   `open_file` (never through a link, no git), up to 8 threads taking the next file, a fixed buffer

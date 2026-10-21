@@ -67,8 +67,8 @@ const ShortcutsHelp = lazy(() =>
     import('./ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
 );
 
-/** Without a project, the palette offers no panel. */
-const NO_PANELS: readonly { id: string; title: string; shortcut: string }[] = [];
+/** At all projects (level 0), the palette offers projects only: no panel. */
+const NO_PANELS: typeof PALETTE_PANELS = [];
 
 /** The command palette: whether it is open, what it looks for, and the text it opens with. */
 interface PaletteState {
@@ -355,7 +355,7 @@ export function AppShell() {
                         projectName={project?.name ?? null}
                         projectId={level > 0 ? (project?.id ?? null) : null}
                         currentFile={palette.open ? shownFile() : null}
-                        panels={project ? palettePanels : NO_PANELS}
+                        panels={level > 0 && project ? palettePanels : NO_PANELS}
                         actions={paletteActions}
                     />
                 </Suspense>

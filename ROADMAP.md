@@ -32,8 +32,6 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 - [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL projects
 - [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
       projects
-- [ ] Palette: two projects of one name (a local and a WSL clone of `shop`) look alike; name the
-      distro there too? Ask with a preview first
 - [ ] Container projects: the same helper through `docker exec -i` (a `LinuxMachine`, as the
       fixture's test); how the Mac ships it (arm64, amd64 under emulation). **After:** WSL projects
 

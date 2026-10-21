@@ -12,8 +12,8 @@ import type { ProjectInfo } from '@/shared/projects/project-info';
 
 /**
  * A stand-in for the backend's ranking (`src-tauri/crates/core/src/modules/search`): the query's
- * letters in order, case ignored, the earliest ones taken. No scoring: matches keep their order.
- * Enough to check the palette's UI on fixtures.
+ * letters in order, case ignored, the earliest ones taken; letters together score more. Enough to
+ * check the palette's UI on fixtures.
  */
 function match(text: string, query: string): Highlight[] | null {
     const needle = query.toLowerCase().replace(/\s+/g, '');
@@ -29,6 +29,23 @@ function match(text: string, query: string): Highlight[] | null {
         from = at + 1;
     }
     return runs;
+}
+
+/** Each word of the query in the text, case ignored: where, or null when one is missing. */
+function words(text: string, query: string): Highlight[] | null {
+    const haystack = text.toLowerCase();
+    const found: Highlight[] = [];
+    for (const word of query.toLowerCase().split(/\s+/).filter(Boolean)) {
+        const at = haystack.indexOf(word);
+        if (at < 0) return null;
+        found.push([at, at + word.length]);
+    }
+    return found.sort((a, b) => a[0] - b[0]);
+}
+
+/** Letters together score more, as fzf's. */
+function score(highlights: readonly Highlight[]): number {
+    return highlights.reduce((sum, [start, end]) => sum + (end - start) ** 2, 0);
 }
 
 /** As the backend's `FILE_LIMIT`. */
@@ -67,13 +84,17 @@ export function fixtureSearch(
         lists: [],
         notes: [],
     };
-    for (const project of projects) {
+    // as the backend: projects only outside a project
+    for (const project of request.projectId ? [] : projects) {
         const highlights = match(project.name, query);
-        if (highlights) results.projects.push({ id: project.id, name: project.name, highlights });
+        if (highlights) {
+            const { id, name, location } = project;
+            results.projects.push({ id, name, location, score: score(highlights), highlights });
+        }
     }
     request.panels.forEach((title, index) => {
         const highlights = match(title, query);
-        if (highlights) results.panels.push({ index, highlights });
+        if (highlights) results.panels.push({ index, score: score(highlights), highlights });
     });
     if (query && notes) searchNotes(query, notes, results);
     if (!query || !files) return results;
@@ -86,7 +107,8 @@ export function fixtureSearch(
         const highlights = match(path, query);
         if (!highlights) continue;
         if (results.files.length < FILE_LIMIT) {
-            results.files.push({ path, mark: marks.get(path) ?? null, highlights });
+            const mark = marks.get(path) ?? null;
+            results.files.push({ path, mark, score: score(highlights), highlights });
         } else {
             results.moreFiles += 1;
         }
@@ -95,48 +117,49 @@ export function fixtureSearch(
 }
 
 /**
- * As the backend's `search_notes`: lists by name, notes by first line, else by the text typed in
- * them (two letters at least), with the part around it. No scoring: notes keep their order.
+ * As the backend's `search_notes`: lists by name, notes holding every word typed (two letters at
+ * least), by first line or with the part around the first word. Scored as the files, best first.
  */
 function searchNotes(query: string, notes: ProjectNotes, results: SearchResults) {
     for (const list of notes.lists) {
         const highlights = match(list.name, query);
-        if (highlights) results.lists.push({ ...list, highlights });
+        if (highlights) results.lists.push({ ...list, score: score(highlights), highlights });
     }
+    if (query.length < 2) return;
     const listName = (id: string) => notes.lists.find((list) => list.id === id)?.name ?? '';
     // open before done, list by list, as the backend
     const ordered = [
         ...notes.lists.flatMap((list) => openNotes(notes.notes, list.id)),
         ...notes.lists.flatMap((list) => doneNotes(notes.notes, list.id)),
     ];
-    const byText: SearchResults['notes'] = [];
+    const found: SearchResults['notes'] = [];
     for (const note of ordered) {
-        const found = {
+        const inText = words(note.text, query);
+        if (!inText) continue;
+        const title = noteTitle(note.text);
+        const inTitle = words(title, query);
+        const base = {
             id: note.id,
             list: note.list,
             listName: listName(note.list),
-            title: noteTitle(note.text),
-            done: note.done !== null,
+            title,
+            score: score(inText),
         };
-        const highlights = match(found.title, query);
-        if (highlights) {
-            results.notes.push({ ...found, highlights, snippet: null });
+        if (inTitle) {
+            found.push({ ...base, highlights: inTitle, snippet: null });
             continue;
         }
-        const at = query.length < 2 ? -1 : note.text.toLowerCase().indexOf(query.toLowerCase());
-        if (at < 0) continue;
+        const [at, until] = inText[0];
         const start = Math.max(0, at - 24);
         const before = (start > 0 ? '…' : '') + note.text.slice(start, at).replace(/\s+/g, ' ');
-        const text = `${before}${note.text.slice(at, at + query.length)}${note.text
-            .slice(at + query.length, at + query.length + 48)
+        const text = `${before}${note.text.slice(at, until)}${note.text
+            .slice(until, until + 48)
             .replace(/\s+/g, ' ')}…`;
-        byText.push({
-            ...found,
-            highlights: [],
-            snippet: { text, highlights: [[before.length, before.length + query.length]] },
-        });
+        const highlights: Highlight[] = [[before.length, before.length + until - at]];
+        found.push({ ...base, highlights: [], snippet: { text, highlights } });
     }
-    results.notes.push(...byText);
+    // best first, equal ones in their order (a stable sort)
+    results.notes.push(...found.sort((a, b) => b.score - a.score));
 }
 
 /** As the backend's `MAX_LINES`. */
