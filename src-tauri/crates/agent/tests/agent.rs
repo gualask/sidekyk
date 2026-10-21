@@ -33,7 +33,7 @@ fn helper() -> Command {
 fn local() -> Arc<LocalRepositories> {
     LocalRepositories::new(
         Arc::new(LocalRepositoryBackend::default()),
-        Arc::new(LocalRepositoryWatcher),
+        Arc::new(LocalRepositoryWatcher::default()),
     )
 }
 

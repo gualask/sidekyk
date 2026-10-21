@@ -5,6 +5,7 @@ mod activity;
 mod commits;
 mod contracts;
 mod diff;
+mod folders;
 mod ignored;
 mod limits;
 mod numstat;
@@ -27,10 +28,14 @@ pub use contracts::{
     REPOSITORY_CHANGED_EVENT,
 };
 pub use diff::load_file_diff;
+pub use folders::WatchedFolders;
 pub use ignored::{IgnoredPaths, Visible};
 pub use limits::MAX_FILE_BYTES;
 pub use open::{repository_name, resolve_repository};
-pub use ports::{GitOutput, RepositoryBackend, RepositoryWatcher, Watch, WorktreeEntry};
+pub use ports::{
+    FolderAdded, FolderWatcher, GitOutput, RepositoryBackend, RepositoryWatcher, Watch,
+    WorktreeEntry,
+};
 pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_tree, FileTree};
 pub use version::{load_version_text, VersionText};

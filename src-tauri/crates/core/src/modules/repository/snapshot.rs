@@ -284,6 +284,10 @@ mod tests {
             unreachable!()
         }
 
+        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<std::path::PathBuf>> {
+            unreachable!()
+        }
+
         fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
@@ -330,6 +334,10 @@ mod tests {
         }
 
         fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
+            unreachable!()
+        }
+
+        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<std::path::PathBuf>> {
             unreachable!()
         }
 

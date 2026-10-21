@@ -41,9 +41,6 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 
 - [ ] Signed builds and self-update (as in Fyler), built by a release workflow on a `v*` tag that
       runs `ci.yml` first; update check at startup or on demand only
-- [ ] Linux watcher: one inotify watch per directory not ignored (~670 vs 33,000-47,000 for the
-      ten repos in `~/Dev`; `clean-flow` alone 8,222 > old 8,192 limit); a failed watch must not
-      fail the project
 - [ ] Verify on the packaged app and other systems:
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, `⌘W` hides and
     `⌘Q` quits, no blank frame at startup
@@ -56,6 +53,8 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
     with the setting (`set_text`)
   - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
     runs View Transitions
+  - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
+    log; a new folder's files told, an ignored folder silent)
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
     follows the window theme

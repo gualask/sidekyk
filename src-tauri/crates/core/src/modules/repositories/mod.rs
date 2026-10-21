@@ -16,6 +16,7 @@ use crate::modules::repository::{
     self, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
     Directory, FileContent, FileDiffRequest, FileTree, RecentCommits, RepositoryBackend,
     RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
+    WatchedFolders,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -88,6 +89,8 @@ pub struct LocalRepositories {
     /// Kept apart from `watched`, which is held while a watcher starts: the app reports the
     /// window's visibility on its main thread, which must not wait for that.
     visibility: Mutex<Visibility>,
+    /// The folders watched where the system watches one folder at a time (inotify).
+    folders: Mutex<Option<WatchedFolders>>,
     snapshots: PerRepository<RepositorySnapshot>,
     /// Every project on screen asks for its summary at once.
     summaries: PerRepository<RepositorySummary>,
@@ -118,6 +121,7 @@ impl LocalRepositories {
             watched: Mutex::default(),
             generation: AtomicU64::new(0),
             visibility: Mutex::default(),
+            folders: Mutex::default(),
             snapshots: PerRepository::default(),
             summaries: PerRepository::default(),
             changed: Mutex::default(),

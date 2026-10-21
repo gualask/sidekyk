@@ -77,21 +77,29 @@ brew install colima docker docker-compose
 for `docker compose`. Colima runs nothing until started and leaves nothing after a stop. Without
 Colima, the script uses the current Docker context (Docker Desktop, a Linux engine).
 
-- VM: Colima profile `sidekyk` (Docker context `colima-sidekyk`), 1 CPU, 512 MiB, disks 1 GiB
+- VM: Colima profile `sidekyk` (Docker context `colima-sidekyk`), 1 CPU, 512 MiB, disks 4 GiB
   for Docker's data and 4 GiB for the system (Colima's smallest; ~870 MB used), both
-  thin-provisioned ceilings. Created by the first `up` with these values, kept apart from other
-  projects' VMs; the script gives the user's Docker context back after starting or stopping it.
+  thin-provisioned ceilings. Created by the first `up` or `test` with these values, kept apart
+  from other projects' VMs; the script gives the user's Docker context back after starting or
+  stopping it.
 - Resizing: memory and CPUs with `colima start --profile sidekyk --memory N`; a disk only grows
   (Colima refuses a smaller one), so shrinking means `colima delete --profile sidekyk --data`.
+  `test` grows the VM to 4 CPUs and 3 GiB while it builds, then leaves it as it found it.
 - Memory on the Mac = the VM's whole memory once its page cache fills it (`footprint`: 1,022 MB
   at 1 GiB, 524 MB at 512 MiB; the guest itself uses ~160 MB). 512 MiB builds the image from
   scratch; compiling Rust inside does not fit.
+- Disk on the Mac: what the VM frees stays taken in its disk file until trimmed; the script runs
+  `fstrim` before each stop it makes (2026-10-21: 3.1 GB file for 1.2 GB used, 1.2 GB after).
+- A VM created before 2026-10-21 resolved names through `192.168.5.3`, which stopped answering
+  (`Temporary failure resolving` in `apt`); a VM created again uses `192.168.5.1` and works. Fix:
+  `colima delete --profile sidekyk --data`, then `up`.
 
 ### The fixture
 
 `tests/container/`: Ubuntu 24.04 (WSL's default distro), pinned by digest, with git and
-inotify-tools. Native arch of the engine: aarch64 on Apple Silicon, so a helper built for it
-targets `aarch64-unknown-linux-musl`.
+inotify-tools, and the Rust toolchain that builds the tests (`test`): one image for both, 1.23 GB.
+Native arch of the engine: aarch64 on Apple Silicon, so a helper built for it targets
+`aarch64-unknown-linux-musl`.
 
 - Account `ubuntu` (uid 1000), as the first user WSL creates.
 - Repository `/home/ubuntu/project` on a named volume, created on first start (`seed.sh`): two
@@ -106,14 +114,32 @@ scripts/container-fixture.sh edit     # a burst of writes from inside, one under
 scripts/container-fixture.sh watch    # inotify events inside (Ctrl-C to stop)
 scripts/container-fixture.sh shell    # bash in the repository
 scripts/container-fixture.sh status   # engine, fixture, git status
-scripts/container-fixture.sh helper <sidekyk-agent>  # the helper end to end in the fixture
+scripts/container-fixture.sh test     # the core's and the helper's tests on Linux
+scripts/container-fixture.sh helper [sidekyk-agent]  # the helper end to end in the fixture
+scripts/container-fixture.sh clean    # removes what test built (src-tauri/target/linux)
 scripts/container-fixture.sh down     # removes fixture and repository (--colima: stops the VM)
 ```
 
+### Tests on Linux
+
+`test [cargo test args]` builds and runs `cargo test -p sidekyk-core -p sidekyk-agent` in the
+fixture's image, on Linux git and inotify (the watcher one folder at a time, `architecture.md`,
+Watching): the Linux half of `ci.yml`'s tests without CI, for a change to the core.
+
+- Sources mounted read-only; crates from the Mac's `~/.cargo/registry` (none downloaded twice);
+  builds in `src-tauri/target/linux` on the Mac (262 MB), seen and removed with `clean`, never in
+  the VM. The workspace's dev profile keeps them small (no incremental cache, line tables only).
+- Rust pinned in the `Dockerfile` (`RUST_VERSION`, the Mac's); a rebuild without changes uses the
+  layers kept as cache (no BuildKit here: `docker image prune` would drop them), and a changed
+  `Dockerfile` replaces the image.
+- Timings (2026-10-21, M-series Mac): first build 39 s, then 8 s; the core's tests 5 s; a whole
+  `test` from a stopped VM ~2 min, most of it starting and resizing the VM.
+
 ### The helper in the fixture
 
-`helper <binary>` runs `crates/agent/tests/container.rs` (ignored otherwise): the real Linux helper,
-built for the fixture's arch (`build.yml`'s `sidekyk-agent-linux-arm64` on Apple Silicon), installed
+`helper [binary]` runs `crates/agent/tests/container.rs` (ignored otherwise): the real Linux helper,
+built for the fixture's arch (by default the one `test` built, glibc; `build.yml`'s static
+`sidekyk-agent-linux-arm64` on Apple Silicon for the shipped one), installed
 in `~/.sidekyk-server/` through `docker exec -i` as in a WSL distro, then read, watched (an edit
 from inside, a write under ignored `build/`), told the window hid and showed, and closed once idle.
 Timings printed (`--nocapture`); measured in `plans/remote-projects.md`.

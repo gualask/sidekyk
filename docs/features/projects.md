@@ -91,7 +91,8 @@ Several repositories, one on screen.
 
 - Not watched (2026-10-13): level 0 reads summaries each time it shows (~65 ms, 0.4 s CPU for ten
   repos). A watcher per project is cheap on FSEvents/Windows but on inotify means one watch per
-  directory (~33,000 for those repos); revisit if real-time cards are missed.
+  folder git does not ignore (`../architecture.md`, Watching); revisit if real-time cards are
+  missed.
 - On show (2026-10-14) read only what may have changed: the watched project if marked while
   hidden, anything older than 30 s. 30 s because of the review loop (`⌘Tab` every 5-30 s: reading
   ten projects each return is ~140 s CPU/hour, 30 s caps it at ~50 s) while another agent's count

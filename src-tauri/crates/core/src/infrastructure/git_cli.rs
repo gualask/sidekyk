@@ -177,6 +177,24 @@ impl RepositoryBackend for LocalRepositoryBackend {
     fn has_entry(&self, root: &Path, path: &Path) -> bool {
         std::fs::symlink_metadata(root.join(path)).is_ok()
     }
+
+    fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>> {
+        let folder = if path.as_os_str().is_empty() {
+            root.to_path_buf()
+        } else {
+            let (full, meta) = inside(root, path)?;
+            meta.is_dir().then_some(full)?
+        };
+        let entries = std::fs::read_dir(folder).ok()?;
+        Some(
+            entries
+                .filter_map(Result::ok)
+                // the entry's own type: a link to a folder is not one
+                .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+                .map(|entry| PathBuf::from(entry.file_name()))
+                .collect(),
+        )
+    }
 }
 
 /// `path` (relative) under `root` and what is there, not following a link, or `None` when nothing
@@ -205,8 +223,8 @@ mod tests {
         load_file_diff, load_file_tree, load_recent_commits, load_snapshot, load_summary,
         load_version_text, repository_name, resolve_repository, ChangeKind, Commit,
         CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
-        IgnoredPaths, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText, Visible,
-        Watch,
+        FolderAdded, FolderWatcher, IgnoredPaths, RepositoryInfo, RepositorySnapshot,
+        RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
@@ -830,7 +848,7 @@ mod tests {
             mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
         ) -> anyhow::Result<Watch> {
             let seen = self.0.clone();
-            LocalRepositoryWatcher.watch(
+            LocalRepositoryWatcher::default().watch(
                 root,
                 git_dir,
                 Box::new(move |paths| {
@@ -902,6 +920,194 @@ mod tests {
         assert_eq!(missed, info.root);
         assert!(received.try_recv().is_err(), "nothing is told while hidden");
         assert_eq!(repositories.set_visible(true), None);
+        repositories.watch(None, Box::new(|_| {}));
+    }
+
+    /// Records the folders added, refusing past `limit` as the system would.
+    struct RecordingFolders {
+        added: Mutex<Vec<PathBuf>>,
+        limit: usize,
+    }
+
+    impl RecordingFolders {
+        fn up_to(limit: usize) -> Arc<Self> {
+            Arc::new(Self {
+                added: Mutex::default(),
+                limit,
+            })
+        }
+
+        fn times(&self, folder: &Path) -> usize {
+            let added = self.added.lock().unwrap();
+            added.iter().filter(|added| *added == folder).count()
+        }
+    }
+
+    impl FolderWatcher for RecordingFolders {
+        fn add(&self, folder: &Path) -> FolderAdded {
+            let mut added = self.added.lock().unwrap();
+            if added.len() == self.limit {
+                return FolderAdded::Full;
+            }
+            added.push(folder.to_path_buf());
+            FolderAdded::Watched
+        }
+    }
+
+    #[test]
+    fn the_folders_watched_are_those_git_does_not_ignore_and_the_git_dir_s_that_count() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, ".gitignore", "node_modules/\n/target/\n");
+        write(root, "src/cart/a.ts", "");
+        write(root, "target/debug/a.o", "");
+        write(root, "node_modules/left/i.js", "");
+        write(root, "node_modules/kept/k.js", "");
+        git(root, &["add", "-f", "node_modules/kept/k.js"]);
+        std::fs::create_dir(root.join("empty")).unwrap();
+        write(root, "inner/.git/HEAD", "");
+        write(root, "inner/lib/b.ts", "");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(root.join("src"), root.join("link")).unwrap();
+
+        let recording = RecordingFolders::up_to(usize::MAX);
+        let mut folders = WatchedFolders::start(&backend, recording.clone(), root, &repo.git_dir);
+        let times = |rel: &str| recording.times(&root.join(rel));
+        // a folder holding tracked files counts, though its rules say ignored; an empty one too,
+        // for what is written in it later; a repository inside only for itself
+        for rel in [
+            "",
+            "src",
+            "src/cart",
+            "empty",
+            "inner",
+            "node_modules",
+            "node_modules/kept",
+            ".git",
+            ".git/refs",
+            ".git/refs/heads",
+            ".git/info",
+        ] {
+            assert_eq!(times(rel), 1, "{rel}");
+        }
+        for rel in [
+            "target",
+            "target/debug",
+            "node_modules/left",
+            "inner/lib",
+            "link",
+            ".git/objects",
+        ] {
+            assert_eq!(times(rel), 0, "{rel}");
+        }
+
+        // a folder made with what it holds, a file beside it
+        write(root, "new/deep/c.ts", "");
+        write(root, "new/node_modules/d/x.js", "");
+        folders.add_created(&backend, &[Path::new("new"), Path::new("src/cart/a.ts")]);
+        assert_eq!(times("new"), 1);
+        assert_eq!(times("new/deep"), 1);
+        assert_eq!(times("new/node_modules"), 0);
+        // removed, then made again: watched again, as its watches went with it
+        std::fs::remove_dir_all(root.join("new")).unwrap();
+        folders.add_created(&backend, &[Path::new("new")]);
+        write(root, "new/deep/c.ts", "");
+        folders.add_created(&backend, &[Path::new("new")]);
+        assert_eq!(times("new/deep"), 2);
+
+        // the rules changed while nobody looked
+        write(root, ".gitignore", "node_modules/\n");
+        folders.add_missed(&backend, &[root.join(".gitignore")]);
+        assert_eq!(times("target/debug"), 1);
+        assert_eq!(times("src"), 1);
+    }
+
+    #[test]
+    fn past_the_system_s_limit_the_folders_watched_stay_and_no_more_are_asked() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        let recording = RecordingFolders::up_to(3);
+        let mut folders = WatchedFolders::start(&backend, recording.clone(), root, &repo.git_dir);
+        write(root, "new/a.ts", "");
+        folders.add_created(&backend, &[Path::new("new")]);
+        folders.rescan(&backend);
+        assert_eq!(recording.added.lock().unwrap().len(), 3);
+        assert_eq!(recording.times(&root.join("new")), 0);
+    }
+
+    #[test]
+    fn folder_by_folder_a_new_folder_is_watched_and_ignored_ones_never_are() {
+        const QUIET: Duration = Duration::from_secs(1);
+        const DEADLINE: Duration = Duration::from_secs(10);
+        let dir = scratch_repo();
+        write(dir.path(), ".gitignore", "build/\n");
+        std::fs::create_dir(dir.path().join("build")).unwrap();
+        let repositories = LocalRepositories::new(
+            Arc::new(LocalRepositoryBackend::default()),
+            Arc::new(LocalRepositoryWatcher::per_folder()),
+        );
+        let info = repositories.resolve(dir.path()).unwrap();
+        let root = Path::new(&info.root);
+        let (sent, received) = std::sync::mpsc::channel();
+        repositories.watch(
+            Some(&info),
+            Box::new(move |event| {
+                let _ = sent.send(event);
+            }),
+        );
+        let settle = || {
+            let started = Instant::now();
+            while received.recv_timeout(QUIET).is_ok() {
+                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
+            }
+        };
+        // waits for an event naming `path`, writing `rel` again until it comes: a watch added on
+        // another thread may still be on its way
+        let told = |rel: &str| {
+            let started = Instant::now();
+            loop {
+                write(root, rel, "x\n");
+                if let Ok(event) = received.recv_timeout(QUIET) {
+                    if event
+                        .paths
+                        .unwrap_or_default()
+                        .iter()
+                        .any(|path| path == rel)
+                    {
+                        return;
+                    }
+                }
+                assert!(started.elapsed() < DEADLINE, "{rel} was never told");
+            }
+        };
+        settle();
+
+        write(root, "build/out.o", "");
+        assert!(
+            received.recv_timeout(QUIET).is_err(),
+            "an ignored folder is not watched"
+        );
+
+        std::fs::create_dir_all(root.join("src/new/deep")).unwrap();
+        told("src/new/deep/x.ts");
+        settle();
+
+        repositories.set_visible(false);
+        std::fs::create_dir_all(root.join("later/inner")).unwrap();
+        let started = Instant::now();
+        while repositories.set_visible(true).is_none() {
+            repositories.set_visible(false);
+            assert!(
+                started.elapsed() < DEADLINE,
+                "the new folder was never marked"
+            );
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        told("later/inner/y.ts");
         repositories.watch(None, Box::new(|_| {}));
     }
 

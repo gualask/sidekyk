@@ -1,21 +1,46 @@
 //! Watches the working tree and the git dir, and reports what changed after a quiet period.
 
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
 use notify_debouncer_mini::notify::{
     self, Config, Event, EventHandler, EventKind, PathsMut, RecommendedWatcher, RecursiveMode,
     Watcher, WatcherKind,
 };
-use notify_debouncer_mini::{new_debouncer_opt, DebounceEventResult};
+use notify_debouncer_mini::{new_debouncer_opt, DebounceEventResult, Debouncer};
 
-use crate::modules::repository::{RepositoryWatcher, Watch};
+use crate::modules::repository::{FolderAdded, FolderWatcher, RepositoryWatcher, Watch};
+use crate::shared::sync::lock;
 
 /// Long enough to fold an agent's burst of writes into one refresh.
 const QUIET_PERIOD: Duration = Duration::from_millis(250);
 
 /// Watches this machine's files (notify: FSEvents, inotify, `ReadDirectoryChangesW`).
-pub struct LocalRepositoryWatcher;
+pub struct LocalRepositoryWatcher {
+    /// One watch per folder, the folders added by the caller.
+    per_folder: bool,
+}
+
+impl Default for LocalRepositoryWatcher {
+    /// inotify watches one folder at a time, so a recursive watch would walk the tree and watch
+    /// every folder, git-ignored ones included (`node_modules/`, `target/`): there the caller adds
+    /// the folders git does not ignore, as VS Code (`@parcel/watcher`) and Zed do. FSEvents and
+    /// `ReadDirectoryChangesW` watch a whole tree at once.
+    fn default() -> Self {
+        Self {
+            per_folder: cfg!(target_os = "linux"),
+        }
+    }
+}
+
+impl LocalRepositoryWatcher {
+    /// One watch per folder on any system, as on Linux.
+    #[cfg(test)]
+    pub fn per_folder() -> Self {
+        Self { per_folder: true }
+    }
+}
 
 impl RepositoryWatcher for LocalRepositoryWatcher {
     /// `on_change` runs on the watcher's thread.
@@ -39,13 +64,49 @@ impl RepositoryWatcher for LocalRepositoryWatcher {
                     on_change(events.into_iter().map(|e| e.path).collect());
                 }
             })?;
+        if self.per_folder {
+            let shared = Arc::new(Mutex::new(debouncer));
+            let folders = OneFolderEach(Arc::downgrade(&shared));
+            return Ok(Watch {
+                guard: Box::new(shared),
+                folders: Some(Arc::new(folders)),
+            });
+        }
         debouncer.watcher().watch(root, RecursiveMode::Recursive)?;
         if !git_dir.starts_with(root) {
             debouncer
                 .watcher()
                 .watch(git_dir, RecursiveMode::Recursive)?;
         }
-        Ok(Box::new(debouncer))
+        Ok(Watch {
+            guard: Box::new(debouncer),
+            folders: None,
+        })
+    }
+}
+
+/// Adds folders to a watch while it lasts, without keeping it alive.
+struct OneFolderEach(Weak<Mutex<Debouncer<ChangesOnly>>>);
+
+impl FolderWatcher for OneFolderEach {
+    fn add(&self, folder: &Path) -> FolderAdded {
+        let Some(shared) = self.0.upgrade() else {
+            return FolderAdded::Skipped;
+        };
+        let mut debouncer = lock(&shared);
+        match debouncer
+            .watcher()
+            .watch(folder, RecursiveMode::NonRecursive)
+        {
+            Ok(()) => FolderAdded::Watched,
+            Err(error) if matches!(error.kind, notify::ErrorKind::MaxFilesWatch) => {
+                FolderAdded::Full
+            }
+            Err(error) => {
+                tracing::debug!(folder = %folder.display(), %error, "folder not watched");
+                FolderAdded::Skipped
+            }
+        }
     }
 }
 
@@ -96,6 +157,15 @@ impl Watcher for ChangesOnly {
 mod tests {
     use super::*;
 
+    /// Where the system watches one folder at a time, the folders the tests write in.
+    fn add_folders(watch: &Watch, folders: &[PathBuf]) {
+        if let Some(watcher) = &watch.folders {
+            for folder in folders {
+                assert_eq!(watcher.add(folder), FolderAdded::Watched);
+            }
+        }
+    }
+
     #[test]
     fn a_write_reaches_the_callback_until_the_watch_is_dropped() {
         let dir = tempfile::tempdir().unwrap();
@@ -103,7 +173,7 @@ mod tests {
         let root = dir.path().canonicalize().unwrap();
         std::fs::create_dir(root.join(".git")).unwrap();
         let (sent, received) = std::sync::mpsc::channel();
-        let watch = LocalRepositoryWatcher
+        let watch = LocalRepositoryWatcher::default()
             .watch(
                 &root,
                 &root.join(".git"),
@@ -112,6 +182,7 @@ mod tests {
                 }),
             )
             .unwrap();
+        add_folders(&watch, std::slice::from_ref(&root));
 
         // FSEvents may first report what happened just before the watch started
         std::fs::write(root.join("a.ts"), "").unwrap();
@@ -139,7 +210,7 @@ mod tests {
         std::fs::create_dir(root.join(".git")).unwrap();
         std::fs::write(root.join(".git/index"), "index").unwrap();
         let (sent, received) = std::sync::mpsc::channel();
-        let _watch = LocalRepositoryWatcher
+        let watch = LocalRepositoryWatcher::default()
             .watch(
                 &root,
                 &root.join(".git"),
@@ -148,6 +219,7 @@ mod tests {
                 }),
             )
             .unwrap();
+        add_folders(&watch, &[root.clone(), root.join(".git")]);
         // FSEvents may first report what happened just before the watch started
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         while received.recv_timeout(Duration::from_secs(1)).is_ok() {

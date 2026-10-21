@@ -1,5 +1,6 @@
 use std::io::Read;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use crate::shared::process::ProcessOutput;
 
@@ -40,6 +41,10 @@ pub trait RepositoryBackend: Send + Sync {
 
     /// Whether anything is at `path` (relative) under `root`, a link there not followed.
     fn has_entry(&self, root: &Path, path: &Path) -> bool;
+
+    /// The names of the folders in `path` (relative) under `root`, links not followed; `None`
+    /// when `path` is not a folder there.
+    fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>>;
 }
 
 /// Watches a repository's working tree and git dir.
@@ -54,8 +59,29 @@ pub trait RepositoryWatcher: Send + Sync {
     ) -> anyhow::Result<Watch>;
 }
 
-/// A repository being watched: watching stops when it is dropped.
-pub type Watch = Box<dyn Send>;
+/// A repository being watched: watching stops when `guard` is dropped.
+pub struct Watch {
+    pub guard: Box<dyn Send>,
+    /// `Some` where the system watches one folder at a time (inotify): nothing is watched until
+    /// folders are added through it. `None` where `root` and `git_dir` are watched with all they
+    /// hold (FSEvents, `ReadDirectoryChangesW`).
+    pub folders: Option<Arc<dyn FolderWatcher>>,
+}
+
+/// Adds folders to a watch that covers one folder at a time.
+pub trait FolderWatcher: Send + Sync {
+    /// Watches the entries of `folder` (absolute), not those of its subfolders.
+    fn add(&self, folder: &Path) -> FolderAdded;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FolderAdded {
+    Watched,
+    /// Gone meanwhile, or not readable.
+    Skipped,
+    /// The system's limit on watches is reached: no more folders can be watched.
+    Full,
+}
 
 /// A path of the working tree, as `read_entry` finds it.
 pub enum WorktreeEntry {

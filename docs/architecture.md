@@ -7,6 +7,7 @@ in Fyler. Each area in `features/`.
 
 ```text
 agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet period)
+                       └─▶ Linux: one watch per folder git does not ignore (Watching below)
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory)
@@ -142,13 +143,16 @@ In the core:
   `modules/repository`): no Tauri.
 - `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
   content (`tree.rs`), a version's whole text (`version.rs`), path checks, ignored-paths filter,
-  which watched changes matter (`watched.rs`), contracts. No Tauri, no disk of its own: it
-  declares the `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`,
-  `has_entry`) and the `RepositoryWatcher` port (changed paths after a quiet period), so it can
-  run on another machine (`plans/remote-projects.md`).
+  which watched changes matter (`watched.rs`), which folders to watch where the system watches one
+  at a time (`folders.rs`), contracts. No Tauri, no disk of its own: it declares the
+  `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`, `has_entry`,
+  `folders`) and the `RepositoryWatcher` port (changed paths after a quiet period; on inotify a
+  `FolderWatcher` to add folders through), so it can run on another machine
+  (`plans/remote-projects.md`).
 - `infrastructure/`: `git_cli.rs` (bounded git), `process.rs` (a child within an output size and a
   time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
-  command's reads would refresh again, without end; found by CI 2026-10-18), `agent/` (above),
+  command's reads would refresh again, without end; found by CI 2026-10-18; on Linux one
+  non-recursive watch per folder added), `agent/` (above),
   `linux_helper.rs` (the helper installed and started on a `LinuxMachine`), `wsl.rs` (distros,
   `WslRepositories`), `machines.rs` (which machine reads a project, and what every machine is
   told).
@@ -167,6 +171,26 @@ In the core:
   `check-ignore` its input size, ls-files 32 MiB. Pipes are read on threads; past the limit git is
   killed and output is `truncated` (cut records dropped, diffs cut at a whole line). stderr keeps
   64 KiB. 30 s timeout → `git_timed_out`.
+
+### Watching
+
+- macOS and Windows: one recursive watch of the root (and of the git dir when outside it):
+  FSEvents and `ReadDirectoryChangesW` cover a whole tree with one stream or handle.
+- Linux (2026-10-21; the app and the WSL helper): inotify watches one folder at a time
+  (`inotify(7)`: "not recursive"), and a recursive watch in notify walks and watches every folder,
+  `node_modules/` and `target/` included, and gave up the whole project at the first failure
+  (`max_user_watches`). fanotify covers a whole filesystem only with `CAP_SYS_ADMIN`. So, as VS
+  Code (`@parcel/watcher`, `src/linux/InotifyBackend.cc`: skips its ignore list) and Zed (a watch
+  per scanned folder, ignored ones not scanned) do: `folders.rs` watches each folder git does not
+  ignore (`check-ignore` once per level; a folder holding tracked files is not ignored), empty
+  ones included, each before reading it; not inside a repository within (a submodule) nor through
+  a link. Git dir: itself, `refs/`, `info/`.
+- A folder a batch created is watched before the change is told, so the read it brings sees what
+  it holds; one created while hidden when the window shows (no git runs before). A `.gitignore`
+  changed: every folder is looked at again. At the system's limit the folders watched stay, one
+  `warn` is logged, and no more are asked.
+- The limit: `max_user_watches`, per user, 8,192 before Linux 5.11; since then 1% of RAM over a
+  watch's cost, within 8,192-1,048,576 (`fs/notify/inotify/inotify_user.c`).
 
 ### Logs
 

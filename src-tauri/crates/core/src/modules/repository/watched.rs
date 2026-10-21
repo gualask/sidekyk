@@ -15,6 +15,9 @@ const GIT_DIR_ENTRIES: [&str; 7] = [
     "info",
 ];
 
+/// The entries of `GIT_DIR_ENTRIES` that are folders, watched with all they hold.
+pub(super) const GIT_DIR_FOLDERS: [&str; 2] = ["refs", "info"];
+
 /// What changed during one quiet period.
 #[derive(Debug, Default, PartialEq)]
 pub struct WatchedChanges {
@@ -62,6 +65,13 @@ mod tests {
             Path::new(root),
             Path::new(git_dir),
         )
+    }
+
+    #[test]
+    fn the_git_dir_folders_watched_are_entries_that_count() {
+        assert!(GIT_DIR_FOLDERS
+            .iter()
+            .all(|folder| GIT_DIR_ENTRIES.contains(folder)));
     }
 
     #[test]

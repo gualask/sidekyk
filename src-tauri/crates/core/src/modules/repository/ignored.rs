@@ -115,7 +115,7 @@ impl IgnoredPaths {
             if rel.as_os_str().is_empty() {
                 return None;
             }
-            if rel.file_name().is_some_and(|name| name == ".gitignore") {
+            if changes_rules(rel) {
                 self.forget();
                 return None;
             }
@@ -131,14 +131,20 @@ impl IgnoredPaths {
     }
 }
 
+/// Whether a change to `path` may change what git ignores: a `.gitignore`.
+pub(super) fn changes_rules(path: &Path) -> bool {
+    path.file_name().is_some_and(|name| name == ".gitignore")
+}
+
 /// A relative path as git writes it, with `/` on every platform. `None` when it is not UTF-8.
 pub(super) fn git_path(path: &Path) -> Option<String> {
     let parts: Option<Vec<&str>> = path.components().map(|c| c.as_os_str().to_str()).collect();
     Some(parts?.join("/"))
 }
 
-/// The paths among `paths` (relative to `root`) that git ignores, or `None` when git fails.
-fn check_ignore(
+/// The paths among `paths` (relative to `root`) that git ignores, or `None` when git fails. A
+/// folder that holds tracked files is not ignored, whatever the rules say of it.
+pub(super) fn check_ignore(
     backend: &dyn RepositoryBackend,
     root: &Path,
     paths: &BTreeSet<&Path>,
@@ -190,6 +196,10 @@ mod tests {
         }
 
         fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
+            unreachable!()
+        }
+
+        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<PathBuf>> {
             unreachable!()
         }
 

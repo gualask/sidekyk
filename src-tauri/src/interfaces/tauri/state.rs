@@ -38,7 +38,7 @@ fn repositories() -> Arc<dyn Repositories> {
     }
     LocalRepositories::new(
         Arc::new(LocalRepositoryBackend::default()),
-        Arc::new(LocalRepositoryWatcher),
+        Arc::new(LocalRepositoryWatcher::default()),
     )
 }
 

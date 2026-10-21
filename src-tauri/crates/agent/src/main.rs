@@ -35,7 +35,7 @@ fn main() -> ExitCode {
             }
             let repositories = LocalRepositories::new(
                 Arc::new(LocalRepositoryBackend::default()),
-                Arc::new(LocalRepositoryWatcher),
+                Arc::new(LocalRepositoryWatcher::default()),
             );
             match serve(repositories, std::io::stdin(), std::io::stdout()) {
                 Ok(()) => ExitCode::SUCCESS,

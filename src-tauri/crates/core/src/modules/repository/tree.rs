@@ -366,6 +366,10 @@ mod tests {
             self.0.lock().unwrap().contains(path.to_str().unwrap())
         }
 
+        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<std::path::PathBuf>> {
+            unreachable!()
+        }
+
         fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
             unreachable!()
         }
