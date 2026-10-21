@@ -19,6 +19,17 @@ impl Visible<'_> {
             Self::Paths(paths) => !paths.is_empty(),
         }
     }
+
+    /// The paths as git writes them, or `None` when any may count: unknown, more than `max`, or
+    /// a name that is not UTF-8, which would not match git's.
+    pub fn git_paths(&self, max: usize) -> Option<Vec<String>> {
+        match self {
+            Self::Paths(paths) if paths.len() <= max => {
+                paths.iter().map(|path| git_path(path)).collect()
+            }
+            _ => None,
+        }
+    }
 }
 
 /// Tells changes that can alter what Sidekyk shows from changes git ignores, such as a build
@@ -296,5 +307,17 @@ mod tests {
         assert!(ignored
             .visible(&git, &[PathBuf::from("/elsewhere/a.ts")])
             .any());
+    }
+
+    #[test]
+    fn visible_paths_go_as_git_writes_them_unless_too_many() {
+        let paths = [Path::new("src").join("cart.ts"), PathBuf::from("README.md")];
+        let visible = Visible::Paths(paths.iter().map(PathBuf::as_path).collect());
+        assert_eq!(
+            visible.git_paths(2),
+            Some(vec!["src/cart.ts".to_string(), "README.md".to_string()])
+        );
+        assert_eq!(visible.git_paths(1), None);
+        assert_eq!(Visible::Unknown.git_paths(2), None);
     }
 }

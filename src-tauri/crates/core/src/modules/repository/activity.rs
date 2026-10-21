@@ -20,7 +20,9 @@ pub fn load_commit_activity(
     since: i64,
 ) -> anyhow::Result<CommitActivity> {
     let root = existing_root(backend, repository)?;
-    let since = format!("--since=@{since}");
+    // git's own date format, exact for any time: a bare `@0` reads as now (`@` with fewer than
+    // nine digits is not taken as seconds)
+    let since = format!("--since=@{since} +0000");
     // one more than read, to know whether there are more
     let count = format!("-n{}", MAX_COMMITS + 1);
     let out = git_checked(

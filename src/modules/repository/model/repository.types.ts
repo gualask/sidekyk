@@ -241,9 +241,14 @@ export interface SyntaxColors {
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {
-    /** 2 since it names the project by its id (`projectId`), not its root. */
-    version: 2;
+    /** 3 since it names the paths that changed; 2 named the project by its id, not its root. */
+    version: 3;
     projectId: string;
     /** The index, HEAD or refs changed too: only then may the recent commits have. */
     gitDir: boolean;
+    /**
+     * The working tree's files or folders that changed, relative to the root with `/`; `null` when
+     * any may have (too many, git could not tell which are ignored, or a name is not UTF-8).
+     */
+    paths: string[] | null;
 }

@@ -21,6 +21,21 @@ pub struct RepositoryChange {
     /// The index, HEAD or refs changed too: the recent commits may have, and only then are they
     /// read again.
     pub git_dir: bool,
+    /// The working tree's files or folders that changed, relative to the root with `/`, so an
+    /// open file or diff no change touched is not read again; `None` when any may have (too
+    /// many, git could not tell which are ignored, or a name is not UTF-8).
+    pub paths: Option<Vec<String>>,
+}
+
+impl RepositoryChange {
+    /// Anything may have changed, git's files included: what the app shows is read again.
+    pub fn anything(root: String) -> Self {
+        Self {
+            root,
+            git_dir: true,
+            paths: None,
+        }
+    }
 }
 
 /// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
@@ -28,19 +43,22 @@ pub struct RepositoryChange {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
-    /// 2: the project named by its id; 1 named its root.
+    /// 3: with the paths that changed; 2 named the project by its id, 1 by its root.
     pub version: u8,
     pub project_id: String,
     /// As in `RepositoryChange`.
     pub git_dir: bool,
+    /// As in `RepositoryChange`.
+    pub paths: Option<Vec<String>>,
 }
 
 impl RepositoryChangedEvent {
-    pub fn new(project_id: &str, git_dir: bool) -> Self {
+    pub fn new(project_id: &str, change: RepositoryChange) -> Self {
         Self {
-            version: 2,
+            version: 3,
             project_id: project_id.to_string(),
-            git_dir,
+            git_dir: change.git_dir,
+            paths: change.paths,
         }
     }
 }
@@ -362,8 +380,26 @@ mod tests {
     #[test]
     fn repository_changed_event_is_versioned() {
         assert_eq!(
-            serde_json::to_value(RepositoryChangedEvent::new("/r", true)).unwrap(),
-            serde_json::json!({ "version": 2, "projectId": "/r", "gitDir": true })
+            serde_json::to_value(RepositoryChangedEvent::new(
+                "/r",
+                RepositoryChange::anything("/r".into())
+            ))
+            .unwrap(),
+            serde_json::json!({ "version": 3, "projectId": "/r", "gitDir": true, "paths": null })
+        );
+        let change = RepositoryChange {
+            root: "/r".into(),
+            git_dir: false,
+            paths: Some(vec!["src/a.ts".into()]),
+        };
+        assert_eq!(
+            serde_json::to_value(RepositoryChangedEvent::new("p", change)).unwrap(),
+            serde_json::json!({
+                "version": 3,
+                "projectId": "p",
+                "gitDir": false,
+                "paths": ["src/a.ts"]
+            })
         );
     }
 

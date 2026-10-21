@@ -41,10 +41,7 @@ pub fn serve(
             // the app does not wait: a change missed while hidden comes up as one
             Request::SetVisible { visible } => {
                 if let Some(root) = repositories.set_visible(visible) {
-                    let event = RepositoryChange {
-                        root,
-                        git_dir: true,
-                    };
+                    let event = RepositoryChange::anything(root);
                     send_message(&output, &Message::Changed(event));
                 }
                 reply(&output, id, value(()));

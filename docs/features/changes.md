@@ -5,7 +5,9 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 ## Behaviour
 
 - File list grouped as changes / new files / staged, with line counts; `↑`/`↓` or `j`/`k` move
-  between files. Refreshed when files or refs change on disk (watcher, `../architecture.md`).
+  between files. Refreshed when files or refs change on disk (watcher, `../architecture.md`);
+  the open diff only when the change touches its file (2026-10-21: an agent writing other files
+  read it again at every batch).
 - Viewer: "Changes | Full file" (default in settings). Changes: unified diff, binary and cut
   notices. Full file: the diff with full context, cut into git's three-line hunks (20 ms on a
   13,291-line file).

@@ -883,6 +883,8 @@ mod tests {
         let event = received.recv_timeout(DEADLINE).unwrap();
         assert_eq!(event.root, info.root);
         assert!(!event.git_dir);
+        let paths = event.paths.unwrap_or_default();
+        assert!(paths.iter().any(|path| path == "src/cart.ts"), "{paths:?}");
         settle();
 
         assert_eq!(repositories.set_visible(false), None);

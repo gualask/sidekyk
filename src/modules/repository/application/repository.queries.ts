@@ -1,5 +1,6 @@
 import {
     type QueryCache,
+    type QueryKey,
     type QueryState,
     type UseQueryResult,
     useQueries,
@@ -8,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
+import { changeTouches } from '../model/changed-paths';
 import { commitRequest } from '../model/commits';
 import type { DiffLine } from '../model/diff-parser';
 import { foldersToRead } from '../model/file-tree';
@@ -35,7 +37,7 @@ import { useRepositoryPort } from './repository.port';
  * Every query of a repository starts with its project's id, so a change on disk refetches only
  * its own.
  */
-const repositoryKeys = {
+export const repositoryKeys = {
     all: ['repository'] as const,
     of: (projectId: string) => [...repositoryKeys.all, projectId] as const,
     snapshot: (projectId: string) => [...repositoryKeys.of(projectId), 'snapshot'] as const,
@@ -64,6 +66,40 @@ const repositoryKeys = {
     colors: (projectId: string, { path, version }: ColorSource, first: number) =>
         [...repositoryKeys.of(projectId), 'colors', version.kind, path, first] as const,
 };
+
+/** Whether a key's value names a path that the working tree's `changed` paths touch. */
+function touchesPath(changed: readonly string[] | null, path: unknown): boolean {
+    return typeof path === 'string' && changeTouches(changed, path);
+}
+
+/**
+ * Whether files written in the working tree (`changed`, or any when `null`) may change what a
+ * repository query read, from its key as `repositoryKeys` lays it out. They make no commit and
+ * change neither the index nor HEAD, so neither the recent commits nor a staged diff; an open
+ * file, its colors or its diff only when it is theirs.
+ */
+export function worktreeChangeTouches(
+    queryKey: QueryKey,
+    changed: readonly string[] | null,
+): boolean {
+    const [, , kind, ...rest] = queryKey;
+    switch (kind) {
+        case 'commits':
+            return false;
+        case 'diff': {
+            const [area, path, origPath] = rest;
+            return (
+                area !== 'staged' && (touchesPath(changed, path) || touchesPath(changed, origPath))
+            );
+        }
+        case 'file':
+            return touchesPath(changed, rest[0]);
+        case 'colors':
+            return rest[0] === 'worktree' && touchesPath(changed, rest[1]);
+        default:
+            return true;
+    }
+}
 
 /**
  * What a commit changed never changes: kept apart from the repository's keys, so neither a change
@@ -393,14 +429,10 @@ export function useRepositoryChangeSubscription() {
     const queryClient = useQueryClient();
     useEffect(
         () =>
-            port.onRepositoryChanged(({ projectId, gitDir }) => {
+            port.onRepositoryChanged(({ projectId, gitDir, paths }) => {
                 void queryClient.invalidateQueries({
                     queryKey: repositoryKeys.of(projectId),
-                    // files written in the working tree make no commit, and change neither the
-                    // index nor HEAD
-                    predicate: ({ queryKey: [, , kind, version] }) =>
-                        gitDir ||
-                        (kind !== 'commits' && (kind !== 'colors' || version === 'worktree')),
+                    predicate: ({ queryKey }) => gitDir || worktreeChangeTouches(queryKey, paths),
                 });
             }),
         [port, queryClient],

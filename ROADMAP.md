@@ -5,12 +5,6 @@ A built item leaves this file for `docs/features/` (`docs/README.md`). Every ite
 repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/product.md`.
 
-## Try in the app
-
-- [ ] Syntax colors in the running app (`pnpm tauri:dev`; `docs/features/syntax-colors.md`)
-- [ ] Languages in the running app: the first start's language, the tray menu and tooltip as the
-      setting changes, dialog titles, an export (`docs/features/languages.md`)
-
 ## App
 
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
@@ -68,22 +62,13 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 
 ## Performance review
 
-Measure first: the first three give the numbers the rest are judged on (**After:** them).
+No measuring code in the app: a question below is measured with a temporary setup when it
+becomes a problem (decided 2026-10-21).
 
-- [ ] First paint and file switch timings as a script, also on the packaged app
-- [ ] Budgets in `docs/performance.md` (cold start, show from hidden, file switch, snapshot and
-      diff on reference repos, idle CPU/wakeups, memory, bundle and binary size); a commit over
-      budget says why
-- [ ] Reference repos for `backend_timings`: small, this one, Linux kernel scale, an unignored
-      `node_modules`
-- [ ] Idle footprint shown/hidden, quiet and during a burst (`powermetrics`, `footprint`)
+- [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
+      written, shortcut status read again): a lighter path for layout-only settings?
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
 - [ ] Tray count while hidden: watcher mark only, or a throttled `git status`
 - [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
       interval? skip `check-ignore` for tracked paths?
-- [ ] The open file (Files) and the open diff are read again on every change on disk; restrict to
-      changes that touch them
 - [ ] Prefetch neighbouring diffs, if switching shows a wait
-- [ ] Bundle and binary size budgets in CI
-- [ ] A sidebar drag stores every setting through `set_settings` (theme applied again, file
-      written, shortcut status read again): a lighter path for layout-only settings?

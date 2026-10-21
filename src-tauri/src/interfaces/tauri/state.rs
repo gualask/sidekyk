@@ -165,7 +165,7 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
         active.as_ref(),
         Box::new(move |change| {
             if let Some(project_id) = &project_id {
-                let event = RepositoryChangedEvent::new(project_id, change.git_dir);
+                let event = RepositoryChangedEvent::new(project_id, change);
                 let _ = emitter.emit(REPOSITORY_CHANGED_EVENT, event);
             }
         }),

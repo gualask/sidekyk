@@ -186,7 +186,8 @@ mod tests {
             &mut stream,
             &Message::Changed(RepositoryChange {
                 root: "/r".into(),
-                git_dir: true,
+                git_dir: false,
+                paths: Some(vec!["src/a.ts".into()]),
             }),
         )
         .unwrap();
@@ -196,7 +197,11 @@ mod tests {
         assert_eq!(read.id, 7);
         assert!(matches!(read.request, Request::Directory { path, .. } if path == "src"));
         let changed: Message = read_frame(&mut input).unwrap().unwrap();
-        assert!(matches!(changed, Message::Changed(event) if event.root == "/r" && event.git_dir));
+        assert!(matches!(
+            changed,
+            Message::Changed(event)
+                if event.root == "/r" && !event.git_dir && event.paths == Some(vec!["src/a.ts".into()])
+        ));
         assert!(read_frame::<Message>(&mut input).unwrap().is_none());
     }
 

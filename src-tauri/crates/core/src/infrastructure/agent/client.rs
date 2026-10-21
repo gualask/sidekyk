@@ -437,10 +437,7 @@ fn watching(kept: &Kept, root: &str) -> Option<SharedOnChange> {
 fn read_again(kept: &Kept) {
     let watched = lock(&kept.watched).clone();
     if let Some((repository, on_change)) = watched {
-        on_change(RepositoryChange {
-            root: repository.root.clone(),
-            git_dir: true,
-        });
+        on_change(RepositoryChange::anything(repository.root.clone()));
     }
 }
 

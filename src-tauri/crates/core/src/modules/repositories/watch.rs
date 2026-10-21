@@ -10,6 +10,10 @@ use crate::modules::repository::{
 };
 use crate::shared::sync::lock;
 
+/// More paths than this in one batch go as "any may have changed": a burst (a checkout, a
+/// dependency install) reads what is open again anyway, and the event stays small.
+const MAX_CHANGED_PATHS: usize = 100;
+
 pub(super) struct Watched {
     root: String,
     /// `None` when the watcher could not start, such as a repository moved away.
@@ -177,6 +181,7 @@ impl LocalRepositories {
             on_change(RepositoryChange {
                 root: root.to_string(),
                 git_dir: changes.git_dir,
+                paths: worktree.git_paths(MAX_CHANGED_PATHS),
             });
         }
     }

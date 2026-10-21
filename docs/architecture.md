@@ -10,9 +10,11 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory)
-                       └─▶ "repository-changed" { version: 2, projectId, gitDir }
+                       └─▶ "repository-changed" { version: 3, projectId, gitDir, paths }
                              └─▶ frontend invalidates ['repository', projectId, …]
-                                 (recent commits only when gitDir: index, HEAD, refs)
+                                 (recent commits and staged diffs only when gitDir: index,
+                                 HEAD, refs; the open file, diff and colors only when paths
+                                 touch them; paths null over 100 or when unknown)
                                    ├─▶ get_repository_snapshot   status + numstat ×3, with summary
                                    ├─▶ get_repository_summary    level 0 only (no snapshot there)
                                    ├─▶ get_file_diff             one file, one area
