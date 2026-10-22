@@ -73,8 +73,9 @@ Linux paths in separate columns; VS Code's identity is `vscode-remote://wsl+<dis
 - No `user`: the distro's default user, the one the agent runs as (Zed has an optional one).
 - Later: `sidekyk .` from a WSL shell, a script reading `$WSL_DISTRO_NAME` as both do.
 - Built: `Project { id, name, location }` (`../features/projects.md`); the id is made from the
-  location, opaque to the frontend. The app routes a project to what reads it by its location
-  (`ProjectsState::repositories_of`).
+  location, opaque to the frontend. Since 2026-10-22 `{ id, name, folders }`, the id made once
+  (`../features/projects.md`). The app routes a project to what reads it by its folder
+  (`ProjectsState::repositories_at`).
 
 ### How a WSL project shows (2026-10-18)
 

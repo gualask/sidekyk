@@ -8,7 +8,7 @@ use super::state::{self, ProjectsState};
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
-use sidekyk_core::modules::projects::{ProjectList, TilesLayout};
+use sidekyk_core::modules::projects::{ProjectList, Relocation, TilesLayout};
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
@@ -80,12 +80,13 @@ pub(crate) async fn set_project_layout(
 }
 
 #[tauri::command]
-/// Asks for the folder a moved repository is in now, and puts the project there, its notes and
-/// layout with it; into the project already there, if it is one. `None` when cancelled.
+/// Asks for the folder a moved repository is in now, and the project follows it there, keeping its
+/// id, notes and layout; a folder that is another project's is not taken, and that project comes
+/// back. `None` when cancelled.
 pub(crate) async fn relocate_project(
     app: tauri::AppHandle,
     project_id: String,
-) -> Result<Option<ProjectList>, AppError> {
+) -> Result<Option<Relocation>, AppError> {
     blocking("relocate_project", app, move |app| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
@@ -97,19 +98,15 @@ pub(crate) async fn relocate_project(
         else {
             return Ok(None);
         };
-        let found = projects.project_at(&folder.into_path()?)?;
-        if found.id == project_id {
-            return Ok(Some(projects.list()));
-        }
-        // the notes first: if they cannot follow, the project stays where it was
-        app.state::<NotesStore>().relink(
-            app.state::<NotesFiles>().inner(),
-            &project_id,
-            &found.id,
-        )?;
-        projects
-            .update(app, |list| list.relocate(&project_id, found))
-            .map(Some)
+        let found = projects.folder_at(&folder.into_path()?)?;
+        let (other, list) = projects.update_with(app, |list| list.relocate(&project_id, found))?;
+        Ok(Some(match other {
+            Some(other) => Relocation::InProject {
+                id: other.id,
+                name: other.name,
+            },
+            None => Relocation::Moved { list },
+        }))
     })
     .await
 }

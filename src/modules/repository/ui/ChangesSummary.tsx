@@ -1,7 +1,7 @@
 import { hasErrorCode } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { Stat } from '@/shared/ui/Stat';
 import { useRepositorySummary } from '../application/repository.queries';
 import { projectErrorMessage } from '../model/project-error';
@@ -71,16 +71,17 @@ function Counts({ project }: { project: ProjectInfo }) {
 function WeekOrProblem({ project }: { project: ProjectInfo }) {
     const summary = useCardSummary(project);
     const i18n = useTranslation();
+    const folder = projectFolder(project);
     // never started for a card: it says so
     if (
         summary.isError &&
         hasErrorCode(summary.error, 'distro_stopped') &&
-        project.location.kind === 'wsl'
+        folder?.kind === 'wsl'
     ) {
         return (
             <CardWell>
                 <WellMessage>
-                    {i18n.t('changes.distroStopped', { distro: project.location.distro })}
+                    {i18n.t('changes.distroStopped', { distro: folder.distro })}
                 </WellMessage>
             </CardWell>
         );
@@ -89,7 +90,7 @@ function WeekOrProblem({ project }: { project: ProjectInfo }) {
         return (
             <CardWell>
                 <WellMessage className="text-ui-danger">
-                    {projectErrorMessage(summary.error, project.location, i18n)}
+                    {projectErrorMessage(summary.error, folder, i18n)}
                 </WellMessage>
             </CardWell>
         );

@@ -1,7 +1,7 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { Translator } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
-import type { ProjectLocation } from '@/shared/projects/project-info';
+import { type ProjectLocation, projectFolder } from '@/shared/projects/project-info';
 import type { ContentFile, Highlight, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
@@ -20,7 +20,7 @@ export type PaletteItem =
           kind: 'project';
           projectId: string;
           /** Its folder, under the name; its machine the row's hint when not this one. */
-          location: ProjectLocation;
+          folder: ProjectLocation | null;
           label: string;
           highlights: Highlight[];
       }
@@ -91,7 +91,7 @@ export function paletteRows(
         item: {
             kind: 'project',
             projectId: project.id,
-            location: project.location,
+            folder: projectFolder(project),
             label: project.name,
             highlights: project.highlights,
         },

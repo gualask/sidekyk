@@ -3,6 +3,7 @@
 
 use super::contracts::{DeletedList, Note, NoteList, NotesSummary, ProjectNotes};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
+use crate::shared::id::is_id;
 
 /// The longest note, in bytes of UTF-8: a long answer of an agent fits many times over.
 pub const MAX_NOTE_BYTES: usize = 1024 * 1024;
@@ -68,11 +69,7 @@ pub fn note_title(text: &str) -> String {
     title
 }
 
-/// Whether `id` is one this module makes: it names a file, so nothing else is let through.
-pub fn is_id(id: &str) -> bool {
-    id.len() == 16 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
-}
-
+/// An id names a file, so nothing but one the app made is let through.
 fn checked_id(id: &str) -> anyhow::Result<()> {
     anyhow::ensure!(is_id(id), "not a note id: {id:?}");
     Ok(())
@@ -366,48 +363,6 @@ impl Book {
         Ok((self.snapshot(), touched))
     }
 
-    /// Takes in another book of the same project (found again where another project was): its
-    /// lists join those of the same name, the others come last; its open notes go below the open
-    /// ones of their list, in their order; done ones keep when they were done.
-    pub(super) fn absorb(&mut self, other: Book) -> Vec<Touched> {
-        let mut touched = vec![Touched::Lists];
-        let mut into = std::collections::HashMap::new();
-        for list in other.lists {
-            match self.lists.iter().find(|l| l.name == list.name) {
-                Some(own) => {
-                    into.insert(list.id, own.id.clone());
-                }
-                None => {
-                    into.insert(list.id.clone(), list.id.clone());
-                    self.lists.push(list);
-                }
-            }
-        }
-        // each list's bottom, found once, then moved down by each note put there
-        let mut bottoms: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-        for note in self.notes.iter().filter(|n| n.done.is_none()) {
-            let bottom = bottoms.entry(note.list.clone()).or_insert(note.position);
-            *bottom = bottom.max(note.position);
-        }
-        let mut notes = other.notes;
-        notes.sort_by(|a, b| a.position.total_cmp(&b.position));
-        for mut note in notes {
-            note.list = into
-                .get(&note.list)
-                .cloned()
-                .unwrap_or_else(|| self.lists[0].id.clone());
-            if note.done.is_none() {
-                let bottom = bottoms.get(&note.list).map_or(-1.0, |b| *b);
-                note.position = bottom + 1.0;
-                bottoms.insert(note.list.clone(), note.position);
-            }
-            self.notes.retain(|n| n.id != note.id);
-            touched.push(Touched::Note(note.id.clone()));
-            self.notes.push(note);
-        }
-        touched
-    }
-
     pub(super) fn open(&mut self, id: &str) -> anyhow::Result<Vec<Touched>> {
         self.list_index(id)?;
         if self.open_list == id {
@@ -681,33 +636,6 @@ mod tests {
     }
 
     #[test]
-    fn a_book_taken_in_joins_lists_of_the_same_name_below_their_notes() {
-        let mut target = with_notes(&["a"]);
-        let mut source = book();
-        source.lists[0].id = "3000000000000000".into();
-        source.lists[1].name = "Ideas".into();
-        source.notes = Vec::new();
-        source
-            .add(id(20), "3000000000000000", "b".into(), 1)
-            .unwrap();
-        let ideas = source.lists[1].id.clone();
-        source.add(id(21), &ideas, "i".into(), 1).unwrap();
-        let touched = target.absorb(source);
-        assert_eq!(order(&target, GENERAL), ["a", "b"]);
-        assert_eq!(order(&target, &ideas), ["i"]);
-        assert_eq!(
-            target
-                .lists
-                .iter()
-                .map(|l| l.name.as_str())
-                .collect::<Vec<_>>(),
-            ["General", "Release", "Ideas"]
-        );
-        assert!(touched.contains(&Touched::Lists));
-        assert!(touched.contains(&Touched::Note(id(20))));
-    }
-
-    #[test]
     fn opening_the_open_list_touches_nothing() {
         let mut book = book();
         assert!(book.open(GENERAL).unwrap().is_empty());
@@ -720,13 +648,5 @@ mod tests {
         assert_eq!(note_title(&long).chars().count(), TITLE_CHARS + 1);
         assert_eq!(note_title("   \n\n"), "");
         assert_eq!(note_title("\n  Watcher plan \n1."), "Watcher plan");
-    }
-
-    #[test]
-    fn ids_are_sixteen_lowercase_hex_digits() {
-        assert!(is_id("0123456789abcdef"));
-        assert!(!is_id("0123456789ABCDEF"));
-        assert!(!is_id("0123456789abcde"));
-        assert!(!is_id("../0123456789abc"));
     }
 }

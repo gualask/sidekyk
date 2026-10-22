@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { DiffView } from '@/shared/git/diff-view';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
+import { projectFolder } from '@/shared/projects/project-info';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
@@ -161,13 +162,14 @@ export function ChangesWorkspace({
             : null;
 
     const listWidth = useSidebarWidth('changes', LIST_WIDTH);
+    const folder = projectFolder(project);
     const listBox = useRef<HTMLElement>(null);
 
     return (
         <div className="flex h-full flex-col">
             {snapshot.isError ? (
                 <div className="border-b border-ui-border bg-ui-danger-soft px-4 py-2 text-sm text-ui-danger-soft-text">
-                    {projectErrorMessage(snapshot.error, project.location, i18n)}
+                    {projectErrorMessage(snapshot.error, folder, i18n)}
                 </div>
             ) : null}
             {/* about the working tree: not shown while its files make room for a commit's */}
@@ -307,10 +309,10 @@ export function ChangesWorkspace({
                             <IconCircleCheck size={32} stroke={1.5} />
                             <p className="text-sm">{i18n.t('changes.nothing')}</p>
                         </div>
-                    ) : snapshot.isPending && project.location.kind === 'wsl' ? (
+                    ) : snapshot.isPending && folder?.kind === 'wsl' ? (
                         // the first read may start the distro and Sidekyk's helper in it
                         <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
-                            {i18n.t('changes.starting', { distro: project.location.distro })}
+                            {i18n.t('changes.starting', { distro: folder.distro })}
                         </div>
                     ) : null}
                 </main>

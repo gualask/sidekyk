@@ -1184,18 +1184,18 @@ mod tests {
         // the palette over every file of the tree, as at each key typed
         let changed: std::sync::Arc<[_]> =
             load_snapshot(&backend, &repo.info).unwrap().files.into();
+        let project = Project::new(
+            repo.info.name.clone(),
+            Some(Location::Local {
+                root: repo.info.root.clone(),
+            }),
+        );
         let palette: SearchRequest = serde_json::from_value(json!({
             "query": "srcmod",
             "panels": ["Changes", "Files"],
-            "projectId": repo.info.root,
+            "projectId": project.id,
         }))
         .unwrap();
-        let project = Project::new(
-            repo.info.name.clone(),
-            Location::Local {
-                root: repo.info.root.clone(),
-            },
-        );
         println!(
             "search over {} files: {}",
             tree.files().len(),

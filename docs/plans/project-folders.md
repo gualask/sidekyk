@@ -28,9 +28,8 @@ Code's multi-root workspaces). High level; details when it is built.
   user.
 - Notes feel global without being so: the Inbox, moving notes, `⌘K` at level 0 finding notes of
   every project (today only projects).
-- Id: made, not derived from a location (a project without folder has none; with several folders
-  no single one names it). Today `Location::id` (`../features/projects.md`); Locate… then
-  relinks a folder, not the project.
+- Id: made, not derived from a location (built 2026-10-22, `../features/projects.md`); Locate…
+  changes a folder, not the project.
 - One folder first; several folders (VS Code's multi-root workspace) after, the model shaped for
   them from the start so the stored projects change once.
 - Without git: no Changes, summary counts, recent commits or tray count.

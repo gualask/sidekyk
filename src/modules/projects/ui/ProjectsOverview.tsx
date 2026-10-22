@@ -4,7 +4,7 @@ import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 
 import { flushSync } from 'react-dom';
 import { useTranslation } from '@/shared/i18n';
 import type { SummaryPart } from '@/shared/panels/panel';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
@@ -122,6 +122,7 @@ function ProjectCard({
     summary: (part: SummaryPart) => ReactNode;
 }) {
     const { t } = useTranslation();
+    const folder = projectFolder(project);
     return (
         <article
             data-zoom
@@ -143,13 +144,13 @@ function ProjectCard({
                         data-current-card={selected ? '' : undefined}
                         className="block max-w-full truncate text-left text-[15px] font-bold after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ui-accent"
                         // its overlay covers the card: the folder shows wherever the pointer rests
-                        title={placeName(project.location)}
+                        title={folder ? placeName(folder) : undefined}
                         onClick={onOpen}
                     >
                         {project.name}
                     </button>
                     <div className="flex min-w-0 items-center gap-1.5">
-                        <RemoteTag location={project.location} className="h-4 px-1.5 text-[11px]" />
+                        <RemoteTag folder={folder} className="h-4 px-1.5 text-[11px]" />
                         {summary('lead')}
                     </div>
                 </div>

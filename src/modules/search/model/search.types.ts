@@ -1,5 +1,5 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
-import type { ProjectLocation } from '@/shared/projects/project-info';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 
 /**
  * Wire contracts with the Rust backend (`src-tauri/crates/core/src/modules/search/contracts.rs`).
@@ -18,11 +18,8 @@ export interface SearchRequest {
 /** Where the query's letters are in a text: UTF-16 offsets `[start, end)`. */
 export type Highlight = [start: number, end: number];
 
-interface ProjectMatch {
-    id: string;
-    name: string;
-    /** Where it is, so two of one name can be told apart. */
-    location: ProjectLocation;
+/** A project as the projects' list has it: its folders tell two of one name apart. */
+interface ProjectMatch extends ProjectInfo {
     /** How well it matched, comparable with the query's other matches: the palette mixes them. */
     score: number;
     /** In the name. */

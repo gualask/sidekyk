@@ -1,5 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
-import type { ProjectList, TilesLayout } from '../model/project.types';
+import type { ProjectList, Relocation, TilesLayout } from '../model/project.types';
 
 /** The projects' runtime boundary: the native backend, or a fixture in browser dev mode. */
 export interface ProjectsPort {
@@ -10,10 +10,10 @@ export interface ProjectsPort {
     /** Forgets a project and deletes its notes; its repository is left as it is. */
     removeProject(projectId: string): Promise<ProjectList>;
     /**
-     * Asks for the folder a moved repository is in now and puts the project there (into the
-     * project already there, if one is). null when the user cancels.
+     * Asks for the folder a moved repository is in now, and the project follows it there; a
+     * folder that is another project's is not taken. null when the user cancels.
      */
-    relocateProject(projectId: string): Promise<ProjectList | null>;
+    relocateProject(projectId: string): Promise<Relocation | null>;
     /** Keeps how a project lays out its tiles. */
     setProjectLayout(projectId: string, layout: TilesLayout): Promise<ProjectList>;
     /** The list changed without the frontend asking. Returns a synchronous disposer. */

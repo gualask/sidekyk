@@ -5,7 +5,7 @@ import { activeProject, neighbourProject } from './project-list';
 const project = (name: string): ProjectInfo => ({
     id: `/p/${name}`,
     name,
-    location: { kind: 'local', root: `/p/${name}` },
+    folders: [{ kind: 'local', root: `/p/${name}` }],
 });
 const list = (active: string | null, ...names: string[]) => ({
     projects: names.map(project),

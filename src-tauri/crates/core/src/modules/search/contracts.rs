@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::modules::projects::Location;
+use crate::modules::projects::Project;
 
 /// What the command palette asks for, at every key typed.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -22,10 +22,9 @@ pub type Highlight = [u32; 2];
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectMatch {
-    pub id: String,
-    pub name: String,
-    /// Where it is, so two of one name can be told apart.
-    pub location: Location,
+    /// As the projects' list has it: its folders tell two of one name apart.
+    #[serde(flatten)]
+    pub project: Project,
     /// How well it matched, comparable with the other matches of the query: the palette mixes
     /// them by it.
     pub score: u32,
@@ -158,6 +157,7 @@ pub struct SearchResults {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::projects::Location;
 
     #[test]
     fn request_and_results_use_the_frontend_field_names() {
@@ -178,11 +178,13 @@ mod tests {
 
         let results = SearchResults {
             projects: vec![ProjectMatch {
-                id: "/r".into(),
-                name: "r".into(),
-                location: Location::Wsl {
-                    distro: "Ubuntu".into(),
-                    root: "/r".into(),
+                project: Project {
+                    id: "/r".into(),
+                    name: "r".into(),
+                    folders: vec![Location::Wsl {
+                        distro: "Ubuntu".into(),
+                        root: "/r".into(),
+                    }],
                 },
                 score: 30,
                 highlights: vec![[0, 1]],
@@ -232,7 +234,7 @@ mod tests {
                 "projects": [{
                     "id": "/r",
                     "name": "r",
-                    "location": { "kind": "wsl", "distro": "Ubuntu", "root": "/r" },
+                    "folders": [{ "kind": "wsl", "distro": "Ubuntu", "root": "/r" }],
                     "score": 30,
                     "highlights": [[0, 1]]
                 }],

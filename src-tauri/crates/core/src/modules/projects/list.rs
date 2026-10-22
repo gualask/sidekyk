@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use super::contracts::{Location, Project, ProjectList, TilesLayout};
+use super::place::{linux_parts, local_parts, same_distro, FoundFolder, IGNORE_CASE};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A stored layout is the frontend's: panel ids are short words, and a project has a few panels.
@@ -36,12 +37,31 @@ impl ProjectList {
         self.projects.iter().find(|p| p.id == id)
     }
 
-    /// Adds the project at the end, unless it is already there, and puts it on screen.
-    pub fn add(&mut self, project: Project) {
-        if self.find(&project.id).is_err() {
-            self.projects.push(project.clone());
-        }
-        self.active = Some(project.id);
+    /// Every project's folders.
+    pub fn folders(&self) -> impl Iterator<Item = &Location> {
+        self.projects.iter().flat_map(|p| &p.folders)
+    }
+
+    /// The project following the folder at `location`, if one does.
+    pub fn at(&self, location: &Location) -> Option<&Project> {
+        self.projects
+            .iter()
+            .find(|p| p.folders.iter().any(|f| f.same_place(location)))
+    }
+
+    /// Puts on screen the project following `found`, adding one at the end, named after the
+    /// folder, when none does: a folder is one project's.
+    pub fn open_folder(&mut self, found: FoundFolder) {
+        let id = match self.at(&found.location) {
+            Some(project) => project.id.clone(),
+            None => {
+                let project = Project::new(found.name, Some(found.location));
+                let id = project.id.clone();
+                self.projects.push(project);
+                id
+            }
+        };
+        self.active = Some(id);
     }
 
     pub fn activate(&mut self, id: &str) -> anyhow::Result<()> {
@@ -67,79 +87,50 @@ impl ProjectList {
         Ok(())
     }
 
-    /// Whether `path`, on this machine, is inside a local project's repository. `canonical` names
-    /// a path as the file system does (links resolved); `ignore_case` compares letters without
-    /// case, as macOS and Windows do by default.
-    pub fn holds(
+    /// Whether `path`, on this machine, is inside a local project's folder, compared as the file
+    /// system does. `canonical` names a path as the file system does (links resolved).
+    pub fn holds(&self, path: &Path, canonical: impl Fn(&Path) -> PathBuf) -> bool {
+        self.holds_as(path, canonical, IGNORE_CASE)
+    }
+
+    fn holds_as(
         &self,
         path: &Path,
         canonical: impl Fn(&Path) -> PathBuf,
         ignore_case: bool,
     ) -> bool {
-        let fold = |path: &Path| -> Vec<String> {
-            canonical(path)
-                .components()
-                .map(|part| {
-                    let part = part.as_os_str().to_string_lossy();
-                    if ignore_case {
-                        part.to_lowercase()
-                    } else {
-                        part.into_owned()
-                    }
-                })
-                .collect()
-        };
-        let path = fold(path);
-        self.projects.iter().any(|p| {
-            p.location
-                .local_root()
-                .is_some_and(|root| path.starts_with(&fold(Path::new(root))))
-        })
+        let parts = |path: &Path| local_parts(&canonical(path), ignore_case);
+        let path = parts(path);
+        self.folders()
+            .filter_map(Location::local_root)
+            .any(|root| path.starts_with(&parts(Path::new(root))))
     }
 
-    /// Whether `path`, in WSL `distro`, is inside one of its projects' repositories.
+    /// Whether `path`, in WSL `distro`, is inside one of its projects' folders.
     pub fn holds_in_wsl(&self, distro: &str, path: &str) -> bool {
-        let parts = |path: &str| -> Vec<String> {
-            path.split('/')
-                .filter(|part| !part.is_empty())
-                .map(String::from)
-                .collect()
-        };
-        let path = parts(path);
-        self.projects.iter().any(|p| match &p.location {
+        let path = linux_parts(path);
+        self.folders().any(|folder| match folder {
             Location::Wsl { distro: d, root } => {
-                d.eq_ignore_ascii_case(distro) && path.starts_with(&parts(root))
+                same_distro(d, distro) && path.starts_with(&linux_parts(root))
             }
             Location::Local { .. } => false,
         })
     }
 
-    /// A project found again at `found` (its repository moved): it takes the new place, and the
-    /// id that comes with it, in its position, its layout with it, and stays on screen if it was.
-    /// When `found` is a project already, the old one goes into it instead.
-    pub fn relocate(&mut self, id: &str, found: Project) -> anyhow::Result<()> {
+    /// A project's folder found again at `found` (it moved): the project follows it there, and
+    /// keeps its id, name, notes and layout. When `found` is another project's folder, nothing
+    /// changes and that project comes back: a folder is one project's.
+    pub fn relocate(&mut self, id: &str, found: FoundFolder) -> anyhow::Result<Option<Project>> {
         let index = self
             .projects
             .iter()
             .position(|p| p.id == id)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
-        if found.id == id {
-            return Ok(());
+        if let Some(other) = self.at(&found.location).filter(|p| p.id != id) {
+            return Ok(Some(other.clone()));
         }
-        let was_active = self.active.as_deref() == Some(id);
-        let layout = self.layouts.remove(id);
-        if self.find(&found.id).is_ok() {
-            self.projects.remove(index);
-        } else {
-            if let Some(layout) = layout {
-                self.layouts.insert(found.id.clone(), layout);
-            }
-            self.projects[index] = found.clone();
-        }
-        if was_active {
-            self.active = Some(found.id);
-        }
-        Ok(())
+        self.projects[index].folders = vec![found.location];
+        Ok(None)
     }
 
     /// Forgets a project; its repository is left as it is. When it was on screen, the one after
@@ -165,8 +156,9 @@ mod tests {
     use super::*;
     use crate::shared::error::user_facing_code;
 
+    /// A project stored before ids, so its id is its root: `/a`.
     fn project(root: &str) -> Project {
-        Project::new(
+        Project::stored_before_ids(
             root.trim_start_matches('/').into(),
             Location::Local { root: root.into() },
         )
@@ -180,14 +172,37 @@ mod tests {
         }
     }
 
-    #[test]
-    fn adding_appends_once_and_puts_the_project_on_screen() {
-        let mut projects = list(&["/a", "/b"], Some("/a"));
-        projects.add(project("/c"));
-        assert_eq!(projects, list(&["/a", "/b", "/c"], Some("/c")));
+    fn found(root: &str) -> FoundFolder {
+        FoundFolder {
+            name: root.trim_start_matches('/').into(),
+            location: Location::Local { root: root.into() },
+        }
+    }
 
-        projects.add(project("/a"));
-        assert_eq!(projects, list(&["/a", "/b", "/c"], Some("/a")));
+    fn roots(projects: &ProjectList) -> Vec<&str> {
+        projects
+            .projects
+            .iter()
+            .map(|p| p.folder().map_or("", Location::root))
+            .collect()
+    }
+
+    #[test]
+    fn a_new_folder_is_a_new_project_on_screen() {
+        let mut projects = list(&["/a", "/b"], Some("/a"));
+        projects.open_folder(found("/c"));
+        assert_eq!(roots(&projects), ["/a", "/b", "/c"]);
+        let added = &projects.projects[2];
+        assert_eq!(added.name, "c");
+        assert_ne!(added.id, "/c");
+        assert_eq!(projects.active.as_deref(), Some(added.id.as_str()));
+    }
+
+    #[test]
+    fn a_folder_already_followed_opens_its_project() {
+        let mut projects = list(&["/a", "/b"], Some("/b"));
+        projects.open_folder(found("/a/"));
+        assert_eq!(projects, list(&["/a", "/b"], Some("/a")));
     }
 
     #[test]
@@ -264,28 +279,28 @@ mod tests {
     fn a_path_inside_a_repository_is_found_however_it_is_written() {
         let projects = list(&["/Dev/Shop"], Some("/Dev/Shop"));
         let same = |path: &Path| path.to_path_buf();
-        assert!(projects.holds(Path::new("/Dev/Shop/notes.md"), same, false));
-        assert!(!projects.holds(Path::new("/Dev/Shopping/notes.md"), same, false));
-        assert!(!projects.holds(Path::new("/dev/shop/notes.md"), same, false));
-        assert!(projects.holds(Path::new("/dev/shop/notes.md"), same, true));
+        assert!(projects.holds_as(Path::new("/Dev/Shop/notes.md"), same, false));
+        assert!(!projects.holds_as(Path::new("/Dev/Shopping/notes.md"), same, false));
+        assert!(!projects.holds_as(Path::new("/dev/shop/notes.md"), same, false));
+        assert!(projects.holds_as(Path::new("/dev/shop/notes.md"), same, true));
         // a link to the repository, as the file system resolves it
         let resolved =
             |path: &Path| PathBuf::from(path.to_string_lossy().replace("/link", "/Dev/Shop"));
-        assert!(projects.holds(Path::new("/link/notes.md"), resolved, false));
+        assert!(projects.holds_as(Path::new("/link/notes.md"), resolved, false));
     }
 
     #[test]
     fn a_wsl_project_holds_no_path_of_this_machine() {
         let mut projects = list(&[], None);
-        projects.add(Project::new(
-            "shop".into(),
-            Location::Wsl {
+        projects.open_folder(FoundFolder {
+            name: "shop".into(),
+            location: Location::Wsl {
                 distro: "Ubuntu".into(),
                 root: "/home/ale/shop".into(),
             },
-        ));
+        });
         let same = |path: &Path| path.to_path_buf();
-        assert!(!projects.holds(Path::new("/home/ale/shop/notes.md"), same, false));
+        assert!(!projects.holds_as(Path::new("/home/ale/shop/notes.md"), same, false));
         assert!(projects.holds_in_wsl("Ubuntu", "/home/ale/shop/notes.md"));
         assert!(projects.holds_in_wsl("ubuntu", "/home/ale/shop"));
         assert!(!projects.holds_in_wsl("Ubuntu", "/home/ale/shopping/notes.md"));
@@ -293,28 +308,24 @@ mod tests {
     }
 
     #[test]
-    fn a_project_found_elsewhere_keeps_its_place_and_layout() {
+    fn a_project_found_elsewhere_keeps_its_id_name_place_and_layout() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
         projects.set_layout("/a", layout(0.3)).unwrap();
-        projects.relocate("/a", project("/moved")).unwrap();
-        assert_eq!(
-            projects
-                .projects
-                .iter()
-                .map(|p| p.id.as_str())
-                .collect::<Vec<_>>(),
-            ["/moved", "/b"]
-        );
-        assert_eq!(projects.active.as_deref(), Some("/moved"));
-        assert_eq!(projects.layouts["/moved"].split, 0.3);
-        assert!(!projects.layouts.contains_key("/a"));
+        assert_eq!(projects.relocate("/a", found("/moved")).unwrap(), None);
+        assert_eq!(roots(&projects), ["/moved", "/b"]);
+        let moved = &projects.projects[0];
+        assert_eq!((moved.id.as_str(), moved.name.as_str()), ("/a", "a"));
+        assert_eq!(projects.active.as_deref(), Some("/a"));
+        assert_eq!(projects.layouts["/a"].split, 0.3);
     }
 
     #[test]
-    fn a_project_found_at_another_project_goes_into_it() {
+    fn a_folder_of_another_project_is_not_taken() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
-        projects.relocate("/a", project("/b")).unwrap();
-        assert_eq!(projects, list(&["/b"], Some("/b")));
-        assert!(projects.relocate("/gone", project("/c")).is_err());
+        let other = projects.relocate("/a", found("/b")).unwrap();
+        assert_eq!(other.map(|p| p.id), Some("/b".into()));
+        assert_eq!(projects, list(&["/a", "/b"], Some("/a")));
+        assert_eq!(projects.relocate("/a", found("/a")).unwrap(), None);
+        assert!(projects.relocate("/gone", found("/c")).is_err());
     }
 }

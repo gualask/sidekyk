@@ -14,6 +14,14 @@ export interface ProjectList {
     layouts: Record<string, TilesLayout>;
 }
 
+/**
+ * What Locate… did: the project follows its folder's new place, or that folder is another
+ * project's, which stays as it is.
+ */
+export type Relocation =
+    | { kind: 'moved'; list: ProjectList }
+    | { kind: 'inProject'; id: string; name: string };
+
 /** A project's tiles, as the user left them. */
 export interface TilesLayout {
     /** The panels minimized to the top bar, by id. */

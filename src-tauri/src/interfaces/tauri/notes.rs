@@ -277,11 +277,10 @@ pub(crate) async fn export_notes(
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
-        let ignore_case = cfg!(any(target_os = "macos", windows));
         let list = projects.list();
         let inside = match wsl_path(&path) {
             Some((distro, path)) => list.holds_in_wsl(&distro, &path),
-            None => list.holds(&path, resolved_path, ignore_case),
+            None => list.holds(&path, resolved_path),
         };
         if inside {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));

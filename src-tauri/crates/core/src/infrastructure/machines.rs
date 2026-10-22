@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::wsl::{installed_distro, wsl_path, WslRepositories};
-use crate::modules::projects::{Location, Project};
+use crate::modules::projects::{same_distro, FoundFolder, Location, Project, ProjectList};
 use crate::modules::repositories::{OnChange, Repositories};
 
 pub struct Machines {
@@ -25,7 +25,7 @@ impl Machine {
     fn holds(&self, location: &Location) -> bool {
         match (self, location) {
             (Self::Local, Location::Local { .. }) => true,
-            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => distro.eq_ignore_ascii_case(d),
+            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => same_distro(distro, d),
             _ => false,
         }
     }
@@ -65,45 +65,49 @@ impl Machines {
             .collect()
     }
 
-    /// The project that contains `candidate`: a folder of this machine, or of a WSL distro as
+    /// The repository that contains `candidate`: a folder of this machine, or of a WSL distro as
     /// Windows names it (`\\wsl.localhost\<distro>\…`), read in that distro.
-    pub fn project_at(&self, candidate: &Path) -> anyhow::Result<Project> {
+    pub fn folder_at(&self, candidate: &Path) -> anyhow::Result<FoundFolder> {
         let Some((distro, path)) = wsl_path(candidate) else {
-            return Ok(Project::local(self.local.resolve(candidate)?));
+            return Ok(FoundFolder::local(self.local.resolve(candidate)?));
         };
         // as WSL names it: `ubuntu` typed in the dialog is the project of `Ubuntu`
         let distro = installed_distro(&distro)?;
         let found = self.wsl.of(&distro).resolve(Path::new(&path))?;
-        Ok(Project::new(
-            found.name,
-            Location::Wsl {
+        Ok(FoundFolder {
+            name: found.name,
+            location: Location::Wsl {
                 distro,
                 root: found.root,
             },
-        ))
+        })
     }
 
-    /// Watches `project`, the one on screen, where it is; every other machine first watches
-    /// nothing, so a helper left idle closes in time.
+    /// Watches `project`, the one on screen, where its folder is; every other machine first
+    /// watches nothing, so a helper left idle closes in time. A project without folder is not
+    /// watched.
     pub fn watch(&self, project: Option<&Project>, on_change: OnChange) {
+        let followed = project.and_then(Project::repository);
         for (machine, repositories) in self.every() {
-            if !project.is_some_and(|p| machine.holds(&p.location)) {
+            if !followed
+                .as_ref()
+                .is_some_and(|(folder, _)| machine.holds(folder))
+            {
                 repositories.watch(None, Box::new(|_| {}));
             }
         }
-        if let Some(project) = project {
-            self.of(&project.location)
-                .watch(Some(&project.repository()), on_change);
+        if let Some((folder, info)) = followed {
+            self.of(folder).watch(Some(&info), on_change);
         }
     }
 
-    /// Tells each machine the projects it still reads, of `projects`.
-    pub fn retain(&self, projects: &[Project]) {
+    /// Tells each machine the folders it still reads, of `list`'s.
+    pub fn retain(&self, list: &ProjectList) {
         for (machine, repositories) in self.every() {
-            let roots: Vec<String> = projects
-                .iter()
-                .filter(|p| machine.holds(&p.location))
-                .map(|p| p.location.root().to_string())
+            let roots: Vec<String> = list
+                .folders()
+                .filter(|folder| machine.holds(folder))
+                .map(|folder| folder.root().to_string())
                 .collect();
             repositories.retain(&roots);
         }
@@ -123,5 +127,124 @@ impl Machines {
         for (_, repositories) in self.every() {
             repositories.stop_content_search();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+    use crate::modules::repository::{
+        CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
+        FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+        UnifiedDiff,
+    };
+    use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
+    use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
+    use crate::shared::sync::lock;
+
+    /// A machine that records what it is told to watch and keep; asked to read, it fails the test.
+    #[derive(Default)]
+    struct Told {
+        watched: Mutex<Vec<Option<String>>>,
+        retained: Mutex<Vec<Vec<String>>>,
+    }
+
+    impl Repositories for Told {
+        fn resolve(&self, _: &Path) -> anyhow::Result<RepositoryInfo> {
+            unreachable!()
+        }
+        fn snapshot(&self, _: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {
+            unreachable!()
+        }
+        fn summary(&self, _: &RepositoryInfo) -> anyhow::Result<RepositorySummary> {
+            unreachable!()
+        }
+        fn file_diff(
+            &self,
+            _: &RepositoryInfo,
+            _: &FileDiffRequest,
+        ) -> anyhow::Result<UnifiedDiff> {
+            unreachable!()
+        }
+        fn recent_commits(&self, _: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
+            unreachable!()
+        }
+        fn commit_activity(&self, _: &RepositoryInfo, _: i64) -> anyhow::Result<CommitActivity> {
+            unreachable!()
+        }
+        fn commit_files(
+            &self,
+            _: &RepositoryInfo,
+            _: &CommitRequest,
+        ) -> anyhow::Result<CommitFiles> {
+            unreachable!()
+        }
+        fn commit_file_diff(
+            &self,
+            _: &RepositoryInfo,
+            _: &CommitFileDiffRequest,
+        ) -> anyhow::Result<UnifiedDiff> {
+            unreachable!()
+        }
+        fn directory(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<Directory> {
+            unreachable!()
+        }
+        fn file_content(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileContent> {
+            unreachable!()
+        }
+        fn syntax_colors(
+            &self,
+            _: &RepositoryInfo,
+            _: &SyntaxRequest,
+        ) -> anyhow::Result<SyntaxColors> {
+            unreachable!()
+        }
+        fn search_files(&self, _: &RepositoryInfo, _: &str) -> Option<FileMatches> {
+            unreachable!()
+        }
+        fn search_contents(
+            &self,
+            _: &RepositoryInfo,
+            _: &str,
+            _: &(dyn Fn(Vec<ContentFile>) + Sync),
+        ) -> anyhow::Result<ContentEnd> {
+            unreachable!()
+        }
+        fn stop_content_search(&self) {}
+        fn retain(&self, roots: &[String]) {
+            lock(&self.retained).push(roots.to_vec());
+        }
+        fn watch(&self, repository: Option<&RepositoryInfo>, _: OnChange) {
+            lock(&self.watched).push(repository.map(|r| r.root.clone()));
+        }
+        fn set_visible(&self, _: bool) -> Option<String> {
+            None
+        }
+    }
+
+    #[test]
+    fn a_project_without_folder_is_never_routed_to_a_machine() {
+        let local = Arc::new(Told::default());
+        let machines = Machines::new(local.clone(), PathBuf::new());
+        let home = Project::new("Home".into(), None);
+        let shop = Project::new(
+            "shop".into(),
+            Some(Location::Local {
+                root: "/shop".into(),
+            }),
+        );
+
+        machines.watch(Some(&home), Box::new(|_| {}));
+        machines.retain(&ProjectList {
+            projects: vec![home.clone(), shop.clone()],
+            ..ProjectList::default()
+        });
+        assert_eq!(*lock(&local.watched), [None]);
+        assert_eq!(*lock(&local.retained), [["/shop"]]);
+
+        machines.watch(Some(&shop), Box::new(|_| {}));
+        assert_eq!(*lock(&local.watched), [None, Some("/shop".into())]);
     }
 }

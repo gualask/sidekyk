@@ -1,5 +1,4 @@
 export { type NotesPort, NotesProvider } from './application/notes.port';
-export { useRereadNotes } from './application/notes.queries';
 export { NotesSettingsProvider } from './application/notes-settings';
 // for the browser fixtures, which keep notes as the backend does
 export { doneNotes, noteTitle, openNotes, positionAt } from './model/notes';

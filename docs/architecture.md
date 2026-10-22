@@ -123,7 +123,7 @@ In the app:
   window in the stored theme, tray, restores projects, opens the CLI argument.
 - `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, the order of
   watch calls, and the `Repositories` the projects are read through; the commands check a project
-  is in the list first, and find what reads it from its location). Blocking work on
+  is in the list first, and find what reads it from its folder). Blocking work on
   `spawn_blocking`.
 
 In the core:

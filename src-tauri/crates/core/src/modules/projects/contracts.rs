@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::modules::repository::RepositoryInfo;
+use crate::shared::id::new_id;
 
 pub const PROJECTS_CHANGED_EVENT: &str = "projects-changed";
 
@@ -23,40 +24,55 @@ pub struct ProjectList {
     pub layouts: BTreeMap<String, TilesLayout>,
 }
 
-/// A repository the user added.
+/// A project: a name, its notes, and the folders it follows (`docs/plans/project-folders.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", try_from = "StoredProject")]
 pub struct Project {
-    /// What the frontend and the app data (notes, layouts) know the project by: `location.id()`.
+    /// What the frontend and the app data (notes, layouts) know the project by. Made once and
+    /// kept: a project whose folder moves keeps its id.
     pub id: String,
     pub name: String,
-    pub location: Location,
+    /// The folders it follows: none, or one repository.
+    pub folders: Vec<Location>,
 }
 
 impl Project {
-    pub fn new(name: String, location: Location) -> Self {
+    /// A new project, with a new id: none or one folder for now.
+    pub fn new(name: String, folder: Option<Location>) -> Self {
         Self {
-            id: location.id(),
+            id: new_id(),
             name,
-            location,
+            folders: folder.into_iter().collect(),
         }
     }
 
-    /// A repository of this machine, as found there.
-    pub fn local(found: RepositoryInfo) -> Self {
-        Self::new(found.name, Location::Local { root: found.root })
+    /// A project as stored before ids were made: its id is its location's.
+    pub fn stored_before_ids(name: String, location: Location) -> Self {
+        Self {
+            id: location.id_before_made_ids(),
+            name,
+            folders: vec![location],
+        }
     }
 
-    /// The repository as the machine holding it knows it, for what reads it there.
-    pub fn repository(&self) -> RepositoryInfo {
-        RepositoryInfo {
-            root: self.location.root().to_string(),
+    /// The folder it follows, if any.
+    pub fn folder(&self) -> Option<&Location> {
+        self.folders.first()
+    }
+
+    /// Its repository: the folder, which says what reads it, and the repository as the machine
+    /// holding it knows it. `None` for a project without folder.
+    pub fn repository(&self) -> Option<(&Location, RepositoryInfo)> {
+        let folder = self.folder()?;
+        let info = RepositoryInfo {
+            root: folder.root().to_string(),
             name: self.name.clone(),
-        }
+        };
+        Some((folder, info))
     }
 }
 
-/// Where a project's repository is (`docs/plans/remote-projects.md`).
+/// Where a project's folder is (`docs/plans/remote-projects.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum Location {
@@ -67,24 +83,24 @@ pub enum Location {
 }
 
 impl Location {
-    /// The id of the project here: never read back, only compared. A local project's is its root,
-    /// as before projects had ids; a WSL project's names its distro too, as VS Code's
-    /// `vscode-remote://wsl+<distro>/<path>`. Two projects in one place have the same id.
-    pub fn id(&self) -> String {
+    /// The id a project at this location had before ids were made, kept by those stored then: a
+    /// local project's root; a WSL project's names its distro too, as VS Code's
+    /// `vscode-remote://wsl+<distro>/<path>`.
+    pub fn id_before_made_ids(&self) -> String {
         match self {
             Self::Local { root } => root.clone(),
             Self::Wsl { distro, root } => format!("wsl:{distro}:{root}"),
         }
     }
 
-    /// The repository's root on the machine that holds it.
+    /// The folder's root on the machine that holds it.
     pub fn root(&self) -> &str {
         match self {
             Self::Local { root } | Self::Wsl { root, .. } => root,
         }
     }
 
-    /// The root, for a repository of this machine.
+    /// The root, for a folder of this machine.
     pub fn local_root(&self) -> Option<&str> {
         match self {
             Self::Local { root } => Some(root),
@@ -93,11 +109,29 @@ impl Location {
     }
 }
 
-/// A project as stored: its id is not read but made again from its location, so the two always
-/// agree; a project stored before locations has its root instead, and is a local one.
+/// What Locate… did: the project follows its folder's new place, or that folder is another
+/// project's, which stays as it is.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum Relocation {
+    Moved {
+        list: ProjectList,
+    },
+    #[serde(rename_all = "camelCase")]
+    InProject {
+        id: String,
+        name: String,
+    },
+}
+
+/// A project as stored: today `{ id, name, folders }`. Older forms are read too: one location
+/// with its id, one location without (before ids), or a root (before locations), the last two
+/// taking their location's id.
 #[derive(Deserialize)]
 struct StoredProject {
+    id: Option<String>,
     name: String,
+    folders: Option<Vec<Location>>,
     location: Option<Location>,
     root: Option<String>,
 }
@@ -106,12 +140,25 @@ impl TryFrom<StoredProject> for Project {
     type Error = &'static str;
 
     fn try_from(stored: StoredProject) -> Result<Self, Self::Error> {
-        let location = match (stored.location, stored.root) {
-            (Some(location), _) => location,
-            (None, Some(root)) => Location::Local { root },
-            (None, None) => return Err("a project with no location"),
+        if stored.id.as_deref() == Some("") {
+            return Err("a project with an empty id");
+        }
+        let older = stored
+            .location
+            .or(stored.root.map(|root| Location::Local { root }));
+        let (folders, id) = match (stored.folders, older) {
+            (Some(folders), _) => (folders, stored.id.ok_or("a project with no id")?),
+            (None, Some(location)) => {
+                let id = stored.id.unwrap_or_else(|| location.id_before_made_ids());
+                (vec![location], id)
+            }
+            (None, None) => return Err("a project with no folders"),
         };
-        Ok(Project::new(stored.name, location))
+        Ok(Project {
+            id,
+            name: stored.name,
+            folders,
+        })
     }
 }
 
@@ -157,22 +204,40 @@ impl Default for ProjectsChangedEvent {
 mod tests {
     use super::*;
 
+    fn local(root: &str) -> Location {
+        Location::Local { root: root.into() }
+    }
+
+    fn wsl(distro: &str, root: &str) -> Location {
+        Location::Wsl {
+            distro: distro.into(),
+            root: root.into(),
+        }
+    }
+
     #[test]
     fn project_list_serializes_with_the_frontend_field_names() {
         let list = ProjectList {
             projects: vec![
-                Project::new("r".into(), Location::Local { root: "/r".into() }),
-                Project::new(
-                    "shop".into(),
-                    Location::Wsl {
-                        distro: "Ubuntu".into(),
-                        root: "/home/ale/shop".into(),
-                    },
-                ),
+                Project {
+                    id: "0123456789abcdef".into(),
+                    name: "r".into(),
+                    folders: vec![local("/r")],
+                },
+                Project {
+                    id: "fedcba9876543210".into(),
+                    name: "shop".into(),
+                    folders: vec![wsl("Ubuntu", "/home/ale/shop")],
+                },
+                Project {
+                    id: "00112233445566ff".into(),
+                    name: "Home".into(),
+                    folders: vec![],
+                },
             ],
-            active: Some("/r".into()),
+            active: Some("0123456789abcdef".into()),
             layouts: BTreeMap::from([(
-                "/r".into(),
+                "0123456789abcdef".into(),
                 TilesLayout {
                     minimized: vec!["files".into()],
                     split: 0.4,
@@ -181,18 +246,48 @@ mod tests {
         };
         let json = serde_json::json!({
             "projects": [
-                { "id": "/r", "name": "r", "location": { "kind": "local", "root": "/r" } },
                 {
-                    "id": "wsl:Ubuntu:/home/ale/shop",
+                    "id": "0123456789abcdef",
+                    "name": "r",
+                    "folders": [{ "kind": "local", "root": "/r" }]
+                },
+                {
+                    "id": "fedcba9876543210",
                     "name": "shop",
-                    "location": { "kind": "wsl", "distro": "Ubuntu", "root": "/home/ale/shop" }
-                }
+                    "folders": [{ "kind": "wsl", "distro": "Ubuntu", "root": "/home/ale/shop" }]
+                },
+                { "id": "00112233445566ff", "name": "Home", "folders": [] }
             ],
-            "active": "/r",
-            "layouts": { "/r": { "minimized": ["files"], "split": 0.4 } }
+            "active": "0123456789abcdef",
+            "layouts": { "0123456789abcdef": { "minimized": ["files"], "split": 0.4 } }
         });
         assert_eq!(serde_json::to_value(&list).unwrap(), json);
         assert_eq!(serde_json::from_value::<ProjectList>(json).unwrap(), list);
+    }
+
+    #[test]
+    fn a_project_stored_with_a_location_keeps_its_id() {
+        let json = serde_json::json!({
+            "id": "wsl:Ubuntu:/home/ale/shop",
+            "name": "shop",
+            "location": { "kind": "wsl", "distro": "Ubuntu", "root": "/home/ale/shop" }
+        });
+        let project = serde_json::from_value::<Project>(json).unwrap();
+        assert_eq!(project.id, "wsl:Ubuntu:/home/ale/shop");
+        assert_eq!(project.folders, [wsl("Ubuntu", "/home/ale/shop")]);
+    }
+
+    #[test]
+    fn a_project_stored_before_ids_takes_its_location_s() {
+        let json = serde_json::json!({
+            "name": "shop", "location": { "kind": "wsl", "distro": "Ubuntu", "root": "/s" }
+        });
+        let project = serde_json::from_value::<Project>(json).unwrap();
+        assert_eq!(project.id, "wsl:Ubuntu:/s");
+        assert_eq!(
+            project,
+            Project::stored_before_ids("shop".into(), wsl("Ubuntu", "/s"))
+        );
     }
 
     #[test]
@@ -202,10 +297,7 @@ mod tests {
         let list = serde_json::from_value::<ProjectList>(json).unwrap();
         assert_eq!(
             list.projects,
-            [Project::new(
-                "r".into(),
-                Location::Local { root: "/r".into() }
-            )]
+            [Project::stored_before_ids("r".into(), local("/r"))]
         );
         assert_eq!(list.projects[0].id, "/r");
     }
@@ -216,26 +308,42 @@ mod tests {
             "projects": [
                 { "name": "r", "location": { "kind": "local", "root": "/r" } },
                 { "name": "s", "location": { "kind": "ssh", "host": "box" } },
-                { "name": "t" }
+                { "name": "t" },
+                { "name": "u", "folders": [] },
+                { "id": "", "name": "v", "folders": [] }
             ],
             "active": "/r"
         });
         let list = serde_json::from_value::<ProjectList>(json).unwrap();
         assert_eq!(
             list.projects,
-            [Project::new(
-                "r".into(),
-                Location::Local { root: "/r".into() }
-            )]
+            [Project::stored_before_ids("r".into(), local("/r"))]
         );
     }
 
     #[test]
-    fn a_stored_id_gives_way_to_the_location() {
-        let json = serde_json::json!({
-            "id": "edited", "name": "r", "location": { "kind": "local", "root": "/r" }
-        });
-        assert_eq!(serde_json::from_value::<Project>(json).unwrap().id, "/r");
+    fn a_new_project_gets_an_id_of_its_own() {
+        let a = Project::new("shop".into(), Some(local("/shop")));
+        let b = Project::new("shop".into(), Some(local("/shop")));
+        assert_ne!(a.id, b.id);
+        assert_eq!(a.repository().unwrap().1.root, "/shop");
+        assert_eq!(Project::new("Home".into(), None).repository(), None);
+    }
+
+    #[test]
+    fn a_relocation_tells_the_frontend_what_happened() {
+        let in_project = Relocation::InProject {
+            id: "0123456789abcdef".into(),
+            name: "shop".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(in_project).unwrap(),
+            serde_json::json!({ "kind": "inProject", "id": "0123456789abcdef", "name": "shop" })
+        );
+        let moved = Relocation::Moved {
+            list: ProjectList::default(),
+        };
+        assert_eq!(serde_json::to_value(moved).unwrap()["kind"], "moved");
     }
 
     #[test]

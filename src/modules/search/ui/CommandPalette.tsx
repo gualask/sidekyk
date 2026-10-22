@@ -435,7 +435,7 @@ function Row({
                 {item.kind === 'project' ? (
                     <span className="flex min-w-0 flex-col">
                         <Label text={item.label} highlights={item.highlights} mono={false} />
-                        <Folder path={item.location.root} />
+                        {item.folder ? <Folder path={item.folder.root} /> : null}
                     </span>
                 ) : (
                     <Label
@@ -487,7 +487,7 @@ function Folder({ path }: { path: string }) {
  * machine when not this one; nothing for a list.
  */
 function hint(item: PaletteItem, t: Translator['t']) {
-    if (item.kind === 'project') return <RemoteTag location={item.location} />;
+    if (item.kind === 'project') return <RemoteTag folder={item.folder} />;
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
     if (item.kind === 'note') return item.listName;
     if (item.kind !== 'file' || !item.mark) return null;

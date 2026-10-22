@@ -4,7 +4,7 @@ import { type ProjectFailure, useProjectFailures } from '@/modules/repository';
 import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
@@ -69,17 +69,20 @@ function projectProblem(
     const remove = { label: t('common.remove'), run: () => fixes.remove(project) };
     const retry = { label: t('problem.retry'), run: () => fixes.retry(project) };
     const name = project.name;
+    // only a folder can fail to be read
+    const folder = projectFolder(project);
+    if (!folder) return null;
     if (failure === 'repository_missing') {
         return {
             id,
             title: t('problem.moved.title', { name }),
-            detail: t('problem.moved.detail', { place: placeName(project.location) }),
+            detail: t('problem.moved.detail', { place: placeName(folder) }),
             fixes: [locate, remove],
         };
     }
     // the others are a WSL distro's; on this machine, git missing is the panels' to tell
-    if (project.location.kind !== 'wsl') return null;
-    const { distro } = project.location;
+    if (folder.kind !== 'wsl') return null;
+    const { distro } = folder;
     if (failure === 'distro_missing') {
         return {
             id,

@@ -10,19 +10,17 @@
 //!
 //! The project read last stays in memory: every change goes to it, then to its files.
 
-use std::collections::hash_map::RandomState;
 use std::collections::{HashMap, HashSet};
-use std::hash::{BuildHasher, Hasher};
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use super::book::{is_id, Book, Touched, MAX_NOTE_BYTES};
+use super::book::{Book, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
     DeletedList, Note, NoteList, NotesSummary, ProjectNotes, StoredLists, StoredNote,
     StoredProject, StoredState, STORED_VERSION,
 };
 use super::ports::NotesStorage;
+use crate::shared::id::{is_id, new_id};
 use crate::shared::sync::lock;
 
 /// The list a project starts with, until `name_first_lists` names it in the UI's language.
@@ -42,19 +40,6 @@ fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or(0, |d| d.as_millis() as u64)
-}
-
-/// A new id: 16 hex digits of a hash keyed by the system's randomness, the time and a counter.
-fn new_id() -> String {
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let mut hasher = RandomState::new().build_hasher();
-    hasher.write_u128(
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |d| d.as_nanos()),
-    );
-    hasher.write_u64(COUNTER.fetch_add(1, Ordering::Relaxed));
-    format!("{:016x}", hasher.finish())
 }
 
 fn note_file(id: &str) -> String {
@@ -380,48 +365,6 @@ impl NotesStore {
         Ok(())
     }
 
-    /// A project found again at `to` (its repository moved): its notes go with it. When `to` has
-    /// notes already (it is a project too), they take these in and this project's folder goes.
-    pub fn relink(&self, storage: &dyn NotesStorage, from: &str, to: &str) -> anyhow::Result<()> {
-        if from == to {
-            return Ok(());
-        }
-        let mut open = lock(&self.open);
-        let Some(from_folder) = self.folder_of(storage, from)? else {
-            return Ok(());
-        };
-        // whatever was read is read again
-        *open = None;
-        if self.folder_of(storage, to)?.is_none() {
-            write_json(
-                storage,
-                &from_folder,
-                PROJECT_FILE,
-                &StoredProject {
-                    version: STORED_VERSION,
-                    id: to.into(),
-                },
-            )?;
-        } else {
-            let source = self.load(storage, from)?;
-            let mut target = self.load(storage, to)?;
-            let mut touched = target.book.absorb(source.book);
-            touched.append(&mut target.pending);
-            self.write(storage, &mut target, touched)?;
-            // a failure here leaves the notes in both folders: harmless, as a note is its id, and
-            // the next relink or removal of the old project clears it
-            storage.remove_folder(&from_folder)?;
-        }
-        if let Some(found) = lock(&self.folders).as_mut() {
-            found.remove(from);
-            found.entry(to.into()).or_insert(from_folder);
-        }
-        let mut summaries = lock(&self.summaries);
-        summaries.remove(from);
-        summaries.remove(to);
-        Ok(())
-    }
-
     /// Looks at a project's lists and notes without making them the ones kept in memory: those of
     /// the project on screen stay (an export from all projects).
     pub fn read_notes<T>(
@@ -575,6 +518,7 @@ impl NotesStore {
 pub mod tests {
     use super::*;
     use std::collections::BTreeMap;
+    use std::sync::atomic::Ordering;
 
     /// Folders of files in memory; `fail_writes` makes every write fail.
     #[derive(Default)]
@@ -837,67 +781,6 @@ pub mod tests {
     }
 
     #[test]
-    fn notes_follow_their_project_found_elsewhere() {
-        let storage = MemoryStorage::default();
-        let store = NotesStore::default();
-        let list = store.notes(&storage, PROJECT).unwrap().open_list;
-        store
-            .add_note(&storage, PROJECT, &list, "a".into())
-            .unwrap();
-        store.relink(&storage, PROJECT, "/moved/shop").unwrap();
-
-        let fresh = NotesStore::default();
-        assert!(fresh.notes(&storage, PROJECT).unwrap().notes.is_empty());
-        assert_eq!(
-            fresh.notes(&storage, "/moved/shop").unwrap().notes[0].text,
-            "a"
-        );
-        assert_eq!(storage.folders().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn notes_found_where_they_were_stay() {
-        let storage = MemoryStorage::default();
-        let store = NotesStore::default();
-        let list = store.notes(&storage, PROJECT).unwrap().open_list;
-        store
-            .add_note(&storage, PROJECT, &list, "a".into())
-            .unwrap();
-        store.relink(&storage, PROJECT, PROJECT).unwrap();
-        assert_eq!(
-            NotesStore::default()
-                .notes(&storage, PROJECT)
-                .unwrap()
-                .notes
-                .len(),
-            1
-        );
-    }
-
-    #[test]
-    fn notes_found_at_another_project_join_its_own() {
-        let storage = MemoryStorage::default();
-        let store = NotesStore::default();
-        for (project, text) in [(PROJECT, "old"), ("/moved/shop", "new")] {
-            let list = store.notes(&storage, project).unwrap().open_list;
-            store
-                .add_note(&storage, project, &list, text.into())
-                .unwrap();
-        }
-        store.relink(&storage, PROJECT, "/moved/shop").unwrap();
-
-        let notes = NotesStore::default()
-            .notes(&storage, "/moved/shop")
-            .unwrap();
-        let mut texts: Vec<&str> = notes.notes.iter().map(|n| n.text.as_str()).collect();
-        texts.sort_unstable();
-        assert_eq!(texts, ["new", "old"]);
-        // one General list, the old one's notes in it
-        assert_eq!(notes.lists.len(), 1);
-        assert_eq!(storage.folders().unwrap().len(), 1);
-    }
-
-    #[test]
     fn a_new_folder_never_takes_one_in_use() {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
@@ -945,12 +828,5 @@ pub mod tests {
         assert!(folder_name("/").starts_with("project-"));
         let long = format!("/{}", "a".repeat(100));
         assert_eq!(folder_name(&long).len(), FOLDER_NAME_LIMIT + 7);
-    }
-
-    #[test]
-    fn ids_are_new_each_time() {
-        let ids: HashSet<String> = (0..1000).map(|_| new_id()).collect();
-        assert_eq!(ids.len(), 1000);
-        assert!(ids.iter().all(|id| is_id(id)));
     }
 }

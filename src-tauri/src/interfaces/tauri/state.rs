@@ -11,7 +11,7 @@ use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::machines::Machines;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
-use sidekyk_core::modules::projects::{Project, ProjectList};
+use sidekyk_core::modules::projects::{FoundFolder, Location, Project, ProjectList};
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::search::{self, ListMatch, NoteMatch, SearchRequest, SearchResults};
@@ -19,10 +19,10 @@ use sidekyk_core::shared::sync::lock;
 
 pub(crate) struct ProjectsState {
     list: Mutex<ProjectList>,
-    /// The id of the project last given to `Repositories::watch`. Held while the project on screen
-    /// is read and watched, so calls racing each other end on the project on screen after the
-    /// last of them.
-    watching: Mutex<Option<String>>,
+    /// The id and folder of the project last given to `Repositories::watch`: a project whose
+    /// folder moved is watched again. Held while the project on screen is read and watched, so
+    /// calls racing each other end on the project on screen after the last of them.
+    watching: Mutex<Option<(String, Option<Location>)>>,
     /// What reads the projects' repositories, on this machine and in WSL distros.
     machines: Machines,
 }
@@ -67,19 +67,20 @@ impl ProjectsState {
         lock(&self.list).find(id).cloned()
     }
 
-    /// What reads a project's repository, where it is.
-    pub(crate) fn repositories_of(&self, project: &Project) -> Arc<dyn Repositories> {
-        self.machines.of(&project.location)
+    /// What reads the repository at `folder`, where it is.
+    pub(crate) fn repositories_at(&self, folder: &Location) -> Arc<dyn Repositories> {
+        self.machines.of(folder)
     }
 
-    /// Whether `project` can be read without starting what holds it, as the projects' cards are.
-    pub(crate) fn readable_without_starting(&self, project: &Project) -> anyhow::Result<()> {
-        self.machines.readable_without_starting(&project.location)
+    /// Whether the repository at `folder` can be read without starting what holds it, as the
+    /// projects' cards are.
+    pub(crate) fn readable_without_starting(&self, folder: &Location) -> anyhow::Result<()> {
+        self.machines.readable_without_starting(folder)
     }
 
-    /// The project that contains `candidate`, on this machine or in a WSL distro.
-    pub(crate) fn project_at(&self, candidate: &Path) -> anyhow::Result<Project> {
-        self.machines.project_at(candidate)
+    /// The repository that contains `candidate`, on this machine or in a WSL distro.
+    pub(crate) fn folder_at(&self, candidate: &Path) -> anyhow::Result<FoundFolder> {
+        self.machines.folder_at(candidate)
     }
 
     /// Tells every machine whether the window shows; when it shows again, the id of the project on
@@ -87,7 +88,7 @@ impl ProjectsState {
     pub(crate) fn set_visible(&self, visible: bool) -> Option<String> {
         let missed = self.machines.set_visible(visible)?;
         let list = lock(&self.list);
-        let project = list.projects.iter().find(|p| p.location == missed)?;
+        let project = list.at(&missed)?;
         Some(project.id.clone())
     }
 
@@ -106,9 +107,9 @@ impl ProjectsState {
     ) -> SearchResults {
         let list = self.list();
         let files_of = |id: &str| {
-            let project = list.find(id).ok()?;
-            self.repositories_of(project)
-                .search_files(&project.repository(), &request.query)
+            let (folder, info) = list.find(id).ok()?.repository()?;
+            self.repositories_at(folder)
+                .search_files(&info, &request.query)
         };
         let notes_of = |id: &str| list.find(id).ok().and_then(|_| notes_of(id));
         search::search(request, &list.projects, files_of, notes_of)
@@ -125,10 +126,19 @@ impl ProjectsState {
         app: &tauri::AppHandle,
         change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
     ) -> anyhow::Result<ProjectList> {
-        let list = self.update_stored(app, change)?;
-        self.machines.retain(&list.projects);
+        self.update_with(app, change).map(|((), list)| list)
+    }
+
+    /// As `update`, giving back what `change` returns with the list.
+    pub(crate) fn update_with<T>(
+        &self,
+        app: &tauri::AppHandle,
+        change: impl FnOnce(&mut ProjectList) -> anyhow::Result<T>,
+    ) -> anyhow::Result<(T, ProjectList)> {
+        let (value, list) = self.change_and_store(app, change)?;
+        self.machines.retain(&list);
         watch_active(app);
-        Ok(list)
+        Ok((value, list))
     }
 
     /// Changes the list and stores it, and nothing else: for what changes neither the projects
@@ -138,29 +148,38 @@ impl ProjectsState {
         app: &tauri::AppHandle,
         change: impl FnOnce(&mut ProjectList) -> anyhow::Result<()>,
     ) -> anyhow::Result<ProjectList> {
+        self.change_and_store(app, change).map(|((), list)| list)
+    }
+
+    fn change_and_store<T>(
+        &self,
+        app: &tauri::AppHandle,
+        change: impl FnOnce(&mut ProjectList) -> anyhow::Result<T>,
+    ) -> anyhow::Result<(T, ProjectList)> {
         let mut list = lock(&self.list);
-        change(&mut list)?;
+        let value = change(&mut list)?;
         // stored while still locked, so concurrent changes reach the disk in their order
         if let Err(error) = settings_store::save_projects(app, &list) {
             tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
         }
-        Ok(list.clone())
+        Ok((value, list.clone()))
     }
 }
 
-/// Watches the project on screen, if it is not watched yet, and stops watching the previous one.
+/// Watches the project on screen, if it is not watched yet where its folder is, and stops watching
+/// the previous one.
 pub(crate) fn watch_active(app: &tauri::AppHandle) {
     let state = app.state::<ProjectsState>();
     let mut watching = lock(&state.watching);
     let active = state.active();
-    let id = active.as_ref().map(|a| a.id.clone());
-    if *watching == id {
+    let watched = active.as_ref().map(|a| (a.id.clone(), a.folder().cloned()));
+    if *watching == watched {
         return;
     }
     // the count shown is the previous project's: cleared until the new one is read
     tray::clear(app);
     let emitter = app.clone();
-    let project_id = id.clone();
+    let project_id = active.as_ref().map(|a| a.id.clone());
     state.machines.watch(
         active.as_ref(),
         Box::new(move |change| {
@@ -170,15 +189,16 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
             }
         }),
     );
-    *watching = id;
+    *watching = watched;
 }
 
-/// Adds the repository that contains `candidate` and puts it on screen.
+/// Puts on screen the project following the repository that contains `candidate`, adding one
+/// when none does.
 pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::Result<ProjectList> {
     let state = app.state::<ProjectsState>();
-    let found = state.project_at(candidate)?;
+    let found = state.folder_at(candidate)?;
     state.update(app, |list| {
-        list.add(found);
+        list.open_folder(found);
         Ok(())
     })
 }

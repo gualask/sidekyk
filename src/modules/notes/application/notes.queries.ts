@@ -259,15 +259,6 @@ export function useNotesCount(projectId: string) {
 }
 
 /**
- * Reads every project's notes again, those on screen now, the others when they show: for a
- * change made outside Notes, such as a project's notes joining another's.
- */
-export function useRereadNotes() {
-    const client = useQueryClient();
-    return useCallback(() => void client.invalidateQueries({ queryKey: ['notes'] }), [client]);
-}
-
-/**
  * What a project's card tells of its notes, read each time all projects shows (the backend keeps
  * it in memory once read).
  */

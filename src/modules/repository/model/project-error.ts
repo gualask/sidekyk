@@ -8,11 +8,11 @@ import type { ProjectLocation } from '@/shared/projects/project-info';
  */
 export function projectErrorMessage(
     error: unknown,
-    location: ProjectLocation,
+    folder: ProjectLocation | null,
     i18n: Translator,
 ): string {
-    if (location.kind === 'wsl' && hasErrorCode(error, 'git_not_found')) {
-        return i18n.t('error.gitNotInDistro', { distro: location.distro });
+    if (folder?.kind === 'wsl' && hasErrorCode(error, 'git_not_found')) {
+        return i18n.t('error.gitNotInDistro', { distro: folder.distro });
     }
     return errorMessage(error, i18n);
 }

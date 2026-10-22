@@ -30,8 +30,9 @@ Several repositories, one on screen.
 - Facts next to the project's name in the top bar: branch, ahead/behind, changed files and lines
   added/removed in tracked files against HEAD (`1.2k changed +1.2k −340`, exact lines in the
   tooltip), or "clean".
-- A moved repository: problem `repository_missing` with Locate… (relinks: notes and layout follow,
-  into the project already there if it is one) and Remove.
+- A moved repository: problem `repository_missing` with Locate… (the project follows its folder
+  there, keeping its id, name, notes and layout) and Remove. A folder that is another project's is
+  not taken: a toast says whose, with Open. Adding a folder a project follows opens that project.
 
 - WSL projects (Windows): a folder of a distro (`\\wsl.localhost\<distro>\…` from the folder
   picker, Locate… or the command line) is read in that distro by Sidekyk's helper, never through
@@ -42,13 +43,20 @@ Several repositories, one on screen.
 
 ## How it is built
 
-- Identity: a project is `{ id, name, location }`, `location` local `{ root }` or WSL
-  `{ distro, root }` (`root` a Linux path). Everything of a project (queries, layout, notes,
-  session state, avatar color) is keyed by `id`; what reads its repository by `location`.
-  `Location::id` makes the id: a local project's is its root, a WSL one's `wsl:<distro>:<root>`;
-  the frontend never reads it. Stored as the frontend gets it; on reading the id is made again
-  from the location, an entry stored before ids (`{ root, name }`) is a local project, and one
-  that cannot be read is left out, not the whole list.
+- Identity: a project is `{ id, name, folders }`, a folder local `{ root }` or WSL
+  `{ distro, root }` (`root` a Linux path); none or one repository for now, a list so that
+  several folders change nothing stored (`../plans/project-folders.md`). Everything of a project
+  (queries, layout, notes, session state, avatar color) is keyed by `id`; what reads its
+  repository by its folder (`Project::folder`, `projectFolder`). The id is made once (16 random
+  hex digits, `shared/id.rs`, as notes') and kept; the frontend never reads it. Stored as the
+  frontend gets it. Read too: `{ id, name, location }` (its id kept) and, before ids,
+  `{ name, location }` and `{ root, name }`, whose id is their location's
+  (`Location::id_before_made_ids`: the root, or `wsl:<distro>:<root>`), so notes and layouts
+  stored then stay theirs. One that cannot be read is left out, not the whole list.
+- A folder is one project's: `ProjectList::at` finds a project by folder (`Location::same_place`:
+  roots by component, without case on macOS and Windows; a distro without case). Places are
+  compared in one file, `modules/projects/place.rs`, for this and for an export inside a project
+  (`holds`).
 - WSL (`../plans/remote-projects.md`): `Machines` (the core's `infrastructure/machines.rs`) routes a
   project to this machine's `LocalRepositories` or its distro's `AgentRepositories`
   (`WslRepositories`, one helper per distro); every machine is told the window's visibility and the
@@ -77,17 +85,21 @@ Several repositories, one on screen.
   (68 commits), 0.5 s on Zed's clone over 129 commits.
 - Notes on the card: `notes_summary` (how many wait), kept in memory once read, until the notes
   change.
-- Locate… (`relocate_project`): the folder picked resolves to its repository; the notes follow
-  first (`notes.md`), then the list (`relocate`: same place, layout, on screen). The same folder
-  changes nothing.
+- Locate… (`relocate_project`): the folder picked resolves to its repository; the project's
+  folder becomes it (`relocate`), nothing else changes; the same folder changes nothing. Another
+  project's folder: `Relocation::InProject { id, name }`, the list as it was. The id stays, so
+  what follows the folder is told: `watch_active` compares the id and the folder, and the frontend
+  reads the project's queries again (`useReadProjectAgain`).
 
 ## Decisions
 
-- Id made from the location (2026-10-18), not random: two projects in one place share it, and
-  Locate… keeps working as before (new place, new id: notes and layout move with it). A random
-  id kept across Locate… would collide with a repository added later where the old one was,
-  unless every new project got a random id too. VS Code names a WSL folder the same way,
-  `vscode-remote://wsl+<distro>/<path>` (`../plans/remote-projects.md`).
+- Id made from the location (2026-10-18), then made once and kept (2026-10-22): a project
+  without folder has no location, one with several no single one. Every new project gets a new
+  id, so a repository added where a moved one was is no collision; one folder is one project's,
+  found by place, not by id. Ids stored before stay: nothing is migrated.
+- Locate… onto another project's folder is refused (2026-10-22), not a merge: Locate… changes a
+  folder only; joining two projects would be a command of its own (not needed). It used to join
+  their notes.
 
 - Not watched (2026-10-13): level 0 reads summaries each time it shows (~65 ms, 0.4 s CPU for ten
   repos). A watcher per project is cheap on FSEvents/Windows but on inotify means one watch per

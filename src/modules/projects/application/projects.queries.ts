@@ -143,10 +143,17 @@ export function useRemoveProject() {
 }
 
 /**
- * Asks where a moved repository is now and puts its project there; `onRelocated` follows, unless
- * the user cancelled. A failure is a toast.
+ * Asks where a moved repository is now, and its project follows it there: `readAgain` reads it at
+ * its new place (its id, so its queries, stay). A folder that is another project's is not taken:
+ * a toast says whose, with `open` for it. A failure is a toast.
  */
-export function useRelocateProject(onRelocated: () => void) {
+export function useRelocateProject({
+    readAgain,
+    open,
+}: {
+    readAgain: (projectId: string) => void;
+    open: (projectId: string) => void;
+}) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const showToast = useShowToast();
@@ -154,10 +161,18 @@ export function useRelocateProject(onRelocated: () => void) {
     return useMutation({
         ...projectsChange,
         mutationFn: (projectId: string) => port.relocateProject(projectId),
-        onSuccess: (list) => {
-            if (!list) return;
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
-            onRelocated();
+        onSuccess: (relocation, projectId) => {
+            if (relocation?.kind === 'inProject') {
+                const { id, name } = relocation;
+                showToast({
+                    title: i18n.t('projects.folderInProject', { name }),
+                    action: { label: i18n.t('common.open'), run: () => open(id) },
+                });
+                return;
+            }
+            if (!relocation) return;
+            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, relocation.list);
+            readAgain(projectId);
         },
         onError: (error, projectId) => {
             showToast(

@@ -1,11 +1,12 @@
 //! Tauri adapters for the repositories under review.
 
+use anyhow::Context;
 use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::tray;
-use sidekyk_core::modules::projects::Project;
+use sidekyk_core::modules::projects::{Location, Project};
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
@@ -20,6 +21,8 @@ use sidekyk_core::shared::error::AppError;
 pub(super) struct OnProject<'a> {
     pub(super) app: &'a tauri::AppHandle,
     pub(super) project: &'a Project,
+    /// The folder it follows, a repository.
+    pub(super) folder: &'a Location,
     pub(super) repositories: &'a dyn Repositories,
     pub(super) info: &'a RepositoryInfo,
 }
@@ -34,11 +37,16 @@ pub(super) async fn on_project<T: Send + 'static>(
     blocking(command, app, move |app| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
+        // the frontend asks only for the repository of a project that follows one
+        let (folder, info) = project
+            .repository()
+            .context("the project follows no repository")?;
         work(OnProject {
             app,
             project: &project,
-            repositories: &*projects.repositories_of(&project),
-            info: &project.repository(),
+            folder,
+            repositories: &*projects.repositories_at(folder),
+            info: &info,
         })
     })
     .await
@@ -69,7 +77,7 @@ pub(crate) async fn get_repository_summary(
         // the cards never start a stopped WSL distro
         on.app
             .state::<ProjectsState>()
-            .readable_without_starting(on.project)?;
+            .readable_without_starting(on.folder)?;
         let summary = on.repositories.summary(on.info);
         tray::show_read(on.app, &on.project.id, summary.as_ref().ok());
         summary

@@ -2,7 +2,7 @@ import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import type { ProjectList } from '@/modules/projects';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureTree } from './files.fixture-data';
 import { fixtureContentSearch, fixtureSearch } from './fixture-search';
@@ -100,8 +100,11 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     const scenarioData = (projectId: string) =>
         projectId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
     const readable = (projectId: string) => {
-        project(projectId);
-        if (projectId === MISSING_PROJECT.id) throw failure('repository_missing');
+        // missing where it was, not where Locate… finds it
+        const folder = projectFolder(project(projectId));
+        if (folder?.root === projectFolder(MISSING_PROJECT)?.root) {
+            throw failure('repository_missing');
+        }
         if (projectId === GONE_PROJECT.id) throw failure('distro_missing');
         if (projectId === NO_GIT_PROJECT.id) throw failure('git_not_found');
     };
@@ -109,8 +112,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     const running = new Set(['Ubuntu', 'Alpine']);
     const helpers = new Set<string>();
     const distroOf = (projectId: string) => {
-        const { location } = project(projectId);
-        return location.kind === 'wsl' ? location.distro : null;
+        const folder = projectFolder(project(projectId));
+        return folder?.kind === 'wsl' ? folder.distro : null;
     };
     const large = (projectId: string) => scenario === 'large' && scenarioData(projectId);
     const snapshot = (projectId: string) => {
@@ -224,17 +227,22 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                     layouts,
                 });
             },
-            // in `problems`, the moved project is found next to where it was
+            // in `problems`, the moved project is found next to where it was; it keeps its id
             relocateProject: async (projectId) => {
                 const moved = project(projectId);
-                const found = localProject(`${moved.location.root}-moved`, moved.name);
-                notes.relink(moved.id, found.id);
-                const { [moved.id]: layout, ...layouts } = list.layouts;
-                return update({
-                    projects: list.projects.map((p) => (p === moved ? found : p)),
-                    active: list.active === moved.id ? found.id : list.active,
-                    layouts: layout ? { ...layouts, [found.id]: layout } : layouts,
-                });
+                const folder = projectFolder(moved);
+                if (!folder) throw new Error(`${moved.name} follows no folder`);
+                const root = `${folder.root}-moved`;
+                const other = list.projects.find((p) => projectFolder(p)?.root === root);
+                if (other) return { kind: 'inProject', id: other.id, name: other.name };
+                const folders = [{ kind: 'local' as const, root }];
+                return {
+                    kind: 'moved',
+                    list: update({
+                        ...list,
+                        projects: list.projects.map((p) => (p === moved ? { ...p, folders } : p)),
+                    }),
+                };
             },
             setProjectLayout: async (projectId, layout) =>
                 update({ ...list, layouts: { ...list.layouts, [project(projectId).id]: layout } }),

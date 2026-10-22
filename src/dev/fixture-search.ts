@@ -88,8 +88,8 @@ export function fixtureSearch(
     for (const project of request.projectId ? [] : projects) {
         const highlights = match(project.name, query);
         if (highlights) {
-            const { id, name, location } = project;
-            results.projects.push({ id, name, location, score: score(highlights), highlights });
+            const { id, name, folders } = project;
+            results.projects.push({ id, name, folders, score: score(highlights), highlights });
         }
     }
     request.panels.forEach((title, index) => {

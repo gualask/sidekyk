@@ -62,9 +62,7 @@ pub fn search(
         ranked
             .into_iter()
             .map(|r| ProjectMatch {
-                id: projects[r.index].id.clone(),
-                name: projects[r.index].name.clone(),
-                location: projects[r.index].location.clone(),
+                project: projects[r.index].clone(),
                 score: r.score,
                 highlights: r.highlights,
             })
@@ -162,9 +160,9 @@ mod tests {
     fn project(name: &str) -> Project {
         Project::new(
             name.into(),
-            Location::Local {
+            Some(Location::Local {
                 root: format!("/dev/{name}"),
-            },
+            }),
         )
     }
 
@@ -226,7 +224,7 @@ mod tests {
             results
                 .projects
                 .into_iter()
-                .map(|p| p.name)
+                .map(|p| p.project.name)
                 .collect::<Vec<_>>()
         };
         assert_eq!(found(" "), ["shop", "cache-hub"]);

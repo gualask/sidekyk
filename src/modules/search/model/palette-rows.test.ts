@@ -42,7 +42,7 @@ describe('paletteRows', () => {
                     {
                         id: '/dev/shop',
                         name: 'shop',
-                        location: { kind: 'local', root: '/dev/shop' },
+                        folders: [{ kind: 'local', root: '/dev/shop' }],
                         score: 0,
                         highlights: [],
                     },

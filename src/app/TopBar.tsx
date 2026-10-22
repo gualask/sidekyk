@@ -4,7 +4,7 @@ import { ProjectFacts } from '@/modules/repository';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -93,7 +93,7 @@ export function TopBar({
                             <Crumb onClick={level === 1 ? undefined : () => onZoom(1)}>
                                 {project.name}
                             </Crumb>
-                            <RemoteTag location={project.location} />
+                            <RemoteTag folder={projectFolder(project)} />
                         </>
                     ) : null}
                     {level === 2 ? (

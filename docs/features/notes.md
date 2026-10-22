@@ -22,7 +22,6 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   cards stay by when done.
 - Export a project's notes to Markdown from the panel's ⋯ (never inside a repository). Removing a
   project with notes asks: export then remove, or delete; nothing is left on disk.
-- A moved repository is relinked with Locate… (`projects.md`): notes follow.
 - Found by `⌘K` (`search.md`).
 
 ## How it is built
@@ -51,9 +50,6 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   and the problems of a repository moved or a WSL distro gone): no notes (`count_notes`, files
   counted, nothing read), it goes at once; else export then remove, or remove and delete; a count
   that fails asks too.
-- Relink (`relink`, from `relocate_project`): `project.json` takes the new id; into another
-  project's notes when it is one: lists of one name join, open notes go below, the old folder
-  goes.
 - Frontend (`NotesWorkspace`): lists on the left full screen, cards of the open list (virtualized,
   measured heights), reorder mode. `useProjectNotes` reads a project once (`['notes', projectId]`,
   never stale: only the app writes); `useNoteActions` changes the cache at once, then sends the

@@ -2,8 +2,8 @@
 
 use tauri_plugin_store::StoreExt;
 
-use sidekyk_core::modules::projects::{Project, ProjectList};
-use sidekyk_core::modules::repository::{repository_name, RepositoryInfo};
+use sidekyk_core::modules::projects::{Location, Project, ProjectList};
+use sidekyk_core::modules::repository::repository_name;
 use sidekyk_core::modules::settings::Settings;
 
 const STORE_FILE: &str = "settings.json";
@@ -26,16 +26,23 @@ pub(crate) fn load_projects(app: &tauri::AppHandle) -> ProjectList {
             }
         };
     }
-    let mut list = ProjectList::default();
     let last = store.get(LAST_REPOSITORY_KEY);
-    if let Some(root) = last.as_ref().and_then(|root| root.as_str()) {
-        list.add(Project::local(RepositoryInfo {
+    let Some(root) = last.as_ref().and_then(|root| root.as_str()) else {
+        return ProjectList::default();
+    };
+    let project = Project::stored_before_ids(
+        repository_name(root),
+        Location::Local {
             root: root.to_string(),
-            name: repository_name(root),
-        }));
-        if let Err(error) = save_projects(app, &list) {
-            tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
-        }
+        },
+    );
+    let list = ProjectList {
+        active: Some(project.id.clone()),
+        projects: vec![project],
+        ..ProjectList::default()
+    };
+    if let Err(error) = save_projects(app, &list) {
+        tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
     }
     list
 }

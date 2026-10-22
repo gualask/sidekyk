@@ -1,11 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import {
-    loadRemoveProjectDialog,
-    newNoteTarget,
-    notesPanel,
-    notesTarget,
-    useRereadNotes,
-} from '@/modules/notes';
+import { loadRemoveProjectDialog, newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
 import {
     activeProject,
     loadProjectsOverview,
@@ -132,19 +126,6 @@ export function AppShell() {
     // a project to remove, once asked what to do with its notes
     const [removing, setRemoving] = useState<ProjectInfo | null>(null);
     const { mutate: removeProject } = useRemoveProject();
-    // a moved repository found again: its notes may have joined another project's
-    const rereadNotes = useRereadNotes();
-    const { mutate: relocate } = useRelocateProject(rereadNotes);
-    const readAgain = useReadProjectAgain();
-    const fixProject = useMemo(
-        () => ({
-            locate: (project: ProjectInfo) => relocate(project.id),
-            remove: setRemoving,
-            retry: (project: ProjectInfo) => readAgain(project.id),
-        }),
-        [relocate, readAgain],
-    );
-    const problems = useProblems(projects.data, openSettings, fixProject);
     const activate = useActivateProject();
 
     /**
@@ -210,12 +191,25 @@ export function AppShell() {
         setSettingsOpen((open) => !open);
     };
 
+    // a project's panels, or the panel already full screen
+    const openProject = (projectId: string) => {
+        activate(projectId);
+        if (level === 0) zoom(1);
+    };
+    const readAgain = useReadProjectAgain();
+    const { mutate: relocate } = useRelocateProject({ readAgain, open: openProject });
+    const fixProject = useMemo(
+        () => ({
+            locate: (project: ProjectInfo) => relocate(project.id),
+            remove: setRemoving,
+            retry: (project: ProjectInfo) => readAgain(project.id),
+        }),
+        [relocate, readAgain],
+    );
+    const problems = useProblems(projects.data, openSettings, fixProject);
+
     const paletteActions: PaletteActions = {
-        // the project's panels, or the panel already full screen
-        openProject: (projectId) => {
-            activate(projectId);
-            if (level === 0) zoom(1);
-        },
+        openProject,
         openPanel: (id) => {
             const next = panelById(id);
             if (next) zoom(2, next);
