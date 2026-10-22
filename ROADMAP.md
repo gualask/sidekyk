@@ -13,14 +13,45 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 ## Notes
 
 - [ ] Optional Google Drive sync/backup (`docs/plans/notes-sync.md`)
+- [ ] Entities recognized while typing a note (`docs/plans/notes-entities.md`)
+- [ ] Agents read a project's notes and captures over MCP, read-only (design open)
 
-## Folders without git
+## Projects with optional folders
 
-`docs/plans/folders-without-git.md`.
+`docs/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
+has.
 
-- [ ] Projects as plain folders, git optional: Files and Notes, no Changes; file list behind a
-      port; watcher filter without git
+- [ ] Project id made, not derived from its folder; the model shaped for several folders
+- [ ] Inbox: a project without folder, always there; notes moved between projects; `⌘K` at
+      level 0 finds notes of every project
+- [ ] Folders without git: Files and Notes, no Changes; file list behind a port; watcher filter
+      without git (`.gitignore`/`.ignore` rules)
+- [ ] Layout without git: what takes Changes' tile (Notes leaning, decided with Capture); level 0
+      card and top bar without branch and commits
+- [ ] What changed without git: recently modified files, no diffs
+- [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
+      section per repository in Changes. **After:** project id made
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
+
+## Previews
+
+`docs/plans/previews.md`.
+
+- [ ] Markdown rendered in the file viewer
+- [ ] Images in the file viewer (today the binary notice)
+- [ ] PDF in the file viewer. **After:** images
+
+## Capture
+
+`docs/plans/capture.md`.
+
+- [ ] Images in notes: a note holds text and images (pasted, dropped), copied out with its text
+- [ ] Annotate an image: arrows with their text, markers (A, B, C), editable later. **After:**
+      images in notes
+- [ ] Capture from a global shortcut: the system's tool picks the region, the image opens to
+      annotate in a new note of the project on screen. **After:** annotate
+- [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`,
+      tazly)
 
 ## Remote projects
 
@@ -56,6 +87,13 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
     follows the window theme
+
+## Later
+
+To evaluate once the app is complete, when its evolution is discussed.
+
+- [ ] Notes as a folder of Markdown files in two-way sync (OpenTodo's vault, `docs/product.md`),
+      outside repositories: an alternative to Drive sync
 
 ## Performance review
 

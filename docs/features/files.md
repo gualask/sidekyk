@@ -37,4 +37,4 @@ The project's tree and the view of any file in it (built 2026-10-17).
   them). Read-only tree on the virtualizer, no tree library.
 - The backend keeps the list and serves open folders (2026-10-17), so the payload is what is open.
   Files is the second panel of the repository module (once `changes`), sharing its viewer.
-- Without git the file list goes behind a port: `../plans/folders-without-git.md`.
+- Without git the file list goes behind a port: `../plans/project-folders.md`.

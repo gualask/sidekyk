@@ -48,6 +48,21 @@ dated in `features/`.
   watched, `features/projects.md`).
 - From tazly: layered glass blur (GPU), rich-text editors. Taken from it: one command bar, `Esc` cancels before navigating, notes with copy, `⌥` shortcuts matched on
   `e.code`. Open: quick capture of a note via a global shortcut; a `PRODUCT.md`.
+- From Carbon (2026-10-22, Tauri, Windows only): capture of the selected text in any app (Windows
+  accessibility; its README: terminals not covered), double-tap modifier shortcuts (a global
+  keyboard hook; Input Monitoring on macOS), link previews (network), backgrounds. Kept in mind for
+  Capture: images pasted or dropped into notes; a small window confirming a capture while the
+  main one is hidden, destroyed 1.5 s after the last.
+- From Shotoshot (2026-10-22, GPL-3.0, Windows and Linux): its overlay over a frozen screen, many
+  drawing tools, desktop Board, presentation mode. Kept in mind for Capture
+  (`plans/capture.md`): editable annotations, one process per capture.
+- From OpenTodo (2026-10-22, AGPL-3.0, a task manager; ideas only): quick add recognizes dates,
+  `#project`, `@label`, priority and estimate while typing, offline, own table-driven grammar in
+  six languages (6-8 kB gzip; date libraries 30-90 kB, English-first); each entity tinted in the
+  field (a layer behind the input, same font and padding) and a chip under it, dismissed by its ×
+  or Backspace at the end, quotes keep words literal. Kept in mind for entities in notes
+  (`plans/notes-entities.md`). Also seen: a Markdown vault in two-way sync (`ROADMAP.md`, Later),
+  a read-only MCP endpoint for agents (`ROADMAP.md`, Notes).
 
 ## Out of scope
 
