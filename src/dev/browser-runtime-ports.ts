@@ -100,8 +100,18 @@ function newProjectId(): string {
     return (0xa0000000 + projectSeq).toString(16).padStart(16, '0');
 }
 
+/** The fixtures' runtime: the ports, and what stands in for the command line. */
+export interface BrowserRuntime {
+    ports: RuntimePorts;
+    /**
+     * As `sidekyk <folder>` (`open_folder`): the project of that name, else one added for a folder
+     * of that name; on screen, and the frontend told the list changed.
+     */
+    openFolder: (name: string) => void;
+}
+
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
-export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
+export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const projects = initialProjects(scenario);
     let list: ProjectList = { projects, active: projects[0]?.id ?? null, layouts: {} };
     const project = (projectId: string) => {
@@ -195,6 +205,11 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         });
     };
     const projectsChanged = new Set<() => void>();
+    const tellProjectsChanged = () => {
+        for (const listener of projectsChanged) listener();
+    };
+    // the project a folder given on the command line put on screen, until the app takes it
+    let opened: string | null = null;
     // how many folders the picker gave, for the next answer of `PICKED_FOLDERS`
     let pickedFolders = 0;
     // as the backend, notes need the Inbox or a project in the list, not its repository: a moved
@@ -219,9 +234,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             return made.id;
         },
         dropProject: removeProject,
-        projectsChanged: () => {
-            for (const listener of projectsChanged) listener();
-        },
+        projectsChanged: tellProjectsChanged,
     });
     // as the backend, the palette searches the notes of the project on screen
     const searchedNotes = (projectId: string | null) => {
@@ -265,12 +278,28 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         },
     });
 
-    return {
+    const openFolder = (name: string) => {
+        const found = list.projects.find((p) => p.name === name);
+        const shown: ProjectInfo = found ?? {
+            id: newProjectId(),
+            name,
+            folders: [{ kind: 'local', root: `/Users/dev/Projects/${name}` }],
+        };
+        const projects = found ? list.projects : [...list.projects, shown];
+        update({ ...list, projects, active: shown.id });
+        opened = shown.id;
+        tellProjectsChanged();
+    };
+
+    const ports: RuntimePorts = {
         notes,
         projects: {
             getProjects: async () => list,
-            // no command line in the browser
-            takeOpenedProject: async () => null,
+            takeOpenedProject: async () => {
+                const taken = opened;
+                opened = null;
+                return taken;
+            },
             chooseProjectFolder: async () => {
                 const picked = PICKED_FOLDERS[pickedFolders % PICKED_FOLDERS.length](list);
                 pickedFolders += 1;
@@ -445,4 +474,5 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         reportError: () => undefined,
         showWindow: () => undefined,
     };
+    return { ports, openFolder };
 }

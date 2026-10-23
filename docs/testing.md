@@ -36,8 +36,9 @@ machine at hand (the Mac); every platform is checked before a release.
 in-memory ports. Scenarios: `review` (changes, commits, notes, long files changed in many places),
 `clean`, `no-repo`, `large`, `problems` (a missing repository; WSL projects whose distro is
 stopped, gone or without git). `review` has a WSL clone of its project, whose helper takes 1.5 s
-to start. UI changes are checked there, in
-light and dark.
+to start. `&open=<name>` starts as `sidekyk <folder>` does, and `sidekykDev.openFolder('<name>')`
+in the console opens one while the app runs: the project of that name, else one made for a folder
+of that name. UI changes are checked there, in light and dark.
 
 ## Timing tests
 

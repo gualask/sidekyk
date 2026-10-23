@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppShell } from '@/app/AppShell';
 import { AppProviders } from '@/app/providers';
-import { createBrowserRuntimePorts, isScenario, SCENARIOS } from './browser-runtime-ports';
+import { createBrowserRuntime, isScenario, SCENARIOS } from './browser-runtime-ports';
 
 /**
  * Browser dev mode: `?dev=app&scenario=review|clean|no-repo|large|problems` renders the real app
- * on fixture data, so a UI change can be checked without Tauri or a real repository.
+ * on fixture data, so a UI change can be checked without Tauri or a real repository. `&open=<name>`
+ * and `sidekykDev.openFolder(<name>)` stand in for the command line (`docs/testing.md`).
  */
 export function DevModePage() {
-    const scenario = new URLSearchParams(window.location.search).get('scenario');
-    const [runtime] = useState(() =>
-        createBrowserRuntimePorts(isScenario(scenario) ? scenario : 'review'),
-    );
+    const params = new URLSearchParams(window.location.search);
+    const scenario = params.get('scenario');
+    const [runtime] = useState(() => {
+        const made = createBrowserRuntime(isScenario(scenario) ? scenario : 'review');
+        const open = params.get('open');
+        if (open) made.openFolder(open);
+        return made;
+    });
+    // in an effect: the runtime kept, not the one of a second call StrictMode makes and drops
+    useEffect(() => {
+        Object.assign(window, { sidekykDev: { openFolder: runtime.openFolder } });
+    }, [runtime]);
 
     if (scenario !== null && !isScenario(scenario)) {
         return (
@@ -22,7 +31,7 @@ export function DevModePage() {
     }
 
     return (
-        <AppProviders runtime={runtime}>
+        <AppProviders runtime={runtime.ports}>
             <AppShell />
         </AppProviders>
     );
