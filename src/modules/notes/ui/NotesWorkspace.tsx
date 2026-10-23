@@ -5,7 +5,7 @@ import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useExportNotes, useNoteActions, useProjectNotes } from '../application/notes.queries';
+import { useExportNotes, useNoteActions, useNotes } from '../application/notes.queries';
 import { type NotesShown, notesShownBy } from '../model/targets';
 import { ListSwitch } from './ListSwitch';
 import { NoteCards } from './NoteCards';
@@ -23,10 +23,10 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
  * rest. A new note (`⌘N`, the app's key) comes as a target.
  */
 export function NotesWorkspace({ project, header, target, place, selected: hasKeys }: PanelProps) {
-    const projectId = project.id;
-    const { data: notes, error } = useProjectNotes(projectId);
-    const actions = useNoteActions(projectId);
-    const exportNotes = useExportNotes(projectId);
+    const book = project.id;
+    const { data: notes, error } = useNotes(book);
+    const actions = useNoteActions(book);
+    const exportNotes = useExportNotes(project.id);
     // the note picked in reorder mode, or null out of it
     const [reorder, setReorder] = useState<string | null>(null);
     // a list whose field takes the focus once it shows: one just made, `⌘N`

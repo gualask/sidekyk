@@ -227,7 +227,7 @@ mod tests {
     #[test]
     #[ignore = "benchmark"]
     fn notes_timings() {
-        use sidekyk_core::modules::notes::NotesStore;
+        use sidekyk_core::modules::notes::{Book, NotesStore};
         use std::time::{Duration, Instant};
 
         fn median(runs: usize, mut run: impl FnMut()) -> Duration {
@@ -246,7 +246,11 @@ mod tests {
         let files = NotesFiles::new(data.path());
         let store = NotesStore::default();
         let root = "/dev/shop";
-        let list = store.notes(&files, root).unwrap().open_list;
+        let book = Book::Project {
+            id: root.into(),
+            name: "shop".into(),
+        };
+        let list = store.notes(&files, &book).unwrap().open_list;
         let mut ids = Vec::new();
         for n in 0..1000 {
             // most a line or two, one in ten an agent's long answer
@@ -255,12 +259,12 @@ mod tests {
             } else {
                 "word ".repeat(40)
             };
-            ids.push(store.add_note(&files, root, &list, text).unwrap().id);
+            ids.push(store.add_note(&files, &book, &list, text).unwrap().id);
         }
         println!(
             "read 1,000 notes: {:?}",
             median(20, || {
-                NotesStore::default().notes(&files, root).unwrap();
+                NotesStore::default().notes(&files, &book).unwrap();
             })
         );
         let mut edits = 0;
@@ -270,13 +274,13 @@ mod tests {
                 // a text unchanged writes nothing: each edit changes it
                 edits += 1;
                 store
-                    .set_note_text(&files, root, &ids[500], format!("edited {edits}"))
+                    .set_note_text(&files, &book, &ids[500], format!("edited {edits}"))
                     .unwrap();
             })
         );
         // the palette over every note, as at each key typed: a word in no first line, read in all
         let request: sidekyk_core::modules::search::SearchRequest = serde_json::from_value(
-            serde_json::json!({ "query": "zzqx", "panels": [], "root": root }),
+            serde_json::json!({ "query": "zzqx", "panels": ["Notes"], "projectId": root }),
         )
         .unwrap();
         println!(
@@ -286,9 +290,9 @@ mod tests {
                     &request,
                     &[],
                     |_| None,
-                    |root| {
+                    |_| {
                         store
-                            .with_notes(&files, root, |lists, notes| {
+                            .with_notes(&files, &book, |lists, notes| {
                                 sidekyk_core::modules::search::search_notes(
                                     &request.query,
                                     lists,
@@ -303,7 +307,9 @@ mod tests {
         println!(
             "move a note: {:?}",
             median(50, || {
-                store.place_note(&files, root, &ids[0], &list, 500).unwrap();
+                store
+                    .place_note(&files, &book, &ids[0], &list, 500)
+                    .unwrap();
             })
         );
     }

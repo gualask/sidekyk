@@ -1,7 +1,7 @@
-//! A project's notes in memory, and every change to them. Pure: each change says which files it
+//! A book's notes in memory, and every change to them. Pure: each change says which files it
 //! touched, and `NotesStore` writes them.
 
-use super::contracts::{DeletedList, Note, NoteList, NotesSummary, ProjectNotes};
+use super::contracts::{DeletedList, ListTarget, Note, NoteList, NotesSummary, ProjectNotes};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 use crate::shared::id::is_id;
 
@@ -22,7 +22,7 @@ pub(super) enum Touched {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct Book {
+pub(super) struct NoteBook {
     /// In the user's order, never empty.
     pub(super) lists: Vec<NoteList>,
     /// In no particular order.
@@ -75,8 +75,16 @@ fn checked_id(id: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-impl Book {
-    /// A project's notes as read, made consistent: at least one list (a new one, `first_list`,
+/// A note handed back by the frontend or another book, before it is stored.
+fn checked_note(note: &Note) -> anyhow::Result<()> {
+    checked_id(&note.id)?;
+    checked_text(&note.text)?;
+    anyhow::ensure!(note.position.is_finite(), "a position must be a number");
+    Ok(())
+}
+
+impl NoteBook {
+    /// A book's notes as read, made consistent: at least one list (a new one, `first_list`,
     /// when none was read), every note in a list that exists (else in the first), an open list
     /// that exists. What it had to mend is touched, so the next write stores it.
     pub(super) fn mended(
@@ -109,10 +117,14 @@ impl Book {
         (book, touched)
     }
 
-    /// What a project's card tells of its notes: how many wait.
+    /// What a project's card tells of its notes: how many wait, how many are done, and when the
+    /// last was written.
     pub(super) fn summary(&self) -> NotesSummary {
+        let open = self.notes.iter().filter(|n| n.done.is_none()).count() as u32;
         NotesSummary {
-            open: self.notes.iter().filter(|n| n.done.is_none()).count() as u32,
+            open,
+            done: self.notes.len() as u32 - open,
+            last_edited: self.notes.iter().map(|n| n.edited).max(),
         }
     }
 
@@ -126,6 +138,30 @@ impl Book {
 
     pub(super) fn note(&self, id: &str) -> Option<&Note> {
         self.notes.iter().find(|n| n.id == id)
+    }
+
+    /// The note of `id`, or `note_missing`.
+    pub(super) fn find(&self, id: &str) -> anyhow::Result<&Note> {
+        self.note(id).ok_or_else(missing)
+    }
+
+    /// Puts a note in, in place of the one with its id if any.
+    fn replace(&mut self, note: Note) -> Touched {
+        self.notes.retain(|n| n.id != note.id);
+        let touched = Touched::Note(note.id.clone());
+        self.notes.push(note);
+        touched
+    }
+
+    /// Takes a list out; when it was open, the first left opens.
+    fn remove_list(&mut self, index: usize) -> (NoteList, Vec<Touched>) {
+        let list = self.lists.remove(index);
+        let mut touched = vec![Touched::Lists];
+        if self.open_list == list.id {
+            self.open_list = self.lists[0].id.clone();
+            touched.push(Touched::State);
+        }
+        (list, touched)
     }
 
     fn note_mut(&mut self, id: &str) -> anyhow::Result<&mut Note> {
@@ -258,24 +294,18 @@ impl Book {
 
     /// Puts a note back as it was given, in place of the one with its id if any (undo).
     pub(super) fn restore(&mut self, note: Note) -> anyhow::Result<(Note, Vec<Touched>)> {
-        checked_id(&note.id)?;
-        checked_text(&note.text)?;
-        anyhow::ensure!(note.position.is_finite(), "a position must be a number");
+        checked_note(&note)?;
         self.list_index(&note.list)?;
-        self.notes.retain(|n| n.id != note.id);
-        self.notes.push(note.clone());
-        let touched = vec![Touched::Note(note.id.clone())];
+        let touched = vec![self.replace(note.clone())];
         Ok((note, touched))
     }
 
     pub(super) fn delete(&mut self, id: &str) -> anyhow::Result<Vec<Touched>> {
-        let index = self
-            .notes
-            .iter()
-            .position(|n| n.id == id)
-            .ok_or_else(missing)?;
-        self.notes.swap_remove(index);
-        Ok(vec![Touched::Note(id.into())])
+        let touched = self.take_out(id);
+        if touched.is_empty() {
+            return Err(missing());
+        }
+        Ok(touched)
     }
 
     /// A new list, last, and open.
@@ -284,13 +314,131 @@ impl Book {
         id: String,
         name: &str,
     ) -> anyhow::Result<(NoteList, Vec<Touched>)> {
+        let list = self.push_list(id, name)?;
+        self.open_list = list.id.clone();
+        Ok((list, vec![Touched::Lists, Touched::State]))
+    }
+
+    /// A new list, last; the open one stays.
+    fn push_list(&mut self, id: String, name: &str) -> anyhow::Result<NoteList> {
         let list = NoteList {
             id,
             name: checked_name(name)?,
         };
         self.lists.push(list.clone());
-        self.open_list = list.id.clone();
-        Ok((list, vec![Touched::Lists, Touched::State]))
+        Ok(list)
+    }
+
+    /// The list a moved note goes to, made when asked for (`new_id` its id).
+    fn target_list(
+        &mut self,
+        target: ListTarget,
+        new_id: String,
+    ) -> anyhow::Result<(String, Vec<Touched>)> {
+        match target {
+            ListTarget::Open => Ok((self.open_list.clone(), Vec::new())),
+            ListTarget::List { id } => {
+                self.list_index(&id)?;
+                Ok((id, Vec::new()))
+            }
+            ListTarget::New { name } => {
+                let list = self.push_list(new_id, &name)?;
+                Ok((list.id, vec![Touched::Lists]))
+            }
+        }
+    }
+
+    /// Takes in a note moved from another book, or from another list of this one, with its id: on
+    /// top of the open notes of the list `target` names (`new_list` the id of one made for it).
+    /// Done, it stays done unless `reopen`.
+    pub(super) fn receive(
+        &mut self,
+        note: Note,
+        target: ListTarget,
+        new_list: String,
+        reopen: bool,
+    ) -> anyhow::Result<(Note, Vec<Touched>)> {
+        checked_note(&note)?;
+        let (list, mut touched) = self.target_list(target, new_list)?;
+        let position = self
+            .open_notes(&list, &note.id)
+            .first()
+            .map_or(0.0, |top| top.position - 1.0);
+        let note = Note {
+            list,
+            position,
+            done: if reopen { None } else { note.done },
+            ..note
+        };
+        touched.push(self.replace(note.clone()));
+        Ok((note, touched))
+    }
+
+    /// Takes a note out, if it is still there.
+    pub(super) fn take_out(&mut self, id: &str) -> Vec<Touched> {
+        let before = self.notes.len();
+        self.notes.retain(|n| n.id != id);
+        if self.notes.len() == before {
+            return Vec::new();
+        }
+        vec![Touched::Note(id.into())]
+    }
+
+    /// Takes in a list of another book with its notes: into the list of the same name (case
+    /// aside), its open notes below that list's in their order, its done ones kept; else as a
+    /// new list, last, of id `new_id`. The list that took them, and whether it was there.
+    pub(super) fn absorb(
+        &mut self,
+        list: &NoteList,
+        notes: Vec<Note>,
+        new_id: String,
+    ) -> anyhow::Result<(String, bool, Vec<Touched>)> {
+        for note in &notes {
+            checked_note(note)?;
+        }
+        let name = list.name.to_lowercase();
+        let (into, joined, mut touched) =
+            match self.lists.iter().find(|l| l.name.to_lowercase() == name) {
+                Some(own) => (own.id.clone(), true, Vec::new()),
+                None => (
+                    self.push_list(new_id, &list.name)?.id,
+                    false,
+                    vec![Touched::Lists],
+                ),
+            };
+        let mut bottom = self
+            .open_notes(&into, "")
+            .last()
+            .map_or(-1.0, |n| n.position);
+        let mut notes = notes;
+        notes.sort_by(|a, b| a.position.total_cmp(&b.position));
+        for note in notes {
+            let position = if note.done.is_none() {
+                bottom += 1.0;
+                bottom
+            } else {
+                note.position
+            };
+            touched.push(self.replace(Note {
+                list: into.clone(),
+                position,
+                ..note
+            }));
+        }
+        Ok((into, joined, touched))
+    }
+
+    /// Gives back what `absorb` took in (undo): the notes of `ids`, and the list `into` when it
+    /// was made for them and holds no other note.
+    pub(super) fn unabsorb(&mut self, into: &str, joined: bool, ids: &[String]) -> Vec<Touched> {
+        let mut touched: Vec<Touched> = ids.iter().flat_map(|id| self.take_out(id)).collect();
+        let kept = joined || self.lists.len() < 2 || self.notes.iter().any(|n| n.list == into);
+        if !kept {
+            if let Ok(index) = self.list_index(into) {
+                touched.extend(self.remove_list(index).1);
+            }
+        }
+        touched
     }
 
     pub(super) fn rename_list(
@@ -309,17 +457,12 @@ impl Book {
     pub(super) fn delete_list(&mut self, id: &str) -> anyhow::Result<(DeletedList, Vec<Touched>)> {
         let index = self.list_index(id)?;
         anyhow::ensure!(self.lists.len() > 1, "a project keeps one list at least");
-        let list = self.lists.remove(index);
+        let (list, mut touched) = self.remove_list(index);
         let (notes, kept) = std::mem::take(&mut self.notes)
             .into_iter()
             .partition(|n: &Note| n.list == list.id);
         self.notes = kept;
-        let mut touched: Vec<Touched> = notes.iter().map(|n| Touched::Note(n.id.clone())).collect();
-        touched.push(Touched::Lists);
-        if self.open_list == list.id {
-            self.open_list = self.lists[0].id.clone();
-            touched.push(Touched::State);
-        }
+        touched.extend(notes.iter().map(|n| Touched::Note(n.id.clone())));
         let deleted = DeletedList {
             list,
             index: index as u32,
@@ -344,21 +487,15 @@ impl Book {
             "the list is already there"
         );
         for note in &notes {
-            checked_id(&note.id)?;
-            checked_text(&note.text)?;
-            anyhow::ensure!(
-                note.list == list.id && note.position.is_finite(),
-                "a note of another list"
-            );
+            checked_note(note)?;
+            anyhow::ensure!(note.list == list.id, "a note of another list");
         }
         let index = (index as usize).min(self.lists.len());
         self.open_list = list.id.clone();
         self.lists.insert(index, list);
         let mut touched = vec![Touched::Lists, Touched::State];
         for note in notes {
-            self.notes.retain(|n| n.id != note.id);
-            touched.push(Touched::Note(note.id.clone()));
-            self.notes.push(note);
+            touched.push(self.replace(note));
         }
         Ok((self.snapshot(), touched))
     }
@@ -385,7 +522,7 @@ mod tests {
         format!("{n:016x}")
     }
 
-    fn book() -> Book {
+    fn book() -> NoteBook {
         let lists = vec![
             NoteList {
                 id: GENERAL.into(),
@@ -396,18 +533,18 @@ mod tests {
                 name: "Release".into(),
             },
         ];
-        Book::mended(lists, Vec::new(), None, || unreachable!()).0
+        NoteBook::mended(lists, Vec::new(), None, || unreachable!()).0
     }
 
     /// The texts of a list's open notes, from the top.
-    fn order(book: &Book, list: &str) -> Vec<String> {
+    fn order(book: &NoteBook, list: &str) -> Vec<String> {
         book.open_notes(list, "")
             .into_iter()
             .map(|n| n.text.clone())
             .collect()
     }
 
-    fn with_notes(texts: &[&str]) -> Book {
+    fn with_notes(texts: &[&str]) -> NoteBook {
         let mut book = book();
         // added bottom first, so they read top to bottom as given
         for (n, text) in texts.iter().rev().enumerate() {
@@ -417,7 +554,7 @@ mod tests {
         book
     }
 
-    fn id_of(book: &Book, text: &str) -> String {
+    fn id_of(book: &NoteBook, text: &str) -> String {
         book.notes
             .iter()
             .find(|n| n.text == text)
@@ -441,7 +578,7 @@ mod tests {
             id: GENERAL.into(),
             name: "General".into(),
         };
-        let (book, touched) = Book::mended(Vec::new(), vec![stray], None, first);
+        let (book, touched) = NoteBook::mended(Vec::new(), vec![stray], None, first);
         assert_eq!(book.lists[0].name, "General");
         assert_eq!(book.notes[0].list, GENERAL);
         assert_eq!(book.open_list, GENERAL);
@@ -452,7 +589,7 @@ mod tests {
     fn a_list_open_that_is_gone_opens_the_first() {
         let lists = book().lists;
         let (book, touched) =
-            Book::mended(lists, Vec::new(), Some("gone".into()), || unreachable!());
+            NoteBook::mended(lists, Vec::new(), Some("gone".into()), || unreachable!());
         assert_eq!(book.open_list, GENERAL);
         assert!(touched.is_empty());
     }
@@ -628,11 +765,20 @@ mod tests {
     }
 
     #[test]
-    fn a_summary_counts_open_notes() {
+    fn a_summary_counts_open_and_done_notes_and_tells_the_last_edit() {
+        assert_eq!(book().summary(), NotesSummary::default());
         let mut book = with_notes(&["a", "b"]);
         book.add(id(9), RELEASE, "c".into(), 9).unwrap();
         book.set_done(&id_of(&book, "a"), true, 10).unwrap();
-        assert_eq!(book.summary(), NotesSummary { open: 2 });
+        book.set_text(&id_of(&book, "b"), "B".into(), 12).unwrap();
+        assert_eq!(
+            book.summary(),
+            NotesSummary {
+                open: 2,
+                done: 1,
+                last_edited: Some(12)
+            }
+        );
     }
 
     #[test]

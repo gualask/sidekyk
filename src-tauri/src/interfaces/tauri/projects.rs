@@ -4,6 +4,7 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
+use super::notes::project_book;
 use super::state::{self, ProjectsState};
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
@@ -57,9 +58,9 @@ pub(crate) async fn remove_project(
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
         let projects = app.state::<ProjectsState>();
-        projects.project(&project_id)?;
+        let project = projects.project(&project_id)?;
         app.state::<NotesStore>()
-            .delete_project(app.state::<NotesFiles>().inner(), &project_id)?;
+            .delete_book(app.state::<NotesFiles>().inner(), &project_book(&project))?;
         projects.update(app, |list| list.remove(&project_id))
     })
     .await

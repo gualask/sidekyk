@@ -1,4 +1,5 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
+import { INBOX_BOOK } from '@/modules/notes';
 import type { ProjectList } from '@/modules/projects';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
@@ -63,6 +64,13 @@ const STORED_SHORTCUT = 'Control+Alt+Space';
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
     return { code, message: code };
+}
+
+let projectSeq = 0;
+/** 16 hex digits, as the backend's new project ids. */
+function newProjectId(): string {
+    projectSeq += 1;
+    return (0xa0000000 + projectSeq).toString(16).padStart(16, '0');
 }
 
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
@@ -145,13 +153,40 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         }
     };
 
-    // as the backend, notes need the project in the list, not its repository: a moved one's stay
-    const notes = fixtureNotes(
-        (projectId) => (!scenarioData(projectId) ? 'empty' : large(projectId) ? 'large' : 'review'),
-        (projectId) => {
-            project(projectId);
+    // as in `src-tauri/crates/core/src/modules/projects/list.rs`: a project removed takes its
+    // notes; when on screen, the next project shows, else the previous
+    const removeProject = (projectId: string) => {
+        const index = list.projects.indexOf(project(projectId));
+        notes.drop(projectId);
+        const projects = list.projects.filter((p) => p.id !== projectId);
+        const next = projects[index] ?? projects.at(-1) ?? null;
+        const { [projectId]: _gone, ...layouts } = list.layouts;
+        return update({
+            projects,
+            active: list.active === projectId ? (next?.id ?? null) : list.active,
+            layouts,
+        });
+    };
+    const projectsChanged = new Set<() => void>();
+    // as the backend, notes need the Inbox or a project in the list, not its repository: a moved
+    // one's stay
+    const notes = fixtureNotes({
+        initial: (book) => (!scenarioData(book) ? 'empty' : large(book) ? 'large' : 'review'),
+        checkBook: (book) => {
+            if (book !== INBOX_BOOK) project(book);
         },
-    );
+        // as `ProjectList::add`: last, without folder, on screen only when none was
+        makeProject: (name) => {
+            const made: ProjectInfo = { id: newProjectId(), name: name.trim(), folders: [] };
+            const active = list.active ?? made.id;
+            update({ ...list, projects: [...list.projects, made], active });
+            return made.id;
+        },
+        dropProject: removeProject,
+        projectsChanged: () => {
+            for (const listener of projectsChanged) listener();
+        },
+    });
     // as the backend, the palette searches the notes of the project on screen
     const searchedNotes = (projectId: string | null) => {
         if (!projectId) return null;
@@ -213,20 +248,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             },
             activateProject: async (projectId) =>
                 update({ ...list, active: project(projectId).id }),
-            // as in `src-tauri/crates/core/src/modules/projects/list.rs`: the next project shows,
-            // else the previous
-            removeProject: async (projectId) => {
-                const index = list.projects.indexOf(project(projectId));
-                notes.drop(projectId);
-                const projects = list.projects.filter((p) => p.id !== projectId);
-                const next = projects[index] ?? projects.at(-1) ?? null;
-                const { [projectId]: _gone, ...layouts } = list.layouts;
-                return update({
-                    projects,
-                    active: list.active === projectId ? (next?.id ?? null) : list.active,
-                    layouts,
-                });
-            },
+            removeProject: async (projectId) => removeProject(projectId),
             // in `problems`, the moved project is found next to where it was; it keeps its id
             relocateProject: async (projectId) => {
                 const moved = project(projectId);
@@ -246,7 +268,10 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             },
             setProjectLayout: async (projectId, layout) =>
                 update({ ...list, layouts: { ...list.layouts, [project(projectId).id]: layout } }),
-            onProjectsChanged: () => () => undefined,
+            onProjectsChanged: (listener) => {
+                projectsChanged.add(listener);
+                return () => projectsChanged.delete(listener);
+            },
         },
         repository: {
             getSnapshot: async (projectId) => {

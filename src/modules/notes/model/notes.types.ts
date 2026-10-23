@@ -3,7 +3,22 @@
  * Change both sides together.
  */
 
-/** One note: a card of plain text in a list of a project. Times are milliseconds since the epoch. */
+/**
+ * Whose notes, on the wire: the Inbox's (this name), or a project's (its id). No project id is
+ * it: ids are 16 hex digits, and before them absolute paths or `wsl:…`.
+ */
+export const INBOX_BOOK = 'inbox';
+
+/** Where a move puts its notes: a book, or a project made for them, without folder. */
+export type BookTarget = { kind: 'book'; book: string } | { kind: 'newProject'; name: string };
+
+/** The list of its book a moved note goes to: the open one (the Inbox's only one), or a new one. */
+export type ListTarget =
+    | { kind: 'open' }
+    | { kind: 'list'; id: string }
+    | { kind: 'new'; name: string };
+
+/** One note: a card of plain text in a list of a book. Times are milliseconds since the epoch. */
 export interface Note {
     id: string;
     /** The list it is in. */
@@ -24,7 +39,7 @@ export interface NoteList {
     name: string;
 }
 
-/** Every note of a project, its lists in the user's order (at least one), and the list open. */
+/** Every note of a book, its lists in the user's order (at least one), and the list open. */
 export interface ProjectNotes {
     lists: NoteList[];
     /** In no particular order. */
@@ -40,8 +55,30 @@ export interface DeletedList {
     notes: Note[];
 }
 
-/** What a project's card at all projects tells of its notes. */
+/** A note moved, as it is now, and the book it went to (a project made for it included). */
+export interface MovedNote {
+    to: string;
+    note: Note;
+}
+
+/** A list moved to another project, handed back to undo it. */
+export interface MovedList {
+    /** The books. */
+    from: string;
+    to: string;
+    /** The list as it left `from`, brought back there as a deleted list is. */
+    left: DeletedList;
+    /** The list of `to` that took its notes. */
+    into: string;
+    /** Whether `into` was there before, a list of the same name: undo leaves it. */
+    joined: boolean;
+}
+
+/** What a book tells of its notes: a project's card at all projects. */
 export interface NotesSummary {
     /** The notes not done. */
     open: number;
+    done: number;
+    /** When the newest change to a note's text was, null without notes. */
+    lastEdited: number | null;
 }

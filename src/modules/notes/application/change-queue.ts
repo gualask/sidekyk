@@ -8,7 +8,7 @@ export type Answer<T> =
     | { kind: 'skip'; value: T };
 
 /**
- * A project's changes to its notes, one at a time in the order they were made: the backend gets
+ * A book's changes to its notes, one at a time in the order they were made: the backend gets
  * them in that order, and an answer that came back while later changes waited is not shown over
  * them. Once the last one is back, the notes are read again if an answer was skipped.
  */
@@ -39,12 +39,12 @@ export class ChangeQueue {
 
 const queues = new Map<string, ChangeQueue>();
 
-/** The queue of a project's changes, by its id. */
-export function changeQueue(projectId: string): ChangeQueue {
-    let queue = queues.get(projectId);
+/** The queue of a book's changes. */
+export function changeQueue(book: string): ChangeQueue {
+    let queue = queues.get(book);
     if (!queue) {
         queue = new ChangeQueue();
-        queues.set(projectId, queue);
+        queues.set(book, queue);
     }
     return queue;
 }

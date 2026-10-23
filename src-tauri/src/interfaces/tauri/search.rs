@@ -4,6 +4,7 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 
 use super::blocking::blocking;
+use super::notes::project_book;
 use super::repository::on_project;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
@@ -25,9 +26,9 @@ pub(crate) async fn search(
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
         let query = request.query.clone();
-        Ok(app.state::<ProjectsState>().search(&request, |project_id| {
+        Ok(app.state::<ProjectsState>().search(&request, |project| {
             notes
-                .with_notes(files.inner(), project_id, |lists, found| {
+                .with_notes(files.inner(), &project_book(project), |lists, found| {
                     search_notes(&query, lists, found)
                 })
                 .inspect_err(

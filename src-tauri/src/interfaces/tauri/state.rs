@@ -103,7 +103,7 @@ impl ProjectsState {
     pub(crate) fn search(
         &self,
         request: &SearchRequest,
-        notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
+        notes_of: impl FnOnce(&Project) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
     ) -> SearchResults {
         let list = self.list();
         let files_of = |id: &str| {
@@ -111,7 +111,7 @@ impl ProjectsState {
             self.repositories_at(folder)
                 .search_files(&info, &request.query)
         };
-        let notes_of = |id: &str| list.find(id).ok().and_then(|_| notes_of(id));
+        let notes_of = |id: &str| list.find(id).ok().and_then(notes_of);
         search::search(request, &list.projects, files_of, notes_of)
     }
 

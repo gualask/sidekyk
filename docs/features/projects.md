@@ -83,8 +83,8 @@ Several repositories, one on screen.
   repository's keys: changes on disk and the window showing leave it alone, another HEAD or
   another day reads it again; its cache expires as the others (`gcTime`). 80 ms on this repository
   (68 commits), 0.5 s on Zed's clone over 129 commits.
-- Notes on the card: `notes_summary` (how many wait), kept in memory once read, until the notes
-  change.
+- Notes on the card: `notes_summary` (how many wait and are done, the last edit), kept in memory
+  once read, until the notes change.
 - Locate… (`relocate_project`): the folder picked resolves to its repository; the project's
   folder becomes it (`relocate`), nothing else changes; the same folder changes nothing. Another
   project's folder: `Relocation::InProject { id, name }`, the list as it was. The id stays, so

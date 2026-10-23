@@ -1,5 +1,9 @@
 import {
+    type BookTarget,
     type DeletedList,
+    INBOX_BOOK,
+    type ListTarget,
+    type MovedList,
     type Note,
     type NoteList,
     type NotesPort,
@@ -127,31 +131,48 @@ function largeBook(): Book {
 }
 
 /**
- * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/book.rs`):
- * the scenario's project starts with the mock's notes, any other with none.
+ * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
+ * the scenario's project starts with the mock's notes, any other book with none. `checkBook`
+ * refuses a book the backend would not know. A move to a new project makes it with `makeProject`
+ * (its id back), takes it away with `dropProject` when the move fails, and says the projects
+ * changed (`projectsChanged`) when it is done.
  */
-export function fixtureNotes(
-    initial: (projectId: string) => 'review' | 'large' | 'empty',
-    checkProject: (projectId: string) => void,
-): NotesPort & {
-    peek: (projectId: string) => ProjectNotes;
-    drop: (projectId: string) => void;
+export function fixtureNotes({
+    initial,
+    checkBook,
+    makeProject,
+    dropProject,
+    projectsChanged,
+}: {
+    initial: (book: string) => 'review' | 'large' | 'empty';
+    checkBook: (book: string) => void;
+    makeProject: (name: string) => string;
+    dropProject: (id: string) => void;
+    projectsChanged: () => void;
+}): NotesPort & {
+    peek: (book: string) => ProjectNotes;
+    drop: (book: string) => void;
 } {
     const books = new Map<string, Book>();
-    const book = (projectId: string): Book => {
-        checkProject(projectId);
-        let found = books.get(projectId);
+    const book = (key: string): Book => {
+        checkBook(key);
+        let found = books.get(key);
         if (!found) {
-            const kind = initial(projectId);
+            const kind = initial(key);
             found =
                 kind === 'review'
                     ? bookOf(REVIEW_NOTES)
                     : kind === 'large'
                       ? largeBook()
                       : emptyBook();
-            books.set(projectId, found);
+            books.set(key, found);
         }
         return found;
+    };
+    // as the store's `project_only`: the Inbox has one list, never changed, and no done
+    const projectBook = (key: string) => {
+        if (key === INBOX_BOOK) throw failure('unknown');
+        return book(key);
     };
     const snapshot = (b: Book): ProjectNotes => ({
         lists: b.lists.map((l) => ({ ...l })),
@@ -165,19 +186,67 @@ export function fixtureNotes(
     };
     const list = (b: Book, id: string) => {
         const found = b.lists.find((l) => l.id === id);
-        if (!found) throw failure('note_missing');
+        if (!found) throw failure('note_list_missing');
         return found;
+    };
+    /** Puts a note in, in place of the one with its id if any. */
+    const replace = (b: Book, put: Note) => {
+        b.notes = [...b.notes.filter((n) => n.id !== put.id), { ...put }];
+    };
+    const takeOut = (b: Book, id: string) => {
+        b.notes = b.notes.filter((n) => n.id !== id);
+    };
+    /** Takes a list out; when it was open, the first left opens. */
+    const removeList = (b: Book, id: string) => {
+        b.lists = b.lists.filter((l) => l.id !== id);
+        if (b.openList === id) b.openList = b.lists[0].id;
+    };
+    /** The list a moved note goes to, made when asked for. */
+    const targetList = (b: Book, target: ListTarget) => {
+        if (target.kind === 'open') return b.openList;
+        if (target.kind === 'list') return list(b, target.id).id;
+        const added = { id: newId(), name: target.name.trim() };
+        b.lists.push(added);
+        return added.id;
+    };
+    /** Runs a move into the book `to` names; a project made for it goes when the move fails. */
+    const into = <T>(to: BookTarget, run: (key: string) => T): T => {
+        if (to.kind === 'book') return run(to.book);
+        const made = makeProject(to.name);
+        try {
+            const moved = run(made);
+            projectsChanged();
+            return moved;
+        } catch (error) {
+            dropProject(made);
+            throw error;
+        }
+    };
+    /** Takes a book's list out with its notes; the last list stays. */
+    const takeList = (b: Book, id: string): DeletedList => {
+        const gone = list(b, id);
+        const index = b.lists.indexOf(gone);
+        if (b.lists.length === 1) throw failure('unknown');
+        removeList(b, id);
+        const notes = b.notes.filter((n) => n.list === id);
+        b.notes = b.notes.filter((n) => n.list !== id);
+        return { list: gone, index, notes };
+    };
+    const putList = (b: Book, deleted: DeletedList) => {
+        b.lists.splice(Math.min(deleted.index, b.lists.length), 0, { ...deleted.list });
+        for (const back of deleted.notes) replace(b, back);
+        b.openList = deleted.list.id;
     };
     return {
         /** The notes as they are, for the palette's search. */
-        peek: (projectId) => snapshot(book(projectId)),
+        peek: (key) => snapshot(book(key)),
         /** A project removed takes its notes, as the backend's `remove_project`. */
-        drop: (projectId) => {
-            books.delete(projectId);
+        drop: (key) => {
+            books.delete(key);
         },
-        getNotes: async (projectId) => snapshot(book(projectId)),
-        addNote: async (projectId, listId, text) => {
-            const b = book(projectId);
+        getNotes: async (key) => snapshot(book(key)),
+        addNote: async (key, listId, text) => {
+            const b = book(key);
             list(b, listId);
             const now = Date.now();
             const added: Note = {
@@ -193,80 +262,133 @@ export function fixtureNotes(
             return { ...added };
         },
         // as the backend, without renumbering: positions here never run out of room
-        setNoteText: async (projectId, id, text) => {
-            const found = note(book(projectId), id);
+        setNoteText: async (key, id, text) => {
+            const found = note(book(key), id);
             if (found.text !== text) {
                 found.text = text;
                 found.edited = Date.now();
             }
             return { ...found };
         },
-        setNoteDone: async (projectId, id, done) => {
-            const found = note(book(projectId), id);
+        setNoteDone: async (key, id, done) => {
+            const found = note(projectBook(key), id);
             if ((found.done !== null) !== done) found.done = done ? Date.now() : null;
             return { ...found };
         },
-        placeNote: async (projectId, id, listId, index) => {
-            const b = book(projectId);
+        placeNote: async (key, id, listId, index) => {
+            const b = projectBook(key);
             list(b, listId);
             const moved = note(b, id);
             moved.position = positionAt(openNotes(b.notes, listId), id, index);
             moved.list = listId;
             return [{ ...moved }];
         },
-        restoreNote: async (projectId, restored) => {
-            const b = book(projectId);
+        restoreNote: async (key, restored) => {
+            const b = book(key);
             list(b, restored.list);
-            b.notes = [...b.notes.filter((n) => n.id !== restored.id), { ...restored }];
+            replace(b, restored);
             return { ...restored };
         },
-        deleteNote: async (projectId, id) => {
-            const b = book(projectId);
+        deleteNote: async (key, id) => {
+            const b = book(key);
             note(b, id);
-            b.notes = b.notes.filter((n) => n.id !== id);
+            takeOut(b, id);
         },
-        addList: async (projectId, name) => {
-            const b = book(projectId);
+        moveNote: async (from, id, to, target) =>
+            into(to, (key) => {
+                const inbox = key === INBOX_BOOK;
+                if (inbox && target.kind !== 'open') throw failure('unknown');
+                const source = book(from);
+                const dest = book(key);
+                const moved = note(source, id);
+                const listId = targetList(dest, target);
+                const placed: Note = {
+                    ...moved,
+                    list: listId,
+                    position: positionAt(openNotes(dest.notes, listId), id, 0),
+                    done: inbox ? null : moved.done,
+                };
+                takeOut(source, id);
+                replace(dest, placed);
+                return { to: key, note: { ...placed } };
+            }),
+        unmoveNote: async (at, original, home) => {
+            const back = book(home);
+            list(back, original.list);
+            takeOut(book(at), original.id);
+            replace(back, original);
+            return { ...original };
+        },
+        moveList: async (from, listId, to) =>
+            into(to, (key) => {
+                const source = projectBook(from);
+                const dest = projectBook(key);
+                const left = takeList(source, listId);
+                const name = left.list.name.toLowerCase();
+                const same = dest.lists.find((l) => l.name.toLowerCase() === name);
+                const taker = same ?? { id: newId(), name: left.list.name };
+                if (!same) dest.lists.push(taker);
+                let bottom = openNotes(dest.notes, taker.id).at(-1)?.position ?? -1;
+                const notes = [...left.notes].sort((a, b) => a.position - b.position);
+                for (const moved of notes) {
+                    if (moved.done === null) bottom += 1;
+                    const position = moved.done === null ? bottom : moved.position;
+                    replace(dest, { ...moved, list: taker.id, position });
+                }
+                const result: MovedList = {
+                    from,
+                    to: key,
+                    left,
+                    into: taker.id,
+                    joined: same !== undefined,
+                };
+                return result;
+            }),
+        unmoveList: async (moved) => {
+            const source = projectBook(moved.from);
+            const dest = projectBook(moved.to);
+            putList(source, moved.left);
+            for (const back of moved.left.notes) takeOut(dest, back.id);
+            const empty = !dest.notes.some((n) => n.list === moved.into);
+            if (!moved.joined && empty && dest.lists.length > 1) removeList(dest, moved.into);
+        },
+        addList: async (key, name) => {
+            const b = projectBook(key);
             const added = { id: newId(), name: name.trim() };
             b.lists.push(added);
             b.openList = added.id;
             return { ...added };
         },
-        renameList: async (projectId, id, name) => {
-            const found = list(book(projectId), id);
+        renameList: async (key, id, name) => {
+            const found = list(projectBook(key), id);
             found.name = name.trim();
             return { ...found };
         },
-        deleteList: async (projectId, id) => {
-            const b = book(projectId);
-            const index = b.lists.indexOf(list(b, id));
-            if (b.lists.length === 1) throw failure('unknown');
-            const [gone] = b.lists.splice(index, 1);
-            const notes = b.notes.filter((n) => n.list === id);
-            b.notes = b.notes.filter((n) => n.list !== id);
-            if (b.openList === id) b.openList = b.lists[0].id;
-            const deleted: DeletedList = { list: gone, index, notes };
-            return deleted;
-        },
-        restoreList: async (projectId, deleted) => {
-            const b = book(projectId);
-            b.lists.splice(Math.min(deleted.index, b.lists.length), 0, { ...deleted.list });
-            b.notes.push(...deleted.notes.map((n) => ({ ...n })));
-            b.openList = deleted.list.id;
+        deleteList: async (key, id) => takeList(projectBook(key), id),
+        restoreList: async (key, deleted) => {
+            const b = projectBook(key);
+            putList(b, deleted);
             return snapshot(b);
         },
-        // as the backend's `Book::summary`
-        notesSummary: async (projectId) => ({
-            open: book(projectId).notes.filter((n) => n.done === null).length,
-        }),
-        countNotes: async (projectId) => book(projectId).notes.length,
+        // as the backend's `NoteBook::summary`
+        notesSummary: async (key) => {
+            const { notes } = book(key);
+            const open = notes.filter((n) => n.done === null).length;
+            const edited = notes.map((n) => n.edited);
+            return {
+                open,
+                done: notes.length - open,
+                lastEdited: edited.length ? Math.max(...edited) : null,
+            };
+        },
+        countNotes: async (key) => book(key).notes.length,
         // as if saved where the dialog first offers
         exportNotes: async (projectId) => {
-            book(projectId);
+            projectBook(projectId);
             return '/Users/dev/Documents/notes.md';
         },
-        openList: async (projectId, id) => {
-            const b = book(projectId);
+        openList: async (key, id) => {
+            const b = projectBook(key);
             list(b, id);
             b.openList = id;
         },

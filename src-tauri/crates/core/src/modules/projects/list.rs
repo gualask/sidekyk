@@ -64,6 +64,19 @@ impl ProjectList {
         self.active = Some(id);
     }
 
+    /// A new project of this name, without folder, last; the one on screen stays, unless there
+    /// was none.
+    pub fn add(&mut self, name: &str) -> anyhow::Result<Project> {
+        let name = name.trim();
+        anyhow::ensure!(!name.is_empty(), "a project needs a name");
+        let project = Project::new(name.into(), None);
+        self.projects.push(project.clone());
+        if self.active.is_none() {
+            self.active = Some(project.id.clone());
+        }
+        Ok(project)
+    }
+
     pub fn activate(&mut self, id: &str) -> anyhow::Result<()> {
         self.find(id)?;
         self.active = Some(id.to_string());
@@ -203,6 +216,19 @@ mod tests {
         let mut projects = list(&["/a", "/b"], Some("/b"));
         projects.open_folder(found("/a/"));
         assert_eq!(projects, list(&["/a", "/b"], Some("/a")));
+    }
+
+    #[test]
+    fn a_project_added_by_name_has_no_folder_and_leaves_the_one_on_screen() {
+        let mut projects = list(&["/a"], Some("/a"));
+        let added = projects.add("  Casa ").unwrap();
+        assert_eq!((added.name.as_str(), added.folders.len()), ("Casa", 0));
+        assert_eq!(projects.active.as_deref(), Some("/a"));
+        assert!(projects.add("  ").is_err());
+
+        let mut empty = ProjectList::default();
+        let first = empty.add("Casa").unwrap();
+        assert_eq!(empty.active, Some(first.id));
     }
 
     #[test]
