@@ -1,28 +1,32 @@
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { Menu } from '@base-ui/react/menu';
+import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { InlineField } from '@/shared/ui/InlineField';
 import type { NoteActions } from '../application/notes.queries';
 import { openCounts } from '../model/notes';
-import type { ProjectNotes } from '../model/notes.types';
+import type { NoteList, ProjectNotes } from '../model/notes.types';
 
 /** The longest list name, as the backend keeps it (`MAX_LIST_NAME` in `book.rs`). */
 const MAX_LIST_NAME = 200;
 
 /**
  * The lists of a project: "New list" first, so it is never a scroll away, then the lists with
- * their open notes counted. A click opens one, a double click renames it, its trash deletes it
- * with its notes (the last list stays).
+ * their open notes counted. A click opens one, a double click renames it, its ⋯ also moves it to
+ * another project or deletes it with its notes (the last list stays).
  */
 export function NoteLists({
     notes,
     actions,
     onOpen,
+    onMove,
 }: {
     notes: ProjectNotes;
     actions: NoteActions;
     /** A list was opened, or made (`write`: its field takes the focus, for its first note). */
     onOpen: (list: string, write: boolean) => void;
+    /** Opens the Move dialog for a list. */
+    onMove: (list: NoteList) => void;
 }) {
     // 'new', or the id of the list being renamed
     const [naming, setNaming] = useState<string | null>(null);
@@ -83,28 +87,76 @@ export function NoteLists({
                         >
                             <span className="min-w-0 flex-1 truncate">{list.name}</span>
                             <span
-                                className={`text-[11.5px] ${
-                                    notes.lists.length > 1 ? 'group-hover/list:invisible' : ''
-                                } ${list.id === notes.openList ? '' : 'text-ui-text-muted'}`}
+                                className={`text-[11.5px] group-hover/list:invisible group-has-data-popup-open/list:invisible ${
+                                    list.id === notes.openList ? '' : 'text-ui-text-muted'
+                                }`}
                             >
                                 {counts.get(list.id) || ''}
                             </span>
                         </button>
-                        {notes.lists.length > 1 ? (
-                            <button
-                                type="button"
-                                className="btn-icon absolute top-1/2 right-1.5 h-6 w-6 -translate-y-1/2 opacity-0 group-hover/list:opacity-100 focus-visible:opacity-100"
-                                title={t('notes.deleteList')}
-                                aria-label={t('notes.deleteListNamed', { list: list.name })}
-                                onClick={() => void actions.deleteList(list.id)}
-                            >
-                                <IconTrash size={13} />
-                            </button>
-                        ) : null}
+                        <ListMenu
+                            list={list}
+                            several={notes.lists.length > 1}
+                            onRename={() => setNaming(list.id)}
+                            onMove={() => onMove(list)}
+                            onDelete={() => void actions.deleteList(list.id)}
+                        />
                     </div>
                 ),
             )}
         </nav>
+    );
+}
+
+/**
+ * A list's ⋯, shown on hover: rename (a double click too), and while it is not the last, move it
+ * to another project or delete it with its notes.
+ */
+function ListMenu({
+    list,
+    several,
+    onRename,
+    onMove,
+    onDelete,
+}: {
+    list: NoteList;
+    several: boolean;
+    onRename: () => void;
+    onMove: () => void;
+    onDelete: () => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <Menu.Root>
+            <Menu.Trigger
+                className="btn-icon absolute top-1/2 right-1.5 h-6 w-6 -translate-y-1/2 opacity-0 group-hover/list:opacity-100 focus-visible:opacity-100 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text data-popup-open:opacity-100"
+                title={t('common.more')}
+                aria-label={t('notes.moreForList', { list: list.name })}
+            >
+                <IconDots size={14} />
+            </Menu.Trigger>
+            <Menu.Portal>
+                <Menu.Positioner sideOffset={4} align="end">
+                    <Menu.Popup className="menu-popup w-[200px]">
+                        <Menu.Item className="menu-item" onClick={onRename}>
+                            {t('notes.renameList')}
+                        </Menu.Item>
+                        {several ? (
+                            <>
+                                <Menu.Item className="menu-item" onClick={onMove}>
+                                    {t('notes.moveListTo')}
+                                </Menu.Item>
+                                <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
+                                <Menu.Item className="menu-item danger" onClick={onDelete}>
+                                    <IconTrash size={14} />
+                                    {t('notes.deleteList')}
+                                </Menu.Item>
+                            </>
+                        ) : null}
+                    </Menu.Popup>
+                </Menu.Positioner>
+            </Menu.Portal>
+        </Menu.Root>
     );
 }
 

@@ -1,6 +1,6 @@
 import type { Translator } from '@/shared/i18n';
 import { timeAgo } from '@/shared/time/relative-time';
-import type { Note, ProjectNotes } from './notes.types';
+import type { Note, NoteList, ProjectNotes } from './notes.types';
 
 /** A card shows this many lines until it is opened. */
 const SHOWN_LINES = 4;
@@ -17,6 +17,11 @@ export function doneNotes(notes: readonly Note[], list: string): Note[] {
     return notes
         .filter((note) => note.list === list && note.done !== null)
         .sort((a, b) => (b.done ?? 0) - (a.done ?? 0));
+}
+
+/** The list a book opens on; the first if the one remembered is gone. */
+export function openListOf(notes: ProjectNotes): NoteList {
+    return notes.lists.find((list) => list.id === notes.openList) ?? notes.lists[0];
 }
 
 /** How many notes of each list are open, by list. */

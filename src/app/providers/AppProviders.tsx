@@ -2,14 +2,20 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
 import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
-import { NotesProvider, NotesSettingsProvider } from '@/modules/notes';
-import { ProjectsProvider } from '@/modules/projects';
+import {
+    type MoveTargets,
+    MoveTargetsProvider,
+    NotesProvider,
+    NotesSettingsProvider,
+} from '@/modules/notes';
+import { ProjectsProvider, useProjects } from '@/modules/projects';
 import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
 import { SettingsProvider, useChangeSettings, useSettingsWhenRead } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { createTranslator, detectLocale, formatTag, TranslationProvider } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
 import { createAppQueryClient } from './query-client';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
@@ -40,7 +46,11 @@ export function AppProviders({
                                             <SearchProvider value={runtime.search}>
                                                 <NotesProvider value={runtime.notes}>
                                                     <NotesSettingsBridge>
-                                                        <ToastsHost>{children}</ToastsHost>
+                                                        <MoveTargetsBridge
+                                                            rank={runtime.search.rankNames}
+                                                        >
+                                                            <ToastsHost>{children}</ToastsHost>
+                                                        </MoveTargetsBridge>
                                                     </NotesSettingsBridge>
                                                 </NotesProvider>
                                             </SearchProvider>
@@ -111,6 +121,15 @@ function NotesSettingsBridge({ children }: { children: ReactNode }) {
         [lines, change],
     );
     return <NotesSettingsProvider value={value}>{children}</NotesSettingsProvider>;
+}
+
+const NO_PROJECTS: readonly ProjectInfo[] = [];
+
+/** Where Notes can move notes: the projects, ranked by name as the palette ranks them. */
+function MoveTargetsBridge({ rank, children }: { rank: MoveTargets['rank']; children: ReactNode }) {
+    const projects = useProjects().data?.projects ?? NO_PROJECTS;
+    const value = useMemo(() => ({ projects, rank }), [projects, rank]);
+    return <MoveTargetsProvider value={value}>{children}</MoveTargetsProvider>;
 }
 
 const NO_WIDTHS: Readonly<Record<string, number>> = {};

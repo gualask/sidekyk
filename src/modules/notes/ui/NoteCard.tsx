@@ -7,7 +7,7 @@ import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboa
 import type { NoteActions } from '../application/notes.queries';
 import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { noteMeta } from '../model/notes';
-import type { Note, NoteList } from '../model/notes.types';
+import type { Note } from '../model/notes.types';
 import { autosize, fitLines, linesClass } from './notes-layout';
 
 /** How long typing pauses before the text is saved; closing the card saves at once. */
@@ -21,7 +21,6 @@ const SAVE_DELAY_MS = 500;
 export function NoteCard({
     note,
     flash,
-    lists,
     editing,
     onEdit,
     actions,
@@ -29,11 +28,11 @@ export function NoteCard({
     onCopy,
     onDone,
     order,
+    onMove,
 }: {
     note: Note;
     /** Lit up for a moment: brought into view from the palette. */
     flash: boolean;
-    lists: readonly NoteList[];
     editing: boolean;
     onEdit: (editing: boolean) => void;
     actions: NoteActions;
@@ -43,9 +42,10 @@ export function NoteCard({
     onDone: ((done: boolean) => void) | null;
     /** For an open note among others: whether it is on top, and the reorder mode to start. */
     order: { top: boolean; moveToTop: () => void; reorder: () => void } | null;
+    /** Opens the Move dialog for the note. */
+    onMove: () => void;
 }) {
     const done = note.done !== null;
-    const others = lists.filter((list) => list.id !== note.list);
     const i18n = useTranslation();
     const { t } = i18n;
     const copyTitle = copyLabel(copied, t('notes.copy'), i18n);
@@ -128,25 +128,10 @@ export function NoteCard({
                                         <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
                                     </>
                                 ) : null}
-                                {others.length > 0 ? (
-                                    <>
-                                        <Menu.Group>
-                                            <Menu.GroupLabel className="px-3 pt-1 pb-0.5 text-[11px] tracking-[.04em] text-ui-text-muted uppercase">
-                                                {t('notes.moveTo')}
-                                            </Menu.GroupLabel>
-                                            {others.map((list) => (
-                                                <Menu.Item
-                                                    key={list.id}
-                                                    className="menu-item"
-                                                    onClick={() => void actions.moveTo(note, list)}
-                                                >
-                                                    <span className="truncate">{list.name}</span>
-                                                </Menu.Item>
-                                            ))}
-                                        </Menu.Group>
-                                        <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
-                                    </>
-                                ) : null}
+                                <Menu.Item className="menu-item" onClick={onMove}>
+                                    {t('notes.move')}
+                                </Menu.Item>
+                                <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
                                 <Menu.Item
                                     className="menu-item danger"
                                     onClick={() => void actions.remove(note)}

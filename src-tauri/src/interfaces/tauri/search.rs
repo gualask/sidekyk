@@ -10,7 +10,7 @@ use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::search::{
-    search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
+    self, search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
 };
 use sidekyk_core::shared::error::AppError;
 
@@ -62,4 +62,12 @@ pub(crate) async fn search_contents(
 /// Stops the search in contents going on: the palette closed.
 pub(crate) fn stop_content_search(state: tauri::State<'_, ProjectsState>) {
     state.stop_content_search();
+}
+
+#[tauri::command]
+/// The names that match `query`, best first, by their index: the Move dialog's projects and lists.
+/// A few names, ranked at once on the async runtime.
+pub(crate) async fn rank_names(query: String, names: Vec<String>) -> Vec<usize> {
+    let names: Vec<&str> = names.iter().map(String::as_str).collect();
+    search::rank_names(&query, &names)
 }

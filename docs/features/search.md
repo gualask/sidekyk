@@ -44,6 +44,9 @@ The palette is the only search; panels have no filter.
   first, equal ones open before done, at most 50. 1,000 notes of ~470 characters, release:
   0.07-0.42 ms a key (before, fuzzy first lines then a substring scan: 0.3-2.4 ms). Target:
   `notesTarget`.
+- `rank_names` (2026-10-23): names handed over, ranked as the palette's projects, best first by
+  index (all in order with nothing typed): the Move dialog's books and lists (`notes.md`), through
+  the search port's `rankNames`, which the app hands Notes (`MoveTargets`).
 - `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
   `open_file` (never through a link, no git), up to 8 threads taking the next file, a fixed buffer
   each, binary skipped at the first NUL, UTF-16 by BOM, the first 2 MiB per file (what the viewer

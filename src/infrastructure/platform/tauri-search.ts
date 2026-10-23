@@ -12,4 +12,5 @@ export const tauriSearch: SearchPort = {
         return invoke('search_contents', { projectId, query, onFiles: channel });
     },
     stopContentSearch: () => invoke('stop_content_search'),
+    rankNames: (query, names) => invoke('rank_names', { query, names }),
 };

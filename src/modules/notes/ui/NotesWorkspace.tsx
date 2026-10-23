@@ -6,8 +6,12 @@ import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useExportNotes, useNoteActions, useNotes } from '../application/notes.queries';
+import type { MoveSubject } from '../model/move-dialog';
+import { openListOf } from '../model/notes';
+import type { Note, NoteList } from '../model/notes.types';
 import { type NotesShown, notesShownBy } from '../model/targets';
 import { ListSwitch } from './ListSwitch';
+import { MoveHost } from './MoveHost';
 import { NoteCards } from './NoteCards';
 import { NoteLists } from './NoteLists';
 import { NotesMenu } from './NotesMenu';
@@ -34,6 +38,10 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     // a note to bring into view, as the palette asked
     const [reveal, setReveal] = useState<string | null>(null);
     const revealed = useCallback(() => setReveal(null), []);
+    // a note or a list in the Move dialog
+    const [moving, setMoving] = useState<MoveSubject | null>(null);
+    const askMoveNote = (note: Note) => setMoving({ kind: 'note', book, note });
+    const askMoveList = (list: NoteList) => setMoving({ kind: 'list', book, list });
 
     // a list, or a note of it, picked in the palette; or a new note (`⌘N`), its field taking the
     // focus as it shows (out of reorder mode it is not there yet)
@@ -64,7 +72,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
         );
     }
     if (!notes) return null;
-    const list = notes.lists.find((l) => l.id === notes.openList) ?? notes.lists[0];
+    const list = openListOf(notes);
 
     const cards =
         reorder !== null ? (
@@ -89,6 +97,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                 reveal={reveal}
                 onRevealed={revealed}
                 onReorder={setReorder}
+                onMove={askMoveNote}
             />
         );
 
@@ -107,6 +116,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                           list={list}
                           actions={actions}
                           onOpen={onListOpened}
+                          onMove={askMoveList}
                       />
                   ) : null}
                   <span className="flex-1" />
@@ -116,10 +126,13 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
           )
         : null;
 
+    const mover = <MoveHost moving={moving} actions={actions} onClose={() => setMoving(null)} />;
+
     if (place === 'tile') {
         return (
             <div className="flex h-full bg-ui-surface font-sans">
                 {head}
+                {mover}
                 {cards}
             </div>
         );
@@ -128,12 +141,18 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     return (
         <div className="flex h-full bg-ui-surface font-sans">
             {head}
+            {mover}
             <div
                 ref={listsBox}
                 className="shrink-0 overflow-auto border-r border-ui-border"
                 style={width.style}
             >
-                <NoteLists notes={notes} actions={actions} onOpen={onListOpened} />
+                <NoteLists
+                    notes={notes}
+                    actions={actions}
+                    onOpen={onListOpened}
+                    onMove={askMoveList}
+                />
             </div>
             <SidebarSplitter
                 width={width}

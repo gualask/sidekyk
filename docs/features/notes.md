@@ -8,15 +8,16 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
 - Cards, not documents: plain text, user's order (new on top), each marked done when used. Done
   cards fold into "Done (n)".
 - Actions on the card, never in its text: done circle left; copy and ⋯ top right. ⋯: move to top,
-  reorder, move to another list, delete (move and delete undoable).
+  reorder, Move…, delete (move and delete undoable).
 - Edit in place: four lines shown (line count if longer), all when clicked; `Esc`, `⌘↵` or click
   outside closes; an empty card goes (Undo). Long lines wrap or scroll (setting `noteLines`, `⌥Z`
   from a note).
 - Field on top adds to the open list: `↵` adds, `⇧↵` new line, paste into the empty field adds at
   once; `⌘N` focuses it, from a project's levels (at all projects, the Inbox's).
 - Lists per project by topic; full screen on the left, in a tile a menu from the header. "New
-  list" first; double click renames; deleting takes its notes (Undo). A project opens on the list
-  last open.
+  list" first; double click renames; a list's ⋯ (on hover): Rename, Move to project…, Delete
+  (deleting takes its notes, Undo; the last list only renames). A project opens on the list last
+  open.
 - Order without drag and drop: "Move to top", and "Reorder…" (one line per card with ↑, position,
   ↓; a typed position for long jumps; `⌥↑`/`⌥↓` move, `↑`/`↓` select; `Esc`/`↵` leave). Done
   cards stay by when done.
@@ -26,9 +27,23 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
 - Inbox (2026-10-23): whatever comes to mind, to sort later; a column at level 0, left of the
   cards, never elsewhere. Not a project: no card, level 1, folder, removal or rename. Title, one
   line saying what it is for, the field on top (as a list's, `⌘N` at level 0), the notes below,
-  newest first; empty, one muted line. A note there is edited and copied as any card; ⋯ deletes
-  it (Undo). No lists, done or order: a note leaves by being moved or deleted. Resized as a
+  newest first; empty, one muted line. A note there is edited and copied as any card; ⋯ moves or
+  deletes it (Undo). No lists, done or order: a note leaves by being moved or deleted. Resized as a
   sidebar (`workspace.md`).
+- Move (2026-10-23): one dialog, from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). Title
+  "Move note" or "Move list", the note's first line or the list's name under it, one field. A
+  note of the Inbox goes to a project; a note of a project to the Inbox or a project, its own
+  project already a chip, so its other lists come first; a list to another project, whole. While
+  no chip, suggestions are the books ranked as the palette ranks names (all, in order, with
+  nothing typed); a name two books share shows the folder under it, a WSL project its tag. `↑`/`↓`
+  choose, `Tab` makes the book chosen a chip (notes only), Backspace on the empty field takes it
+  away, `↵` moves, `Esc` closes. With a project's chip, suggestions are its lists; `↵` on one moves
+  there, `↵` with none chosen into the list the project opens on (said in the field; nothing when
+  the note is there already); the Inbox as chip has no lists, `↵` moves. Text that is not exactly
+  a name (case aside) gets a last row, never hidden: "New project “…”" (without folder) or "New
+  list “…”". `↵` on the note's own project makes it the chip. After a move a toast "Moved to …"
+  (the project, the Inbox, or the list within the note's own project) with Undo: the note back in
+  its book, list and place; a list back as it was. A project made for the move stays after Undo.
 
 ## How it is built
 
@@ -50,7 +65,7 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   the memory copy. Nothing is written for a book until its first change; until then its first
   list has a fixed id, so the one the frontend was given is still there after another book was
   read. Ids: 16 hex digits, the only names let through to files.
-- Moving (`move_note`, `move_list`, backend and port; the dialog is still to come): a note goes
+- Moving (`move_note`, `move_list`): a note goes
   to another book, or another list of its own, with its id, on top of the list's open notes
   (`ListTarget`: the open list, a list, a new one); done stays done, but into the Inbox. A list
   goes to another project whole: into its list of the same name (case aside), its open notes
@@ -61,6 +76,16 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   other project, with the list made for them when nothing else is in it. A move to a new project
   (`BookTarget::NewProject`) makes it, without folder, in the interface, and removes it with
   what was written for it when the move fails; `projects-changed` tells the frontend.
+- Move dialog (`MoveDialog`, lazy, opened through `MoveHost` by `NotesWorkspace` and
+  `InboxColumn`): Base UI's Autocomplete as the palette's, with the field's keys handled by the
+  dialog (`↵` and `Tab` before Base UI's). What it does is a model of pure functions
+  (`model/move-dialog.ts`, unit tested): the books, the chip, the step (books, a project's lists,
+  none for the Inbox), the rows with the create row, `Tab`, Backspace and what `↵` does. The
+  projects and the ranking come from the app (`MoveTargets` context: the projects' list and the
+  search port's `rankNames`, the backend's `rank_names`, the palette's `Ranker` over plain names),
+  so notes import neither projects nor search. `useNoteActions` `moveNote`/`moveList`: off the
+  screen at once, through the book's change queue, then the other book's caches made stale
+  (`['notes', book]`, summary included); Undo through the same queue.
 - A note is at most 1 MiB (`note_too_long`); a missing note or list is `note_missing` /
   `note_list_missing`; a broken file is skipped and logged, never removed; a change that changes
   nothing writes nothing. A new folder never takes one in use (two projects of one name).
@@ -77,7 +102,7 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
 - Frontend (`NotesWorkspace`): lists on the left full screen, cards of the open list (virtualized,
   measured heights: `useCardRows`, `CardRows`), reorder mode. `InboxColumn` (exported, the app
   places it at level 0) shows the Inbox's one list with the same field (`Composer`), cards
-  (`NoteCard` without done, order or lists) and their shared states (`useCardStates`: the card
+  (`NoteCard` without done or order) and their shared states (`useCardStates`: the card
   edited, the one copied). `useNotes` reads a book once (`['notes', book]`,
   never stale: only the app writes); `useNoteActions` changes the cache at once, then sends the
   change after those before it (`ChangeQueue`, per book: the backend gets them in order); only

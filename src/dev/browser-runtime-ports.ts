@@ -6,7 +6,7 @@ import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureTree } from './files.fixture-data';
-import { fixtureContentSearch, fixtureSearch } from './fixture-search';
+import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
 import { localProject, wslProject } from './projects.fixture';
@@ -417,6 +417,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 return end;
             },
             stopContentSearch: async () => undefined,
+            rankNames: async (query, names) => fixtureRankNames(query, names),
         },
         settings: {
             getSettings: async () => settings,

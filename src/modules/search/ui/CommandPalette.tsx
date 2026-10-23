@@ -14,6 +14,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { type MessageKey, RichText, type Translator, useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
+import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import {
     type ContentResults,
@@ -446,7 +447,7 @@ function Row({
                 {item.kind === 'project' ? (
                     <span className="flex min-w-0 flex-col">
                         <Label text={item.label} highlights={item.highlights} mono={false} />
-                        {item.folder ? <Folder path={item.folder.root} /> : null}
+                        {item.folder ? <FolderPath path={item.folder.root} /> : null}
                     </span>
                 ) : (
                     <Label
@@ -474,22 +475,6 @@ function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' }> }) {
             stroke={1.75}
             className="shrink-0 text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft"
         />
-    );
-}
-
-/**
- * A project's folder, cut at its start when too long: its end tells two projects apart. The
- * isolate keeps the path's own order inside the right-to-left box that cuts it on the left.
- */
-function Folder({ path }: { path: string }) {
-    return (
-        <span
-            dir="rtl"
-            title={path}
-            className="truncate text-left text-[11.5px] text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft"
-        >
-            <bdi dir="ltr">{path}</bdi>
-        </span>
     );
 }
 

@@ -1,13 +1,15 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useNoteActions, useNotes } from '../application/notes.queries';
+import type { MoveSubject } from '../model/move-dialog';
 import { openNotes } from '../model/notes';
 import { INBOX_BOOK } from '../model/notes.types';
 import { CardRows } from './CardRows';
 import { Composer } from './Composer';
+import { MoveHost } from './MoveHost';
 import { NoteCard } from './NoteCard';
 import { useCardRows } from './use-card-rows';
 import { useCardStates } from './use-card-states';
@@ -35,6 +37,7 @@ export function InboxColumn({
     const { data: notes, error } = useNotes(INBOX_BOOK);
     const actions = useNoteActions(INBOX_BOOK);
     const cardState = useCardStates();
+    const [moving, setMoving] = useState<MoveSubject | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
     const i18n = useTranslation();
@@ -84,11 +87,13 @@ export function InboxColumn({
                                     <NoteCard
                                         note={note}
                                         flash={false}
-                                        lists={[]}
                                         actions={actions}
                                         {...cardState(note)}
                                         onDone={null}
                                         order={null}
+                                        onMove={() =>
+                                            setMoving({ kind: 'note', book: INBOX_BOOK, note })
+                                        }
                                     />
                                 );
                             }}
@@ -96,6 +101,7 @@ export function InboxColumn({
                     </>
                 ) : null}
             </section>
+            <MoveHost moving={moving} actions={actions} onClose={() => setMoving(null)} />
             {/* nothing to fit: the notes wrap; a double click goes back to the share of the window */}
             <SidebarSplitter
                 width={width}

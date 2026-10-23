@@ -21,7 +21,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
 has.
 
-- [ ] Notes and lists moved between the Inbox and projects: one Move dialog
 - [ ] `⌘K` at level 0 finds notes of every project and of the Inbox
 - [ ] Folders without git: Files and Notes, no Changes; file list behind a port; watcher filter
       without git (`.gitignore`/`.ignore` rules)

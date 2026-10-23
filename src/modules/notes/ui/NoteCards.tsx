@@ -28,6 +28,7 @@ export function NoteCards({
     reveal,
     onRevealed,
     onReorder,
+    onMove,
 }: {
     notes: ProjectNotes;
     list: NoteList;
@@ -40,6 +41,8 @@ export function NoteCards({
     onRevealed: () => void;
     /** Starts reordering the open notes, on one of them. */
     onReorder: (id: string) => void;
+    /** Opens the Move dialog for a note. */
+    onMove: (note: Note) => void;
 }) {
     const [showDone, setShowDone] = useState(false);
     const cardState = useCardStates();
@@ -123,7 +126,6 @@ export function NoteCards({
                         <NoteCard
                             note={item.note}
                             flash={flash === item.note.id}
-                            lists={notes.lists}
                             actions={actions}
                             {...cardState(item.note)}
                             onDone={(done) => void actions.setDone(item.note, done)}
@@ -139,6 +141,7 @@ export function NoteCards({
                                           reorder: () => onReorder(item.note.id),
                                       }
                             }
+                            onMove={() => onMove(item.note)}
                         />
                     );
                 }}

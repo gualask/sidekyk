@@ -116,6 +116,17 @@ export function fixtureSearch(
     return results;
 }
 
+/** As the backend's `rank_names`: the names that match, best first, equal ones in their order. */
+export function fixtureRankNames(query: string, names: readonly string[]): number[] {
+    return names
+        .map((name, index) => ({ index, highlights: match(name, query.trim()) }))
+        .flatMap(({ index, highlights }) =>
+            highlights ? [{ index, score: score(highlights) }] : [],
+        )
+        .sort((a, b) => b.score - a.score)
+        .map(({ index }) => index);
+}
+
 /**
  * As the backend's `search_notes`: lists by name, notes holding every word typed (two letters at
  * least), by first line or with the part around the first word. Scored as the files, best first.

@@ -1,3 +1,4 @@
+export { type MoveTargets, MoveTargetsProvider } from './application/move-targets';
 export { type NotesPort, NotesProvider } from './application/notes.port';
 export { NotesSettingsProvider } from './application/notes-settings';
 // for the browser fixtures, which keep notes as the backend does

@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
+import type { Move } from '../model/move-dialog';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
 import { changeQueue } from './change-queue';
@@ -20,12 +21,13 @@ const countKey = (book: string) => [...notesKey(book), 'count'] as const;
  * A book's notes, read once: only the app writes them, and every change goes through the cache
  * too.
  */
-export function useNotes(book: string) {
+export function useNotes(book: string, enabled = true) {
     const port = useNotesPort();
     return useQuery({
         queryKey: notesKey(book),
         queryFn: () => port.getNotes(book),
         staleTime: Number.POSITIVE_INFINITY,
+        enabled,
     });
 }
 
@@ -56,6 +58,22 @@ export function useNoteActions(book: string) {
                 notes: notes.notes.map((note) => (note.id === id ? { ...note, ...fields } : note)),
             }));
         const updated = (notes: Note[]) => update((all) => withUpdated(all, notes));
+        /** Another book changed by a move: read again when it shows, its summary too. */
+        const forget = (other: string) => {
+            if (other !== book) void client.invalidateQueries({ queryKey: notesKey(other) });
+        };
+        /** Takes a list and its notes off the screen, unless it is the last; whether it did. */
+        const dropList = (id: string) => {
+            const before = current();
+            if (!before || before.lists.length < 2) return false;
+            const rest = before.lists.filter((l) => l.id !== id);
+            update((notes) => ({
+                lists: rest,
+                notes: notes.notes.filter((n) => n.list !== id),
+                openList: notes.openList === id ? rest[0].id : notes.openList,
+            }));
+            return true;
+        };
 
         /** Sends a change; `shown` puts its answer on screen when nothing newer is there. */
         const send = async <T>(
@@ -148,18 +166,52 @@ export function useNoteActions(book: string) {
                 }
             },
             place: (note: Note, list: string, index: number) => void place(note, list, index),
-            /** Moves a note on top of another list; Undo takes it back where it was. */
-            moveTo: async (note: Note, list: NoteList) => {
-                const from = openNotes(current()?.notes ?? [], note.list).findIndex(
-                    (open) => open.id === note.id,
+            /**
+             * Moves a note to another book or list (the Move dialog); Undo puts it back in its
+             * book, list and place. The book it went to is read again when it shows.
+             */
+            moveNote: async (note: Note, { to, list, name }: Move) => {
+                update((notes) => withoutNote(notes, note.id));
+                const moved = await send(t('notes.moveFailed'), () =>
+                    port.moveNote(book, note.id, to, list),
                 );
-                const moved = await place(note, list.id, 0);
                 if (!moved) return;
+                if (moved.to === book) update((notes) => withNotes(notes, [moved.note]));
+                forget(moved.to);
                 showToast({
-                    title: t('notes.moved', { list: list.name }),
+                    title: t('notes.moved', { name }),
                     action: {
                         label: t('notes.undo'),
-                        run: () => void place(note, note.list, Math.max(0, from)),
+                        run: () => {
+                            update((notes) => withNotes(notes, [note]));
+                            void send(
+                                t('notes.undoFailed'),
+                                () => port.unmoveNote(moved.to, note, book),
+                                (restored) => update((notes) => withNotes(notes, [restored])),
+                            ).then(() => forget(moved.to));
+                        },
+                    },
+                });
+            },
+            /** Moves a list with its notes to another project; Undo brings it back as it was. */
+            moveList: async (id: string, { to, name }: Move) => {
+                if (!dropList(id)) return;
+                const moved = await send(t('notes.moveListFailed'), () =>
+                    port.moveList(book, id, to),
+                );
+                if (!moved) return;
+                forget(moved.to);
+                showToast({
+                    title: t('notes.moved', { name }),
+                    action: {
+                        label: t('notes.undo'),
+                        // its notes come back as stored: read again
+                        run: () =>
+                            void send(
+                                t('notes.undoFailed'),
+                                () => port.unmoveList(moved),
+                                reread,
+                            ).then(() => forget(moved.to)),
                     },
                 });
             },
@@ -190,14 +242,7 @@ export function useNoteActions(book: string) {
             },
             /** Deletes a list with its notes; the toast brings them all back. */
             deleteList: async (id: string) => {
-                const before = current();
-                if (!before || before.lists.length < 2) return;
-                const rest = before.lists.filter((l) => l.id !== id);
-                update((notes) => ({
-                    lists: rest,
-                    notes: notes.notes.filter((n) => n.list !== id),
-                    openList: notes.openList === id ? rest[0].id : notes.openList,
-                }));
+                if (!dropList(id)) return;
                 const deleted = await send(t('notes.deleteListFailed'), () =>
                     port.deleteList(book, id),
                 );

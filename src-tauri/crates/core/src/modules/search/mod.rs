@@ -1,6 +1,7 @@
 //! The command palette's search: what was typed, ranked against the projects, the panels and the
 //! files, note lists and notes of the project on screen (`⌘K`), or looked for in those files' contents (`⌘F`). Names are
-//! ranked from what the caller hands over; contents are read through the repository's port.
+//! ranked from what the caller hands over; contents are read through the repository's port. The
+//! Move dialog ranks its projects and lists the same way (`rank_names`).
 
 mod contents;
 mod contracts;
@@ -97,6 +98,13 @@ pub fn search(
     }
 }
 
+/// The names that match `query`, best first, as the palette ranks projects: where to move notes
+/// (the Move dialog's projects and lists). With nothing typed, every name in its order.
+pub fn rank_names(query: &str, names: &[&str]) -> Vec<usize> {
+    let (best, _) = Ranker::new(query, Texts::Names).best(names, usize::MAX);
+    best.into_iter().map(|scored| scored.index).collect()
+}
+
 /// The files of a project that match `query` best, and how many more did. A deleted file is not
 /// in the tree, but Changes lists it: it is searched too.
 pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
@@ -164,6 +172,16 @@ mod tests {
                 root: format!("/dev/{name}"),
             }),
         )
+    }
+
+    #[test]
+    fn names_rank_best_first_and_all_in_order_with_nothing_typed() {
+        let names = ["Calcetto", "Thesis", "Casa", "Ca shop"];
+        assert_eq!(rank_names("cas", &names), vec![2, 3]);
+        // equal scores keep the names' order
+        assert_eq!(rank_names("ca", &names), vec![0, 2, 3]);
+        assert_eq!(rank_names(" ", &names), vec![0, 1, 2, 3]);
+        assert!(rank_names("zz", &names).is_empty());
     }
 
     fn change(path: &str, area: ChangeArea, kind: ChangeKind) -> ChangedFile {

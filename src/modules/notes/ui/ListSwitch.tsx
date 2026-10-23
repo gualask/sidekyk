@@ -15,11 +15,13 @@ export function ListSwitch({
     list,
     actions,
     onOpen,
+    onMove,
 }: {
     notes: ProjectNotes;
     list: NoteList;
     actions: NoteActions;
     onOpen: (list: string, write: boolean) => void;
+    onMove: (list: NoteList) => void;
 }) {
     const [open, setOpen] = useState(false);
     const { t } = useTranslation();
@@ -45,6 +47,10 @@ export function ListSwitch({
                             onOpen={(id, write) => {
                                 setOpen(false);
                                 onOpen(id, write);
+                            }}
+                            onMove={(moved) => {
+                                setOpen(false);
+                                onMove(moved);
                             }}
                         />
                     </Popover.Popup>

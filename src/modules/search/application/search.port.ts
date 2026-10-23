@@ -15,6 +15,11 @@ export interface SearchPort {
     ): Promise<ContentEnd>;
     /** Stops the search in contents going on: the palette closed. */
     stopContentSearch(): Promise<void>;
+    /**
+     * The names that match `query`, best first, by their index, as the palette ranks projects;
+     * with nothing typed, every name in its order.
+     */
+    rankNames(query: string, names: readonly string[]): Promise<number[]>;
 }
 
 const SearchPortContext = createContext<SearchPort | null>(null);
