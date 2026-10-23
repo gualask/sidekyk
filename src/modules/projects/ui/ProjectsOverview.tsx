@@ -37,9 +37,10 @@ function moveInGrid(event: KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * Level 0: one card per project, doubling as the project switcher. Loaded on its first show, with
- * the menu component it needs. It opens with the focus on the project on screen, so `↵` goes
- * back to it and the arrows start from it.
+ * Level 0: one card per project, doubling as the project switcher, the "+ Add a repository" card
+ * last (alone without projects). It opens with the focus on the project on screen, so `↵` goes
+ * back to it and the arrows start from it. It fills the room beside it down to one column of
+ * cards: what is beside gives way then.
  */
 export function ProjectsOverview({
     list,
@@ -68,10 +69,15 @@ export function ProjectsOverview({
     }, []);
 
     return (
-        <section aria-label={t('common.allProjects')} className="h-full overflow-auto p-4">
+        <section
+            aria-label={t('common.allProjects')}
+            // a card's least width, the grid's column and the least the overview takes with its
+            // padding
+            className="h-full min-w-[calc(var(--card-min)+2rem)] flex-1 overflow-auto p-4 [--card-min:300px]"
+        >
             <div
                 ref={grid}
-                className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4"
+                className="grid grid-cols-[repeat(auto-fill,minmax(var(--card-min),1fr))] gap-4"
                 onKeyDown={moveInGrid}
             >
                 {list.projects.map((project) => (

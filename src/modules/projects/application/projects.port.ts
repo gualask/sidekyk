@@ -4,6 +4,11 @@ import type { ProjectList, Relocation, TilesLayout } from '../model/project.type
 /** The projects' runtime boundary: the native backend, or a fixture in browser dev mode. */
 export interface ProjectsPort {
     getProjects(): Promise<ProjectList>;
+    /**
+     * The project a folder given on the command line put on screen, once (null when none): the
+     * app shows its panels.
+     */
+    takeOpenedProject(): Promise<string | null>;
     /** Asks for a folder, adds its repository and shows it. null when the user cancels. */
     addProject(): Promise<ProjectList | null>;
     activateProject(projectId: string): Promise<ProjectList>;
@@ -16,7 +21,10 @@ export interface ProjectsPort {
     relocateProject(projectId: string): Promise<Relocation | null>;
     /** Keeps how a project lays out its tiles. */
     setProjectLayout(projectId: string, layout: TilesLayout): Promise<ProjectList>;
-    /** The list changed without the frontend asking. Returns a synchronous disposer. */
+    /**
+     * The list changed without the frontend asking. `listener` also runs once as the listening
+     * starts, for a change made before it. Returns a synchronous disposer.
+     */
     onProjectsChanged(listener: () => void): () => void;
 }
 

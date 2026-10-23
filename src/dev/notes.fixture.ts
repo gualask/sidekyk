@@ -78,6 +78,17 @@ const REVIEW_NOTES: [string, string, number, number | null][] = [
     ],
 ];
 
+/** The Inbox's notes in `review` and `clean`, newest first: [text, age]. */
+const INBOX_NOTES: [string, number][] = [
+    ['Ask whether the WSL helper needs its own log file', 15 * MINUTE],
+    ['Dentist on Thursday, 9:30: move the standup', 3 * HOUR],
+    [
+        '"Keep the watcher per repository and coalesce per directory" (from the agent, to try on the large fixture)',
+        28 * HOUR,
+    ],
+    ['Book idea: a field guide to small tools that stay out of the way', 3 * DAY],
+];
+
 let seq = 0;
 /** 16 hex digits, as the backend's ids. */
 function newId(): string {
@@ -119,6 +130,11 @@ function bookOf(rows: [string, string, number, number | null][]): Book {
     return { lists, notes, openList: lists[0].id };
 }
 
+/** The Inbox's one list, holding the notes of `INBOX_NOTES`. */
+function inboxBook(): Book {
+    return bookOf(INBOX_NOTES.map(([text, age]) => ['General', text, age, null]));
+}
+
 /** In `large`, a list long enough to need its cards virtualized. */
 function largeBook(): Book {
     const rows: [string, string, number, number | null][] = Array.from({ length: 600 }, (_, n) => [
@@ -132,7 +148,8 @@ function largeBook(): Book {
 
 /**
  * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
- * the scenario's project starts with the mock's notes, any other book with none. `checkBook`
+ * each book starts as `initial` says (the scenario's project with the mock's notes, the Inbox with
+ * a few in `review` and `clean`, any other book with none). `checkBook`
  * refuses a book the backend would not know. A move to a new project makes it with `makeProject`
  * (its id back), takes it away with `dropProject` when the move fails, and says the projects
  * changed (`projectsChanged`) when it is done.
@@ -144,7 +161,7 @@ export function fixtureNotes({
     dropProject,
     projectsChanged,
 }: {
-    initial: (book: string) => 'review' | 'large' | 'empty';
+    initial: (book: string) => 'review' | 'large' | 'inbox' | 'empty';
     checkBook: (book: string) => void;
     makeProject: (name: string) => string;
     dropProject: (id: string) => void;
@@ -164,7 +181,9 @@ export function fixtureNotes({
                     ? bookOf(REVIEW_NOTES)
                     : kind === 'large'
                       ? largeBook()
-                      : emptyBook();
+                      : kind === 'inbox'
+                        ? inboxBook()
+                        : emptyBook();
             books.set(key, found);
         }
         return found;

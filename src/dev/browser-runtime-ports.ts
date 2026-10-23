@@ -171,7 +171,13 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
     // as the backend, notes need the Inbox or a project in the list, not its repository: a moved
     // one's stay
     const notes = fixtureNotes({
-        initial: (book) => (!scenarioData(book) ? 'empty' : large(book) ? 'large' : 'review'),
+        initial: (book) => {
+            if (book === INBOX_BOOK) {
+                return scenario === 'review' || scenario === 'clean' ? 'inbox' : 'empty';
+            }
+            if (!scenarioData(book)) return 'empty';
+            return large(book) ? 'large' : 'review';
+        },
         checkBook: (book) => {
             if (book !== INBOX_BOOK) project(book);
         },
@@ -233,6 +239,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         notes,
         projects: {
             getProjects: async () => list,
+            // no command line in the browser
+            takeOpenedProject: async () => null,
             addProject: async () => {
                 // the folder picked is not in a repository
                 if (scenario === 'problems') throw failure('not_a_repository');
@@ -270,6 +278,10 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
                 update({ ...list, layouts: { ...list.layouts, [project(projectId).id]: layout } }),
             onProjectsChanged: (listener) => {
                 projectsChanged.add(listener);
+                // once as the listening starts, as the backend's adapter
+                queueMicrotask(() => {
+                    if (projectsChanged.has(listener)) listener();
+                });
                 return () => projectsChanged.delete(listener);
             },
         },

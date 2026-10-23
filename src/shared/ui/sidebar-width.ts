@@ -45,14 +45,15 @@ export interface SidebarWidth {
 }
 
 /**
- * A sidebar's width: the one stored once dragged, else its default. A drag moves the sidebar's
+ * A sidebar's width: the one stored once dragged, else its default (pixels, or a CSS width such as
+ * a share of what holds the sidebar). A drag moves the sidebar's
  * edge itself, with no render, and stores the width shown when the button comes up; a double click
  * fits what it shows, a second one goes back. The layout bounds the width (the content beside
  * keeps its room): what is stored is what it allowed.
  */
 export function useSidebarWidth(
     sidebar: string,
-    { initial, min }: { initial: number; min: number },
+    { initial, min }: { initial: number | string; min: number },
 ): SidebarWidth {
     const context = useContext(SidebarWidthsContext);
     if (!context) {

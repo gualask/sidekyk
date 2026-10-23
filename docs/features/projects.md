@@ -6,7 +6,8 @@ Several repositories, one on screen.
 
 - Add (folder picker, `sidekyk <folder>`: the first CLI argument's repository), remove (⋯ on the
   level 0 card; the repository is untouched; asks first about its notes, `notes.md`), switch
-  (`[`/`]`, `Esc` to level 0, `⌘K` there). At start the project shown last opens.
+  (`[`/`]`, `Esc` to level 0, `⌘K` there). The app starts at level 0, the project shown last
+  selected; `sidekyk <folder>` opens its project at level 1 (`workspace.md`).
 - A project not on this machine says where it is: `WSL: Ubuntu` before its folder on the level 0
   card and after its name in the top bar (the same repository cloned in Windows and in WSL shows
   as two `shop`s otherwise).

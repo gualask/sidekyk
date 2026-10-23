@@ -43,11 +43,13 @@ fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()>
 }
 
 /// Adds and shows a repository named at launch, off the main thread: a WSL distro's may take a
-/// while to start. A failure leaves the app as it was.
+/// while to start. The frontend, told the list changed, takes the project to show its panels. A
+/// failure leaves the app as it was.
 fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
     let app = app.clone();
     std::thread::spawn(move || match open_folder(&app, &folder) {
-        Ok(_) => {
+        Ok(list) => {
+            app.state::<ProjectsState>().set_opened(list.active);
             let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
         }
         Err(error) => tracing::warn!(
@@ -124,6 +126,7 @@ pub(crate) fn run() {
         .on_window_event(hide_on_close)
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
+            tauri_commands::projects::take_opened_project,
             tauri_commands::projects::add_project,
             tauri_commands::projects::activate_project,
             tauri_commands::projects::remove_project,

@@ -1,20 +1,15 @@
 import { IconChevronDown } from '@tabler/icons-react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import { shortcutLabel } from '@/shared/platform/shortcut';
-import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../application/notes.queries';
-import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { doneNotes, openNotes } from '../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
+import { CardRows } from './CardRows';
+import { Composer } from './Composer';
 import { NoteCard } from './NoteCard';
-import { autosize, fitLines, linesClass } from './notes-layout';
+import { useCardRows } from './use-card-rows';
+import { useCardStates } from './use-card-states';
 
-/** The room between cards, and around them, in pixels. */
-const GAP = 6;
-/** A card's height before it is measured: one line of text and its meta. */
-const CARD_ESTIMATE = 64;
 /** How long a note brought into view stays lit up, as its animation (`.note-flash`). */
 const FLASH_MS = 1200;
 
@@ -47,8 +42,7 @@ export function NoteCards({
     onReorder: (id: string) => void;
 }) {
     const [showDone, setShowDone] = useState(false);
-    const [editing, setEditing] = useState<string | null>(null);
-    const { copied, copy } = useCopyToClipboard();
+    const cardState = useCardStates();
     const { t } = useTranslation();
 
     const open = useMemo(() => openNotes(notes.notes, list.id), [notes.notes, list.id]);
@@ -64,20 +58,11 @@ export function NoteCards({
         return rows;
     }, [open, done, showDone]);
 
-    const scroller = useRef<HTMLDivElement>(null);
-    const virtualizer = useVirtualizer({
-        count: items.length,
-        getScrollElement: () => scroller.current,
-        estimateSize: () => CARD_ESTIMATE,
-        getItemKey: (index) => {
-            const item = items[index];
-            return item.kind === 'note' ? item.note.id : 'done';
-        },
-        gap: GAP,
-        paddingStart: GAP,
-        paddingEnd: 12,
-        overscan: 6,
+    const rows = useCardRows(items.length, (index) => {
+        const item = items[index];
+        return item.kind === 'note' ? item.note.id : 'done';
     });
+    const { virtualizer } = rows;
 
     // the note brought into view, lit up for a moment; a done one unfolds its group first
     const [flash, setFlash] = useState<string | null>(null);
@@ -107,155 +92,57 @@ export function NoteCards({
             <Composer
                 focus={focusComposer}
                 onFocused={onComposerFocused}
-                list={list}
-                hint={empty}
+                placeholder={t('notes.composer', { list: list.name })}
+                label={t('notes.newNoteIn', { list: list.name })}
+                hint={empty ? t('notes.composerHint') : null}
                 onAdd={async (text) => {
                     const added = await actions.add(list.id, text);
                     if (added) virtualizer.scrollToOffset(0);
                     return added !== undefined;
                 }}
             />
-            <div ref={scroller} className="min-h-0 flex-1 overflow-auto px-3">
-                <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-                    {virtualizer.getVirtualItems().map((row) => {
-                        const item = items[row.index];
-                        return (
-                            <div
-                                key={row.key}
-                                ref={virtualizer.measureElement}
-                                data-index={row.index}
-                                className="absolute top-0 left-0 w-full"
-                                style={{ transform: `translateY(${row.start}px)` }}
-                            >
-                                {item.kind === 'done' ? (
-                                    <button
-                                        type="button"
-                                        className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-semibold text-ui-text-muted hover:bg-ui-surface-hover hover:text-ui-text-secondary"
-                                        aria-expanded={showDone}
-                                        onClick={() => setShowDone((shown) => !shown)}
-                                    >
-                                        <IconChevronDown
-                                            size={12}
-                                            className={`transition-transform motion-reduce:transition-none ${
-                                                showDone ? '' : '-rotate-90'
-                                            }`}
-                                        />
-                                        {t('notes.doneCount', { count: item.count })}
-                                    </button>
-                                ) : (
-                                    <NoteCard
-                                        note={item.note}
-                                        flash={flash === item.note.id}
-                                        lists={notes.lists}
-                                        editing={editing === item.note.id}
-                                        onEdit={(on) => setEditing(on ? item.note.id : null)}
-                                        actions={actions}
-                                        copied={copied?.id === item.note.id ? copied : null}
-                                        onCopy={() => void copy(item.note.id, item.note.text)}
-                                        order={
-                                            item.index < 0 || open.length < 2
-                                                ? null
-                                                : {
-                                                      top: item.index === 0,
-                                                      moveToTop: () => {
-                                                          void actions.place(item.note, list.id, 0);
-                                                          virtualizer.scrollToOffset(0);
-                                                      },
-                                                      reorder: () => onReorder(item.note.id),
-                                                  }
-                                        }
-                                    />
-                                )}
-                            </div>
-                        );
-                    })}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-/**
- * The field on top: `↵` adds the note, `⇧↵` breaks the line, a paste into the empty field adds it
- * at once.
- */
-function Composer({
-    focus,
-    onFocused,
-    list,
-    hint,
-    onAdd,
-}: {
-    focus: boolean;
-    onFocused: () => void;
-    list: NoteList;
-    hint: boolean;
-    /** Whether the note was added. */
-    onAdd: (text: string) => Promise<boolean>;
-}) {
-    const [text, setText] = useState('');
-    const field = useRef<HTMLTextAreaElement>(null);
-    const settings = useNotesSettings();
-    const { t } = useTranslation();
-    // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
-    useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
-    useEffect(() => {
-        if (!focus) return;
-        field.current?.focus();
-        onFocused();
-    }, [focus, onFocused]);
-    // one note at a time: a second ↵ while the first is being added adds nothing
-    const adding = useRef(false);
-    // the field keeps the text until the note is added: a failure loses nothing; what was typed
-    // meanwhile stays
-    const add = async (value: string) => {
-        const note = value.trimEnd();
-        if (note.trim() === '' || adding.current) return;
-        adding.current = true;
-        const added = await onAdd(note);
-        adding.current = false;
-        const typed = field.current;
-        if (!added || !typed || typed.value !== value) return;
-        setText('');
-        typed.value = '';
-        autosize(typed);
-    };
-
-    return (
-        <div className="px-3 pt-2.5 pb-1">
-            <textarea
-                ref={field}
-                rows={1}
-                value={text}
-                spellCheck={false}
-                placeholder={`${t('notes.composer', { list: list.name })}  ${shortcutLabel('N')}`}
-                aria-label={t('notes.newNoteIn', { list: list.name })}
-                className={`block max-h-[132px] w-full resize-none rounded-lg border border-ui-border bg-ui-surface-subtle px-2.5 py-[7px] text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${linesClass(settings.lines)}`}
-                onChange={(event) => {
-                    setText(event.target.value);
-                    autosize(event.target);
+            <CardRows rows={rows}>
+                {(index) => {
+                    const item = items[index];
+                    return item.kind === 'done' ? (
+                        <button
+                            type="button"
+                            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-semibold text-ui-text-muted hover:bg-ui-surface-hover hover:text-ui-text-secondary"
+                            aria-expanded={showDone}
+                            onClick={() => setShowDone((shown) => !shown)}
+                        >
+                            <IconChevronDown
+                                size={12}
+                                className={`transition-transform motion-reduce:transition-none ${
+                                    showDone ? '' : '-rotate-90'
+                                }`}
+                            />
+                            {t('notes.doneCount', { count: item.count })}
+                        </button>
+                    ) : (
+                        <NoteCard
+                            note={item.note}
+                            flash={flash === item.note.id}
+                            lists={notes.lists}
+                            actions={actions}
+                            {...cardState(item.note)}
+                            onDone={(done) => void actions.setDone(item.note, done)}
+                            order={
+                                item.index < 0 || open.length < 2
+                                    ? null
+                                    : {
+                                          top: item.index === 0,
+                                          moveToTop: () => {
+                                              void actions.place(item.note, list.id, 0);
+                                              virtualizer.scrollToOffset(0);
+                                          },
+                                          reorder: () => onReorder(item.note.id),
+                                      }
+                            }
+                        />
+                    );
                 }}
-                onKeyDown={(event) => {
-                    if (onNoteFieldKey(event, settings)) return;
-                    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
-                        return;
-                    }
-                    event.preventDefault();
-                    void add(text);
-                }}
-                onPaste={(event) => {
-                    if (text !== '') return;
-                    const pasted = event.clipboardData.getData('text/plain');
-                    if (pasted.trim() === '') return;
-                    event.preventDefault();
-                    void add(pasted);
-                }}
-            />
-            {hint ? (
-                <p className="px-0.5 pt-1 text-[11.5px] text-ui-text-muted">
-                    {t('notes.composerHint')}
-                </p>
-            ) : null}
+            </CardRows>
         </div>
     );
 }

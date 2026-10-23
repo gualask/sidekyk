@@ -13,7 +13,7 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   outside closes; an empty card goes (Undo). Long lines wrap or scroll (setting `noteLines`, `⌥Z`
   from a note).
 - Field on top adds to the open list: `↵` adds, `⇧↵` new line, paste into the empty field adds at
-  once; `⌘N` focuses it, from anywhere but all projects.
+  once; `⌘N` focuses it, from a project's levels (at all projects, the Inbox's).
 - Lists per project by topic; full screen on the left, in a tile a menu from the header. "New
   list" first; double click renames; deleting takes its notes (Undo). A project opens on the list
   last open.
@@ -23,6 +23,12 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
 - Export a project's notes to Markdown from the panel's ⋯ (never inside a repository). Removing a
   project with notes asks: export then remove, or delete; nothing is left on disk.
 - Found by `⌘K` (`search.md`).
+- Inbox (2026-10-23): whatever comes to mind, to sort later; a column at level 0, left of the
+  cards, never elsewhere. Not a project: no card, level 1, folder, removal or rename. Title, one
+  line saying what it is for, the field on top (as a list's, `⌘N` at level 0), the notes below,
+  newest first; empty, one muted line. A note there is edited and copied as any card; ⋯ deletes
+  it (Undo). No lists, done or order: a note leaves by being moved or deleted. Resized as a
+  sidebar (`workspace.md`).
 
 ## How it is built
 
@@ -69,7 +75,10 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   counted, nothing read), it goes at once; else export then remove, or remove and delete; a count
   that fails asks too.
 - Frontend (`NotesWorkspace`): lists on the left full screen, cards of the open list (virtualized,
-  measured heights), reorder mode. `useNotes` reads a book once (`['notes', book]`,
+  measured heights: `useCardRows`, `CardRows`), reorder mode. `InboxColumn` (exported, the app
+  places it at level 0) shows the Inbox's one list with the same field (`Composer`), cards
+  (`NoteCard` without done, order or lists) and their shared states (`useCardStates`: the card
+  edited, the one copied). `useNotes` reads a book once (`['notes', book]`,
   never stale: only the app writes); `useNoteActions` changes the cache at once, then sends the
   change after those before it (`ChangeQueue`, per book: the backend gets them in order); only
   the last answer is shown, a skipped one makes the notes read again at the end, a failure too.

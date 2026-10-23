@@ -1,5 +1,5 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useEffectEvent } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { ProjectList, TilesLayout } from '../model/project.types';
@@ -38,14 +38,22 @@ export function useProjects() {
     return useQuery(projectsQuery(useProjectsPort()));
 }
 
-/** Reads the list again when the backend changed it, such as a folder given on the command line. */
-export function useProjectsChangeSubscription() {
+/**
+ * Reads the list again when the backend changed it, such as a folder given on the command line;
+ * the project that folder put on screen goes to `onOpened`, once the list read has it.
+ */
+export function useProjectsChangeSubscription(onOpened: (projectId: string) => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
+    const opened = useEffectEvent(onOpened);
     useEffect(
         () =>
             port.onProjectsChanged(() => {
-                void queryClient.invalidateQueries({ queryKey: projectsKey });
+                void (async () => {
+                    await queryClient.invalidateQueries({ queryKey: projectsKey });
+                    const id = await port.takeOpenedProject();
+                    if (id !== null) opened(id);
+                })();
             }),
         [port, queryClient],
     );

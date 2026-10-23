@@ -23,9 +23,9 @@ Code's multi-root workspaces). High level; details when it is built.
 - Panels derived from the project, never templates chosen by the user: no folder, Notes only; a
   folder, Files too; a repository, Changes too (a `git init` later shows it: the watcher sees
   `.git`).
-- Inbox: the first project without folder, always there (first card at level 0, `⌘K`). Every note
-  can be moved to another project and back. More projects without folder may be made by the
-  user.
+- Inbox: not a project, a column at level 0 beside the cards, always there (built 2026-10-23,
+  `../features/notes.md`). Every note can be moved to a project and back. Projects without folder
+  are made by the user.
 - Notes feel global without being so: the Inbox, moving notes, `⌘K` at level 0 finding notes of
   every project (today only projects).
 - Id: made, not derived from a location (built 2026-10-22, `../features/projects.md`); Locate…
@@ -61,8 +61,8 @@ Code's multi-root workspaces). High level; details when it is built.
 - What takes Changes' tile without git: Notes (the maintainer's leaning: an overview, notes of
   text and images, `capture.md`), Files beside. Decided together with Capture.
 - The name: "project" sounds like a developer's word for a topic or the Inbox ("space"?).
-- Where a global capture lands: the Inbox while the window is hidden, the project on screen while
-  shown? To try (`capture.md`).
+- Where a global capture lands: the Inbox while the window is hidden (2026-10-22); the project on
+  screen while shown? To try (`capture.md`).
 - Watcher filter without git (`.gitignore`/`.ignore` rules); the walker to choose.
 - Documents (PDF, Office) need text extraction and likely an index (`tantivy`), i.e. work in the
   background against the golden rule: a separate decision, with measures.

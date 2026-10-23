@@ -19,6 +19,12 @@ pub(crate) fn get_projects(app: tauri::AppHandle) -> ProjectList {
 }
 
 #[tauri::command]
+/// The project a folder given on the command line put on screen, once, to show its panels.
+pub(crate) fn take_opened_project(app: tauri::AppHandle) -> Option<String> {
+    app.state::<ProjectsState>().take_opened()
+}
+
+#[tauri::command]
 /// Asks for a folder, adds the repository that contains it and puts it on screen. `None` when
 /// cancelled.
 pub(crate) async fn add_project(app: tauri::AppHandle) -> Result<Option<ProjectList>, AppError> {

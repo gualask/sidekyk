@@ -1,10 +1,15 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { loadRemoveProjectDialog, newNoteTarget, notesPanel, notesTarget } from '@/modules/notes';
+import {
+    InboxColumn,
+    loadRemoveProjectDialog,
+    newNoteTarget,
+    notesPanel,
+    notesTarget,
+} from '@/modules/notes';
 import {
     activeProject,
-    loadProjectsOverview,
-    NoProjects,
     type ProjectList,
+    ProjectsOverview,
     type TilesLayout,
     useActivateProject,
     useProjectLayout,
@@ -48,7 +53,6 @@ import type { ZoomLevel } from './workspace';
 import { useWorkspaceKeys } from './workspace-keys';
 import { useZoomGestures } from './zoom-gestures';
 
-const ProjectsOverview = preloadable(loadProjectsOverview, (module) => module.ProjectsOverview);
 const SettingsDialog = preloadable(loadSettingsDialog, (module) => module.SettingsDialog);
 const CommandPalette = preloadable(loadCommandPalette, (module) => module.CommandPalette);
 const RemoveProjectDialog = preloadable(
@@ -87,7 +91,6 @@ const TILES_STYLE = { ...PROJECT_ZOOM, gap: TILE_GAP };
 
 /** The window: the top bar, and below it the workspace at its zoom level. */
 export function AppShell() {
-    useProjectsChangeSubscription();
     useRepositoryChangeSubscription();
     const projects = useProjects();
     const i18n = useTranslation();
@@ -96,13 +99,17 @@ export function AppShell() {
         () => PALETTE_PANELS.map((panel) => ({ ...panel, title: i18n.t(panel.title) })),
         [i18n],
     );
-    // the app opens on the project it showed last, with its panels
-    const [level, setLevel] = useState<ZoomLevel>(1);
+    // the app opens at all projects, the one shown last selected; without projects it stays there
+    const [zoomLevel, setLevel] = useState<ZoomLevel>(0);
     // the panel full screen at level 2, and the tile selected at level 1
     const [panel, setPanel] = useState(INITIAL_PANEL);
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
+    const level = project ? zoomLevel : 0;
+    // the Inbox's field takes the focus (`⌘N` at all projects)
+    const [focusInbox, setFocusInbox] = useState(false);
+    const inboxFocused = useCallback(() => setFocusInbox(false), []);
     // how the project lays out its tiles: which wait in the top bar, the side column's split
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
     // a tile minimized is not selected: Changes is, which is never minimized
@@ -196,6 +203,8 @@ export function AppShell() {
         activate(projectId);
         if (level === 0) zoom(1);
     };
+    // a folder given on the command line: its project, already on screen, shows its panels
+    useProjectsChangeSubscription(() => zoom(1));
     const readAgain = useReadProjectAgain();
     const { mutate: relocate } = useRelocateProject({ readAgain, open: openProject });
     const fixProject = useMemo(
@@ -225,7 +234,7 @@ export function AppShell() {
     };
 
     const zoomIn = () => {
-        if (level < 2) zoom((level + 1) as ZoomLevel);
+        if (project && level < 2) zoom((level + 1) as ZoomLevel);
     };
     const zoomOut = () => {
         if (level > 0) zoom((level - 1) as ZoomLevel);
@@ -248,9 +257,10 @@ export function AppShell() {
         toggleSettings,
         togglePalette,
         toggleHelp,
-        // in Notes at the same zoom, its field ready; all projects have no notes to write in
+        // in Notes at the same zoom, its field ready; at all projects, in the Inbox
         newNote: () => {
             if (level > 0) show(notesPanel.id, newNoteTarget());
+            else setFocusInbox(true);
         },
     });
     useZoomGestures({
@@ -263,12 +273,11 @@ export function AppShell() {
         zoomOut,
     });
 
-    // all projects and the settings are a click away: their code is fetched while nothing else
+    // the settings and the palette are a key away: their code is fetched while nothing else
     // happens
     useEffect(
         () =>
             whenIdle(() => {
-                void ProjectsOverview.preload();
                 void SettingsDialog.preload();
                 void CommandPalette.preload();
                 for (const summary of SUMMARIES) void summary.preload();
@@ -315,6 +324,8 @@ export function AppShell() {
                         show={show}
                         findInFiles={findInFiles}
                         onRemove={setRemoving}
+                        focusInbox={focusInbox}
+                        onInboxFocused={inboxFocused}
                     />
                 ) : null}
             </main>
@@ -384,6 +395,8 @@ function Workspace({
     onSplit,
     onMinimize,
     onRemove,
+    focusInbox,
+    onInboxFocused,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
@@ -400,17 +413,19 @@ function Workspace({
     onMinimize: (panel: PanelDefinition) => void;
     /** Asks to remove a project. */
     onRemove: (project: ProjectInfo) => void;
+    /** The Inbox's field takes the focus. */
+    focusInbox: boolean;
+    onInboxFocused: () => void;
 }) {
     const targetOf = (id: string) => (target?.panel === id ? target.target : null);
     // the side column's tiles not minimized; without them, Changes takes the whole width
     const side = SIDE_TILES.filter((tile) => !layout.minimized.includes(tile.id));
-    // also reached from all projects, once the last project is removed there: the repository
-    // added next opens, as from the "+ Add a repository" card
-    if (!project) return <NoProjects onOpen={() => zoom(1)} />;
-    if (level === 0) {
+    // all projects: the Inbox, then the cards, which give way first in a narrow window
+    if (!project || level === 0) {
         return (
-            <Suspense fallback={null}>
-                <ProjectsOverview.Component
+            <div className="flex h-full">
+                <InboxColumn focusComposer={focusInbox} onComposerFocused={onInboxFocused} />
+                <ProjectsOverview
                     list={list}
                     onOpen={() => zoom(1)}
                     onRemove={onRemove}
@@ -422,7 +437,7 @@ function Workspace({
                         ))
                     }
                 />
-            </Suspense>
+            </div>
         );
     }
     if (level === 2) {

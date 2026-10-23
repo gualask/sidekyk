@@ -25,6 +25,9 @@ pub(crate) struct ProjectsState {
     watching: Mutex<Option<(String, Option<Location>)>>,
     /// What reads the projects' repositories, on this machine and in WSL distros.
     machines: Machines,
+    /// The project a folder given on the command line put on screen, until the frontend takes it
+    /// to show its panels: the app starts at all projects otherwise.
+    opened: Mutex<Option<String>>,
 }
 
 /// This machine's repositories, read here. A dev build started with `SIDEKYK_AGENT=local` reads
@@ -49,11 +52,23 @@ impl ProjectsState {
             list: Mutex::default(),
             watching: Mutex::default(),
             machines: Machines::new(repositories(), helper),
+            opened: Mutex::default(),
         }
     }
 
     pub(crate) fn list(&self) -> ProjectList {
         lock(&self.list).clone()
+    }
+
+    /// Keeps the project a folder given on the command line put on screen, for `take_opened`.
+    pub(crate) fn set_opened(&self, id: Option<String>) {
+        *lock(&self.opened) = id;
+    }
+
+    /// The project a folder given on the command line put on screen, once: the frontend shows its
+    /// panels, then it is forgotten.
+    pub(crate) fn take_opened(&self) -> Option<String> {
+        lock(&self.opened).take()
     }
 
     /// The project on screen.
@@ -201,4 +216,18 @@ pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::R
         list.open_folder(found);
         Ok(())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_project_opened_is_taken_once() {
+        let state = ProjectsState::new(PathBuf::new());
+        assert_eq!(state.take_opened(), None);
+        state.set_opened(Some("0123456789abcdef".into()));
+        assert_eq!(state.take_opened().as_deref(), Some("0123456789abcdef"));
+        assert_eq!(state.take_opened(), None);
+    }
 }

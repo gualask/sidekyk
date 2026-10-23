@@ -2,10 +2,11 @@ import type { RefObject } from 'react';
 import { type MessageKey, useTranslation } from '@/shared/i18n';
 import type { SidebarWidth } from './sidebar-width';
 
-const TITLES: Record<'column' | 'tree' | 'list', MessageKey> = {
+const TITLES: Record<'column' | 'tree' | 'list' | 'inbox', MessageKey> = {
     column: 'splitter.column',
     tree: 'splitter.tree',
     list: 'splitter.list',
+    inbox: 'splitter.inbox',
 };
 
 /**

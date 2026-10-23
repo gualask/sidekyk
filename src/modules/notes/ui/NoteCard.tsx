@@ -14,9 +14,9 @@ import { autosize, fitLines, linesClass } from './notes-layout';
 const SAVE_DELAY_MS = 500;
 
 /**
- * One note: done on the left, copy and ⋯ on the right, the text in between, four lines until
- * clicked. Clicked, the text is edited in place: saved as typing pauses, closed by `Esc`, `⌘↵` or a
- * click outside; emptied, the note goes (with Undo).
+ * One note: done on the left (where notes can be done), copy and ⋯ on the right, the text in
+ * between, four lines until clicked. Clicked, the text is edited in place: saved as typing pauses,
+ * closed by `Esc`, `⌘↵` or a click outside; emptied, the note goes (with Undo).
  */
 export function NoteCard({
     note,
@@ -27,6 +27,7 @@ export function NoteCard({
     actions,
     copied,
     onCopy,
+    onDone,
     order,
 }: {
     note: Note;
@@ -38,6 +39,8 @@ export function NoteCard({
     actions: NoteActions;
     copied: CopyState;
     onCopy: () => void;
+    /** Marks the note done or open again; null where notes are never done (the Inbox). */
+    onDone: ((done: boolean) => void) | null;
     /** For an open note among others: whether it is on top, and the reorder mode to start. */
     order: { top: boolean; moveToTop: () => void; reorder: () => void } | null;
 }) {
@@ -49,42 +52,46 @@ export function NoteCard({
 
     return (
         <article
-            className={`group/card relative grid grid-cols-[18px_minmax(0,1fr)_auto] gap-x-2.5 gap-y-0.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
+            className={`group/card relative flex items-start gap-2.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
                 editing ? 'border-ui-accent' : 'border-ui-border hover:border-ui-border-hover'
             } ${flash ? 'note-flash' : ''}`}
             aria-label={t('notes.note')}
         >
-            <button
-                type="button"
-                className={`row-span-2 mt-px grid h-[18px] w-[18px] place-items-center rounded-full border-[1.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted ${
-                    done
-                        ? 'border-ui-success bg-ui-success text-ui-surface'
-                        : 'border-ui-text-muted text-transparent hover:border-ui-success hover:text-ui-success'
-                }`}
-                title={t(done ? 'notes.notDone' : 'notes.done')}
-                aria-label={t(done ? 'notes.markNotDone' : 'notes.markDone')}
-                onClick={() => void actions.setDone(note, !done)}
-            >
-                <IconCheck size={11} stroke={3} />
-            </button>
-            {editing ? (
-                <NoteEditor note={note} actions={actions} onClose={() => onEdit(false)} />
-            ) : (
+            {onDone ? (
                 <button
                     type="button"
-                    className={`line-clamp-4 min-w-0 cursor-text text-left text-[13px]/[1.5] break-words whitespace-pre-wrap focus-visible:outline-none ${
-                        done ? 'text-ui-text-muted' : 'text-ui-text-secondary'
+                    className={`mt-px grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted ${
+                        done
+                            ? 'border-ui-success bg-ui-success text-ui-surface'
+                            : 'border-ui-text-muted text-transparent hover:border-ui-success hover:text-ui-success'
                     }`}
-                    title={t('notes.clickToEdit')}
-                    onClick={() => onEdit(true)}
+                    title={t(done ? 'notes.notDone' : 'notes.done')}
+                    aria-label={t(done ? 'notes.markNotDone' : 'notes.markDone')}
+                    onClick={() => onDone(!done)}
                 >
-                    {note.text}
+                    <IconCheck size={11} stroke={3} />
                 </button>
-            )}
-            <div className="col-start-2 text-[11.5px] text-ui-text-muted">
-                {noteMeta(note, Date.now(), i18n)}
+            ) : null}
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                {editing ? (
+                    <NoteEditor note={note} actions={actions} onClose={() => onEdit(false)} />
+                ) : (
+                    <button
+                        type="button"
+                        className={`line-clamp-4 min-w-0 cursor-text text-left text-[13px]/[1.5] break-words whitespace-pre-wrap focus-visible:outline-none ${
+                            done ? 'text-ui-text-muted' : 'text-ui-text-secondary'
+                        }`}
+                        title={t('notes.clickToEdit')}
+                        onClick={() => onEdit(true)}
+                    >
+                        {note.text}
+                    </button>
+                )}
+                <div className="text-[11.5px] text-ui-text-muted">
+                    {noteMeta(note, Date.now(), i18n)}
+                </div>
             </div>
-            <div className="col-start-3 row-span-2 row-start-1 -mt-0.5 -mr-0.5 flex items-start">
+            <div className="-mt-0.5 -mr-0.5 flex shrink-0 items-start">
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"

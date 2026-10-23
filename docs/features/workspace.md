@@ -7,8 +7,13 @@ problems. Why semantic zoom: `../product.md`.
 
 - Breadcrumb (All projects / project / panel) is the only "where am I", in the top bar (macOS
   overlay title bar); its "All projects" goes to level 0.
-- Levels: 0 all projects (cards, `projects.md`), 1 a project's panels as tiles, 2 one panel full
-  screen. Zoom transitions: View Transitions, 320 ms.
+- Levels: 0 all projects (the Inbox column, `notes.md`, and the cards, `projects.md`), 1 a
+  project's panels as tiles, 2 one panel full screen. Zoom transitions: View Transitions, 320 ms.
+- Start (2026-10-23): every start opens level 0, the project shown last selected (`↵` opens it);
+  `sidekyk <folder>` (first argument or a second instance) opens its project at level 1. Without
+  projects level 0 holds the Inbox and the "+ Add a repository" card only.
+- Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the
+  Inbox, down to 320 px; the window's least width (760 px) fits both.
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes on the left keeps 560 px;
   Files above Notes in the side column, which gives way first.
   - Side column (2026-10-17): one width, the tree's, the same setting as full screen (one value,
@@ -18,8 +23,10 @@ problems. Why semantic zoom: `../product.md`.
   - Files and Notes minimize to chips in the top bar; each project keeps its tiles (minimized,
     split), gone with the project.
 - Every sidebar resizes the same way (2026-10-17): Changes' list (200 px min, 288 default), Files'
-  tree, Notes' lists. Drag; double click fits what it shows, again goes back; the content beside
-  keeps 240 px; one width per sidebar, the same in a tile and full screen (`sidebarWidths`).
+  tree, Notes' lists, the Inbox (320 px min, 40% of the window until dragged). Drag; double click
+  fits what it shows, again goes back (the Inbox has nothing to fit: back to 40%); the content
+  beside keeps 240 px; one width per sidebar, the same in a tile and full screen
+  (`sidebarWidths`).
 - Panel headers: in a tile the panel's icon (title and key in its tooltip; 2026-10-17, the title
   repeated what the panel shows), what is open, icon actions; full screen no header when empty.
   Icons from Tabler.
@@ -45,14 +52,21 @@ problems. Why semantic zoom: `../product.md`.
 - `↵`/`Esc` zoom (`Esc` progressive: field, menu, mode, then zoom); `1`-`9` panels; `[`/`]`
   projects; `←`/`→` tiles at level 1 (the selected tile takes `j`/`k`); `⌘`+scroll and pinch
   (macOS) zoom under the pointer.
-- `⌘K` / `⌘F` the palette (`search.md`), `⌘,` settings, `⌘N` a new note (`notes.md`).
+- `⌘K` / `⌘F` the palette (`search.md`), `⌘,` settings, `⌘N` a new note (`notes.md`): in the
+  project's Notes at levels 1 and 2, in the Inbox at level 0.
 - `?` (and the top bar's `?`) shows the shortcuts in a card, bottom right: sections with a title
   and a thin line (move around, find, changes and files, notes, app), two columns, 13.5 px.
 
 ## How it is built
 
 - `AppShell` owns level, selected tile / full-screen panel and the pending target; every level
-  change goes through `zoom` inside a view transition. `preloadable` parts render at once when
+  change goes through `zoom` inside a view transition. Without a project on screen the level is 0
+  whatever was zoomed. Level 0 is the app composing `InboxColumn` (notes module) and
+  `ProjectsOverview` (projects module), both in the first chunk: they are the first paint.
+- Start at level 1 from the command line: the backend keeps the project the folder argument put on
+  screen (`ProjectsState::opened`) and says the list changed; the frontend reads the list again
+  and takes that project once (`take_opened_project`), then zooms to it. `onProjectsChanged` also
+  runs once as the listening starts, so a change made before the page listened is not missed. `preloadable` parts render at once when
   their chunk is loaded, so a transition never captures an empty frame.
 - `app/workspace-keys.ts`: `↵`/`Esc`, `1`-`9`, `←`/`→` (tiles), `[`/`]`, `⌘,`, `⌘K`, `⌘F` (also
   inside the palette, to switch mode; a viewer takes it first), `?` (`ShortcutsHelp`, lazy; list
@@ -71,7 +85,7 @@ problems. Why semantic zoom: `../product.md`.
 - Tiles per project (`ProjectList.layouts`, by root: minimized panels, split; `useProjectLayout`,
   `set_project_layout`): shown at once (in the same render, for the view transition), stored
   after (`update_stored`: no watcher or cache touched); a removed project's layout goes with it.
-- Sidebar widths: one setting (`sidebarWidths`, by sidebar: `changes`, `files`, `notes`), served
+- Sidebar widths: one setting (`sidebarWidths`, by sidebar: `changes`, `files`, `notes`, `inbox`), served
   to every module by `shared/ui/sidebar-width.ts` (`useSidebarWidth`, `SidebarSplitter`); a drag
   stores the width the layout allowed.
 - Toasts (`useShowToast`) for failures nothing on screen waits for; Base UI toaster loaded with the

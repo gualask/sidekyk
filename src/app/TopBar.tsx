@@ -79,31 +79,29 @@ export function TopBar({
                 overlaid ? 'pl-[78px]' : 'pl-3.5'
             }`}
         >
-            {project ? (
-                <nav
-                    aria-label={t('topBar.whereYouAre')}
-                    className="flex min-w-0 items-center gap-1.5 text-sm font-semibold"
-                >
-                    <Crumb onClick={level === 0 ? undefined : () => onZoom(0)}>
-                        {t('common.allProjects')}
-                    </Crumb>
-                    {level >= 1 ? (
-                        <>
-                            {separator}
-                            <Crumb onClick={level === 1 ? undefined : () => onZoom(1)}>
-                                {project.name}
-                            </Crumb>
-                            <RemoteTag folder={projectFolder(project)} />
-                        </>
-                    ) : null}
-                    {level === 2 ? (
-                        <>
-                            {separator}
-                            <Crumb>{t(panel.title)}</Crumb>
-                        </>
-                    ) : null}
-                </nav>
-            ) : null}
+            <nav
+                aria-label={t('topBar.whereYouAre')}
+                className="flex min-w-0 items-center gap-1.5 text-sm font-semibold"
+            >
+                <Crumb onClick={level === 0 ? undefined : () => onZoom(0)}>
+                    {t('common.allProjects')}
+                </Crumb>
+                {project && level >= 1 ? (
+                    <>
+                        {separator}
+                        <Crumb onClick={level === 1 ? undefined : () => onZoom(1)}>
+                            {project.name}
+                        </Crumb>
+                        <RemoteTag folder={projectFolder(project)} />
+                    </>
+                ) : null}
+                {level === 2 ? (
+                    <>
+                        {separator}
+                        <Crumb>{t(panel.title)}</Crumb>
+                    </>
+                ) : null}
+            </nav>
             {project && level >= 1 ? (
                 // a project's panels are on screen, Changes among them: its snapshot has the facts
                 <ProjectFacts project={project} fromSnapshot />

@@ -14,6 +14,7 @@ export {
 } from './model/notes.types';
 export { newNoteTarget, notesTarget } from './model/targets';
 export { notesPanel } from './panel';
+export { InboxColumn } from './ui/InboxColumn';
 
 /** Asks about a project's notes before it is removed; loaded with the first removal. */
 export const loadRemoveProjectDialog = () => import('./ui/RemoveProjectDialog');
