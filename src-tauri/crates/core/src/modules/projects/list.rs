@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::contracts::{Location, Project, ProjectList, TilesLayout};
+use super::contracts::{FolderChoice, Location, Project, ProjectList, TilesLayout};
 use super::place::{linux_parts, local_parts, same_distro, FoundFolder, IGNORE_CASE};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
@@ -64,17 +64,47 @@ impl ProjectList {
         self.active = Some(id);
     }
 
-    /// A new project of this name, without folder, last; the one on screen stays, unless there
-    /// was none.
-    pub fn add(&mut self, name: &str) -> anyhow::Result<Project> {
-        let name = name.trim();
-        anyhow::ensure!(!name.is_empty(), "a project needs a name");
-        let project = Project::new(name.into(), None);
+    /// A new project of this name, with `folder` or none, last; the one on screen stays, unless
+    /// there was none. A folder is one project's: one already followed is refused.
+    pub fn add(&mut self, name: &str, folder: Option<Location>) -> anyhow::Result<Project> {
+        let name = checked_name(name)?;
+        if let Some(other) = folder.as_ref().and_then(|folder| self.at(folder)) {
+            anyhow::bail!("that folder is already the project {}", other.id);
+        }
+        let project = Project::new(name, folder);
         self.projects.push(project.clone());
         if self.active.is_none() {
             self.active = Some(project.id.clone());
         }
         Ok(project)
+    }
+
+    /// What a folder found at `path`, picked for a new project, is: another project's, or one to
+    /// follow.
+    pub fn folder_choice(&self, path: String, found: FoundFolder) -> FolderChoice {
+        match self.at(&found.location) {
+            Some(other) => FolderChoice::InProject {
+                id: other.id.clone(),
+                name: other.name.clone(),
+            },
+            None => FolderChoice::Usable {
+                path,
+                name: found.name,
+                location: found.location,
+            },
+        }
+    }
+
+    /// Names a project anew; two projects may share a name.
+    pub fn rename(&mut self, id: &str, name: &str) -> anyhow::Result<()> {
+        let name = checked_name(name)?;
+        let project = self
+            .projects
+            .iter_mut()
+            .find(|p| p.id == id)
+            .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
+        project.name = name;
+        Ok(())
     }
 
     pub fn activate(&mut self, id: &str) -> anyhow::Result<()> {
@@ -164,6 +194,13 @@ impl ProjectList {
     }
 }
 
+/// A project's name as given, trimmed; a blank one is refused (the dialog never sends it).
+fn checked_name(name: &str) -> anyhow::Result<String> {
+    let name = name.trim();
+    anyhow::ensure!(!name.is_empty(), "a project needs a name");
+    Ok(name.into())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,14 +258,60 @@ mod tests {
     #[test]
     fn a_project_added_by_name_has_no_folder_and_leaves_the_one_on_screen() {
         let mut projects = list(&["/a"], Some("/a"));
-        let added = projects.add("  Casa ").unwrap();
+        let added = projects.add("  Casa ", None).unwrap();
         assert_eq!((added.name.as_str(), added.folders.len()), ("Casa", 0));
         assert_eq!(projects.active.as_deref(), Some("/a"));
-        assert!(projects.add("  ").is_err());
+        assert!(projects.add("  ", None).is_err());
 
         let mut empty = ProjectList::default();
-        let first = empty.add("Casa").unwrap();
+        let first = empty.add("Casa", None).unwrap();
         assert_eq!(empty.active, Some(first.id));
+    }
+
+    #[test]
+    fn a_project_added_with_a_folder_follows_it_unless_another_does() {
+        let mut projects = list(&["/a"], Some("/a"));
+        let added = projects.add("api", Some(found("/api").location)).unwrap();
+        assert_eq!(roots(&projects), ["/a", "/api"]);
+        assert_eq!(added.folder(), Some(&found("/api").location));
+        assert!(projects.add("again", Some(found("/a/").location)).is_err());
+        assert_eq!(projects.projects.len(), 2);
+    }
+
+    #[test]
+    fn a_folder_picked_is_another_projects_or_one_to_follow() {
+        let projects = list(&["/a"], Some("/a"));
+        let usable = projects.folder_choice("/api/src".into(), found("/api"));
+        assert_eq!(
+            usable,
+            FolderChoice::Usable {
+                path: "/api/src".into(),
+                name: "api".into(),
+                location: found("/api").location,
+            }
+        );
+        let taken = projects.folder_choice("/a/src".into(), found("/a/"));
+        assert_eq!(
+            taken,
+            FolderChoice::InProject {
+                id: "/a".into(),
+                name: "a".into()
+            }
+        );
+    }
+
+    #[test]
+    fn a_project_is_renamed_trimmed_and_never_blank() {
+        let mut projects = list(&["/a", "/b"], Some("/a"));
+        projects.rename("/b", " Shop ").unwrap();
+        assert_eq!(projects.projects[1].name, "Shop");
+        assert!(projects.rename("/b", " ").is_err());
+        assert_eq!(projects.projects[1].name, "Shop");
+        let error = projects.rename("/gone", "x").unwrap_err();
+        assert_eq!(
+            user_facing_code(&error),
+            Some(UserFacingErrorCode::ProjectNotFound)
+        );
     }
 
     #[test]

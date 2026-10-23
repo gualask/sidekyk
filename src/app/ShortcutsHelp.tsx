@@ -4,7 +4,7 @@ import { MACOS } from '@/shared/platform/macos';
 import { altLabel, shortcutLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken } from '@/shared/ui/keys';
-import { PALETTE_PANELS } from './panels';
+import { PANEL_KEYS } from './panels';
 
 /** A shortcut: what it does, and its keys, each its own key cap. */
 interface Shortcut {
@@ -93,8 +93,8 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
     const rowOf = (shortcut: Shortcut | 'panels') =>
         shortcut === 'panels'
             ? {
-                  label: PALETTE_PANELS.map((panel) => t(panel.title)).join(', '),
-                  keys: PALETTE_PANELS.map((panel) => panel.shortcut),
+                  label: PANEL_KEYS.map((panel) => t(panel.title)).join(', '),
+                  keys: PANEL_KEYS.map((panel) => panel.shortcut),
                   also: undefined,
               }
             : {

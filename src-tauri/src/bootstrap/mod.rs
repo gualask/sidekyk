@@ -127,7 +127,9 @@ pub(crate) fn run() {
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
             tauri_commands::projects::take_opened_project,
-            tauri_commands::projects::add_project,
+            tauri_commands::projects::choose_project_folder,
+            tauri_commands::projects::create_project,
+            tauri_commands::projects::rename_project,
             tauri_commands::projects::activate_project,
             tauri_commands::projects::remove_project,
             tauri_commands::projects::set_project_layout,

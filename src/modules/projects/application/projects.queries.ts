@@ -23,6 +23,11 @@ function isLastChange(queryClient: QueryClient): boolean {
     return queryClient.isMutating({ mutationKey: projectsKey }) <= 1;
 }
 
+/** Shows the list a change returned, when no later change waits behind it (`isLastChange`). */
+function showList(queryClient: QueryClient, list: ProjectList) {
+    if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+}
+
 /** A project's name as the list on screen has it, for a message about a change to it. */
 function projectName(queryClient: QueryClient, projectId: string): string {
     const list = queryClient.getQueryData<ProjectList>(projectsKey);
@@ -59,25 +64,41 @@ export function useProjectsChangeSubscription(onOpened: (projectId: string) => v
     );
 }
 
+/** Asks for a new project's folder, and tells what it is (`FolderChoice`): nothing changes yet. */
+export function useChooseProjectFolder() {
+    const port = useProjectsPort();
+    return useMutation({ mutationFn: () => port.chooseProjectFolder() });
+}
+
 /**
- * Asks for a folder and adds its repository; `onAdded` follows, unless the user cancelled. A
- * failure is a toast: the folder picker has closed, nothing on screen waits for it.
+ * Adds a project, with the folder chosen or none, and shows it; `onCreated` follows. A failure is
+ * the dialog's to show: it is still open.
  */
-export function useAddProject(onAdded: () => void) {
+export function useCreateProject(onCreated: () => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
-    const showToast = useShowToast();
-    const i18n = useTranslation();
     return useMutation({
         ...projectsChange,
-        mutationFn: () => port.addProject(),
+        mutationFn: ({ name, folder }: { name: string; folder: string | null }) =>
+            port.createProject(name, folder),
         onSuccess: (list) => {
-            if (!list) return;
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
-            onAdded();
+            showList(queryClient, list);
+            onCreated();
         },
-        onError: (error) => {
-            showToast(errorToast(i18n.t('projects.addFailed'), error, i18n));
+    });
+}
+
+/** Names a project anew. A failure is the dialog's to show: it is still open. */
+export function useRenameProject(onRenamed: () => void) {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        ...projectsChange,
+        mutationFn: ({ projectId, name }: { projectId: string; name: string }) =>
+            port.renameProject(projectId, name),
+        onSuccess: (list) => {
+            showList(queryClient, list);
+            onRenamed();
         },
     });
 }
@@ -102,7 +123,7 @@ export function useActivateProject() {
             );
         },
         onSuccess: (list) => {
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            showList(queryClient, list);
         },
         onError: (error, projectId) => {
             showToast(
@@ -136,7 +157,7 @@ export function useRemoveProject() {
         ...projectsChange,
         mutationFn: (projectId: string) => port.removeProject(projectId),
         onSuccess: (list) => {
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            showList(queryClient, list);
         },
         onError: (error, projectId) => {
             showToast(
@@ -179,7 +200,7 @@ export function useRelocateProject({
                 return;
             }
             if (!relocation) return;
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, relocation.list);
+            showList(queryClient, relocation.list);
             readAgain(projectId);
         },
         onError: (error, projectId) => {
@@ -215,7 +236,7 @@ export function useProjectLayout(projectId: string | null) {
         mutationFn: ({ projectId, layout }: { projectId: string; layout: TilesLayout }) =>
             port.setProjectLayout(projectId, layout),
         onSuccess: (list) => {
-            if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
+            showList(queryClient, list);
         },
         onError: (error) => {
             showToast(errorToast(i18n.t('projects.layoutFailed'), error, i18n));

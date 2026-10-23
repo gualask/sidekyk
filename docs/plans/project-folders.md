@@ -22,10 +22,11 @@ Code's multi-root workspaces). High level; details when it is built.
   places for a note). Lists stay topics inside a project.
 - Panels derived from the project, never templates chosen by the user: no folder, Notes only; a
   folder, Files too; a repository, Changes too (a `git init` later shows it: the watcher sees
-  `.git`).
+  `.git`). Built for no folder and a repository (2026-10-23, `../features/workspace.md`); a folder
+  without git is next.
 - Inbox: not a project, a column at level 0 beside the cards, always there (built 2026-10-23,
   `../features/notes.md`). Every note can be moved to a project and back. Projects without folder
-  are made by the user.
+  are made by the user (New project, built 2026-10-23, `../features/projects.md`).
 - Notes feel global without being so: the Inbox, moving notes, `⌘K` at level 0 finding notes of
   every project (today only projects).
 - Id: made, not derived from a location (built 2026-10-22, `../features/projects.md`); Locate…

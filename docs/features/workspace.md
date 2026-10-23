@@ -11,7 +11,11 @@ problems. Why semantic zoom: `../product.md`.
   project's panels as tiles, 2 one panel full screen. Zoom transitions: View Transitions, 320 ms.
 - Start (2026-10-23): every start opens level 0, the project shown last selected (`↵` opens it);
   `sidekyk <folder>` (first argument or a second instance) opens its project at level 1. Without
-  projects level 0 holds the Inbox and the "+ Add a repository" card only.
+  projects level 0 holds the Inbox and the "+ New project" card only.
+- Panels from the project (2026-10-23): a repository has Changes, Files and Notes as tiles; a
+  project without folder has Notes only, shown at level 1 as full screen shows it (lists on the
+  left, no tiles), and no level 2: `↵`, zooming in and `1`-`9` do nothing, `Esc` goes to level 0;
+  the palette offers no panel and no search in files; no facts in the top bar.
 - Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the
   Inbox, down to 320 px; the window's least width (760 px) fits both.
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes on the left keeps 560 px;
@@ -60,8 +64,10 @@ problems. Why semantic zoom: `../product.md`.
 ## How it is built
 
 - `AppShell` owns level, selected tile / full-screen panel and the pending target; every level
-  change goes through `zoom` inside a view transition. Without a project on screen the level is 0
-  whatever was zoomed. Level 0 is the app composing `InboxColumn` (notes module) and
+  change goes through `zoom` inside a view transition. The level shown is as deep as the project
+  goes (0 without a project, at most 1 with one panel), and the level kept follows it: another
+  project opens at the level seen. What a panel is asked to show (`⌘N`, a file from the palette)
+  names its project: switching project leaves it behind. Level 0 is the app composing `InboxColumn` (notes module) and
   `ProjectsOverview` (projects module), both in the first chunk: they are the first paint.
 - Start at level 1 from the command line: the backend keeps the project the folder argument put on
   screen (`ProjectsState::opened`) and says the list changed; the frontend reads the list again
@@ -74,8 +80,14 @@ problems. Why semantic zoom: `../product.md`.
   Panels listen with `useWindowKeys`; a panel taking `↵`/`Esc` listens while capturing and the
   workspace skips handled keys.
 - `app/zoom-gestures.ts`: the wheel listener exists only while `⌘`/`Ctrl` is held.
-- Tiles: `MAIN_TILE` (Changes, fills, keeps 560 px) and `SIDE_TILES` (Files above Notes) in
-  `SideColumn`, which owns their width (`SIDE_WIDTH`: the tree's setting, `sidebarWidths.files`),
+- A project's panels (`app/panels.ts`, `projectTiles`): each panel says what it needs
+  (`PanelDefinition.needs`: Changes and Files a repository, Notes nothing); a project's panels are
+  those whose needs it meets, the first the main tile, the others the side column, and with those
+  its card's summaries and the panels that open full screen (by key or palette: none with one
+  panel, `deepestLevel` 1). One value per kind of project. The panel asked for that a project does
+  not have gives way to its main one.
+- Tiles: the main tile (Changes, fills, keeps 560 px, `MAIN_TILE_MIN_WIDTH`) and the side column
+  (Files above Notes) in `SideColumn`, which owns their width (`SIDE_WIDTH`: the tree's setting, `sidebarWidths.files`),
   at least the widest `tileMinWidth` shown, giving way first. Its splitter's double click fits what
   tiles need (`PanelProps.tileFit`: Files tells its tree's), else goes back to the default. A
   splitter between its tiles (`split`); each tile keeps its place in the tree, so minimizing one

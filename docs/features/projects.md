@@ -1,11 +1,23 @@
 # Projects
 
-Several repositories, one on screen.
+Several projects, one on screen: a project is a name, its notes and none or one folder (a
+repository).
 
 ## Behaviour
 
-- Add (folder picker, `sidekyk <folder>`: the first CLI argument's repository), remove (⋯ on the
-  level 0 card; the repository is untouched; asks first about its notes, `notes.md`), switch
+- New project (2026-10-23): the "+ New project" card last at level 0 ("Notes on a topic, and a
+  folder if you want") opens one dialog for everyone: Name (focused) and Folder (optional), "None"
+  until Choose… picks one; Cancel and Create (disabled while the name is blank), `↵` creates.
+  The folder picked resolves to its repository's root, its name fills an empty name. A folder
+  that is another project's is said under the field ("Already the project shop", Open: that
+  project shows); one that is not a repository is said there too and not taken (the folder chosen
+  before stays). Create adds the project last and opens it at level 1.
+- Rename (2026-10-23): from the card's ⋯, the same dialog with the name only. Two projects may
+  share a name. Removing a project without folder asks about its notes the same way, without the
+  line about the repository.
+- `sidekyk <folder>` (the first CLI argument's repository) opens its project, adding one named
+  after the folder when none follows it. Remove (⋯ on the level 0 card; the repository is
+  untouched; asks first about its notes, `notes.md`), switch
   (`[`/`]`, `Esc` to level 0, `⌘K` there). The app starts at level 0, the project shown last
   selected; `sidekyk <folder>` opens its project at level 1 (`workspace.md`).
 - A project not on this machine says where it is: `WSL: Ubuntu` before its folder on the level 0
@@ -20,6 +32,9 @@ Several repositories, one on screen.
     widest three fill 262 of the card's 266 px.
   - A well at the bottom, one height whatever it holds: the week of commits, "No commits in 7
     days", or why the repository cannot be read (moved, distro stopped or gone, no git).
+  A project without folder (2026-10-23): its name; boxes "waiting" (open notes) and "done"; in
+  the well "Last change yesterday" (calendar days, `Intl.RelativeTimeFormat`: today, yesterday,
+  3 days ago, then weeks, months, years) or "No notes yet". Quiet at 0, as the other boxes.
   Boxes and well on `surface-subtle`, never in the page's color: page, card, box are three
   layers; no border, the surface tells them apart (2026-10-18). No chips, no file list (the detail is one
   zoom away), no least height.
@@ -75,8 +90,18 @@ Several repositories, one on screen.
   a snapshot gives; 52 ms on Zed's clone. Read when level 0 shows, and when the window shows again
   on it, only if older than 30 s. Inactive projects' caches expire (`gcTime`).
 - Card parts: a panel's summary is shown once per part (`SummaryPart`: `lead`, `facts`, `body`)
-  and shows nothing in the parts it has nothing for; Changes fills all three, Notes `facts` (a
-  `Stat` box each, `shared/ui`). Each module stays on its own, the card keeps the order.
+  and shows nothing in the parts it has nothing for; Changes fills all three, Notes `facts`, and
+  `facts` and `body` for a project without folder (a `Stat` box each, the well a `CardWell`,
+  `shared/ui`). Only the summaries of the project's panels show (`projectTiles`). Each module
+  stays on its own, the card keeps the order.
+- New project and rename (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says
+  what it is (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`,
+  `NotRepository`), changing nothing; `create_project(name, folder)` checks the path again
+  (`folder_at`) and adds the project (`ProjectList::add`: name trimmed, never blank; a folder
+  another project follows is refused), then shows it; `rename_project` (`ProjectList::rename`,
+  stored only: nothing watched changes). Their failures show in the dialog, still open.
+- A project without folder is never routed to a machine, watched or summarized as a repository:
+  `Project::repository` is `None`, and a repository command given one is an internal error.
 - Week of commits (`get_commit_activity`, `load_commit_activity`): `git log --since=@<local
   midnight 6 days ago> --no-merges --shortstat -n 501 HEAD` (`LC_ALL=C`: the line is not
   translated), at most 500 commits and 256 KiB; the frontend sums them by local day

@@ -3,7 +3,7 @@
  * Change both sides together.
  */
 
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectInfo, ProjectLocation } from '@/shared/projects/project-info';
 
 export interface ProjectList {
     /** In the order they were added. */
@@ -21,6 +21,15 @@ export interface ProjectList {
 export type Relocation =
     | { kind: 'moved'; list: ProjectList }
     | { kind: 'inProject'; id: string; name: string };
+
+/**
+ * A folder picked for a new project: a repository no project follows yet (`path` as picked, given
+ * back to create the project; `name` its repository's), another project's, or not a repository.
+ */
+export type FolderChoice =
+    | { kind: 'usable'; path: string; name: string; location: ProjectLocation }
+    | { kind: 'inProject'; id: string; name: string }
+    | { kind: 'notRepository' };
 
 /** A project's tiles, as the user left them. */
 export interface TilesLayout {

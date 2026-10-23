@@ -1,5 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
-import type { ProjectList, Relocation, TilesLayout } from '../model/project.types';
+import type { FolderChoice, ProjectList, Relocation, TilesLayout } from '../model/project.types';
 
 /** The projects' runtime boundary: the native backend, or a fixture in browser dev mode. */
 export interface ProjectsPort {
@@ -9,8 +9,14 @@ export interface ProjectsPort {
      * app shows its panels.
      */
     takeOpenedProject(): Promise<string | null>;
-    /** Asks for a folder, adds its repository and shows it. null when the user cancels. */
-    addProject(): Promise<ProjectList | null>;
+    /** Asks for a new project's folder and says what it is. null when the user cancels. */
+    chooseProjectFolder(): Promise<FolderChoice | null>;
+    /**
+     * Adds a project of this name, following the repository at `folder` (a path as
+     * `chooseProjectFolder` gave it) or none, and shows it.
+     */
+    createProject(name: string, folder: string | null): Promise<ProjectList>;
+    renameProject(projectId: string, name: string): Promise<ProjectList>;
     activateProject(projectId: string): Promise<ProjectList>;
     /** Forgets a project and deletes its notes; its repository is left as it is. */
     removeProject(projectId: string): Promise<ProjectList>;

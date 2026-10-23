@@ -1,6 +1,14 @@
 import { Menu } from '@base-ui/react/menu';
-import { IconDots, IconPlus, IconTrash } from '@tabler/icons-react';
-import { type KeyboardEvent, type ReactNode, useEffect, useRef, useState } from 'react';
+import { IconDots, IconPencil, IconPlus, IconTrash } from '@tabler/icons-react';
+import {
+    type KeyboardEvent,
+    lazy,
+    type ReactNode,
+    Suspense,
+    useEffect,
+    useRef,
+    useState,
+} from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from '@/shared/i18n';
 import type { SummaryPart } from '@/shared/panels/panel';
@@ -8,9 +16,14 @@ import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info'
 import { placeName } from '@/shared/projects/project-place';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
-import { useActivateProject, useAddProject } from '../application/projects.queries';
+import { useActivateProject } from '../application/projects.queries';
 import type { ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
+
+/** Loaded when first asked for: the first paint does not show it. */
+const ProjectDialog = lazy(() =>
+    import('./ProjectDialog').then((module) => ({ default: module.ProjectDialog })),
+);
 
 const GRID_KEYS: Record<string, 'left' | 'right' | 'up' | 'down'> = {
     ArrowLeft: 'left',
@@ -20,7 +33,7 @@ const GRID_KEYS: Record<string, 'left' | 'right' | 'up' | 'down'> = {
 };
 
 /**
- * Moves the focus among the cards (and "Add a repository") with the arrows, row by row as the grid
+ * Moves the focus among the cards (and "New project") with the arrows, row by row as the grid
  * lays them out.
  */
 function moveInGrid(event: KeyboardEvent<HTMLElement>) {
@@ -37,8 +50,8 @@ function moveInGrid(event: KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * Level 0: one card per project, doubling as the project switcher, the "+ Add a repository" card
- * last (alone without projects). It opens with the focus on the project on screen, so `↵` goes
+ * Level 0: one card per project, doubling as the project switcher, the "+ New project" card last
+ * (alone without projects), which opens the New project dialog; a card's ⋯ renames or removes. It opens with the focus on the project on screen, so `↵` goes
  * back to it and the arrows start from it. It fills the room beside it down to one column of
  * cards: what is beside gives way then.
  */
@@ -49,20 +62,27 @@ export function ProjectsOverview({
     summary,
 }: {
     list: ProjectList;
-    /** A project was picked or added: show it. */
+    /** A project was picked or made: show it. */
     onOpen: () => void;
     /** A project's removal asked for: the app asks what to do with what it holds, then removes. */
     onRemove: (project: ProjectInfo) => void;
     /** What the panels tell about a project, below its name, part by part. */
     summary: (project: ProjectInfo, part: SummaryPart) => ReactNode;
 }) {
-    const add = useAddProject(onOpen);
     const { t } = useTranslation();
+    // the dialog open: a new project, or the project to rename
+    const [dialog, setDialog] = useState<{ renaming: ProjectInfo | null } | null>(null);
     const activate = useActivateProject();
     // the card the zoom grows from: the one being opened, else the project on screen
     const [opening, setOpening] = useState<string | null>(null);
     const zoomed = opening ?? list.active;
     const grid = useRef<HTMLDivElement>(null);
+    // the zoom grows from its card, named before the zoom captures the screen it leaves
+    const open = (id: string) => {
+        flushSync(() => setOpening(id));
+        activate(id);
+        onOpen();
+    };
 
     useEffect(() => {
         grid.current?.querySelector<HTMLElement>('[data-current-card]')?.focus();
@@ -86,12 +106,8 @@ export function ProjectsOverview({
                         project={project}
                         selected={project.id === list.active}
                         zoomed={project.id === zoomed}
-                        onOpen={() => {
-                            // named before the zoom captures the screen it leaves
-                            flushSync(() => setOpening(project.id));
-                            activate(project.id);
-                            onOpen();
-                        }}
+                        onOpen={() => open(project.id)}
+                        onRename={() => setDialog({ renaming: project })}
                         onRemove={() => onRemove(project)}
                         summary={(part) => summary(project, part)}
                     />
@@ -99,14 +115,26 @@ export function ProjectsOverview({
                 <button
                     type="button"
                     data-grid-cell
-                    disabled={add.isPending}
-                    className="flex min-h-44 items-center justify-center gap-2 rounded-xl border border-dashed border-ui-border text-sm text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent disabled:opacity-40"
-                    onClick={() => add.mutate()}
+                    className="flex min-h-44 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ui-border p-4 text-center text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent"
+                    onClick={() => setDialog({ renaming: null })}
                 >
-                    <IconPlus size={16} />
-                    {t('projects.add')}
+                    <span className="flex items-center gap-2 text-sm">
+                        <IconPlus size={16} />
+                        {t('projects.new')}
+                    </span>
+                    <span className="text-xs">{t('projects.newHint')}</span>
                 </button>
             </div>
+            {dialog ? (
+                <Suspense fallback={null}>
+                    <ProjectDialog
+                        renaming={dialog.renaming}
+                        onCreated={onOpen}
+                        onOpenProject={open}
+                        onClose={() => setDialog(null)}
+                    />
+                </Suspense>
+            ) : null}
         </section>
     );
 }
@@ -116,6 +144,7 @@ function ProjectCard({
     selected,
     zoomed,
     onOpen,
+    onRename,
     onRemove,
     summary,
 }: {
@@ -124,6 +153,7 @@ function ProjectCard({
     /** The zoom to the project's panels grows from this card, or back into it. */
     zoomed: boolean;
     onOpen: () => void;
+    onRename: () => void;
     onRemove: () => void;
     summary: (part: SummaryPart) => ReactNode;
 }) {
@@ -175,6 +205,10 @@ function ProjectCard({
                 <Menu.Portal>
                     <Menu.Positioner sideOffset={4} align="end">
                         <Menu.Popup className="menu-popup">
+                            <Menu.Item className="menu-item" onClick={onRename}>
+                                <IconPencil size={14} />
+                                {t('projects.rename')}
+                            </Menu.Item>
                             <Menu.Item className="menu-item danger" onClick={onRemove}>
                                 <IconTrash size={14} />
                                 {t('common.remove')}

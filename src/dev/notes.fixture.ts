@@ -89,6 +89,16 @@ const INBOX_NOTES: [string, number][] = [
     ['Book idea: a field guide to small tools that stay out of the way', 3 * DAY],
 ];
 
+/** The notes of a project without folder, on a topic: [list, text, age, done age]. */
+const TOPIC_NOTES: [string, string, number, number | null][] = [
+    ['Chapter 2', 'Reread the section on related work: too long', 26 * HOUR, null],
+    ['Chapter 2', 'Ask Prof. Rossi about the second dataset', 2 * DAY, null],
+    ['Chapter 2', 'Fix the figure numbering', 5 * DAY, 3 * DAY],
+    ['Reading', 'Lamport, "Time, Clocks, and the Ordering of Events"', 4 * DAY, null],
+    ['Reading', 'Kleppmann, chapter 9', 9 * DAY, 6 * DAY],
+    ['Reading', 'Brewer, "CAP twelve years later"', 12 * DAY, 8 * DAY],
+];
+
 let seq = 0;
 /** 16 hex digits, as the backend's ids. */
 function newId(): string {
@@ -149,7 +159,8 @@ function largeBook(): Book {
 /**
  * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
  * each book starts as `initial` says (the scenario's project with the mock's notes, the Inbox with
- * a few in `review` and `clean`, any other book with none). `checkBook`
+ * a few in `review` and `clean`, the project without folder with its topic's, any other book with
+ * none). `checkBook`
  * refuses a book the backend would not know. A move to a new project makes it with `makeProject`
  * (its id back), takes it away with `dropProject` when the move fails, and says the projects
  * changed (`projectsChanged`) when it is done.
@@ -161,7 +172,7 @@ export function fixtureNotes({
     dropProject,
     projectsChanged,
 }: {
-    initial: (book: string) => 'review' | 'large' | 'inbox' | 'empty';
+    initial: (book: string) => 'review' | 'large' | 'inbox' | 'topic' | 'empty';
     checkBook: (book: string) => void;
     makeProject: (name: string) => string;
     dropProject: (id: string) => void;
@@ -183,7 +194,9 @@ export function fixtureNotes({
                       ? largeBook()
                       : kind === 'inbox'
                         ? inboxBook()
-                        : emptyBook();
+                        : kind === 'topic'
+                          ? bookOf(TOPIC_NOTES)
+                          : emptyBook();
             books.set(key, found);
         }
         return found;

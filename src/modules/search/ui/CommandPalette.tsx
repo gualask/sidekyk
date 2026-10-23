@@ -71,6 +71,7 @@ export function CommandPalette({
     initialText,
     projectName,
     projectId,
+    hasFiles,
     currentFile,
     panels,
     actions,
@@ -83,8 +84,10 @@ export function CommandPalette({
     initialText: string;
     /** The project on screen, whose panels and files are offered; null when there is none. */
     projectName: string | null;
-    /** The project whose files are searched; null when all projects show. */
+    /** The project whose files and notes are searched; null when all projects show. */
     projectId: string | null;
+    /** Whether that project has files to search: a folder. */
+    hasFiles: boolean;
     /** The file the project shows, whose lines found come first. */
     currentFile: string | null;
     panels: readonly PalettePanel[];
@@ -105,6 +108,7 @@ export function CommandPalette({
                         initialText={initialText}
                         projectName={projectName}
                         projectId={projectId}
+                        hasFiles={hasFiles}
                         currentFile={currentFile}
                         panels={panels}
                         onOpen={(item, query) => {
@@ -133,6 +137,7 @@ function Palette({
     initialText,
     projectName,
     projectId,
+    hasFiles,
     currentFile,
     panels,
     onOpen,
@@ -142,6 +147,7 @@ function Palette({
     initialText: string;
     projectName: string | null;
     projectId: string | null;
+    hasFiles: boolean;
     currentFile: string | null;
     panels: readonly PalettePanel[];
     onOpen: (item: PaletteItem, query: string) => void;
@@ -152,7 +158,9 @@ function Palette({
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
     const contents = mode === 'contents';
     const names = useSearch(query, titles, projectId, !contents);
-    const found = useContentSearch(contents ? projectId : null, query);
+    // the project whose files are searched for a text: none without a folder
+    const filesOf = hasFiles ? projectId : null;
+    const found = useContentSearch(contents ? filesOf : null, query);
     const { items, rows } = useMemo(() => {
         if (contents)
             return found ? contentRows(found.files, currentFile, i18n) : { items: [], rows: [] };
@@ -183,7 +191,7 @@ function Palette({
         paddingEnd: 6,
     });
     const empty = contents
-        ? contentsNotice(projectId, query, found, i18n)
+        ? contentsNotice(filesOf, query, found, i18n)
         : names.data && rows.length === 0
           ? t('palette.nothingFound')
           : null;
@@ -214,7 +222,7 @@ function Palette({
                 )}
                 <Autocomplete.Input
                     aria-label={t(contents ? 'common.findInFiles' : 'common.goTo')}
-                    placeholder={placeholder(mode, projectId, projectName, i18n)}
+                    placeholder={placeholder(mode, projectId, hasFiles, projectName, i18n)}
                     spellCheck={false}
                     autoComplete="off"
                     className="h-[50px] min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ui-text outline-none placeholder:text-ui-text-muted"
@@ -294,7 +302,7 @@ function Palette({
                         parts={{ esc: <kbd className="kbd">Esc</kbd> }}
                     />
                 </span>
-                {contents && projectId && query.trim().length >= MIN_CONTENT_QUERY ? (
+                {contents && filesOf && query.trim().length >= MIN_CONTENT_QUERY ? (
                     <span className="ml-auto" aria-live="polite">
                         {contentsStatus(found, query, i18n)}
                     </span>
@@ -307,13 +315,16 @@ function Palette({
 function placeholder(
     mode: PaletteMode,
     projectId: string | null,
+    hasFiles: boolean,
     projectName: string | null,
     { t }: Translator,
 ): string {
     if (mode === 'names') {
-        return t(projectId ? 'palette.placeholder.names' : 'palette.placeholder.namesNoProject');
+        if (!projectId) return t('palette.placeholder.namesNoProject');
+        return t(hasFiles ? 'palette.placeholder.names' : 'palette.placeholder.namesNotes');
     }
     if (!projectId) return t('palette.placeholder.contentsNoProject');
+    if (!hasFiles) return t('palette.placeholder.contentsNoFolder');
     return projectName
         ? t('palette.placeholder.contents', { name: projectName })
         : t('palette.placeholder.contentsUnnamed');

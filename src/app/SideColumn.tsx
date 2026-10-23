@@ -13,7 +13,7 @@ import type { PanelDefinition, PanelProps } from '@/shared/panels/panel';
 import { trackDrag } from '@/shared/ui/pointer-drag';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { MAIN_TILE, SIDE_WIDTH, sideMinWidth, TILE_BORDERS, TILE_GAP } from './panels';
+import { MAIN_TILE_MIN_WIDTH, SIDE_WIDTH, sideMinWidth, TILE_BORDERS, TILE_GAP } from './panels';
 
 /** The least height a tile of the column keeps while the splitter between them is dragged. */
 const TILE_MIN_HEIGHT = 96;
@@ -114,12 +114,12 @@ export function SideColumn({
     );
 }
 
-/** The column's width: its own, at least `min`, bounded by what Changes keeps. */
+/** The column's width: its own, at least `min`, bounded by what the main tile keeps. */
 function columnWidth(width: CSSProperties, min: number): CSSProperties {
     return {
         ...width,
         minWidth: min,
-        maxWidth: `max(${min}px, 100% - ${MAIN_TILE.minWidth + TILE_GAP}px)`,
+        maxWidth: `max(${min}px, 100% - ${MAIN_TILE_MIN_WIDTH + TILE_GAP}px)`,
     };
 }
 

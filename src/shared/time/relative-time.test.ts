@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from '@/shared/i18n';
-import { relativeTime, relativeTimeWidth, timeAgo } from './relative-time';
+import { dayAgo, relativeTime, relativeTimeWidth, timeAgo } from './relative-time';
 
 const en = createTranslator('en', 'en');
 const it_ = createTranslator('it', 'it');
@@ -38,5 +38,30 @@ describe('relativeTime', () => {
     it('knows how wide its column must be', () => {
         expect(relativeTimeWidth(en)).toBe(4);
         expect(relativeTimeWidth(it_)).toBe(7);
+    });
+});
+
+describe('dayAgo', () => {
+    // noon, so that hours back stay on the day meant
+    const now = new Date(2026, 9, 23, 12).getTime();
+    const daysBack = (days: number, hour = 12) => new Date(2026, 9, 23 - days, hour).getTime();
+
+    it('counts calendar days, not hours', () => {
+        expect(dayAgo(daysBack(0, 0), now, 'en')).toBe('today');
+        expect(dayAgo(daysBack(1, 23), now, 'en')).toBe('yesterday');
+        expect(dayAgo(daysBack(3), now, 'en')).toBe('3 days ago');
+        expect(dayAgo(now + 3600_000, now, 'en')).toBe('today');
+    });
+
+    it('goes to weeks, months and years', () => {
+        expect(dayAgo(daysBack(15), now, 'en')).toBe('2 weeks ago');
+        expect(dayAgo(daysBack(65), now, 'en')).toBe('2 months ago');
+        expect(dayAgo(daysBack(800), now, 'en')).toBe('2 years ago');
+    });
+
+    it('speaks the UI language', () => {
+        expect(dayAgo(daysBack(0), now, 'it')).toBe('oggi');
+        expect(dayAgo(daysBack(1), now, 'it')).toBe('ieri');
+        expect(dayAgo(daysBack(3), now, 'it')).toBe('3 giorni fa');
     });
 });

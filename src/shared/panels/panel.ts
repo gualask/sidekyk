@@ -62,6 +62,9 @@ export interface PanelSummaryProps {
     part: SummaryPart;
 }
 
+/** What a panel needs of a project to show anything: a repository (Changes, Files). */
+export type PanelNeed = 'repository';
+
 /**
  * What a module gives the app to show it as a panel. The app lays panels out and switches between
  * them; a panel knows nothing of the others or of where it sits.
@@ -73,6 +76,8 @@ export interface PanelDefinition {
     icon: ComponentType<{ size?: number; stroke?: number; className?: string }>;
     /** As a tile beside another, the least width it keeps while the window has room. */
     tileMinWidth?: number;
+    /** What the project must have for the panel to be among its panels; none, every project. */
+    needs?: PanelNeed;
     /**
      * The panel itself, loaded on its first show (one chunk per module). Its queries live inside
      * it, so a panel that is not on screen runs none. It is mounted again for another project, so
@@ -103,7 +108,7 @@ export function definePanel<M, S = never>({
     pick,
     summary,
     ...panel
-}: Pick<PanelDefinition, 'id' | 'title' | 'icon' | 'tileMinWidth'> &
+}: Pick<PanelDefinition, 'id' | 'title' | 'icon' | 'tileMinWidth' | 'needs'> &
     LazyPart<M, PanelProps> & {
         summary?: LazyPart<S, PanelSummaryProps>;
     }): PanelDefinition {

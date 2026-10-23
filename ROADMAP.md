@@ -29,7 +29,7 @@ has.
       card and top bar without branch and commits
 - [ ] What changed without git: recently modified files, no diffs
 - [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
-      section per repository in Changes. **After:** project id made
+      section per repository in Changes
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
 
 ## Previews

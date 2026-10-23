@@ -6,6 +6,7 @@ export const changesPanel = definePanel({
     id: 'changes',
     title: 'panel.changes',
     icon: IconGitCompare,
+    needs: 'repository',
     load: () => import('./ui/ChangesWorkspace'),
     pick: (module) => module.ChangesWorkspace,
     summary: {
@@ -18,6 +19,7 @@ export const filesPanel = definePanel({
     id: 'files',
     title: 'panel.files',
     icon: IconFolder,
+    needs: 'repository',
     tileMinWidth: FILES_TREE_WIDTH.min,
     load: () => import('./ui/FilesWorkspace'),
     pick: (module) => module.FilesWorkspace,

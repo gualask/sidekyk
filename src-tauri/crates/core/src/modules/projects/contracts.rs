@@ -124,6 +124,25 @@ pub enum Relocation {
     },
 }
 
+/// A folder picked for a new project: a repository no project follows yet (`path` as picked, to
+/// give back on creating it; `name` its repository's), another project's, or not a repository.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum FolderChoice {
+    #[serde(rename_all = "camelCase")]
+    Usable {
+        path: String,
+        name: String,
+        location: Location,
+    },
+    #[serde(rename_all = "camelCase")]
+    InProject {
+        id: String,
+        name: String,
+    },
+    NotRepository,
+}
+
 /// A project as stored: today `{ id, name, folders }`. Older forms are read too: one location
 /// with its id, one location without (before ids), or a root (before locations), the last two
 /// taking their location's id.
@@ -344,6 +363,38 @@ mod tests {
             list: ProjectList::default(),
         };
         assert_eq!(serde_json::to_value(moved).unwrap()["kind"], "moved");
+    }
+
+    #[test]
+    fn a_folder_choice_tells_the_dialog_what_was_picked() {
+        let usable = FolderChoice::Usable {
+            path: "/Users/ale/Dev/api/src".into(),
+            name: "api".into(),
+            location: Location::Local {
+                root: "/Users/ale/Dev/api".into(),
+            },
+        };
+        assert_eq!(
+            serde_json::to_value(usable).unwrap(),
+            serde_json::json!({
+                "kind": "usable",
+                "path": "/Users/ale/Dev/api/src",
+                "name": "api",
+                "location": { "kind": "local", "root": "/Users/ale/Dev/api" }
+            })
+        );
+        let in_project = FolderChoice::InProject {
+            id: "0123456789abcdef".into(),
+            name: "shop".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(in_project).unwrap()["kind"],
+            "inProject"
+        );
+        assert_eq!(
+            serde_json::to_value(FolderChoice::NotRepository).unwrap(),
+            serde_json::json!({ "kind": "notRepository" })
+        );
     }
 
     #[test]

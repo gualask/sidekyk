@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
 /**
- * The well at the bottom of a project's card: the week of commits, or why there is none. One
- * height whatever it holds, so that cards side by side line up: the chart's 16 px caption, 6 px
- * gap and 56 px bars, in 12 px of padding.
+ * The well at the bottom of a project's card: the week of commits or why there is none, or a
+ * project's notes' last change. One height whatever it holds, so that cards side by side line up:
+ * the chart's 16 px caption, 6 px gap and 56 px bars, in 12 px of padding.
  */
 export function CardWell({ children }: { children: ReactNode }) {
     return (

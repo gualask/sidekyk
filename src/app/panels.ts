@@ -1,6 +1,7 @@
 import { notesPanel } from '@/modules/notes';
 import { changesPanel, FILES_TREE_WIDTH, filesPanel } from '@/modules/repository';
-import type { PanelDefinition } from '@/shared/panels/panel';
+import type { PanelDefinition, PanelNeed } from '@/shared/panels/panel';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 
 /**
  * Every panel, in the order of their shortcuts (`1`, `2`, …), which is also their order as tiles
@@ -11,15 +12,8 @@ const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel, notesPanel
 /** The room between tiles, in pixels, where the splitter of the side column sits. */
 export const TILE_GAP = 8;
 
-/** Changes, on the left: it fills what the side column leaves, keeping this much. */
-export const MAIN_TILE = { panel: changesPanel, minWidth: 560 };
-
-/**
- * The side column, top to bottom: Files above Notes, each can be minimized to the top bar. The
- * column is as wide as Files' tree (one width with full screen), and wider while Notes is in it,
- * whose cards need the room; it gives way first when the window is narrow.
- */
-export const SIDE_TILES: readonly PanelDefinition[] = [filesPanel, notesPanel];
+/** What the main tile keeps of the width, the side column giving way first. */
+export const MAIN_TILE_MIN_WIDTH = 560;
 
 /**
  * The side column's width is the Files tree's (one setting with Files full screen): what the
@@ -35,39 +29,84 @@ export function sideMinWidth(panels: readonly PanelDefinition[]): number {
     return Math.max(0, ...panels.map((panel) => panel.tileMinWidth ?? 0));
 }
 
-/** The panels shown as tiles, in their order: Changes, then the side column's not minimized. */
-function shownTiles(minimized: readonly string[]): PanelDefinition[] {
-    return [MAIN_TILE.panel, ...SIDE_TILES.filter((panel) => !minimized.includes(panel.id))];
+/**
+ * A project's panels, from what it has: those whose needs it meets, in their order. With several,
+ * level 1 lays them out as tiles: the first on the left (Changes for a repository), filling what
+ * the side column leaves; the others in that column, top to bottom (Files above Notes), each can be
+ * minimized to the top bar; the column is as wide as Files' tree, wider while Notes is in it,
+ * and gives way first. With one (Notes, without folder), level 1 shows it as full screen does and
+ * there is no level 2.
+ */
+export interface ProjectTiles {
+    panels: readonly PanelDefinition[];
+    main: PanelDefinition;
+    /** Empty when the project has one panel. */
+    side: readonly PanelDefinition[];
+    /** The panels saying something on the project's card at all projects. */
+    summaries: readonly PanelSummary[];
+    /** The panels that open full screen (level 2), by key or from the palette: none without tiles. */
+    fullScreen: readonly PanelDefinition[];
 }
 
-/**
- * The panel selected at startup, among the tiles the app opens on. Their chunks start loading
- * with the app, not after the first render.
- */
-export const INITIAL_PANEL = PANELS[0];
-for (const panel of [MAIN_TILE.panel, ...SIDE_TILES]) void panel.preload();
+/** A panel's summary, by the panel's id. */
+type PanelSummary = NonNullable<PanelDefinition['summary']> & { id: string };
 
-/** The tile shown next to a panel's, before (-1) or after (1) it, if any. */
+function summariesOf(panels: readonly PanelDefinition[]): PanelSummary[] {
+    return panels.flatMap((panel) => (panel.summary ? [{ id: panel.id, ...panel.summary }] : []));
+}
+
+function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
+    const panels = PANELS.filter((panel) => !panel.needs || met(panel.needs));
+    const [main, ...side] = panels;
+    return {
+        panels,
+        main,
+        side,
+        summaries: summariesOf(panels),
+        fullScreen: side.length > 0 ? panels : [],
+    };
+}
+
+/** One value per kind of project, so the panels of a project keep their identity across renders. */
+const TILES = {
+    repository: tilesMeeting(() => true),
+    none: tilesMeeting(() => false),
+};
+
+export function projectTiles(project: ProjectInfo): ProjectTiles {
+    return projectFolder(project) ? TILES.repository : TILES.none;
+}
+
+/** The deepest level a project zooms to: 2 when its panels are tiles, else 1. */
+export function deepestLevel(tiles: ProjectTiles): 1 | 2 {
+    return tiles.side.length > 0 ? 2 : 1;
+}
+
+/** The panel selected at startup. Every chunk starts loading with the app, not after a render. */
+export const INITIAL_PANEL = PANELS[0];
+for (const panel of PANELS) void panel.preload();
+
+/**
+ * The tile shown next to a panel's, before (-1) or after (1) it, if any, among a project's tiles
+ * not minimized.
+ */
 export function tileBeside(
+    tiles: ProjectTiles,
     panel: PanelDefinition,
     step: -1 | 1,
     minimized: readonly string[],
 ): PanelDefinition | undefined {
-    const tiles = shownTiles(minimized);
-    const index = tiles.indexOf(panel);
-    return index < 0 ? undefined : tiles[index + step];
+    const shown = [tiles.main, ...tiles.side.filter((tile) => !minimized.includes(tile.id))];
+    const index = shown.indexOf(panel);
+    return index < 0 ? undefined : shown[index + step];
 }
 
-/** The panels that say something about a project on its card at all projects. */
-export const SUMMARIES = PANELS.flatMap((panel) =>
-    panel.summary ? [{ id: panel.id, ...panel.summary }] : [],
-);
+/** Every panel's summary: their chunks load while the app is idle, before all projects shows. */
+export const SUMMARIES = summariesOf(PANELS);
 
-/** The panels as the command palette offers them, with the keys that open them. */
-export const PALETTE_PANELS = PANELS.map((panel) => ({
-    id: panel.id,
+/** The panels as the shortcuts list them, with the keys that open them full screen. */
+export const PANEL_KEYS = PANELS.map((panel) => ({
     title: panel.title,
-    icon: panel.icon,
     shortcut: panelShortcut(panel),
 }));
 

@@ -2,7 +2,7 @@ import { AlertDialog } from '@base-ui/react/alert-dialog';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useEffectEvent, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { notesKey, useExportNotes, useNotesCount } from '../application/notes.queries';
 
 /**
@@ -54,6 +54,8 @@ export function RemoveProjectDialog({
                     </AlertDialog.Title>
                     <AlertDialog.Description className="mt-1.5 text-ui-text-secondary">
                         {notes === null ? t('remove.notes') : tp('remove.notesCount', notes)}
+                        {/* a project without folder has no repository to leave as it is */}
+                        {projectFolder(project) ? ` ${t('remove.repositoryStays')}` : null}
                     </AlertDialog.Description>
                     <div className="mt-4 flex flex-wrap justify-end gap-2">
                         <AlertDialog.Close className="btn-ghost-sm">

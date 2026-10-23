@@ -19,6 +19,7 @@ import {
     useRemoveProject,
 } from '@/modules/projects';
 import {
+    changesPanel,
     filesPanel,
     fileTarget,
     useReadProjectAgain,
@@ -36,11 +37,13 @@ import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
 import { PanelTile } from './PanelTile';
 import {
+    deepestLevel,
     INITIAL_PANEL,
-    MAIN_TILE,
-    PALETTE_PANELS,
+    MAIN_TILE_MIN_WIDTH,
+    type ProjectTiles,
     panelById,
-    SIDE_TILES,
+    panelShortcut,
+    projectTiles,
     SUMMARIES,
     TILE_GAP,
     tileBeside,
@@ -64,9 +67,6 @@ const RemoveProjectDialog = preloadable(
 const ShortcutsHelp = lazy(() =>
     import('./ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
 );
-
-/** At all projects (level 0), the palette offers projects only: no panel. */
-const NO_PANELS: typeof PALETTE_PANELS = [];
 
 /** The command palette: whether it is open, what it looks for, and the text it opens with. */
 interface PaletteState {
@@ -94,26 +94,41 @@ export function AppShell() {
     useRepositoryChangeSubscription();
     const projects = useProjects();
     const i18n = useTranslation();
-    // the panels as the palette offers them, by their titles in the UI's language
-    const palettePanels = useMemo(
-        () => PALETTE_PANELS.map((panel) => ({ ...panel, title: i18n.t(panel.title) })),
-        [i18n],
-    );
     // the app opens at all projects, the one shown last selected; without projects it stays there
     const [zoomLevel, setLevel] = useState<ZoomLevel>(0);
     // the panel full screen at level 2, and the tile selected at level 1
-    const [panel, setPanel] = useState(INITIAL_PANEL);
+    const [shownPanel, setPanel] = useState(INITIAL_PANEL);
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
-    const level = project ? zoomLevel : 0;
+    // the project's panels, from what it has; none at all projects without projects
+    const tiles = project ? projectTiles(project) : null;
+    // as deep as the project goes: a project with one panel has no level 2, and without projects
+    // only all projects shows. The level kept follows the one shown, so another project opens at
+    // the level seen
+    const level = tiles ? (Math.min(zoomLevel, deepestLevel(tiles)) as ZoomLevel) : 0;
+    if (projects.data && level !== zoomLevel) setLevel(level);
+    // a panel the project does not have gives way to its main one
+    const panel = tiles && !tiles.panels.includes(shownPanel) ? tiles.main : shownPanel;
+    // the panels the palette offers, by their titles in the UI's language: a project's own, at its
+    // panels
+    const palettePanels = useMemo(
+        () =>
+            (level > 0 && tiles ? tiles.fullScreen : []).map((offered) => ({
+                id: offered.id,
+                title: i18n.t(offered.title),
+                icon: offered.icon,
+                shortcut: panelShortcut(offered),
+            })),
+        [level, tiles, i18n],
+    );
     // the Inbox's field takes the focus (`⌘N` at all projects)
     const [focusInbox, setFocusInbox] = useState(false);
     const inboxFocused = useCallback(() => setFocusInbox(false), []);
     // how the project lays out its tiles: which wait in the top bar, the side column's split
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
-    // a tile minimized is not selected: Changes is, which is never minimized
-    const selectedTile = layout.minimized.includes(panel.id) ? MAIN_TILE.panel : panel;
+    // a tile minimized is not selected: the main one is, which is never minimized
+    const selectedTile = tiles && layout.minimized.includes(panel.id) ? tiles.main : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell, and in
     // the language of the settings
     const settingsRead = useSettingsWhenRead() !== undefined;
@@ -140,7 +155,7 @@ export function AppShell() {
      * asks the panel full screen to show something; any other move leaves the panels as they are.
      */
     const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
-        const asked = nextTarget ? { panel: nextPanel.id, target: nextTarget } : null;
+        const asked = nextTarget && project ? askedOf(project, nextPanel.id, nextTarget) : null;
         if (next === level && nextPanel === panel) {
             if (asked) setTarget(asked);
             return;
@@ -156,7 +171,7 @@ export function AppShell() {
     const minimize = (tile: PanelDefinition) =>
         zoomTransition(() => {
             changeLayout((current) => ({ ...current, minimized: [...current.minimized, tile.id] }));
-            if (panel === tile) setPanel(MAIN_TILE.panel);
+            if (panel === tile && tiles) setPanel(tiles.main);
         });
     const restore = (tile: PanelDefinition) =>
         zoomTransition(() => {
@@ -171,14 +186,14 @@ export function AppShell() {
     // waited there), or full screen in place of the first
     const show: PanelProps['show'] = (id, nextTarget) => {
         const next = panelById(id);
-        if (!next) return;
+        if (!next || !project || !tiles?.panels.includes(next)) return;
         if (level === 2) {
             zoom(2, next, nextTarget);
             return;
         }
         if (layout.minimized.includes(next.id)) restore(next);
         else setPanel(next);
-        setTarget({ panel: next.id, target: nextTarget });
+        setTarget(askedOf(project, next.id, nextTarget));
     };
 
     // one dialog at a time: the palette and the settings close each other. The palette's other
@@ -221,12 +236,12 @@ export function AppShell() {
         openProject,
         openPanel: (id) => {
             const next = panelById(id);
-            if (next) zoom(2, next);
+            if (next && tiles?.fullScreen.includes(next)) zoom(2, next);
         },
         // as a file picked in the tree: in Files' own viewer when it is full screen, else Changes
         openFile: (path, find) =>
             show(
-                level === 2 && panel === filesPanel ? filesPanel.id : MAIN_TILE.panel.id,
+                level === 2 && panel === filesPanel ? filesPanel.id : changesPanel.id,
                 fileTarget(path, null, find ?? null),
             ),
         // in Notes, at the same zoom
@@ -234,7 +249,7 @@ export function AppShell() {
     };
 
     const zoomIn = () => {
-        if (project && level < 2) zoom((level + 1) as ZoomLevel);
+        if (tiles && level < deepestLevel(tiles)) zoom((level + 1) as ZoomLevel);
     };
     const zoomOut = () => {
         if (level > 0) zoom((level - 1) as ZoomLevel);
@@ -246,13 +261,16 @@ export function AppShell() {
         zoomOut,
         // full screen, from a project's panels or another panel
         openPanel: (next) => {
-            if (level > 0) zoom(2, next);
+            if (level > 0 && tiles?.fullScreen.includes(next)) zoom(2, next);
         },
         // the arrows move among the tiles of a project's panels
         moveTile: (step) => {
-            const next = level === 1 ? tileBeside(selectedTile, step, layout.minimized) : undefined;
+            const among = level === 1 && tiles && tiles.side.length > 0 ? tiles : null;
+            const next = among
+                ? tileBeside(among, selectedTile, step, layout.minimized)
+                : undefined;
             if (next) setPanel(next);
-            return level === 1;
+            return among !== null;
         },
         toggleSettings,
         togglePalette,
@@ -298,8 +316,8 @@ export function AppShell() {
                 helpOpen={helpOpen}
                 onToggleHelp={toggleHelp}
                 minimized={
-                    level === 1 && project
-                        ? SIDE_TILES.filter((tile) => layout.minimized.includes(tile.id))
+                    level === 1 && tiles
+                        ? tiles.side.filter((tile) => layout.minimized.includes(tile.id))
                         : []
                 }
                 onRestore={restore}
@@ -313,6 +331,7 @@ export function AppShell() {
                     <Workspace
                         list={projects.data}
                         project={project}
+                        tiles={tiles}
                         level={level}
                         panel={level === 1 ? selectedTile : panel}
                         target={target}
@@ -359,8 +378,9 @@ export function AppShell() {
                         initialText={palette.text}
                         projectName={project?.name ?? null}
                         projectId={level > 0 ? (project?.id ?? null) : null}
+                        hasFiles={tiles?.panels.includes(filesPanel) ?? false}
                         currentFile={palette.open ? shownFile() : null}
-                        panels={level > 0 && project ? palettePanels : NO_PANELS}
+                        panels={palettePanels}
                         actions={paletteActions}
                     />
                 </Suspense>
@@ -369,21 +389,27 @@ export function AppShell() {
     );
 }
 
-/** Changes fills what the side column leaves, keeping its least width while the window allows. */
-const MAIN_SIZE = { flexGrow: 1, flexBasis: 0, minWidth: `min(${MAIN_TILE.minWidth}px, 100%)` };
+/** The main tile fills what the side column leaves, keeping its least width while the window allows. */
+const MAIN_SIZE = { flexGrow: 1, flexBasis: 0, minWidth: `min(${MAIN_TILE_MIN_WIDTH}px, 100%)` };
 
 /** A tile of the side column fills its slot. */
 const SIDE_SIZE = { flexGrow: 1, flexBasis: 0 };
 
-/** What a panel was asked to show, and which panel. */
+/** What a panel was asked to show, and which panel of which project: no other project's shows it. */
 interface Asked {
+    project: string;
     panel: string;
     target: PanelTarget;
+}
+
+function askedOf(project: ProjectInfo, panel: string, target: PanelTarget): Asked {
+    return { project: project.id, panel, target };
 }
 
 function Workspace({
     list,
     project,
+    tiles,
     level,
     panel,
     target,
@@ -400,8 +426,10 @@ function Workspace({
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
+    /** The project's panels; null with no project. */
+    tiles: ProjectTiles | null;
     level: ZoomLevel;
-    /** Full screen at level 2, the selected tile at level 1. */
+    /** Full screen at level 2 (and at level 1 with one panel), the selected tile at level 1. */
     panel: PanelDefinition;
     target: Asked | null;
     zoom: (level: ZoomLevel, panel?: PanelDefinition) => void;
@@ -417,11 +445,10 @@ function Workspace({
     focusInbox: boolean;
     onInboxFocused: () => void;
 }) {
-    const targetOf = (id: string) => (target?.panel === id ? target.target : null);
-    // the side column's tiles not minimized; without them, Changes takes the whole width
-    const side = SIDE_TILES.filter((tile) => !layout.minimized.includes(tile.id));
+    const targetOf = (id: string) =>
+        target?.project === project?.id && target?.panel === id ? target.target : null;
     // all projects: the Inbox, then the cards, which give way first in a narrow window
-    if (!project || level === 0) {
+    if (!project || !tiles || level === 0) {
         return (
             <div className="flex h-full">
                 <InboxColumn focusComposer={focusInbox} onComposerFocused={onInboxFocused} />
@@ -430,7 +457,7 @@ function Workspace({
                     onOpen={() => zoom(1)}
                     onRemove={onRemove}
                     summary={(card, part) =>
-                        SUMMARIES.map(({ id, Component }) => (
+                        projectTiles(card).summaries.map(({ id, Component }) => (
                             <Suspense key={id} fallback={null}>
                                 <Component project={card} part={part} />
                             </Suspense>
@@ -440,7 +467,8 @@ function Workspace({
             </div>
         );
     }
-    if (level === 2) {
+    // full screen, and a project's one panel at level 1
+    if (level === 2 || tiles.side.length === 0) {
         return (
             <div className="flex h-full" style={PROJECT_ZOOM}>
                 <PanelTile
@@ -454,22 +482,25 @@ function Workspace({
             </div>
         );
     }
+    const { main } = tiles;
+    // the side column's tiles not minimized; without them, the main tile takes the whole width
+    const side = tiles.side.filter((tile) => !layout.minimized.includes(tile.id));
     return (
         <div className="flex h-full p-2" style={TILES_STYLE}>
             <PanelTile
-                panel={MAIN_TILE.panel}
+                panel={main}
                 project={project}
-                target={targetOf(MAIN_TILE.panel.id)}
-                selected={MAIN_TILE.panel === panel}
+                target={targetOf(main.id)}
+                selected={main === panel}
                 show={show}
                 findInFiles={findInFiles}
                 tile={MAIN_SIZE}
-                onZoomIn={() => zoom(2, MAIN_TILE.panel)}
-                onSelect={() => select(MAIN_TILE.panel)}
+                onZoomIn={() => zoom(2, main)}
+                onSelect={() => select(main)}
             />
             {side.length > 0 ? (
                 <SideColumn
-                    panels={SIDE_TILES}
+                    panels={tiles.side}
                     shown={side}
                     split={layout.split}
                     onSplit={onSplit}

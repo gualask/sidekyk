@@ -17,7 +17,8 @@ pub(crate) struct Texts {
     pub(crate) one_changed_file: &'static str,
     /// `{count}`: how many, `12` or `10000+`.
     pub(crate) changed_files: &'static str,
-    pub(crate) add_repository: &'static str,
+    /// The folder picker's title for a new project.
+    pub(crate) choose_folder: &'static str,
     /// `{name}`: the project's.
     pub(crate) locate: &'static str,
     pub(crate) export_notes: &'static str,
@@ -33,7 +34,7 @@ static ENGLISH: Texts = Texts {
     no_changes: "no changes",
     one_changed_file: "1 changed file",
     changed_files: "{count} changed files",
-    add_repository: "Add a repository",
+    choose_folder: "Choose the project's folder",
     locate: "Locate {name}",
     export_notes: "Export notes",
     export_file: "{name}-notes.md",
@@ -51,7 +52,7 @@ static ITALIAN: Texts = Texts {
     no_changes: "nessuna modifica",
     one_changed_file: "1 file modificato",
     changed_files: "{count} file modificati",
-    add_repository: "Aggiungi un repository",
+    choose_folder: "Scegli la cartella del progetto",
     locate: "Individua {name}",
     export_notes: "Esporta le note",
     export_file: "{name}-note.md",

@@ -2,12 +2,12 @@ import { hasErrorCode } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import { CardWell, WellMessage } from '@/shared/ui/CardWell';
 import { Stat } from '@/shared/ui/Stat';
 import { useRepositorySummary } from '../application/repository.queries';
 import { projectErrorMessage } from '../model/project-error';
 import { changedCount } from '../model/summary';
 import { BranchName } from './BranchName';
-import { CardWell, WellMessage } from './CardWell';
 import { TrackedLines } from './LineCounts';
 import { WeekOfCommits } from './WeekOfCommits';
 

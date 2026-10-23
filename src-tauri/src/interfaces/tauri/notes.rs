@@ -75,7 +75,7 @@ fn into_target<T>(
     let projects = app.state::<ProjectsState>();
     let moved = into_new_project(
         || {
-            let (project, _) = projects.update_with(app, |list| list.add(&name))?;
+            let (project, _) = projects.update_with(app, |list| list.add(&name, None))?;
             Ok(project_book(&project))
         },
         run,

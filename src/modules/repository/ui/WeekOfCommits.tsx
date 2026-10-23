@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { type Translator, useTranslation } from '@/shared/i18n';
+import { CardWell, WellMessage } from '@/shared/ui/CardWell';
 import { useCommitActivity } from '../application/repository.queries';
 import { ACTIVITY_DAYS, type ActivityDay, activityDays, activitySince } from '../model/activity';
-import { CardWell, WellMessage } from './CardWell';
 import { LineCounts } from './LineCounts';
 
 /** `Wed 14 Oct`, as the UI's language and the system's region write it. */

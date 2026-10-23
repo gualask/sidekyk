@@ -1,6 +1,6 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
-import type { ProjectList } from '@/modules/projects';
+import type { FolderChoice, ProjectList } from '@/modules/projects';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
@@ -30,6 +30,30 @@ const CLEAN_PROJECTS: ProjectInfo[] = [
 /** In `review`: a clone of the scenario's repository in a WSL distro, clean, of the same name. */
 const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
 
+/** In `review` and `clean`: a project without folder, notes on a topic. */
+const TOPIC_PROJECT: ProjectInfo = { id: 'b0000000000000a1', name: 'Thesis', folders: [] };
+
+/** The repository the folder picker finds, a folder inside it picked. */
+const PICKED_REPOSITORY = {
+    kind: 'usable',
+    path: '/Users/dev/Projects/api-gateway/src',
+    name: 'api-gateway',
+    location: { kind: 'local', root: '/Users/dev/Projects/api-gateway' },
+} as const satisfies FolderChoice;
+
+/**
+ * What the folder picker gives in turn, to see each answer of the New project dialog: a repository
+ * no project follows, the scenario's own repository, then a folder that is no repository.
+ */
+const PICKED_FOLDERS: readonly ((list: ProjectList) => FolderChoice)[] = [
+    () => PICKED_REPOSITORY,
+    (list) =>
+        list.projects.some((p) => p.id === FIXTURE_REPOSITORY.id)
+            ? { kind: 'inProject', id: FIXTURE_REPOSITORY.id, name: FIXTURE_REPOSITORY.name }
+            : { kind: 'notRepository' },
+    () => ({ kind: 'notRepository' }),
+];
+
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
 const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-prototype');
 
@@ -46,10 +70,13 @@ const HELPER_START_MS = 1500;
 
 function initialProjects(scenario: Scenario): ProjectInfo[] {
     if (scenario === 'no-repo') return [];
-    if (scenario === 'review') return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT];
+    if (scenario === 'review') {
+        return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT, TOPIC_PROJECT];
+    }
     if (scenario === 'problems') {
         return [FIXTURE_REPOSITORY, MISSING_PROJECT, STOPPED_PROJECT, GONE_PROJECT, NO_GIT_PROJECT];
     }
+    if (scenario === 'clean') return [FIXTURE_REPOSITORY, TOPIC_PROJECT];
     return [FIXTURE_REPOSITORY];
 }
 
@@ -168,6 +195,8 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
         });
     };
     const projectsChanged = new Set<() => void>();
+    // how many folders the picker gave, for the next answer of `PICKED_FOLDERS`
+    let pickedFolders = 0;
     // as the backend, notes need the Inbox or a project in the list, not its repository: a moved
     // one's stay
     const notes = fixtureNotes({
@@ -175,6 +204,7 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             if (book === INBOX_BOOK) {
                 return scenario === 'review' || scenario === 'clean' ? 'inbox' : 'empty';
             }
+            if (book === TOPIC_PROJECT.id) return 'topic';
             if (!scenarioData(book)) return 'empty';
             return large(book) ? 'large' : 'review';
         },
@@ -241,17 +271,37 @@ export function createBrowserRuntimePorts(scenario: Scenario): RuntimePorts {
             getProjects: async () => list,
             // no command line in the browser
             takeOpenedProject: async () => null,
-            addProject: async () => {
-                // the folder picked is not in a repository
-                if (scenario === 'problems') throw failure('not_a_repository');
-                const added =
-                    CLEAN_PROJECTS.find((p) => !list.projects.some((q) => q.id === p.id)) ??
-                    FIXTURE_REPOSITORY;
-                const known = list.projects.some((p) => p.id === added.id);
+            chooseProjectFolder: async () => {
+                const picked = PICKED_FOLDERS[pickedFolders % PICKED_FOLDERS.length](list);
+                pickedFolders += 1;
+                return picked;
+            },
+            // as `ProjectList::add`, then on screen; a folder is the one picked, checked again
+            createProject: async (name, folder) => {
+                if (folder !== null && folder !== PICKED_REPOSITORY.path) {
+                    throw failure('not_a_repository');
+                }
+                const location = folder === null ? null : PICKED_REPOSITORY.location;
+                if (
+                    location &&
+                    list.projects.some((p) => projectFolder(p)?.root === location.root)
+                ) {
+                    throw failure('unknown');
+                }
+                const made: ProjectInfo = {
+                    id: newProjectId(),
+                    name: name.trim(),
+                    folders: location ? [location] : [],
+                };
+                return update({ ...list, projects: [...list.projects, made], active: made.id });
+            },
+            renameProject: async (projectId, name) => {
+                const renamed = project(projectId);
                 return update({
                     ...list,
-                    projects: known ? list.projects : [...list.projects, added],
-                    active: added.id,
+                    projects: list.projects.map((p) =>
+                        p === renamed ? { ...p, name: name.trim() } : p,
+                    ),
                 });
             },
             activateProject: async (projectId) =>
