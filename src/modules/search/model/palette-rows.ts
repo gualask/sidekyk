@@ -14,6 +14,15 @@ export interface PalettePanel {
     shortcut: string;
 }
 
+/**
+ * The book of a list or note found at all projects, as its row names it: a project, or the Inbox
+ * (its one list never named).
+ */
+export interface PaletteBook {
+    name: string;
+    inbox: boolean;
+}
+
 /** Something the palette opens. */
 export type PaletteItem =
     | {
@@ -39,13 +48,22 @@ export type PaletteItem =
           label: string;
           highlights: Highlight[];
       }
-    | { kind: 'list'; id: string; label: string; highlights: Highlight[] }
+    | {
+          kind: 'list';
+          book: string;
+          id: string;
+          /** Its project's name at all projects: the row's hint. */
+          hint: string | null;
+          label: string;
+          highlights: Highlight[];
+      }
     | {
           kind: 'note';
+          book: string;
           id: string;
           list: string;
-          /** Its list's name: the row's hint. */
-          listName: string;
+          /** Its list's name, in its project's at all projects, or the Inbox's: the row's hint. */
+          hint: string;
           /** Its first line, or the part of it where the text typed is. */
           label: string;
           highlights: Highlight[];
@@ -78,13 +96,15 @@ interface Ranked {
  * The items, in the order the list shows them, and the rows that show them. With nothing typed,
  * where to go under its title (the projects, or the panels); typed, one list by score, the best
  * two of each kind first, equal scores a name chosen (project, panel, list), then a file, then a
- * note.
+ * note. `books` names the books of the lists and notes found at all projects; null inside a
+ * project, whose own they all are.
  */
 export function paletteRows(
     results: SearchResults,
     panels: readonly PalettePanel[],
     projectName: string | null,
     typed: boolean,
+    books: ((book: string) => PaletteBook) | null,
     { t }: Translator,
 ): { items: PaletteItem[]; rows: PaletteRow[] } {
     const projects: Ranked[] = results.projects.map((project) => ({
@@ -116,15 +136,28 @@ export function paletteRows(
             : [];
     });
     const lists: Ranked[] = results.lists.map((list) => ({
-        item: { kind: 'list', id: list.id, label: list.name, highlights: list.highlights },
+        item: {
+            kind: 'list',
+            book: list.book,
+            id: list.id,
+            hint: books ? books(list.book).name : null,
+            label: list.name,
+            highlights: list.highlights,
+        },
         score: list.score,
     }));
+    const noteHint = (book: string, list: string) => {
+        const where = books?.(book);
+        if (!where) return list;
+        return where.inbox ? where.name : t('palette.noteIn', { list, project: where.name });
+    };
     const notes: Ranked[] = results.notes.map((note) => ({
         item: {
             kind: 'note',
+            book: note.book,
             id: note.id,
             list: note.list,
-            listName: note.listName,
+            hint: noteHint(note.book, note.listName),
             label: note.snippet?.text ?? note.title,
             highlights: note.snippet?.highlights ?? note.highlights,
         },

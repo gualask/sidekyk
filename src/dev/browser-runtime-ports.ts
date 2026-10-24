@@ -289,14 +289,17 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         dropProject: removeProject,
         projectsChanged: tellProjectsChanged,
     });
-    // as the backend, the palette searches the notes of the project on screen
+    // as the backend, the palette searches the notes of the project on screen, or at all projects
+    // those of every book, the Inbox first
     const searchedNotes = (projectId: string | null) => {
-        if (!projectId) return null;
-        try {
-            return notes.peek(projectId);
-        } catch {
-            return null;
-        }
+        const books = projectId ? [projectId] : [INBOX_BOOK, ...list.projects.map((p) => p.id)];
+        return books.flatMap((book) => {
+            try {
+                return [[book, notes.peek(book)] as const];
+            } catch {
+                return [];
+            }
+        });
     };
 
     // the versions a diff compares, from the diffs and files served below

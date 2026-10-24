@@ -28,8 +28,8 @@ Code's multi-root workspaces). High level; details when it is built.
   `../features/notes.md`). Every note can be moved to a project and back (the Move dialog, built
   2026-10-23, `../features/notes.md`). Projects without folder
   are made by the user (New project, built 2026-10-23, `../features/projects.md`).
-- Notes feel global without being so: the Inbox, moving notes, `⌘K` at level 0 finding notes of
-  every project (today only projects).
+- Notes feel global without being so: the Inbox, moving notes, `⌘K` at level 0 finding the lists
+  and notes of every project and of the Inbox (built 2026-10-24, `../features/search.md`).
 - Id: made, not derived from a location (built 2026-10-22, `../features/projects.md`); Locate…
   changes a folder, not the project.
 - One folder first; several folders (VS Code's multi-root workspace) after, the model shaped for

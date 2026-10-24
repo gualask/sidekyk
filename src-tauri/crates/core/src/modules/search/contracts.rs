@@ -102,10 +102,12 @@ pub struct ContentEnd {
     pub cancelled: bool,
 }
 
-/// A list of notes of the project searched.
+/// A list of notes of the project searched, or of any project at all projects.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListMatch {
+    /// Its book: its project's id.
+    pub book: String,
     pub id: String,
     pub name: String,
     /// As `ProjectMatch::score`.
@@ -122,10 +124,12 @@ pub struct Snippet {
     pub highlights: Vec<Highlight>,
 }
 
-/// A note of the project searched, holding every word typed.
+/// A note of the project searched, or of any book at all projects, holding every word typed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteMatch {
+    /// Its book: its project's id, or `INBOX_BOOK`.
+    pub book: String,
     pub id: String,
     pub list: String,
     pub list_name: String,
@@ -139,9 +143,10 @@ pub struct NoteMatch {
     pub snippet: Option<Snippet>,
 }
 
-/// The matches, best first in each group. Projects only when no project is searched, its own
-/// files, lists and notes then: one leaves a project by zooming out, not by searching. With
-/// nothing typed: every project or panel, no files, lists or notes.
+/// The matches, best first in each group. Projects only when no project is searched, with the
+/// lists and notes of every book; a project's own files, lists and notes when one is: one leaves a
+/// project by zooming out, not by searching. With nothing typed: every project or panel, no files,
+/// lists or notes.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResults {
@@ -210,12 +215,14 @@ mod tests {
             ],
             more_files: 2,
             lists: vec![ListMatch {
+                book: "/r".into(),
                 id: "l1".into(),
                 name: "Release".into(),
                 score: 40,
                 highlights: vec![[0, 2]],
             }],
             notes: vec![NoteMatch {
+                book: "inbox".into(),
                 id: "n1".into(),
                 list: "l1".into(),
                 list_name: "Release".into(),
@@ -244,8 +251,15 @@ mod tests {
                     { "path": "README.md", "mark": null, "score": 0, "highlights": [] }
                 ],
                 "moreFiles": 2,
-                "lists": [{ "id": "l1", "name": "Release", "score": 40, "highlights": [[0, 2]] }],
+                "lists": [{
+                    "book": "/r",
+                    "id": "l1",
+                    "name": "Release",
+                    "score": 40,
+                    "highlights": [[0, 2]]
+                }],
                 "notes": [{
+                    "book": "inbox",
                     "id": "n1",
                     "list": "l1",
                     "listName": "Release",

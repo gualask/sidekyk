@@ -1,9 +1,12 @@
-//! The palette's notes and lists, in the project searched: lists by name (fuzzy), notes by the
-//! words typed, anywhere in them (fuzzy letters over a whole note would match almost any).
+//! The palette's notes and lists, in the project searched or in every book at all projects:
+//! lists by name (fuzzy), notes by the words typed, anywhere in them (fuzzy letters over a whole
+//! note would match almost any).
+
+use std::cmp::Reverse;
 
 use super::contracts::{ListMatch, NoteMatch, Snippet};
 use super::rank::{Ranker, Texts};
-use crate::modules::notes::{note_title as title, Note, NoteList};
+use crate::modules::notes::{note_title as title, Book, BookNotes, Note, NoteList};
 
 /// At most this many notes go back.
 pub(super) const NOTE_LIMIT: usize = 50;
@@ -61,8 +64,9 @@ fn first_run(matched: &[u32]) -> Option<(usize, usize)> {
     Some((at as usize, len))
 }
 
-fn note_match(note: &Note, lists: &[NoteList], score: u32) -> NoteMatch {
+fn note_match(book: &str, note: &Note, lists: &[NoteList], score: u32) -> NoteMatch {
     NoteMatch {
+        book: book.into(),
         id: note.id.clone(),
         list: note.list.clone(),
         list_name: lists
@@ -77,20 +81,62 @@ fn note_match(note: &Note, lists: &[NoteList], score: u32) -> NoteMatch {
     }
 }
 
-/// The lists whose names match, and the notes holding every word typed, best first, equal ones
-/// open before done, in the user's order. A note shows its first line, with the words in it, or
-/// else the part around the first word.
+/// The lists of a book whose names match, and the notes holding every word typed, best first,
+/// equal ones open before done, in the user's order. A note shows its first line, with the words
+/// in it, or else the part around the first word.
 pub fn search_notes(
     query: &str,
+    book: &str,
     lists: &[NoteList],
     notes: &[Note],
 ) -> (Vec<ListMatch>, Vec<NoteMatch>) {
+    let (lists, notes) = found_in(query, book, lists, notes);
+    (lists, notes.into_iter().map(|(note, _)| note).collect())
+}
+
+/// The lists and notes of every book that match, best first: the lists of the projects (the
+/// Inbox's one is never shown), and the best `NOTE_LIMIT` notes of all. Equal scores: open notes
+/// before done ones, then the books' order (the Inbox first, then the projects as their cards),
+/// then each book's own.
+pub fn search_every_book(query: &str, books: &[BookNotes]) -> (Vec<ListMatch>, Vec<NoteMatch>) {
+    let mut lists = Vec::new();
+    let mut notes = Vec::new();
+    for (place, found) in books.iter().enumerate() {
+        let (book_lists, book_notes) = found_in(query, found.book.key(), found.lists, found.notes);
+        if !matches!(found.book, Book::Inbox) {
+            lists.extend(book_lists);
+        }
+        // a book's best `NOTE_LIMIT` hold all of its notes among the best of all
+        notes.extend(
+            book_notes
+                .into_iter()
+                .enumerate()
+                .map(|(rank, (note, done))| (note, done, place, rank)),
+        );
+    }
+    // stable: equal lists keep the books' order
+    lists.sort_by_key(|list| Reverse(list.score));
+    notes.sort_unstable_by_key(|&(ref note, done, place, rank)| {
+        (Reverse(note.score), done, place, rank)
+    });
+    notes.truncate(NOTE_LIMIT);
+    (lists, notes.into_iter().map(|(note, ..)| note).collect())
+}
+
+/// `search_notes`, each note with whether it is done.
+fn found_in(
+    query: &str,
+    book: &str,
+    lists: &[NoteList],
+    notes: &[Note],
+) -> (Vec<ListMatch>, Vec<(NoteMatch, bool)>) {
     let mut names = Ranker::new(query, Texts::Names);
     let list_names: Vec<&str> = lists.iter().map(|l| l.name.as_str()).collect();
     let (ranked, _) = names.rank(&list_names, usize::MAX);
     let list_matches = ranked
         .into_iter()
         .map(|r| ListMatch {
+            book: book.into(),
             id: lists[r.index].id.clone(),
             name: lists[r.index].name.clone(),
             score: r.score,
@@ -126,7 +172,7 @@ pub fn search_notes(
         .into_iter()
         .map(|found| {
             let note = ordered[found.index];
-            let mut found = note_match(note, lists, found.score);
+            let mut found = note_match(book, note, lists, found.score);
             if let Some(highlights) = words.highlights(&found.title) {
                 found.highlights = highlights;
             } else if let Some((at, len)) = words.matched(&note.text).as_deref().and_then(first_run)
@@ -138,7 +184,7 @@ pub fn search_notes(
                 }
                 found.snippet = Some(part);
             }
-            found
+            (found, note.done.is_some())
         })
         .collect();
     (list_matches, matches)
@@ -147,7 +193,7 @@ pub fn search_notes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::notes::NoteList;
+    use crate::modules::notes::{NoteList, INBOX_BOOK};
 
     fn note(id: &str, position: f64, text: &str, done: Option<u64>) -> Note {
         Note {
@@ -168,22 +214,26 @@ mod tests {
 
     impl Notes {
         fn search(&self, query: &str) -> (Vec<ListMatch>, Vec<NoteMatch>) {
-            search_notes(query, &self.lists, &self.notes)
+            search_notes(query, "/dev/shop", &self.lists, &self.notes)
         }
+    }
+
+    fn notes_lists() -> Vec<NoteList> {
+        vec![
+            NoteList {
+                id: "l1".into(),
+                name: "Architecture".into(),
+            },
+            NoteList {
+                id: "l2".into(),
+                name: "Release".into(),
+            },
+        ]
     }
 
     fn notes() -> Notes {
         Notes {
-            lists: vec![
-                NoteList {
-                    id: "l1".into(),
-                    name: "Architecture".into(),
-                },
-                NoteList {
-                    id: "l2".into(),
-                    name: "Release".into(),
-                },
-            ],
+            lists: notes_lists(),
             notes: vec![
                 note("b", 1.0, "Wide scrollbar setting", None),
                 note(
@@ -253,6 +303,88 @@ mod tests {
     fn one_letter_is_not_looked_for_inside_notes() {
         let (_, found) = notes().search("q");
         assert!(found.iter().all(|n| n.snippet.is_none()));
+    }
+
+    /// The books as the store hands them over.
+    fn books<'a>(books: &'a [(Book, &'a Notes)]) -> Vec<BookNotes<'a>> {
+        books
+            .iter()
+            .map(|(book, found)| BookNotes {
+                book,
+                lists: &found.lists,
+                notes: &found.notes,
+            })
+            .collect()
+    }
+
+    fn project(id: &str) -> Book {
+        Book::Project {
+            id: id.into(),
+            name: id.into(),
+        }
+    }
+
+    #[test]
+    fn every_book_is_searched_equal_notes_open_first_in_the_books_order() {
+        let same = |notes: Vec<Note>| Notes {
+            lists: notes_lists(),
+            notes,
+        };
+        let inbox = same(vec![note("i", 0.0, "Watcher plan", None)]);
+        let shop = same(vec![
+            note("d", 0.0, "Watcher plan", Some(5)),
+            note("a", 1.0, "Watcher plan", None),
+        ]);
+        let docs = same(vec![note("x", 0.0, "Watcher plan", None)]);
+        let all = [
+            (Book::Inbox, &inbox),
+            (project("shop"), &shop),
+            (project("docs"), &docs),
+        ];
+        let (_, found) = search_every_book("watcher", &books(&all));
+        let found: Vec<(&str, &str)> = found
+            .iter()
+            .map(|n| (n.book.as_str(), n.id.as_str()))
+            .collect();
+        assert_eq!(
+            found,
+            [
+                (INBOX_BOOK, "i"),
+                ("shop", "a"),
+                ("docs", "x"),
+                ("shop", "d")
+            ]
+        );
+    }
+
+    #[test]
+    fn every_book_offers_the_lists_of_projects_not_the_inbox_one() {
+        let shop = notes();
+        let all = [(Book::Inbox, &shop), (project("shop"), &shop)];
+        let (lists, _) = search_every_book("arch", &books(&all));
+        let lists: Vec<(&str, &str)> = lists
+            .iter()
+            .map(|l| (l.book.as_str(), l.name.as_str()))
+            .collect();
+        assert_eq!(lists, [("shop", "Architecture")]);
+    }
+
+    #[test]
+    fn every_book_gives_the_best_notes_of_all() {
+        let crowded = |prefix: &str| Notes {
+            lists: notes_lists(),
+            notes: (0..NOTE_LIMIT)
+                .map(|i| note(&format!("{prefix}{i}"), i as f64, "a plain note", None))
+                .collect(),
+        };
+        let plain = crowded("p");
+        let mut best = crowded("b");
+        best.notes[NOTE_LIMIT - 1].text = "note".into();
+        let all = [(Book::Inbox, &plain), (project("shop"), &best)];
+        let (_, found) = search_every_book("note", &books(&all));
+        assert_eq!(found.len(), NOTE_LIMIT);
+        // the note that is the word typed alone, last of the last book, comes first
+        assert_eq!(found[0].id, format!("b{}", NOTE_LIMIT - 1));
     }
 
     #[test]

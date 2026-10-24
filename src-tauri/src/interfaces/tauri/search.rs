@@ -8,16 +8,17 @@ use super::notes::project_book;
 use super::repository::on_project;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
-use sidekyk_core::modules::notes::NotesStore;
+use sidekyk_core::modules::notes::{Book, NotesStore};
 use sidekyk_core::modules::search::{
-    self, search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
+    self, search_every_book, search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
 };
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
-/// What was typed in the palette, ranked against the projects, the panels and the files, note
-/// lists and notes of the project on screen. Git runs only to list the files, when its tree is not
-/// read yet; the notes are read from disk only when not already in memory.
+/// What was typed in the palette, ranked against the projects and the note lists and notes of the
+/// Inbox and every project at all projects, or the panels and the files, note lists and notes of
+/// the project on screen. Git runs only to list the files, when its tree is not read yet; the
+/// notes are read from disk only when not already in memory.
 pub(crate) async fn search(
     app: tauri::AppHandle,
     request: SearchRequest,
@@ -25,17 +26,29 @@ pub(crate) async fn search(
     blocking("search", app, move |app| {
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
-        let query = request.query.clone();
-        Ok(app.state::<ProjectsState>().search(&request, |project| {
-            notes
-                .with_notes(files.inner(), &project_book(project), |lists, found| {
-                    search_notes(&query, lists, found)
+        let query = request.query.as_str();
+        Ok(app.state::<ProjectsState>().search(
+            &request,
+            |project| {
+                notes
+                    .with_notes(files.inner(), &project_book(project), |lists, found| {
+                        search_notes(query, &project.id, lists, found)
+                    })
+                    .inspect_err(
+                        |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
+                    )
+                    .ok()
+            },
+            |projects| {
+                // the Inbox first: equal scores keep the books' order
+                let books: Vec<Book> = std::iter::once(Book::Inbox)
+                    .chain(projects.iter().map(project_book))
+                    .collect();
+                notes.with_every_book(files.inner(), &books, |found| {
+                    search_every_book(query, found)
                 })
-                .inspect_err(
-                    |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
-                )
-                .ok()
-        }))
+            },
+        ))
     })
     .await
 }

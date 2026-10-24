@@ -1,4 +1,4 @@
-import { doneNotes, noteTitle, openNotes, type ProjectNotes } from '@/modules/notes';
+import { doneNotes, INBOX_BOOK, noteTitle, openNotes, type ProjectNotes } from '@/modules/notes';
 import type { ChangedFile } from '@/modules/repository';
 import type {
     ContentEnd,
@@ -50,6 +50,8 @@ function score(highlights: readonly Highlight[]): number {
 
 /** As the backend's `FILE_LIMIT`. */
 const FILE_LIMIT = 500;
+/** As the backend's `NOTE_LIMIT`. */
+const NOTE_LIMIT = 50;
 
 /** As the backend's `marks_by_path`: an edit over a new file over a deletion. */
 function marksByPath(changed: readonly ChangedFile[]): Map<string, ChangeMark> {
@@ -69,11 +71,15 @@ function marksByPath(changed: readonly ChangedFile[]): Map<string, ChangeMark> {
     return marks;
 }
 
+/**
+ * As the backend's `search`: `books` are the notes searched, by book: the project's on screen, or
+ * every book at all projects (the Inbox first).
+ */
 export function fixtureSearch(
     request: SearchRequest,
     projects: readonly ProjectInfo[],
     files: { paths: readonly string[]; changed: readonly ChangedFile[] } | null,
-    notes: ProjectNotes | null,
+    books: readonly (readonly [string, ProjectNotes])[],
 ): SearchResults {
     const query = request.query.trim();
     const results: SearchResults = {
@@ -96,7 +102,12 @@ export function fixtureSearch(
         const highlights = match(title, query);
         if (highlights) results.panels.push({ index, score: score(highlights), highlights });
     });
-    if (query && notes) searchNotes(query, notes, results);
+    if (query) {
+        for (const [book, notes] of books) searchNotes(book, query, notes, results);
+        // as `search_every_book`: the best of all, equal ones in the books' order (a stable sort)
+        results.lists.sort((a, b) => b.score - a.score);
+        results.notes = results.notes.sort((a, b) => b.score - a.score).slice(0, NOTE_LIMIT);
+    }
     if (!query || !files) return results;
     const marks = marksByPath(files.changed);
     // a deleted file is not in the tree, but Changes lists it
@@ -128,13 +139,16 @@ export function fixtureRankNames(query: string, names: readonly string[]): numbe
 }
 
 /**
- * As the backend's `search_notes`: lists by name, notes holding every word typed (two letters at
- * least), by first line or with the part around the first word. Scored as the files, best first.
+ * As the backend's `search_notes`: lists by name (none of the Inbox, whose one list is never
+ * shown), notes holding every word typed (two letters at least), by first line or with the part
+ * around the first word. Scored as the files, best first.
  */
-function searchNotes(query: string, notes: ProjectNotes, results: SearchResults) {
-    for (const list of notes.lists) {
+function searchNotes(book: string, query: string, notes: ProjectNotes, results: SearchResults) {
+    for (const list of book === INBOX_BOOK ? [] : notes.lists) {
         const highlights = match(list.name, query);
-        if (highlights) results.lists.push({ ...list, score: score(highlights), highlights });
+        if (highlights) {
+            results.lists.push({ book, ...list, score: score(highlights), highlights });
+        }
     }
     if (query.length < 2) return;
     const listName = (id: string) => notes.lists.find((list) => list.id === id)?.name ?? '';
@@ -150,6 +164,7 @@ function searchNotes(query: string, notes: ProjectNotes, results: SearchResults)
         const title = noteTitle(note.text);
         const inTitle = words(title, query);
         const base = {
+            book,
             id: note.id,
             list: note.list,
             listName: listName(note.list),

@@ -46,8 +46,10 @@ interface FileMatch {
     highlights: Highlight[];
 }
 
-/** A list of notes of the project searched. */
+/** A list of notes of the project searched, or of any project at all projects. */
 interface ListMatch {
+    /** Its book: its project's id. */
+    book: string;
     id: string;
     name: string;
     /** As `ProjectMatch.score`. */
@@ -62,8 +64,10 @@ interface Snippet {
     highlights: Highlight[];
 }
 
-/** A note of the project searched, holding every word typed. */
+/** A note of the project searched, or of any book at all projects, holding every word typed. */
 interface NoteMatch {
+    /** Its book: its project's id, or the Inbox's. */
+    book: string;
     id: string;
     list: string;
     listName: string;
@@ -78,9 +82,9 @@ interface NoteMatch {
 }
 
 /**
- * The matches, best first in each group. Projects only when no project is searched, its own
- * files, lists and notes then. With nothing typed: every project or panel, no files, lists or
- * notes.
+ * The matches, best first in each group. Projects only when no project is searched, with the
+ * lists and notes of every book; a project's own files, lists and notes when one is. With nothing
+ * typed: every project or panel, no files, lists or notes.
  */
 export interface SearchResults {
     projects: ProjectMatch[];

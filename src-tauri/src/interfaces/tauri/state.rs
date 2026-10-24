@@ -114,11 +114,12 @@ impl ProjectsState {
     /// The palette's matches: the projects, the panels the frontend names, and the files of the
     /// project asked for, ranked where its files are kept: none while its WSL distro is stopped,
     /// which only its Start button starts. Its notes are `notes_of`'s, asked only for a project of
-    /// the list.
+    /// the list; at all projects, those of every book are `every_notes`', given the projects.
     pub(crate) fn search(
         &self,
         request: &SearchRequest,
         notes_of: impl FnOnce(&Project) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
+        every_notes: impl FnOnce(&[Project]) -> (Vec<ListMatch>, Vec<NoteMatch>),
     ) -> SearchResults {
         let list = self.list();
         let files_of = |id: &str| {
@@ -128,7 +129,9 @@ impl ProjectsState {
                 .search_files(&info, &request.query)
         };
         let notes_of = |id: &str| list.find(id).ok().and_then(notes_of);
-        search::search(request, &list.projects, files_of, notes_of)
+        search::search(request, &list.projects, files_of, notes_of, || {
+            every_notes(&list.projects)
+        })
     }
 
     /// Replaces the list at startup, before anything is watched.

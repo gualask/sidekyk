@@ -29,7 +29,8 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   line saying what it is for, the field on top (as a list's, `⌘N` at level 0), the notes below,
   newest first; empty, one muted line. A note there is edited and copied as any card; ⋯ moves or
   deletes it (Undo). No lists, done or order: a note leaves by being moved or deleted. Resized as a
-  sidebar (`workspace.md`).
+  sidebar (`workspace.md`). `⌘K` at level 0 finds its notes with every project's; one picked is
+  scrolled to and lit up in the column (`search.md`).
 - Move (2026-10-23): one dialog, from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). Title
   "Move note" or "Move list", the note's first line or the list's name under it, one field. A
   note of the Inbox goes to a project; a note of a project to the Inbox or a project, its own

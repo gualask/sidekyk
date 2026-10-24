@@ -13,6 +13,7 @@ import { MoveHost } from './MoveHost';
 import { NoteCard } from './NoteCard';
 import { useCardRows } from './use-card-rows';
 import { useCardStates } from './use-card-states';
+import { useRevealedNote } from './use-revealed-note';
 
 /**
  * The column's width until first dragged, a share of the window, and the least it takes: the
@@ -29,10 +30,15 @@ const INBOX_WIDTH = { initial: '40%', min: 320 };
 export function InboxColumn({
     focusComposer,
     onComposerFocused,
+    reveal,
+    onRevealed,
 }: {
     /** The field to write in takes the focus (`⌘N` at all projects). */
     focusComposer: boolean;
     onComposerFocused: () => void;
+    /** A note to bring into view, and light up for a moment (one found in the palette). */
+    reveal: string | null;
+    onRevealed: () => void;
 }) {
     const { data: notes, error } = useNotes(INBOX_BOOK);
     const actions = useNoteActions(INBOX_BOOK);
@@ -50,6 +56,13 @@ export function InboxColumn({
         [notes, list],
     );
     const rows = useCardRows(shown.length, (index) => shown[index].id);
+    // once the notes are read: before, the note asked for has no row yet
+    const flash = useRevealedNote({
+        reveal: notes ? reveal : null,
+        index: shown.findIndex((note) => note.id === reveal),
+        virtualizer: rows.virtualizer,
+        onRevealed,
+    });
 
     return (
         <>
@@ -86,7 +99,7 @@ export function InboxColumn({
                                 return (
                                     <NoteCard
                                         note={note}
-                                        flash={false}
+                                        flash={flash === note.id}
                                         actions={actions}
                                         {...cardState(note)}
                                         onDone={null}

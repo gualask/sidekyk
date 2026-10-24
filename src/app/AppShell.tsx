@@ -1,5 +1,6 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import {
+    INBOX_BOOK,
     InboxColumn,
     loadRemoveProjectDialog,
     newNoteTarget,
@@ -27,7 +28,12 @@ import {
     useRepositoryChangeSubscription,
     useShownFile,
 } from '@/modules/repository';
-import { loadCommandPalette, type PaletteActions, type PaletteMode } from '@/modules/search';
+import {
+    loadCommandPalette,
+    type PaletteActions,
+    type PaletteBook,
+    type PaletteMode,
+} from '@/modules/search';
 import { loadSettingsDialog, useSettingsWhenRead } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
@@ -148,6 +154,11 @@ export function AppShell() {
     // the Inbox's field takes the focus (`⌘N` at all projects)
     const [focusInbox, setFocusInbox] = useState(false);
     const inboxFocused = useCallback(() => setFocusInbox(false), []);
+    // an Inbox note found in the palette, brought into view in its column
+    const [inboxNote, setInboxNote] = useState<string | null>(null);
+    const inboxRevealed = useCallback(() => setInboxNote(null), []);
+    // a project's note found at all projects: shown in Notes once that project's panels show
+    const [waitingNote, setWaitingNote] = useState<Asked | null>(null);
     // how the project lays out its tiles: which wait in the top bar, the side column's split
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
     // a tile minimized is not selected: the main one is, which is never minimized
@@ -178,6 +189,8 @@ export function AppShell() {
      * asks the panel full screen to show something; any other move leaves the panels as they are.
      */
     const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
+        // back at all projects, a note that waited for its project is no longer asked for
+        if (next === 0) setWaitingNote(null);
         const asked = nextTarget && project ? askedOf(project, nextPanel.id, nextTarget) : null;
         if (next === level && nextPanel === panel) {
             if (asked) setTarget(asked);
@@ -196,14 +209,14 @@ export function AppShell() {
             changeLayout((current) => ({ ...current, minimized: [...current.minimized, tile.id] }));
             if (panel === tile && tiles) setPanel(tiles.main);
         });
-    const restore = (tile: PanelDefinition) =>
-        zoomTransition(() => {
-            changeLayout((current) => ({
-                ...current,
-                minimized: current.minimized.filter((id) => id !== tile.id),
-            }));
-            setPanel(tile);
-        });
+    const unminimize = (tile: PanelDefinition) => {
+        changeLayout((current) => ({
+            ...current,
+            minimized: current.minimized.filter((id) => id !== tile.id),
+        }));
+        setPanel(tile);
+    };
+    const restore = (tile: PanelDefinition) => zoomTransition(() => unminimize(tile));
 
     // a panel shows something in another: the other tile, selected (back from the top bar if it
     // waited there), or full screen in place of the first
@@ -270,9 +283,49 @@ export function AppShell() {
                     : changesPanel.id,
                 fileTarget(path, null, find ?? null),
             ),
-        // in Notes, at the same zoom
-        openNotes: (list, note) => show(notesPanel.id, notesTarget(list, note)),
+        // in Notes, at the same zoom; at all projects, an Inbox note in its column, a project's
+        // in its panels, Notes selected
+        openNotes: (book, list, note) => {
+            if (book === INBOX_BOOK) setInboxNote(note);
+            else if (level > 0 && book === project?.id) {
+                show(notesPanel.id, notesTarget(list, note));
+            } else {
+                setWaitingNote({
+                    project: book,
+                    panel: notesPanel.id,
+                    target: notesTarget(list, note),
+                });
+                activate(book);
+                zoom(1, notesPanel);
+            }
+        },
     };
+    // the project activated and its panels shown (a folder's kind read): the panel back from the
+    // top bar within the zoom still running, not in a transition of its own, which would skip it
+    const showWaitingNote = useEffectEvent((waiting: Asked) => {
+        setWaitingNote(null);
+        const tile = panelById(waiting.panel);
+        if (tile && layout.minimized.includes(tile.id)) unminimize(tile);
+        setTarget(waiting);
+    });
+    const noteReady =
+        waitingNote && level > 0 && tiles && project?.id === waitingNote.project
+            ? waitingNote
+            : null;
+    useEffect(() => {
+        if (noteReady) showWaitingNote(noteReady);
+    }, [noteReady]);
+    // the books of the lists and notes the palette finds at all projects
+    const paletteBook = useCallback(
+        (book: string): PaletteBook =>
+            book === INBOX_BOOK
+                ? { name: i18n.t('inbox.title'), inbox: true }
+                : {
+                      name: projects.data?.projects.find((p) => p.id === book)?.name ?? '',
+                      inbox: false,
+                  },
+        [projects.data, i18n],
+    );
 
     // every project has its panels (level 1), whatever its folder turns out to be
     const zoomIn = () => {
@@ -373,6 +426,8 @@ export function AppShell() {
                         onRemove={setRemoving}
                         focusInbox={focusInbox}
                         onInboxFocused={inboxFocused}
+                        inboxNote={inboxNote}
+                        onInboxNoteRevealed={inboxRevealed}
                     />
                 ) : null}
             </main>
@@ -410,6 +465,7 @@ export function AppShell() {
                         stoppedDistro={stoppedDistro}
                         currentFile={palette.open ? shownFile() : null}
                         panels={palettePanels}
+                        books={paletteBook}
                         actions={paletteActions}
                     />
                 </Suspense>
@@ -452,6 +508,8 @@ function Workspace({
     onRemove,
     focusInbox,
     onInboxFocused,
+    inboxNote,
+    onInboxNoteRevealed,
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
@@ -473,6 +531,9 @@ function Workspace({
     /** The Inbox's field takes the focus. */
     focusInbox: boolean;
     onInboxFocused: () => void;
+    /** An Inbox note to bring into view. */
+    inboxNote: string | null;
+    onInboxNoteRevealed: () => void;
 }) {
     const targetOf = (id: string) =>
         target?.project === project?.id && target?.panel === id ? target.target : null;
@@ -480,7 +541,12 @@ function Workspace({
     if (!project || level === 0) {
         return (
             <div className="flex h-full">
-                <InboxColumn focusComposer={focusInbox} onComposerFocused={onInboxFocused} />
+                <InboxColumn
+                    focusComposer={focusInbox}
+                    onComposerFocused={onInboxFocused}
+                    reveal={inboxNote}
+                    onRevealed={onInboxNoteRevealed}
+                />
                 <ProjectsOverview
                     list={list}
                     onOpen={() => zoom(1)}

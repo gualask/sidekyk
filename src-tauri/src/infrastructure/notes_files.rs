@@ -295,12 +295,14 @@ mod tests {
                             .with_notes(&files, &book, |lists, notes| {
                                 sidekyk_core::modules::search::search_notes(
                                     &request.query,
+                                    root,
                                     lists,
                                     notes,
                                 )
                             })
                             .ok()
                     },
+                    Default::default,
                 );
             })
         );

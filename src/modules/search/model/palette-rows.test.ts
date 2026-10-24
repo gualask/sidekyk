@@ -24,6 +24,7 @@ const file = (path: string, score: number): SearchResults['files'][number] => ({
 });
 
 const note = (id: string, score: number): SearchResults['notes'][number] => ({
+    book: '/dev/shop',
     id,
     list: 'l1',
     listName: 'General',
@@ -51,6 +52,7 @@ describe('paletteRows', () => {
             [],
             null,
             false,
+            null,
             en,
         );
         expect(projects.rows).toEqual([
@@ -63,6 +65,7 @@ describe('paletteRows', () => {
             PANELS,
             'shop',
             false,
+            null,
             en,
         );
         expect(panels.rows.map((row) => (row.kind === 'group' ? row.label : row.kind))).toEqual([
@@ -82,6 +85,7 @@ describe('paletteRows', () => {
             PANELS,
             'shop',
             true,
+            null,
             en,
         );
         expect(items.map((item) => item.label)).toEqual(['db/seed.sql', 'Note a']);
@@ -102,6 +106,7 @@ describe('paletteRows', () => {
             PANELS,
             'shop',
             true,
+            null,
             en,
         );
         expect(items.map((item) => item.label)).toEqual([
@@ -120,12 +125,15 @@ describe('paletteRows', () => {
                 ...NONE,
                 panels: [{ index: 0, score: 50, highlights: [] }],
                 files: [file('changes.md', 50)],
-                lists: [{ id: 'l1', name: 'Changes log', score: 50, highlights: [] }],
+                lists: [
+                    { book: '/dev/shop', id: 'l1', name: 'Changes log', score: 50, highlights: [] },
+                ],
                 notes: [note('a', 50)],
             },
             PANELS,
             'shop',
             true,
+            null,
             en,
         );
         expect(items.map((item) => item.kind)).toEqual(['panel', 'list', 'file', 'note']);
@@ -146,14 +154,57 @@ describe('paletteRows', () => {
             PANELS,
             'shop',
             true,
+            null,
             en,
         );
         expect(items[0]).toMatchObject({ label: 'Bump version', highlights: [[0, 4]] });
         expect(items[1]).toMatchObject({
             label: '…the downloads…',
             highlights: [[5, 14]],
-            listName: 'General',
+            hint: 'General',
         });
+    });
+
+    it('at all projects, names the book of a list or note found', () => {
+        const books = (book: string) =>
+            book === 'inbox' ? { name: 'Inbox', inbox: true } : { name: 'shop', inbox: false };
+        const { items } = paletteRows(
+            {
+                ...NONE,
+                lists: [
+                    { book: '/dev/shop', id: 'l2', name: 'Release', score: 90, highlights: [] },
+                ],
+                notes: [note('a', 80), { ...note('b', 70), book: 'inbox' }],
+            },
+            [],
+            null,
+            true,
+            books,
+            en,
+        );
+        expect(
+            items.map((item) => (item.kind === 'note' || item.kind === 'list' ? item.hint : null)),
+        ).toEqual(['shop', 'General in shop', 'Inbox']);
+        // inside a project, its own: a note's list alone, nothing for a list
+        const inside = paletteRows(
+            {
+                ...NONE,
+                lists: [
+                    { book: '/dev/shop', id: 'l2', name: 'Release', score: 90, highlights: [] },
+                ],
+                notes: [note('a', 80)],
+            },
+            [],
+            'shop',
+            true,
+            null,
+            en,
+        );
+        expect(
+            inside.items.map((item) =>
+                item.kind === 'note' || item.kind === 'list' ? item.hint : null,
+            ),
+        ).toEqual([null, 'General']);
     });
 
     it('names a panel by its definition and skips one it does not know', () => {
@@ -168,6 +219,7 @@ describe('paletteRows', () => {
             PANELS,
             'shop',
             true,
+            null,
             en,
         );
         expect(items).toEqual([

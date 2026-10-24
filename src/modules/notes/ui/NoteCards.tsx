@@ -1,5 +1,5 @@
 import { IconChevronDown } from '@tabler/icons-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { NoteActions } from '../application/notes.queries';
 import { doneNotes, openNotes } from '../model/notes';
@@ -9,9 +9,7 @@ import { Composer } from './Composer';
 import { NoteCard } from './NoteCard';
 import { useCardRows } from './use-card-rows';
 import { useCardStates } from './use-card-states';
-
-/** How long a note brought into view stays lit up, as its animation (`.note-flash`). */
-const FLASH_MS = 1200;
+import { useRevealedNote } from './use-revealed-note';
 
 type Item = { kind: 'note'; note: Note; index: number } | { kind: 'done'; count: number };
 
@@ -68,25 +66,14 @@ export function NoteCards({
     const { virtualizer } = rows;
 
     // the note brought into view, lit up for a moment; a done one unfolds its group first
-    const [flash, setFlash] = useState<string | null>(null);
-    useEffect(() => {
-        if (!reveal) return;
-        const index = items.findIndex((item) => item.kind === 'note' && item.note.id === reveal);
-        if (index < 0 && !showDone && done.some((note) => note.id === reveal)) {
-            setShowDone(true);
-            return;
-        }
-        if (index >= 0) {
-            virtualizer.scrollToIndex(index, { align: 'center' });
-            setFlash(reveal);
-        }
-        onRevealed();
-    }, [reveal, items, showDone, done, virtualizer, onRevealed]);
-    useEffect(() => {
-        if (!flash) return;
-        const timer = window.setTimeout(() => setFlash(null), FLASH_MS);
-        return () => window.clearTimeout(timer);
-    }, [flash]);
+    const flash = useRevealedNote({
+        reveal,
+        index: items.findIndex((item) => item.kind === 'note' && item.note.id === reveal),
+        folded: !showDone && done.some((note) => note.id === reveal),
+        unfold: () => setShowDone(true),
+        virtualizer,
+        onRevealed,
+    });
 
     const empty = open.length === 0 && done.length === 0;
 

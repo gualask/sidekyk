@@ -1,7 +1,8 @@
-//! The command palette's search: what was typed, ranked against the projects, the panels and the
-//! files, note lists and notes of the project on screen (`⌘K`), or looked for in those files' contents (`⌘F`). Names are
-//! ranked from what the caller hands over; contents are read through the repository's port. The
-//! Move dialog ranks its projects and lists the same way (`rank_names`).
+//! The command palette's search: what was typed, ranked against the projects and the note lists and
+//! notes of every book at all projects, or the panels and the files, note lists and notes of the
+//! project on screen (`⌘K`); or looked for in those files' contents (`⌘F`). Names are ranked from
+//! what the caller hands over; contents are read through the repository's port. The Move dialog
+//! ranks its projects and lists the same way (`rank_names`).
 
 mod contents;
 mod contracts;
@@ -13,7 +14,7 @@ pub use contracts::{
     ContentEnd, ContentFile, FileMatch, FileMatches, ListMatch, NoteMatch, SearchRequest,
     SearchResults,
 };
-pub use notes::search_notes;
+pub use notes::{search_every_book, search_notes};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -34,15 +35,17 @@ pub struct ProjectFiles {
 }
 
 /// Ranks the panels and the files, lists and notes of the project the request names against the
-/// query, or the projects when it names none. With nothing typed, every panel or project in their
-/// order and nothing of the project: the palette opens on where to go. `files_of` and `notes_of` are asked only once
-/// something is typed, as listing a project's files may run git and its notes be read from disk;
-/// each ranks them where they are kept (`search_files`, `search_notes`).
+/// query, or the projects and the lists and notes of every book when it names none. With nothing
+/// typed, every panel or project in their order and no file, list or note: the palette opens on
+/// where to go. `files_of`, `notes_of` and `every_notes` are asked only once something is typed, as
+/// listing a project's files may run git and notes be read from disk; each ranks them where they
+/// are kept (`search_files`, `search_notes`, `search_every_book`).
 pub fn search(
     request: &SearchRequest,
     projects: &[Project],
     files_of: impl FnOnce(&str) -> Option<FileMatches>,
     notes_of: impl FnOnce(&str) -> Option<(Vec<ListMatch>, Vec<NoteMatch>)>,
+    every_notes: impl FnOnce() -> (Vec<ListMatch>, Vec<NoteMatch>),
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
 
@@ -72,12 +75,17 @@ pub fn search(
         })
         .collect();
 
-    let project = request.project_id.as_deref().filter(|_| !names.is_empty());
+    let typed = !names.is_empty();
+    let project = request.project_id.as_deref().filter(|_| typed);
     let FileMatches {
         files,
         more: more_files,
     } = project.and_then(files_of).unwrap_or_default();
-    let (lists, notes) = project.and_then(notes_of).unwrap_or_default();
+    let (lists, notes) = match request.project_id {
+        Some(_) => project.and_then(notes_of).unwrap_or_default(),
+        None if typed => every_notes(),
+        None => Default::default(),
+    };
 
     SearchResults {
         projects,
@@ -211,6 +219,7 @@ mod tests {
             &[project("shop"), project("docs")],
             |_| panic!("nothing typed lists no file"),
             |_| panic!("nothing typed reads no note"),
+            || panic!("nothing typed reads no note"),
         );
         assert!(results.projects.is_empty());
         assert_eq!(results.panels.len(), 2);
@@ -229,6 +238,7 @@ mod tests {
                 &[project("shop"), project("cache-hub")],
                 |_| None,
                 |_| None,
+                Default::default,
             );
             results
                 .projects
@@ -241,6 +251,40 @@ mod tests {
     }
 
     #[test]
+    fn without_a_project_every_book_is_searched_once_something_is_typed() {
+        let mut all = request(" ");
+        all.project_id = None;
+        let none = search(
+            &all,
+            &[project("shop")],
+            |_| panic!("no project to list"),
+            |_| panic!("no project to read"),
+            || panic!("nothing typed reads no note"),
+        );
+        assert!(none.notes.is_empty());
+        all.query = "plan".into();
+        let found = |book: &str| NoteMatch {
+            book: book.into(),
+            id: "n".into(),
+            list: "l".into(),
+            list_name: "General".into(),
+            title: "plan".into(),
+            score: 1,
+            highlights: Vec::new(),
+            snippet: None,
+        };
+        let results = search(
+            &all,
+            &[project("shop")],
+            |_| panic!("no project to list"),
+            |_| panic!("one project's notes are asked inside it"),
+            || (Vec::new(), vec![found("inbox")]),
+        );
+        assert_eq!(results.notes, [found("inbox")]);
+        assert!(results.files.is_empty());
+    }
+
+    #[test]
     fn a_query_ranks_the_panels_and_the_files_but_no_project() {
         let results = search(
             &request("ch"),
@@ -250,6 +294,7 @@ mod tests {
                 Some(files("ch", &["src/cart/checkout.ts", "README.md"], &[]))
             },
             |_| None,
+            || panic!("inside a project only its notes"),
         );
         assert!(results.projects.is_empty());
         assert_eq!(results.panels.len(), 1);
@@ -275,6 +320,7 @@ mod tests {
             &[],
             |_| Some(files("ts", &["a.ts", "b.ts", "c.ts", "back.ts"], &changed)),
             |_| None,
+            Default::default,
         );
         let found: HashMap<&str, Option<ChangeMark>> = results
             .files
@@ -298,12 +344,15 @@ mod tests {
             &[project("shop")],
             |_| panic!("no project to list"),
             |_| panic!("no project to read"),
+            Default::default,
         );
         assert!(results.files.is_empty());
         // a project whose files cannot be read offers none
-        assert!(search(&request("ts"), &[], |_| None, |_| None)
-            .files
-            .is_empty());
+        assert!(
+            search(&request("ts"), &[], |_| None, |_| None, Default::default)
+                .files
+                .is_empty()
+        );
     }
 
     #[test]
@@ -317,6 +366,7 @@ mod tests {
             &[],
             |_| Some(files("file", &paths, &[])),
             |_| None,
+            Default::default,
         );
         assert_eq!(results.files.len(), FILE_LIMIT);
         assert_eq!(results.more_files, 7);

@@ -21,7 +21,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
 has.
 
-- [ ] `⌘K` at level 0 finds notes of every project and of the Inbox
 - [ ] Layout without git: what takes Changes' tile (today Files; Notes leaning, decided with
       Capture)
 - [ ] What changed without git: recently modified files, no diffs

@@ -25,6 +25,7 @@ import { useSearch } from '../application/search.queries';
 import {
     contentRows,
     highlightParts,
+    type PaletteBook,
     type PaletteItem,
     type PalettePanel,
     type PaletteRow,
@@ -52,13 +53,16 @@ export interface PaletteActions {
     openPanel: (id: string) => void;
     /** A file, or a line of it where a text was found, to look through in the viewer. */
     openFile: (path: string, find?: { query: string; line: number }) => void;
-    /** A list of notes, and one of its notes to bring into view, if any. */
-    openNotes: (list: string, note: string | null) => void;
+    /**
+     * A list of notes of a book, and one of its notes to bring into view, if any: the project on
+     * screen's, or at all projects any project's or the Inbox's.
+     */
+    openNotes: (book: string, list: string, note: string | null) => void;
 }
 
 /**
- * The command palette: one field to go to a project, a panel of the project on screen or one of
- * its files by name (`⌘K`), or to find a text in that project's files (`⌘F`); the other key, or
+ * The command palette: one field to go to a project or a list or note of any book (at all
+ * projects), a panel of the project on screen or one of its files, lists or notes (`⌘K`), or to find a text in that project's files (`⌘F`); the other key, or
  * a tab, switches while keeping what is typed. Names are ranked in the backend, the best first;
  * lines found come under their files as they are read, the file shown first. The list is
  * virtualized. `↑`/`↓` move, `↵` opens, `Esc` empties the field, then closes. Loaded with Base
@@ -76,6 +80,7 @@ export function CommandPalette({
     stoppedDistro,
     currentFile,
     panels,
+    books,
     actions,
 }: {
     open: boolean;
@@ -95,6 +100,8 @@ export function CommandPalette({
     /** The file the project shows, whose lines found come first. */
     currentFile: string | null;
     panels: readonly PalettePanel[];
+    /** The books of the lists and notes found at all projects, by id. */
+    books: (book: string) => PaletteBook;
     actions: PaletteActions;
 }) {
     const { t } = useTranslation();
@@ -116,14 +123,17 @@ export function CommandPalette({
                         stoppedDistro={stoppedDistro}
                         currentFile={currentFile}
                         panels={panels}
+                        books={books}
                         onOpen={(item, query) => {
                             onOpenChange(false);
                             if (item.kind === 'project') actions.openProject(item.projectId);
                             else if (item.kind === 'panel') actions.openPanel(item.id);
                             else if (item.kind === 'file') actions.openFile(item.path);
-                            else if (item.kind === 'list') actions.openNotes(item.id, null);
-                            else if (item.kind === 'note') actions.openNotes(item.list, item.id);
-                            else actions.openFile(item.path, { query, line: item.number });
+                            else if (item.kind === 'list') {
+                                actions.openNotes(item.book, item.id, null);
+                            } else if (item.kind === 'note') {
+                                actions.openNotes(item.book, item.list, item.id);
+                            } else actions.openFile(item.path, { query, line: item.number });
                         }}
                     />
                 </Dialog.Popup>
@@ -146,6 +156,7 @@ function Palette({
     stoppedDistro,
     currentFile,
     panels,
+    books,
     onOpen,
 }: {
     mode: PaletteMode;
@@ -157,6 +168,7 @@ function Palette({
     stoppedDistro: string | null;
     currentFile: string | null;
     panels: readonly PalettePanel[];
+    books: (book: string) => PaletteBook;
     onOpen: (item: PaletteItem, query: string) => void;
 }) {
     const [query, setQuery] = useState(initialText);
@@ -173,10 +185,19 @@ function Palette({
             return found ? contentRows(found.files, currentFile, i18n) : { items: [], rows: [] };
         // typed or not as the query the matches on screen answer, not the one still coming
         const shown = names.data;
+        // inside a project, every list and note found is its own
+        const rowBooks = projectId ? null : books;
         return shown
-            ? paletteRows(shown.results, panels, projectName, shown.query.trim() !== '', i18n)
+            ? paletteRows(
+                  shown.results,
+                  panels,
+                  projectName,
+                  shown.query.trim() !== '',
+                  rowBooks,
+                  i18n,
+              )
             : { items: [], rows: [] };
-    }, [contents, found, currentFile, names.data, panels, projectName, i18n]);
+    }, [contents, found, currentFile, names.data, panels, projectName, projectId, books, i18n]);
     // the row of each item, to bring the one highlighted into view
     const itemRows = useMemo(
         () => rows.flatMap((row, rowIndex) => (row.kind === 'item' ? [rowIndex] : [])),
@@ -496,13 +517,13 @@ function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' }> }) {
 }
 
 /**
- * What a row says on its right: a panel's key, how a file changed, a note's list, a project's
- * machine when not this one; nothing for a list.
+ * What a row says on its right: a panel's key, how a file changed, a note's list (and project, at
+ * all projects), a list's project at all projects, a project's machine when not this one.
  */
 function hint(item: PaletteItem, t: Translator['t']) {
     if (item.kind === 'project') return <RemoteTag folder={item.folder} />;
     if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
-    if (item.kind === 'note') return item.listName;
+    if (item.kind === 'note' || item.kind === 'list') return item.hint;
     if (item.kind !== 'file' || !item.mark) return null;
     return <span className={CHANGE_MARK_TONE[item.mark]}>{t(CHANGE_MARK_WORD[item.mark])}</span>;
 }

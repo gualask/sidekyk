@@ -1420,6 +1420,7 @@ mod tests {
                         ))
                     },
                     |_| None,
+                    Default::default,
                 );
             })
         );
