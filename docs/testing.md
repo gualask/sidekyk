@@ -5,7 +5,17 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
 ## Checks and tests
 
 - Frontend: `vitest` (mostly models and parsers, some hooks and UI logic), Biome, TypeScript, knip
-  (unused code), `boundaries:check` (layers, `architecture.md`).
+  (unused code), `boundaries:check` (layers, `architecture.md`). Tests run in Node; a hook's test
+  (`*.test.tsx`) runs in `happy-dom`, asked by `// @vitest-environment happy-dom` at the top of its
+  file, and renders the hook with `renderHook` (`src/shared/testing/render-hook.tsx`: React's
+  `act` and `createRoot`, the providers through `wrapper`); `vi.waitFor` waits for a query's
+  answer. Fakes give only the port methods the hook calls.
+- Test dependencies (2026-10-24): `happy-dom` over `jsdom` (7 dependencies against 20, faster,
+  enough for hooks) and over Vitest's browser mode (Playwright and its browsers on every machine
+  and CI run); no `@testing-library/react`: its `renderHook` is the same few lines on React's
+  `act`, and it brings `@testing-library/dom` (2.5 MB, 8 dependencies) for queries hooks do not
+  need. Components with layout (virtualized lists, view transitions) stay checked on the browser
+  fixtures.
 - Backend: `cargo test`; end-to-end tests run a real git on scratch repositories, the watched
   repository a real watcher too. clippy and rustfmt.
 - Helper (`crates/agent/tests`): the `sidekyk-agent` binary started as the app starts it, its

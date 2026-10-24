@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import {
     INBOX_BOOK,
     InboxColumn,
@@ -42,6 +42,7 @@ import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info'
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
+import { type Asked, askedOf, useWaitingAsked } from './asked';
 import { PanelTile } from './PanelTile';
 import {
     deepestLevel,
@@ -157,10 +158,19 @@ export function AppShell() {
     // an Inbox note found in the palette, brought into view in its column
     const [inboxNote, setInboxNote] = useState<string | null>(null);
     const inboxRevealed = useCallback(() => setInboxNote(null), []);
-    // a project's note found at all projects: shown in Notes once that project's panels show
-    const [waitingNote, setWaitingNote] = useState<Asked | null>(null);
     // how the project lays out its tiles: which wait in the top bar, the side column's split
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
+    // a project's note found at all projects, shown once that project's panels are (a folder's
+    // kind read): the panel back from the top bar within the zoom still running, not in a
+    // transition of its own, which would skip it
+    const waitForPanels = useWaitingAsked(
+        level > 0 && tiles ? (project?.id ?? null) : null,
+        (asked) => {
+            const tile = panelById(asked.panel);
+            if (tile && layout.minimized.includes(tile.id)) unminimize(tile);
+            setTarget(asked);
+        },
+    );
     // a tile minimized is not selected: the main one is, which is never minimized
     const selectedTile = tiles && layout.minimized.includes(panel.id) ? tiles.main : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell, and in
@@ -190,7 +200,7 @@ export function AppShell() {
      */
     const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
         // back at all projects, a note that waited for its project is no longer asked for
-        if (next === 0) setWaitingNote(null);
+        if (next === 0) waitForPanels(null);
         const asked = nextTarget && project ? askedOf(project, nextPanel.id, nextTarget) : null;
         if (next === level && nextPanel === panel) {
             if (asked) setTarget(asked);
@@ -290,7 +300,7 @@ export function AppShell() {
             else if (level > 0 && book === project?.id) {
                 show(notesPanel.id, notesTarget(list, note));
             } else {
-                setWaitingNote({
+                waitForPanels({
                     project: book,
                     panel: notesPanel.id,
                     target: notesTarget(list, note),
@@ -300,21 +310,6 @@ export function AppShell() {
             }
         },
     };
-    // the project activated and its panels shown (a folder's kind read): the panel back from the
-    // top bar within the zoom still running, not in a transition of its own, which would skip it
-    const showWaitingNote = useEffectEvent((waiting: Asked) => {
-        setWaitingNote(null);
-        const tile = panelById(waiting.panel);
-        if (tile && layout.minimized.includes(tile.id)) unminimize(tile);
-        setTarget(waiting);
-    });
-    const noteReady =
-        waitingNote && level > 0 && tiles && project?.id === waitingNote.project
-            ? waitingNote
-            : null;
-    useEffect(() => {
-        if (noteReady) showWaitingNote(noteReady);
-    }, [noteReady]);
     // the books of the lists and notes the palette finds at all projects
     const paletteBook = useCallback(
         (book: string): PaletteBook =>
@@ -479,17 +474,6 @@ const MAIN_SIZE = { flexGrow: 1, flexBasis: 0, minWidth: `min(${MAIN_TILE_MIN_WI
 
 /** A tile of the side column fills its slot. */
 const SIDE_SIZE = { flexGrow: 1, flexBasis: 0 };
-
-/** What a panel was asked to show, and which panel of which project: no other project's shows it. */
-interface Asked {
-    project: string;
-    panel: string;
-    target: PanelTarget;
-}
-
-function askedOf(project: ProjectInfo, panel: string, target: PanelTarget): Asked {
-    return { project: project.id, panel, target };
-}
 
 function Workspace({
     list,
