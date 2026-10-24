@@ -3,10 +3,11 @@ use std::path::{Path, PathBuf};
 
 use super::ports::RepositoryBackend;
 
-/// The changes of a batch that git does not ignore.
+/// The changes of a batch that show: git does not ignore them, or, in a folder without git, the
+/// walk's rules do not hide them.
 pub enum Visible<'a> {
-    /// Every change counts: git could not answer, or a change may alter what it ignores (a
-    /// `.gitignore`, the root itself).
+    /// Every change counts: git could not answer, or a change may alter what is hidden (an
+    /// ignore file, the root itself).
     Unknown,
     /// These paths, relative to the root.
     Paths(Vec<&'a Path>),
@@ -181,7 +182,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::{GitOutput, WorktreeEntry};
+    use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
 
     /// Ignores `target/` and `*.log` and records every question.
     #[derive(Default)]
@@ -242,6 +243,18 @@ mod tests {
         }
 
         fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
+            unreachable!()
+        }
+
+        fn walk(&self, _root: &Path, _max: usize) -> Walked {
+            unreachable!()
+        }
+
+        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
+            unreachable!()
+        }
+
+        fn real_path(&self, _path: &Path) -> Option<PathBuf> {
             unreachable!()
         }
     }

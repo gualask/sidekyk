@@ -238,11 +238,20 @@ export interface SyntaxColors {
     lines: LineColors[];
 }
 
+/**
+ * What a project's folder is, found where it is read and never stored (`FolderKind` in
+ * `src-tauri/crates/core/src/modules/folder/mod.rs`): a repository, or a folder without git.
+ */
+export type FolderKind = 'repository' | 'plain';
+
 export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {
-    /** 3 since it names the paths that changed; 2 named the project by its id, not its root. */
-    version: 3;
+    /**
+     * 4 since it tells a change of kind; 3 brought the paths that changed; 2 named the project by
+     * its id, not its root.
+     */
+    version: 4;
     projectId: string;
     /** The index, HEAD or refs changed too: only then may the recent commits have. */
     gitDir: boolean;
@@ -251,4 +260,9 @@ export interface RepositoryChangedEvent {
      * any may have (too many, git could not tell which are ignored, or a name is not UTF-8).
      */
     paths: string[] | null;
+    /**
+     * A `.git` came or went at the root: the folder is now the other kind, and what was read of it
+     * is dropped rather than read again.
+     */
+    kindChanged: boolean;
 }

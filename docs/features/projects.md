@@ -1,23 +1,27 @@
 # Projects
 
 Several projects, one on screen: a project is a name, its notes and none or one folder (a
-repository).
+repository, or a folder without git).
 
 ## Behaviour
 
 - New project (2026-10-23): the "+ New project" card last at level 0 ("Notes on a topic, and a
   folder if you want") opens one dialog for everyone: Name (focused) and Folder (optional), "None"
   until Choose… picks one; Cancel and Create (disabled while the name is blank), `↵` creates.
-  The folder picked resolves to its repository's root, its name fills an empty name. A folder
-  that is another project's is said under the field ("Already the project shop", Open: that
-  project shows); one that is not a repository is said there too and not taken (the folder chosen
-  before stays). Create adds the project last and opens it at level 1.
+  Any folder (2026-10-24): one inside a repository resolves to the repository's root, any other is
+  taken as it is; its name fills an empty name. A folder that is another project's is said under
+  the field ("Already the project shop", Open: that project shows). Create adds the project last
+  and opens it at level 1.
+- What a folder is (2026-10-24): a repository when a `.git` (folder, or file for linked worktrees
+  and submodules) is at its root, else a folder without git. Found where it is read, never
+  stored: `git init` in it, or `.git` removed, changes its panels while the app runs (Changes
+  comes and goes, `workspace.md`). A plain folder inside a repository made later stays plain.
 - Rename (2026-10-23): from the card's ⋯, the same dialog with the name only. Two projects may
   share a name. Removing a project without folder asks about its notes the same way, without the
-  line about the repository.
-- `sidekyk <folder>` (the first CLI argument's repository) opens its project, adding one named
-  after the folder when none follows it. Remove (⋯ on the level 0 card; the repository is
-  untouched; asks first about its notes, `notes.md`), switch
+  line about the folder.
+- `sidekyk <folder>` (the first CLI argument, inside a repository its root) opens its project,
+  adding one named after the folder when none follows it. Remove (⋯ on the level 0 card; the
+  folder is untouched; asks first about its notes, `notes.md`), switch
   (`[`/`]`, `Esc` to level 0, `⌘K` there). The app starts at level 0, the project shown last
   selected; `sidekyk <folder>` opens its project at level 1 (`workspace.md`).
 - A project not on this machine says where it is: `WSL: Ubuntu` before its folder on the level 0
@@ -25,15 +29,16 @@ repository).
   as two `shop`s otherwise).
 - Level 0 card (2026-10-18), three groups set apart by space:
   - Name, and under it the branch (cut with "…"; ahead/behind stay) after a WSL project's
-    `WSL: Ubuntu`. The folder is the name's tooltip, which covers the card.
+    `WSL: Ubuntu`; for a folder without git the folder itself, cut at its start. The folder is
+    the name's tooltip, which covers the card.
   - Three boxes across the card, each as wide as what it holds plus a share of what is left:
     files changed, lines (`+54 −27`), notes waiting; a value at 16 px over its label. Quiet (muted) at 0, so that
     in the grid the projects at work stand out. Counts kept short (`10k+`, `+999k −999k`): the
     widest three fill 262 of the card's 266 px.
   - A well at the bottom, one height whatever it holds: the week of commits, "No commits in 7
     days", or why the repository cannot be read (moved, distro stopped or gone, no git).
-  A project without folder (2026-10-23): its name; boxes "waiting" (open notes) and "done"; in
-  the well "Last change yesterday" (calendar days, `Intl.RelativeTimeFormat`: today, yesterday,
+  A project without folder (2026-10-23), or with a folder without git (2026-10-24, its folder
+  under the name): boxes "waiting" (open notes) and "done"; in the well "Last change yesterday" (calendar days, `Intl.RelativeTimeFormat`: today, yesterday,
   3 days ago, then weeks, months, years) or "No notes yet". Quiet at 0, as the other boxes.
   Boxes and well on `surface-subtle`, never in the page's color: page, card, box are three
   layers; no border, the surface tells them apart (2026-10-18). No chips, no file list (the detail is one
@@ -46,7 +51,8 @@ repository).
 - Facts next to the project's name in the top bar: branch, ahead/behind, changed files and lines
   added/removed in tracked files against HEAD (`1.2k changed +1.2k −340`, exact lines in the
   tooltip), or "clean".
-- A moved repository: problem `repository_missing` with Locate… (the project follows its folder
+- A moved folder (a repository's or not): problem `repository_missing` ("{name}'s folder was
+  moved or deleted") with Locate… (the project follows its folder
   there, keeping its id, name, notes and layout) and Remove. A folder that is another project's is
   not taken: a toast says whose, with Open. Adding a folder a project follows opens that project.
 
@@ -91,17 +97,32 @@ repository).
   on it, only if older than 30 s. Inactive projects' caches expire (`gcTime`).
 - Card parts: a panel's summary is shown once per part (`SummaryPart`: `lead`, `facts`, `body`)
   and shows nothing in the parts it has nothing for; Changes fills all three, Notes `facts`, and
-  `facts` and `body` for a project without folder (a `Stat` box each, the well a `CardWell`,
-  `shared/ui`). Only the summaries of the project's panels show (`projectTiles`). Each module
-  stays on its own, the card keeps the order.
+  `facts` and `body` for a project without folder or with a folder without git (a `Stat` box
+  each, the well a `CardWell`, `shared/ui`), Files `lead` for a folder without git
+  (`FilesSummary`). Only the summaries of the project's panels show (`projectTiles`, from the
+  folder's kind), each told `repository` (`PanelSummaryProps`). Each module stays on its own, the
+  card keeps the order.
+- Opening a folder (`resolve_folder`, `modules/folder/open.rs`): the candidate's real path (links
+  resolved on Unix, as the watcher reports paths; on Windows as given); the nearest folder at or
+  above it with a `.git` is a repository, its root from `git rev-parse --show-toplevel`, or that
+  folder when git fails (missing, a broken `.git`); no `.git` found, the folder itself and no git
+  runs (on macOS without the Command Line Tools `/usr/bin/git` asks to install them).
+- Folder kind (`get_folder_kind(projectId, start)`, `folder::folder_kind`): `repository_missing`
+  for a folder gone, else whether `.git` is at the root; no git. The cards ask with `start: false`
+  (never starting a distro, `distro_stopped` as the summary), the project opened with `true`, the
+  cards' answer its placeholder; a kind that cannot be read counts as a repository, its panels and
+  the problems telling why (`useFolderKind`). A change of kind comes from the watcher
+  (`RepositoryChange.kind_changed`): the frontend resets the project's queries.
 - New project and rename (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says
-  what it is (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`,
-  `NotRepository`), changing nothing; `create_project(name, folder)` checks the path again
+  what it is (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`),
+  changing nothing; `create_project(name, folder)` checks the path again
   (`folder_at`) and adds the project (`ProjectList::add`: name trimmed, never blank; a folder
   another project follows is refused), then shows it; `rename_project` (`ProjectList::rename`,
   stored only: nothing watched changes). Their failures show in the dialog, still open.
 - A project without folder is never routed to a machine, watched or summarized as a repository:
-  `Project::repository` is `None`, and a repository command given one is an internal error.
+  `Project::repository` is `None`, and a repository command given one is an internal error. A
+  folder without git is routed and watched, never summarized: snapshot, summary, diffs and
+  commits on it are an internal error, never asked.
 - Week of commits (`get_commit_activity`, `load_commit_activity`): `git log --since=@<local
   midnight 6 days ago> --no-merges --shortstat -n 501 HEAD` (`LC_ALL=C`: the line is not
   translated), at most 500 commits and 256 KiB; the frontend sums them by local day
@@ -111,7 +132,7 @@ repository).
   (68 commits), 0.5 s on Zed's clone over 129 commits.
 - Notes on the card: `notes_summary` (how many wait and are done, the last edit), kept in memory
   once read, until the notes change.
-- Locate… (`relocate_project`): the folder picked resolves to its repository; the project's
+- Locate… (`relocate_project`): the folder picked resolves as a new project's; the project's
   folder becomes it (`relocate`), nothing else changes; the same folder changes nothing. Another
   project's folder: `Relocation::InProject { id, name }`, the list as it was. The id stays, so
   what follows the folder is told: `watch_active` compares the id and the folder, and the frontend
@@ -123,6 +144,10 @@ repository).
   without folder has no location, one with several no single one. Every new project gets a new
   id, so a repository added where a moved one was is no collision; one folder is one project's,
   found by place, not by id. Ids stored before stay: nothing is migrated.
+- Any folder (2026-10-24, `../plans/project-folders.md`): a folder without git has Files and
+  Notes; a folder inside a repository is the repository's root, as before. Kind read by a query of
+  its own, not from the summary: at level 1 a repository's summary comes with its snapshot, so a
+  summary first would run `git status` twice in a row.
 - Locate… onto another project's folder is refused (2026-10-22), not a merge: Locate… changes a
   folder only; joining two projects would be a command of its own (not needed). It used to join
   their notes.

@@ -34,7 +34,7 @@ pub struct FileTree {
     folders: HashMap<String, Folder>,
     /// Every file's path, sorted by its bytes: the palette searches them in this order.
     files: Vec<String>,
-    /// git listed more files than `MAX_TREE_PATHS`: the tree stops there.
+    /// More files were listed than `MAX_TREE_PATHS`: the tree stops there.
     truncated: bool,
 }
 
@@ -78,6 +78,12 @@ impl FileTree {
             files,
             truncated: false,
         }
+    }
+
+    /// The same tree, saying whether more files were listed than it holds.
+    pub fn with_truncated(mut self, truncated: bool) -> Self {
+        self.truncated = truncated;
+        self
     }
 
     /// Every file's path, sorted by its bytes.
@@ -245,9 +251,8 @@ pub fn load_file_tree(
         .iter()
         .map(String::as_str)
         .filter(|path| !deleted.contains(path));
-    let mut tree = FileTree::from_paths(present.by_ref().take(MAX_TREE_PATHS));
-    tree.truncated = cut || present.next().is_some();
-    Ok(tree)
+    let tree = FileTree::from_paths(present.by_ref().take(MAX_TREE_PATHS));
+    Ok(tree.with_truncated(cut || present.next().is_some()))
 }
 
 /// One file of a repository as the Files panel shows it: its text, or what it is instead. A link
@@ -297,7 +302,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::GitOutput;
+    use crate::modules::repository::{FolderRules, GitOutput, Walked};
 
     fn names(directory: &Directory) -> Vec<(&str, &str, bool)> {
         directory
@@ -393,6 +398,18 @@ mod tests {
         }
 
         fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn Read + Send>> {
+            unreachable!()
+        }
+
+        fn walk(&self, _root: &Path, _max: usize) -> Walked {
+            unreachable!()
+        }
+
+        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
+            unreachable!()
+        }
+
+        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
             unreachable!()
         }
     }

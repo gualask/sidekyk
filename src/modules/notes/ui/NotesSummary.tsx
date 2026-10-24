@@ -1,6 +1,6 @@
 import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import type { ProjectInfo } from '@/shared/projects/project-info';
 import { dayAgo } from '@/shared/time/relative-time';
 import { CardWell, WellMessage } from '@/shared/ui/CardWell';
 import { Stat } from '@/shared/ui/Stat';
@@ -8,11 +8,11 @@ import { useNotesSummary } from '../application/notes.queries';
 
 /**
  * What Notes tells about a project on its card at all projects: beside a repository's numbers, how
- * many notes wait. A project without folder has only its notes, which fill the card: how many
- * wait and how many are done, and when they last changed.
+ * many notes wait. A project without folder, or with a folder without git, has nothing else to
+ * count: its notes fill the card, how many wait and how many are done, and when they last changed.
  */
-export function NotesSummary({ project, part }: PanelSummaryProps) {
-    const alone = projectFolder(project) === null;
+export function NotesSummary({ project, part, repository }: PanelSummaryProps) {
+    const alone = !repository;
     if (part === 'facts') return <Counts project={project} alone={alone} />;
     if (part === 'body' && alone) return <LastChange project={project} />;
     return null;

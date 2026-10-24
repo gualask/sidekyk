@@ -26,6 +26,20 @@ const REVIEW_PATHS = [
     'vendor/payments-sdk',
 ];
 
+/**
+ * A folder without git, of notes in Markdown: what its walk lists. Its `.ignore` hides `drafts/`,
+ * which is not listed.
+ */
+const DOCUMENT_PATHS = [
+    '.ignore',
+    'index.md',
+    'ideas.md',
+    'journal/2026-10-23.md',
+    'journal/2026-10-24.md',
+    'reading/papers.md',
+    'reading/books.md',
+];
+
 /** In the large scenario: enough files that the tree is virtualized, and a folder too large to list. */
 function largePaths(): string[] {
     const paths: string[] = [];
@@ -107,6 +121,11 @@ class FixtureTree {
 const MAX_ENTRIES = 10_000;
 const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }).compare;
 
+/** A folder without git's tree, as its walk lists it. */
+export function fixtureFolderTree() {
+    return new FixtureTree(DOCUMENT_PATHS);
+}
+
 /** The repository's tree, with the changed files in it and the deleted ones out. */
 export function fixtureTree(large: boolean, changes: readonly ChangedFile[]) {
     const deleted = new Set(changes.filter((c) => c.kind === 'deleted').map((c) => c.path));
@@ -126,7 +145,16 @@ function textOf(path: string, lines: number): string {
     return `${body.join('\n')}\n`;
 }
 
+/** A note in Markdown, after its file's name. */
+function noteOf(path: string): string {
+    const title = (path.split('/').at(-1) ?? path).replace(/\.md$/, '');
+    return `# ${title}\n\n- [ ] Read it again\n- [x] Write it down\n\nA note, for the fixtures.\n`;
+}
+
 const TEXTS: Record<string, string> = {
+    '.ignore': 'drafts/\n',
+    'index.md':
+        '# Vault\n\nNotes kept in Markdown, without git.\n\n- [[ideas]]\n- [[reading/papers]]\n',
     'README.md': '# shop\n\nA small shop, for the fixtures.\n\n## Run\n\n    pnpm dev\n',
     '.gitignore': 'node_modules/\ndist/\n*.log\n',
     'src/cart/cart.ts':
@@ -140,5 +168,6 @@ export function fixtureFileContent(path: string): FileContent {
     if (path === 'vendor/payments-sdk') return { kind: 'folder' };
     if (path === 'generated/big.ts')
         return { kind: 'text', text: textOf(path, 60_000), truncated: true };
-    return { kind: 'text', text: TEXTS[path] ?? textOf(path, 40), truncated: false };
+    const text = TEXTS[path] ?? (path.endsWith('.md') ? noteOf(path) : textOf(path, 40));
+    return { kind: 'text', text, truncated: false };
 }

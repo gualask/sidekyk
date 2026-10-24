@@ -60,10 +60,12 @@ export type SummaryPart = 'lead' | 'facts' | 'body';
 export interface PanelSummaryProps {
     project: ProjectInfo;
     part: SummaryPart;
+    /** The project's folder is a repository: false without folder, or for a folder without git. */
+    repository: boolean;
 }
 
-/** What a panel needs of a project to show anything: a repository (Changes, Files). */
-export type PanelNeed = 'repository';
+/** What a panel needs of a project to show anything: a folder (Files), a repository (Changes). */
+export type PanelNeed = 'folder' | 'repository';
 
 /**
  * What a module gives the app to show it as a panel. The app lays panels out and switches between

@@ -1,11 +1,12 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
 import type { FolderChoice, ProjectList } from '@/modules/projects';
+import type { FolderKind, RepositoryChangedEvent } from '@/modules/repository';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
-import { fixtureFileContent, fixtureTree } from './files.fixture-data';
+import { fixtureFileContent, fixtureFolderTree, fixtureTree } from './files.fixture-data';
 import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
@@ -33,6 +34,10 @@ const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
 /** In `review` and `clean`: a project without folder, notes on a topic. */
 const TOPIC_PROJECT: ProjectInfo = { id: 'b0000000000000a1', name: 'Thesis', folders: [] };
 
+/** In `review` and `clean`: a folder without git, notes in Markdown (`sidekykDev.gitInit`). */
+const VAULT_ROOT = '/Users/dev/Notes/vault';
+const VAULT_PROJECT = localProject(VAULT_ROOT, 'Vault');
+
 /** The repository the folder picker finds, a folder inside it picked. */
 const PICKED_REPOSITORY = {
     kind: 'usable',
@@ -41,17 +46,28 @@ const PICKED_REPOSITORY = {
     location: { kind: 'local', root: '/Users/dev/Projects/api-gateway' },
 } as const satisfies FolderChoice;
 
+/** A folder without git the folder picker finds. */
+const PICKED_PLAIN = {
+    kind: 'usable',
+    path: '/Users/dev/Documents/papers',
+    name: 'papers',
+    location: { kind: 'local', root: '/Users/dev/Documents/papers' },
+} as const satisfies FolderChoice;
+
+/** The folders without git, until `sidekykDev.gitInit`: they list notes in Markdown. */
+const DOCUMENT_ROOTS: readonly string[] = [VAULT_ROOT, PICKED_PLAIN.location.root];
+
 /**
  * What the folder picker gives in turn, to see each answer of the New project dialog: a repository
- * no project follows, the scenario's own repository, then a folder that is no repository.
+ * no project follows, the scenario's own repository, then a folder without git.
  */
 const PICKED_FOLDERS: readonly ((list: ProjectList) => FolderChoice)[] = [
     () => PICKED_REPOSITORY,
     (list) =>
         list.projects.some((p) => p.id === FIXTURE_REPOSITORY.id)
             ? { kind: 'inProject', id: FIXTURE_REPOSITORY.id, name: FIXTURE_REPOSITORY.name }
-            : { kind: 'notRepository' },
-    () => ({ kind: 'notRepository' }),
+            : PICKED_PLAIN,
+    () => PICKED_PLAIN,
 ];
 
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
@@ -71,12 +87,12 @@ const HELPER_START_MS = 1500;
 function initialProjects(scenario: Scenario): ProjectInfo[] {
     if (scenario === 'no-repo') return [];
     if (scenario === 'review') {
-        return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT, TOPIC_PROJECT];
+        return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT, VAULT_PROJECT, TOPIC_PROJECT];
     }
     if (scenario === 'problems') {
         return [FIXTURE_REPOSITORY, MISSING_PROJECT, STOPPED_PROJECT, GONE_PROJECT, NO_GIT_PROJECT];
     }
-    if (scenario === 'clean') return [FIXTURE_REPOSITORY, TOPIC_PROJECT];
+    if (scenario === 'clean') return [FIXTURE_REPOSITORY, VAULT_PROJECT, TOPIC_PROJECT];
     return [FIXTURE_REPOSITORY];
 }
 
@@ -108,6 +124,10 @@ export interface BrowserRuntime {
      * of that name; on screen, and the frontend told the list changed.
      */
     openFolder: (name: string) => void;
+    /** As `git init` in the folder of the project of that name, its watcher telling the change. */
+    gitInit: (name: string) => void;
+    /** As its `.git` removed. */
+    gitRemove: (name: string) => void;
 }
 
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
@@ -144,14 +164,24 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (projectId: string) =>
         projectId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
-    const readable = (projectId: string) => {
+    const rootOf = (projectId: string) => projectFolder(project(projectId))?.root ?? '';
+    // what is a folder without git, by its root: `gitInit` and `gitRemove` change it
+    const plainRoots = new Set(DOCUMENT_ROOTS);
+    const kindOf = (projectId: string): FolderKind =>
+        plainRoots.has(rootOf(projectId)) ? 'plain' : 'repository';
+    // the folder is there, no git asked
+    const present = (projectId: string) => {
         // missing where it was, not where Locate… finds it
-        const folder = projectFolder(project(projectId));
-        if (folder?.root === projectFolder(MISSING_PROJECT)?.root) {
+        if (rootOf(projectId) === projectFolder(MISSING_PROJECT)?.root) {
             throw failure('repository_missing');
         }
         if (projectId === GONE_PROJECT.id) throw failure('distro_missing');
+    };
+    // a repository git can read: the frontend never asks a folder without git
+    const readable = (projectId: string) => {
+        present(projectId);
         if (projectId === NO_GIT_PROJECT.id) throw failure('git_not_found');
+        if (kindOf(projectId) === 'plain') throw failure('unknown');
     };
     // as the backend: a card never starts a distro, opening a project starts it and the helper
     const running = new Set(['Ubuntu', 'Alpine']);
@@ -159,6 +189,15 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const distroOf = (projectId: string) => {
         const folder = projectFolder(project(projectId));
         return folder?.kind === 'wsl' ? folder.distro : null;
+    };
+    // opening a WSL project starts its distro, and the helper takes a while the first time
+    const startHelper = async (projectId: string) => {
+        const distro = distroOf(projectId);
+        if (distro && !helpers.has(distro)) {
+            await new Promise((started) => setTimeout(started, HELPER_START_MS));
+            helpers.add(distro);
+            running.add(distro);
+        }
     };
     const large = (projectId: string) => scenario === 'large' && scenarioData(projectId);
     const snapshot = (projectId: string) => {
@@ -170,10 +209,12 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     // as the backend, the tree is built once and kept: the fixtures never change on disk
     const trees = new Map<string, ReturnType<typeof fixtureTree>>();
     const tree = (projectId: string) => {
-        readable(projectId);
+        present(projectId);
         let found = trees.get(projectId);
         if (!found) {
-            found = fixtureTree(large(projectId), snapshot(projectId).files);
+            found = DOCUMENT_ROOTS.includes(rootOf(projectId))
+                ? fixtureFolderTree()
+                : fixtureTree(large(projectId), snapshot(projectId).files);
             trees.set(projectId, found);
         }
         return found;
@@ -184,7 +225,8 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const searchedFiles = (projectId: string | null) => {
         if (!projectId) return null;
         try {
-            return { paths: tree(projectId).files, changed: snapshot(projectId).files };
+            const changed = kindOf(projectId) === 'plain' ? [] : snapshot(projectId).files;
+            return { paths: tree(projectId).files, changed };
         } catch {
             return null;
         }
@@ -249,6 +291,8 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     // the versions a diff compares, from the diffs and files served below
     const texts = (projectId: string): FixtureTexts => ({
         changeDiff: (area, path) => {
+            // a folder without git has no changes
+            if (kindOf(projectId) === 'plain') return null;
             if (!snapshot(projectId).files.some((f) => f.area === area && f.path === path))
                 return null;
             const diff = large(projectId)
@@ -277,6 +321,24 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             return null;
         },
     });
+
+    // as the watcher tells a `.git` come or gone at a folder's root
+    const repositoryChanged = new Set<(event: RepositoryChangedEvent) => void>();
+    const setKind = (name: string, kind: FolderKind) => {
+        const found = list.projects.find((p) => p.name === name);
+        const root = found ? projectFolder(found)?.root : undefined;
+        if (!found || !root) throw new Error(`No project ${name} with a folder`);
+        if (kind === 'plain') plainRoots.add(root);
+        else plainRoots.delete(root);
+        const event: RepositoryChangedEvent = {
+            version: 4,
+            projectId: found.id,
+            gitDir: true,
+            paths: null,
+            kindChanged: true,
+        };
+        for (const listener of repositoryChanged) listener(event);
+    };
 
     const openFolder = (name: string) => {
         const found = list.projects.find((p) => p.name === name);
@@ -307,10 +369,9 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             },
             // as `ProjectList::add`, then on screen; a folder is the one picked, checked again
             createProject: async (name, folder) => {
-                if (folder !== null && folder !== PICKED_REPOSITORY.path) {
-                    throw failure('not_a_repository');
-                }
-                const location = folder === null ? null : PICKED_REPOSITORY.location;
+                const picked = [PICKED_REPOSITORY, PICKED_PLAIN].find((p) => p.path === folder);
+                if (folder !== null && !picked) throw failure('repository_missing');
+                const location = picked?.location ?? null;
                 if (
                     location &&
                     list.projects.some((p) => projectFolder(p)?.root === location.root)
@@ -365,14 +426,19 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             },
         },
         repository: {
+            // as the backend: no git, and a card never starts a distro
+            getFolderKind: async (projectId, start) => {
+                present(projectId);
+                const distro = distroOf(projectId);
+                if (start) await startHelper(projectId);
+                else if (distro && !helpers.has(distro) && !running.has(distro)) {
+                    throw failure('distro_stopped');
+                }
+                return kindOf(projectId);
+            },
             getSnapshot: async (projectId) => {
                 readable(projectId);
-                const distro = distroOf(projectId);
-                if (distro && !helpers.has(distro)) {
-                    await new Promise((started) => setTimeout(started, HELPER_START_MS));
-                    helpers.add(distro);
-                    running.add(distro);
-                }
+                await startHelper(projectId);
                 return snapshot(projectId);
             },
             getSummary: async (projectId) => {
@@ -415,14 +481,19 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 return fixtureFileContent(path);
             },
             getSyntaxColors: async (projectId, { path, version, first, count }) => {
-                readable(projectId);
+                // as the backend: a file on disk is read without git
+                if (version.kind === 'worktree') present(projectId);
+                else readable(projectId);
                 return fixtureColors(
                     fixtureVersionText(texts(projectId), path, version),
                     first,
                     count,
                 );
             },
-            onRepositoryChanged: () => () => undefined,
+            onRepositoryChanged: (listener) => {
+                repositoryChanged.add(listener);
+                return () => repositoryChanged.delete(listener);
+            },
             setWindowVisible: async () => null,
         },
         search: {
@@ -474,5 +545,10 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         reportError: () => undefined,
         showWindow: () => undefined,
     };
-    return { ports, openFolder };
+    return {
+        ports,
+        openFolder,
+        gitInit: (name) => setKind(name, 'repository'),
+        gitRemove: (name) => setKind(name, 'plain'),
+    };
 }

@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::modules::folder::FolderKind;
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{FileContent, FileDiffRequest, RepositoryInfo};
 use sidekyk_core::shared::error::{user_facing_code, UserFacingErrorCode};
@@ -136,6 +137,20 @@ fn the_helper_answers_as_the_app_reads_directly() {
 }
 
 #[test]
+fn a_folder_without_git_is_listed_through_the_helper() {
+    let dir = tempfile::tempdir().unwrap();
+    write(dir.path(), ".ignore", "draft.md\n");
+    write(dir.path(), "draft.md", "");
+    write(dir.path(), "notes/todo.md", "find me\n");
+    let agent = agent();
+    let info = agent.resolve(dir.path()).unwrap();
+    assert_eq!(agent.folder_kind(&info).unwrap(), FolderKind::Plain);
+    let root = agent.directory(&info, "").unwrap();
+    let names: Vec<&str> = root.entries.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(names, ["notes", ".ignore"]);
+}
+
+#[test]
 fn a_failure_keeps_its_code_through_the_helper() {
     let dir = scratch_repo();
     let agent = agent();
@@ -148,7 +163,7 @@ fn a_failure_keeps_its_code_through_the_helper() {
     let error = agent.resolve(&dir.path().join("nowhere")).unwrap_err();
     assert_eq!(
         user_facing_code(&error),
-        Some(UserFacingErrorCode::NotARepository)
+        Some(UserFacingErrorCode::RepositoryMissing)
     );
     let moved = RepositoryInfo {
         root: dir.path().join("moved").to_string_lossy().into_owned(),

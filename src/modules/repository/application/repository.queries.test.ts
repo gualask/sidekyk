@@ -21,7 +21,7 @@ describe('a change in the working tree', () => {
         expect(worktreeChangeTouches(colors('README.md'), changed)).toBe(false);
     });
 
-    it('leaves a staged diff, the index and HEAD colors and the commits alone', () => {
+    it("leaves a staged diff, the index and HEAD colors, the commits and the folder's kind alone", () => {
         const changed = ['src/cart.ts'];
         expect(worktreeChangeTouches(diff('staged', 'src/cart.ts'), changed)).toBe(false);
         const index = repositoryKeys.colors(
@@ -31,6 +31,8 @@ describe('a change in the working tree', () => {
         );
         expect(worktreeChangeTouches(index, changed)).toBe(false);
         expect(worktreeChangeTouches(repositoryKeys.commits('p'), null)).toBe(false);
+        // a change of kind is told as such
+        expect(worktreeChangeTouches(repositoryKeys.kind('p', true), null)).toBe(false);
     });
 
     it('reads again the snapshot and folders always, the rest when the paths are unknown', () => {

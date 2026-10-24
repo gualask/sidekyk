@@ -6,7 +6,9 @@ import { createBrowserRuntime, isScenario, SCENARIOS } from './browser-runtime-p
 /**
  * Browser dev mode: `?dev=app&scenario=review|clean|no-repo|large|problems` renders the real app
  * on fixture data, so a UI change can be checked without Tauri or a real repository. `&open=<name>`
- * and `sidekykDev.openFolder(<name>)` stand in for the command line (`docs/testing.md`).
+ * and `sidekykDev.openFolder(<name>)` stand in for the command line; `sidekykDev.gitInit(<name>)`
+ * and `gitRemove(<name>)` for `git init` and `.git` removed in a project's folder
+ * (`docs/testing.md`).
  */
 export function DevModePage() {
     const params = new URLSearchParams(window.location.search);
@@ -19,7 +21,8 @@ export function DevModePage() {
     });
     // in an effect: the runtime kept, not the one of a second call StrictMode makes and drops
     useEffect(() => {
-        Object.assign(window, { sidekykDev: { openFolder: runtime.openFolder } });
+        const { openFolder, gitInit, gitRemove } = runtime;
+        Object.assign(window, { sidekykDev: { openFolder, gitInit, gitRemove } });
     }, [runtime]);
 
     if (scenario !== null && !isScenario(scenario)) {

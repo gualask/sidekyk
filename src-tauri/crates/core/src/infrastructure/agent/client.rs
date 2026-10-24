@@ -18,6 +18,7 @@ use serde_json::value::RawValue;
 
 use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, WireError};
 use crate::infrastructure::hide_console;
+use crate::modules::folder::FolderKind;
 use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
@@ -460,6 +461,11 @@ impl Repositories for AgentRepositories {
     fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo> {
         let candidate = candidate.to_path_buf();
         self.call(Request::Resolve { candidate }, &nothing)
+    }
+
+    fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind> {
+        let repository = info.clone();
+        self.call(Request::FolderKind { repository }, &nothing)
     }
 
     fn snapshot(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {

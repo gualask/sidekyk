@@ -8,7 +8,7 @@ use nucleo_matcher::{Config, Matcher, Utf32Str};
 use std::cmp::Reverse;
 
 use super::contracts::Highlight;
-use super::threads;
+use crate::shared::threads::threads;
 
 /// From this many texts, scoring is split over threads: a large repository's every file is scored
 /// at each key typed (200,000 paths: ~80 ms on one thread).

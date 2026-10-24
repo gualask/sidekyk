@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use crate::modules::folder::FolderKind;
 use crate::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
     FileDiffRequest, RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot,
@@ -19,8 +20,12 @@ pub type OnChange = Box<dyn Fn(RepositoryChange) + Send + Sync>;
 pub struct ContentRun(pub(super) u64);
 
 pub trait Repositories: Send + Sync {
-    /// The repository that contains `candidate`, which can be any folder inside it.
+    /// The folder a project takes for `candidate`: the repository that holds it, else itself
+    /// (`folder::resolve_folder`).
     fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo>;
+
+    /// Whether a project's folder is a repository or a folder without git, without git.
+    fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind>;
 
     /// A repository's snapshot, sharing the one in flight.
     fn snapshot(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot>;
@@ -50,10 +55,10 @@ pub trait Repositories: Send + Sync {
         request: &CommitFileDiffRequest,
     ) -> anyhow::Result<UnifiedDiff>;
 
-    /// What a folder of a repository holds, from its files in memory; `""` is the root.
+    /// What a folder of a project's folder holds, from its files in memory; `""` is the root.
     fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory>;
 
-    /// One file of a repository's tree. Only a file of the tree is read, so never one git ignores.
+    /// One file of a project's tree. Only a file of the tree is read, so never one hidden.
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent>;
 
     /// The syntax colors of some lines of one version of a file.
@@ -63,11 +68,11 @@ pub trait Repositories: Send + Sync {
         request: &SyntaxRequest,
     ) -> anyhow::Result<SyntaxColors>;
 
-    /// The palette's matches among a repository's files: its tree (read if not yet), and how its
-    /// last snapshot found them changed; none when they cannot be listed.
+    /// The palette's matches among a project's files: its tree (read if not yet), and how its last
+    /// snapshot found them changed; none when they cannot be listed.
     fn search_files(&self, info: &RepositoryInfo, query: &str) -> Option<FileMatches>;
 
-    /// The lines of a repository's files where `query` is, sent to `send` as they are found. A
+    /// The lines of a project's files where `query` is, sent to `send` as they are found. A
     /// newer search, or `stop_content_search`, stops this one. When the text grew from the last
     /// complete search's, in the same files and with nothing changed since, only the files it
     /// found are read.
@@ -84,9 +89,10 @@ pub trait Repositories: Send + Sync {
     /// Forgets every repository but `roots`, the ones the caller still reads.
     fn retain(&self, roots: &[String]);
 
-    /// Watches the repository on screen, unless it is the one watched already, and stops watching
-    /// the previous one; `None` watches nothing. `on_change` gets each change that shows; for the
-    /// repository watched already, the first `on_change` stays. The caller calls it in the order
+    /// Watches the project's folder on screen, unless it is the one watched already, and stops
+    /// watching the previous one; `None` watches nothing. `on_change` gets each change that
+    /// shows, a change of kind included; for the folder watched already, the first `on_change`
+    /// stays. The caller calls it in the order
     /// the repository on screen changed.
     fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange);
 

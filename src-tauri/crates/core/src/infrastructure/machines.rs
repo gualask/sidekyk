@@ -135,6 +135,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
+    use crate::modules::folder::FolderKind;
     use crate::modules::repository::{
         CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
         FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
@@ -153,6 +154,9 @@ mod tests {
 
     impl Repositories for Told {
         fn resolve(&self, _: &Path) -> anyhow::Result<RepositoryInfo> {
+            unreachable!()
+        }
+        fn folder_kind(&self, _: &RepositoryInfo) -> anyhow::Result<FolderKind> {
             unreachable!()
         }
         fn snapshot(&self, _: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {

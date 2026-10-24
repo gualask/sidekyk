@@ -6,7 +6,6 @@ use std::sync::{Arc, Mutex};
 
 use tauri::{Emitter, Manager};
 
-use super::tray;
 use crate::infrastructure::settings_store;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::machines::Machines;
@@ -191,8 +190,6 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     if *watching == watched {
         return;
     }
-    // the count shown is the previous project's: cleared until the new one is read
-    tray::clear(app);
     let emitter = app.clone();
     let project_id = active.as_ref().map(|a| a.id.clone());
     state.machines.watch(
@@ -207,8 +204,8 @@ pub(crate) fn watch_active(app: &tauri::AppHandle) {
     *watching = watched;
 }
 
-/// Puts on screen the project following the repository that contains `candidate`, adding one
-/// when none does.
+/// Puts on screen the project following `candidate`'s folder (inside a repository, the
+/// repository's), adding one when none does.
 pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::Result<ProjectList> {
     let state = app.state::<ProjectsState>();
     let found = state.folder_at(candidate)?;

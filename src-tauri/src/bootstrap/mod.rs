@@ -42,7 +42,7 @@ fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()>
     Ok(())
 }
 
-/// Adds and shows a repository named at launch, off the main thread: a WSL distro's may take a
+/// Adds and shows a folder named at launch, off the main thread: a WSL distro's may take a
 /// while to start. The frontend, told the list changed, takes the project to show its panels. A
 /// failure leaves the app as it was.
 fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
@@ -55,7 +55,7 @@ fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
         Err(error) => tracing::warn!(
             folder = %folder.display(),
             error = %format!("{error:#}"),
-            "could not open the repository"
+            "could not open the folder"
         ),
     });
 }
@@ -134,6 +134,7 @@ pub(crate) fn run() {
             tauri_commands::projects::remove_project,
             tauri_commands::projects::set_project_layout,
             tauri_commands::projects::relocate_project,
+            tauri_commands::repository::get_folder_kind,
             tauri_commands::repository::get_repository_snapshot,
             tauri_commands::repository::get_repository_summary,
             tauri_commands::repository::get_file_diff,

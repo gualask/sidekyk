@@ -27,6 +27,10 @@ grep-matcher = "0.1.9"
 # slower, which matters only on large files (2026-10-18, docs/features/syntax-colors.md).
 syntect = { version = "5.3", default-features = false, features = ["parsing", "regex-onig"] }
 two-face = { version = "0.5", default-features = false, features = ["syntect-onig"] }
+# Files of a folder without git (ripgrep's walker and gitignore matcher): `.gitignore`, `.ignore`
+# and git's global excludes as git applies them, a parallel walk (2026-10-24, chosen over
+# `walkdir` plus our own parser, `jwalk`, `gix`'s dirwalk).
+ignore = "0.4"
 
 [dev-dependencies]
 tempfile.workspace = true

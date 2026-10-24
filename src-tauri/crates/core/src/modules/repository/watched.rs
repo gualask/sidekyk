@@ -35,15 +35,16 @@ impl WatchedChanges {
 }
 
 /// Sorts the paths the watcher reported (absolute) into the git dir's entries that matter and
-/// the working tree's paths; the rest of the git dir (objects, logs, locks) is dropped.
+/// the working tree's paths; the rest of the git dir (objects, logs, locks) is dropped. A folder
+/// without git has no `git_dir`: every path under the root is the working tree's.
 pub fn classify<'a>(
     paths: impl Iterator<Item = &'a Path>,
     root: &Path,
-    git_dir: &Path,
+    git_dir: Option<&Path>,
 ) -> WatchedChanges {
     let mut changes = WatchedChanges::default();
     for path in paths {
-        if let Ok(inside_git_dir) = path.strip_prefix(git_dir) {
+        if let Some(inside_git_dir) = git_dir.and_then(|git_dir| path.strip_prefix(git_dir).ok()) {
             let is_lock = path.extension().is_some_and(|ext| ext == "lock");
             let first = inside_git_dir.components().next();
             changes.git_dir |= !is_lock
@@ -63,7 +64,7 @@ mod tests {
         classify(
             paths.iter().map(Path::new),
             Path::new(root),
-            Path::new(git_dir),
+            Some(Path::new(git_dir)),
         )
     }
 
@@ -122,5 +123,21 @@ mod tests {
         );
         assert!(found.git_dir);
         assert_eq!(found.worktree, vec![PathBuf::from("/wt/src/a.ts")]);
+    }
+
+    #[test]
+    fn without_git_every_path_under_the_root_is_the_working_trees() {
+        let found = classify(
+            ["/r/.git", "/r/notes/a.md", "/elsewhere/b.md"]
+                .iter()
+                .map(Path::new),
+            Path::new("/r"),
+            None,
+        );
+        assert!(!found.git_dir);
+        assert_eq!(
+            found.worktree,
+            vec![PathBuf::from("/r/.git"), PathBuf::from("/r/notes/a.md")]
+        );
     }
 }

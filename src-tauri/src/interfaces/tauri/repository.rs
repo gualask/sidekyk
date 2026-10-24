@@ -1,12 +1,12 @@
-//! Tauri adapters for the repositories under review.
+//! Tauri adapters for the projects' folders: a repository under review, or a folder without git.
 
 use anyhow::Context;
 use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
-use super::tray;
-use sidekyk_core::modules::projects::{Location, Project};
+use sidekyk_core::modules::folder::FolderKind;
+use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
@@ -16,18 +16,16 @@ use sidekyk_core::modules::repository::{
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
 
-/// What `on_project` gives its work: the project, and its repository as what reads it there
-/// knows it.
+/// What `on_project` gives its work: the project's folder, as what reads it there knows it.
 pub(super) struct OnProject<'a> {
     pub(super) app: &'a tauri::AppHandle,
-    pub(super) project: &'a Project,
-    /// The folder it follows, a repository.
+    /// Where its folder is.
     pub(super) folder: &'a Location,
     pub(super) repositories: &'a dyn Repositories,
     pub(super) info: &'a RepositoryInfo,
 }
 
-/// Runs `work` off the async runtime on a project the user added, with what reads its repository.
+/// Runs `work` off the async runtime on a project the user added, with what reads its folder.
 pub(super) async fn on_project<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
@@ -37,17 +35,34 @@ pub(super) async fn on_project<T: Send + 'static>(
     blocking(command, app, move |app| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
-        // the frontend asks only for the repository of a project that follows one
-        let (folder, info) = project
-            .repository()
-            .context("the project follows no repository")?;
+        // the frontend asks only of a project that has a folder
+        let (folder, info) = project.repository().context("the project has no folder")?;
         work(OnProject {
             app,
-            project: &project,
             folder,
             repositories: &*projects.repositories_at(folder),
             info: &info,
         })
+    })
+    .await
+}
+
+#[tauri::command]
+/// Whether a project's folder is a repository or a folder without git. No git runs, so the
+/// cards ask it at once; `start` starts a stopped WSL distro that holds it, as opening the project
+/// does and the cards do not.
+pub(crate) async fn get_folder_kind(
+    app: tauri::AppHandle,
+    project_id: String,
+    start: bool,
+) -> Result<FolderKind, AppError> {
+    on_project("get_folder_kind", app, project_id, move |on| {
+        if !start {
+            on.app
+                .state::<ProjectsState>()
+                .readable_without_starting(on.folder)?;
+        }
+        on.repositories.folder_kind(on.info)
     })
     .await
 }
@@ -59,10 +74,7 @@ pub(crate) async fn get_repository_snapshot(
     project_id: String,
 ) -> Result<RepositorySnapshot, AppError> {
     on_project("get_repository_snapshot", app, project_id, |on| {
-        let snapshot = on.repositories.snapshot(on.info);
-        let summary = snapshot.as_ref().ok().map(|s| &s.summary);
-        tray::show_read(on.app, &on.project.id, summary);
-        snapshot
+        on.repositories.snapshot(on.info)
     })
     .await
 }
@@ -78,9 +90,7 @@ pub(crate) async fn get_repository_summary(
         on.app
             .state::<ProjectsState>()
             .readable_without_starting(on.folder)?;
-        let summary = on.repositories.summary(on.info);
-        tray::show_read(on.app, &on.project.id, summary.as_ref().ok());
-        summary
+        on.repositories.summary(on.info)
     })
     .await
 }

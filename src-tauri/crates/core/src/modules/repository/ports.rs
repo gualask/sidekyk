@@ -7,8 +7,8 @@ use crate::shared::process::ProcessOutput;
 /// What a git call wrote, and how it ended.
 pub type GitOutput = ProcessOutput;
 
-/// What the repository module needs from the machine: the `git` CLI and read access to files in
-/// the working tree. The module never reads the disk itself, so the machine can be another one
+/// What the repository and folder modules need from the machine: the `git` CLI and read access to
+/// the files of a project's folder. The modules never read the disk themselves, so the machine can be another one
 /// (a WSL distro). Every git call is bounded: it reads at most `max_stdout` bytes of output, and
 /// fails with `git_timed_out` when git takes too long, killed either way.
 pub trait RepositoryBackend: Send + Sync {
@@ -45,26 +45,60 @@ pub trait RepositoryBackend: Send + Sync {
     /// The names of the folders in `path` (relative) under `root`, links not followed; `None`
     /// when `path` is not a folder there.
     fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>>;
+
+    /// The files of a folder without git, at most `max`: what its `.gitignore` and `.ignore` files,
+    /// git's global excludes and `folder::always_hidden` do not hide; links listed, not followed.
+    fn walk(&self, root: &Path, max: usize) -> Walked;
+
+    /// The rules `walk` hides files by, asked about one path at a time.
+    fn folder_rules(&self, root: &Path) -> Box<dyn FolderRules>;
+
+    /// `path` as the watcher reports what is under it, or `None` when nothing is there: links
+    /// resolved where the system's watcher reports real paths (FSEvents, inotify), as git names a
+    /// repository's root; on Windows the absolute path as given.
+    fn real_path(&self, path: &Path) -> Option<PathBuf>;
 }
 
-/// Watches a repository's working tree and git dir.
+/// What `walk` would not list, for one path at a time (a change the watcher saw). Each folder's
+/// ignore files are read once, when a path under it is first asked about: after one changes,
+/// rules are asked for again.
+pub trait FolderRules: Send {
+    /// Whether `path` (relative to the root) is hidden: itself, or a folder above it. What is
+    /// there tells a folder from a file; a path gone is a file.
+    fn is_hidden(&mut self, path: &Path) -> bool;
+
+    /// Whether `path` (relative to the root) is a file the rules are read from: a change to it
+    /// changes them.
+    fn is_rules_file(&self, path: &Path) -> bool;
+}
+
+/// What `walk` found.
+pub struct Walked {
+    /// Relative to the root, `/` between names, in no order.
+    pub paths: Vec<String>,
+    /// More files were there than the walk took.
+    pub truncated: bool,
+}
+
+/// Watches a project's folder, and a repository's git dir.
 pub trait RepositoryWatcher: Send + Sync {
     /// Calls `on_change` with the paths (absolute) that changed during each quiet period, until
-    /// the returned watch is dropped. `classify` says which of them matter.
+    /// the returned watch is dropped. `classify` says which of them matter. `git_dir` is `None`
+    /// for a folder without git.
     fn watch(
         &self,
         root: &Path,
-        git_dir: &Path,
+        git_dir: Option<&Path>,
         on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
     ) -> anyhow::Result<Watch>;
 }
 
-/// A repository being watched: watching stops when `guard` is dropped.
+/// A project's folder being watched: watching stops when `guard` is dropped.
 pub struct Watch {
     pub guard: Box<dyn Send>,
     /// `Some` where the system watches one folder at a time (inotify): nothing is watched until
-    /// folders are added through it. `None` where `root` and `git_dir` are watched with all they
-    /// hold (FSEvents, `ReadDirectoryChangesW`).
+    /// folders are added through it. `None` where the folder and its git dir are watched with all
+    /// they hold (FSEvents, `ReadDirectoryChangesW`).
     pub folders: Option<Arc<dyn FolderWatcher>>,
 }
 

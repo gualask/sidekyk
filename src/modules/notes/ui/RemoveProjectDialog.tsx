@@ -55,7 +55,7 @@ export function RemoveProjectDialog({
                     <AlertDialog.Description className="mt-1.5 text-ui-text-secondary">
                         {notes === null ? t('remove.notes') : tp('remove.notesCount', notes)}
                         {/* a project without folder has no repository to leave as it is */}
-                        {projectFolder(project) ? ` ${t('remove.repositoryStays')}` : null}
+                        {projectFolder(project) ? ` ${t('remove.folderStays')}` : null}
                     </AlertDialog.Description>
                     <div className="mt-4 flex flex-wrap justify-end gap-2">
                         <AlertDialog.Close className="btn-ghost-sm">

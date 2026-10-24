@@ -133,7 +133,7 @@ indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problem
 
 - One helper per distro, a child of the app, started on first need; no daemon, no timer while
   idle.
-- Alive while a project of its distro is on screen, the window hidden included (the tray mark).
+- Alive while a project of its distro is on screen, the window hidden included (the watcher's mark for when it shows).
   Otherwise the app closes its stdin 10 min after its last request, and it exits (2026-10-18, the
   maintainer's call, as Zed after a disconnect; VS Code 5 min, opt-in): a short pause or level 0
   never waits for a new helper, and the WSL VM it keeps alive for those 10 min is acceptable. The

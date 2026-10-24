@@ -27,7 +27,6 @@ pub enum UserFacingErrorCode {
     InvalidCommit,
     #[cfg(any(target_os = "macos", windows))]
     InvalidShortcut,
-    NotARepository,
     NoteListMissing,
     NoteMissing,
     NoteTooLong,
@@ -51,7 +50,6 @@ impl UserFacingErrorCode {
             Self::InvalidCommit => "invalid_commit",
             #[cfg(any(target_os = "macos", windows))]
             Self::InvalidShortcut => "invalid_shortcut",
-            Self::NotARepository => "not_a_repository",
             Self::NoteListMissing => "note_list_missing",
             Self::NoteMissing => "note_missing",
             Self::NoteTooLong => "note_too_long",
@@ -79,7 +77,6 @@ impl UserFacingErrorCode {
         Self::InvalidCommit,
         #[cfg(any(target_os = "macos", windows))]
         Self::InvalidShortcut,
-        Self::NotARepository,
         Self::NoteListMissing,
         Self::NoteMissing,
         Self::NoteTooLong,
@@ -170,10 +167,10 @@ mod tests {
 
     #[test]
     fn serializes_user_facing_codes_and_unknown_errors() {
-        let known = AppError::from(user_facing(UserFacingErrorCode::NotARepository));
+        let known = AppError::from(user_facing(UserFacingErrorCode::RepositoryMissing));
         assert_eq!(
             serde_json::to_value(known).unwrap(),
-            serde_json::json!({ "code": "not_a_repository", "message": "not_a_repository" })
+            serde_json::json!({ "code": "repository_missing", "message": "repository_missing" })
         );
 
         let unknown = AppError::from(anyhow::anyhow!("git exploded"));
@@ -231,7 +228,6 @@ mod tests {
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::HelperFailed, "helper_failed"),
             (UserFacingErrorCode::InvalidCommit, "invalid_commit"),
-            (UserFacingErrorCode::NotARepository, "not_a_repository"),
             (UserFacingErrorCode::NoteListMissing, "note_list_missing"),
             (UserFacingErrorCode::NoteMissing, "note_missing"),
             (UserFacingErrorCode::NoteTooLong, "note_too_long"),

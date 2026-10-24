@@ -1,13 +1,13 @@
 import { IconHelp, IconSearch, IconSettings } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
-import { changesPanel, ProjectFacts } from '@/modules/repository';
+import { ProjectFacts } from '@/modules/repository';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
-import { panelShortcut, projectTiles } from './panels';
+import { panelShortcut } from './panels';
 import type { Problem } from './problems';
 import { useTitleBarOverlaid } from './providers';
 import type { ZoomLevel } from './workspace';
@@ -54,6 +54,7 @@ export function TopBar({
     onToggleHelp,
     minimized,
     onRestore,
+    facts,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
@@ -67,6 +68,8 @@ export function TopBar({
     /** The panels waiting in the top bar, at a project's panels. */
     minimized: readonly PanelDefinition[];
     onRestore: (panel: PanelDefinition) => void;
+    /** A project's panels are on screen, Changes among them: its snapshot has the facts. */
+    facts: boolean;
 }) {
     const { t } = useTranslation();
     const overlaid = useTitleBarOverlaid();
@@ -102,10 +105,7 @@ export function TopBar({
                     </>
                 ) : null}
             </nav>
-            {project && level >= 1 && projectTiles(project).panels.includes(changesPanel) ? (
-                // a project's panels are on screen, Changes among them: its snapshot has the facts
-                <ProjectFacts project={project} fromSnapshot />
-            ) : null}
+            {project && facts ? <ProjectFacts project={project} fromSnapshot /> : null}
             <div className="ml-auto flex items-center gap-1.5">
                 {minimized.length > 0 ? (
                     <nav

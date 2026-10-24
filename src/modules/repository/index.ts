@@ -1,6 +1,7 @@
 export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
 export {
     type ProjectFailure,
+    useFolderKind,
     useProjectFailures,
     useReadProjectAgain,
     useRepositoryChangeSubscription,
@@ -18,6 +19,7 @@ export {
     type FileChange,
     type FileContent,
     type FileVersion,
+    type FolderKind,
     REPOSITORY_CHANGED_EVENT,
     type RecentCommits,
     type RepositoryChangedEvent,

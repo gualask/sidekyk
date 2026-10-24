@@ -9,10 +9,11 @@ const selectionKey = (projectId: string) => `selection:${projectId}`;
 /**
  * The file shown of a project, the same in both panels and kept for the session, with what it
  * shows among the changed files: the snapshot it comes from, the changed files in the list's
- * order, the change (if it is one) and the path the tree reveals.
+ * order, the change (if it is one) and the path the tree reveals. A folder without git
+ * (`repository` false) has no snapshot and no changed files.
  */
-export function useSelectedFile(projectId: string) {
-    const snapshot = useRepositorySnapshot(projectId);
+export function useSelectedFile(projectId: string, repository: boolean) {
+    const snapshot = useRepositorySnapshot(projectId, repository);
     const [selection, setSelection] = useSessionState<Selection>(
         selectionKey(projectId),
         FIRST_CHANGE,

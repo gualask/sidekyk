@@ -268,7 +268,7 @@ pub fn load_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::{GitOutput, WorktreeEntry};
+    use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
 
     /// Files of `size` bytes of text, one line each, except `logo.png` which is binary.
     struct FakeFiles {
@@ -320,6 +320,18 @@ mod tests {
             }
             Some(bytes)
         }
+
+        fn walk(&self, _root: &Path, _max: usize) -> Walked {
+            unreachable!()
+        }
+
+        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
+            unreachable!()
+        }
+
+        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
+            unreachable!()
+        }
     }
 
     /// `git status` printing `stdout`, cut by the transport when `truncated`.
@@ -369,6 +381,18 @@ mod tests {
         }
 
         fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
+            unreachable!()
+        }
+
+        fn walk(&self, _root: &Path, _max: usize) -> Walked {
+            unreachable!()
+        }
+
+        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
+            unreachable!()
+        }
+
+        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
             unreachable!()
         }
     }

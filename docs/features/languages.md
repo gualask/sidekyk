@@ -6,7 +6,7 @@ The UI in English and Italian: the frontend's text, and what the backend writes 
 ## Behaviour
 
 - Settings › Appearance › Language: `English`, `Italiano`, each by its own name. Changes apply at
-  once, without reloading the page; the tray menu and tooltip follow.
+  once, without reloading the page; the tray menu follows.
 - First start: the system's language (`navigator.languages`, the first one the UI speaks, else
   English), stored in the settings; from then on only the setting counts. No "System" option, as
   the theme has none.
@@ -45,7 +45,7 @@ The UI in English and Italian: the frontend's text, and what the backend writes 
   Removing the code of a text without its keys fails it.
 - Backend: `Settings.language` (`Option<Language>`, `None` until the first start stores one).
   `interfaces/tauri/texts.rs` holds the Rust text, one `Texts` per language (the struct makes
-  both complete): tray menu and tooltip, dialog titles, export file name and `ExportWords`, the
+  both complete): tray menu, dialog titles, export file name and `ExportWords`, the
   first list's name (`NotesStore::name_first_lists`). Startup and `set_settings` apply it
   (`tray::speak`).
 

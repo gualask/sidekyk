@@ -1,7 +1,8 @@
-//! What runs on the machine holding the repository: the git CLI, the filesystem watcher, and the
-//! helper that serves them to the app from another machine.
+//! What runs on the machine holding the project's folder: the git CLI, the walk of a folder without
+//! git, the filesystem watcher, and the helper that serves them to the app from another machine.
 
 pub mod agent;
+mod folder_walk;
 pub mod git_cli;
 pub mod linux_helper;
 pub mod machines;

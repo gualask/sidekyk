@@ -1,4 +1,5 @@
-//! Watches the working tree and the git dir, and reports what changed after a quiet period.
+//! Watches a project's folder and a repository's git dir, and reports what changed after a quiet
+//! period.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, Weak};
@@ -47,7 +48,7 @@ impl RepositoryWatcher for LocalRepositoryWatcher {
     fn watch(
         &self,
         root: &Path,
-        git_dir: &Path,
+        git_dir: Option<&Path>,
         mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
     ) -> anyhow::Result<Watch> {
         let config = notify_debouncer_mini::Config::default().with_timeout(QUIET_PERIOD);
@@ -73,7 +74,7 @@ impl RepositoryWatcher for LocalRepositoryWatcher {
             });
         }
         debouncer.watcher().watch(root, RecursiveMode::Recursive)?;
-        if !git_dir.starts_with(root) {
+        if let Some(git_dir) = git_dir.filter(|git_dir| !git_dir.starts_with(root)) {
             debouncer
                 .watcher()
                 .watch(git_dir, RecursiveMode::Recursive)?;
@@ -176,7 +177,7 @@ mod tests {
         let watch = LocalRepositoryWatcher::default()
             .watch(
                 &root,
-                &root.join(".git"),
+                Some(&root.join(".git")),
                 Box::new(move |paths| {
                     let _ = sent.send(paths);
                 }),
@@ -213,7 +214,7 @@ mod tests {
         let watch = LocalRepositoryWatcher::default()
             .watch(
                 &root,
-                &root.join(".git"),
+                Some(&root.join(".git")),
                 Box::new(move |paths| {
                     let _ = sent.send(paths);
                 }),

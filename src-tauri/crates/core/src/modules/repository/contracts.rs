@@ -25,6 +25,9 @@ pub struct RepositoryChange {
     /// open file or diff no change touched is not read again; `None` when any may have (too
     /// many, git could not tell which are ignored, or a name is not UTF-8).
     pub paths: Option<Vec<String>>,
+    /// A `.git` came or went at the root: the folder is now the other kind, and what was read of
+    /// it is dropped rather than read again.
+    pub kind_changed: bool,
 }
 
 impl RepositoryChange {
@@ -34,6 +37,15 @@ impl RepositoryChange {
             root,
             git_dir: true,
             paths: None,
+            kind_changed: false,
+        }
+    }
+
+    /// The folder at `root` became a repository, or stopped being one.
+    pub fn kind(root: String) -> Self {
+        Self {
+            kind_changed: true,
+            ..Self::anything(root)
         }
     }
 }
@@ -43,22 +55,26 @@ impl RepositoryChange {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
-    /// 3: with the paths that changed; 2 named the project by its id, 1 by its root.
+    /// 4: with a change of kind; 3 brought the paths that changed; 2 named the project by its
+    /// id, 1 by its root.
     pub version: u8,
     pub project_id: String,
     /// As in `RepositoryChange`.
     pub git_dir: bool,
     /// As in `RepositoryChange`.
     pub paths: Option<Vec<String>>,
+    /// As in `RepositoryChange`.
+    pub kind_changed: bool,
 }
 
 impl RepositoryChangedEvent {
     pub fn new(project_id: &str, change: RepositoryChange) -> Self {
         Self {
-            version: 3,
+            version: 4,
             project_id: project_id.to_string(),
             git_dir: change.git_dir,
             paths: change.paths,
+            kind_changed: change.kind_changed,
         }
     }
 }
@@ -385,21 +401,37 @@ mod tests {
                 RepositoryChange::anything("/r".into())
             ))
             .unwrap(),
-            serde_json::json!({ "version": 3, "projectId": "/r", "gitDir": true, "paths": null })
+            serde_json::json!({
+                "version": 4,
+                "projectId": "/r",
+                "gitDir": true,
+                "paths": null,
+                "kindChanged": false
+            })
         );
         let change = RepositoryChange {
             root: "/r".into(),
             git_dir: false,
             paths: Some(vec!["src/a.ts".into()]),
+            kind_changed: false,
         };
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("p", change)).unwrap(),
             serde_json::json!({
-                "version": 3,
+                "version": 4,
                 "projectId": "p",
                 "gitDir": false,
-                "paths": ["src/a.ts"]
+                "paths": ["src/a.ts"],
+                "kindChanged": false
             })
+        );
+        assert_eq!(
+            serde_json::to_value(RepositoryChangedEvent::new(
+                "p",
+                RepositoryChange::kind("/r".into())
+            ))
+            .unwrap()["kindChanged"],
+            true
         );
     }
 

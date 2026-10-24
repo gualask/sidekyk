@@ -12,6 +12,7 @@ import { onTauriEvent } from './events';
  * window's visibility in `window.rs`.
  */
 export const tauriRepository: RepositoryPort = {
+    getFolderKind: (projectId, start) => invoke('get_folder_kind', { projectId, start }),
     getSnapshot: (projectId) => invoke('get_repository_snapshot', { projectId }),
     getSummary: (projectId) => invoke('get_repository_summary', { projectId }),
     getFileDiff: (projectId, request) => invoke('get_file_diff', { projectId, request }),

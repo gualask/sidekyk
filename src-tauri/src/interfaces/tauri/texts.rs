@@ -1,7 +1,7 @@
 //! The text the backend writes for the user, in the UI's language (`Settings::language`): the
 //! tray, the dialogs' titles, an export of notes, a project's first list. The frontend's own is in
 //! `src/shared/i18n/messages`; both languages have every field, as the struct asks. Statics, so
-//! that one language is one address (`tray::speak` compares them).
+//! that a language's texts live as long as the app.
 
 use sidekyk_core::modules::notes::ExportWords;
 use sidekyk_core::modules::settings::Language;
@@ -12,11 +12,6 @@ use super::settings::AppliedSettings;
 pub(crate) struct Texts {
     pub(crate) show: &'static str,
     pub(crate) quit: &'static str,
-    /// The tray's tooltip, after the project's name.
-    pub(crate) no_changes: &'static str,
-    pub(crate) one_changed_file: &'static str,
-    /// `{count}`: how many, `12` or `10000+`.
-    pub(crate) changed_files: &'static str,
     /// The folder picker's title for a new project.
     pub(crate) choose_folder: &'static str,
     /// `{name}`: the project's.
@@ -31,9 +26,6 @@ pub(crate) struct Texts {
 static ENGLISH: Texts = Texts {
     show: "Show Sidekyk",
     quit: "Quit Sidekyk",
-    no_changes: "no changes",
-    one_changed_file: "1 changed file",
-    changed_files: "{count} changed files",
     choose_folder: "Choose the project's folder",
     locate: "Locate {name}",
     export_notes: "Export notes",
@@ -49,9 +41,6 @@ static ENGLISH: Texts = Texts {
 static ITALIAN: Texts = Texts {
     show: "Mostra Sidekyk",
     quit: "Esci da Sidekyk",
-    no_changes: "nessuna modifica",
-    one_changed_file: "1 file modificato",
-    changed_files: "{count} file modificati",
     choose_folder: "Scegli la cartella del progetto",
     locate: "Individua {name}",
     export_notes: "Esporta le note",

@@ -1,19 +1,30 @@
 //! The folders to watch where the system watches one folder at a time (inotify): every folder of
 //! the working tree git does not ignore, as VS Code (`@parcel/watcher`) and Zed watch on Linux,
-//! and the folders of the git dir whose files `classify` counts.
+//! and the folders of the git dir whose files `classify` counts; in a folder without git, every
+//! folder its walk would enter.
 
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::ignored::{changes_rules, check_ignore};
-use super::ports::{FolderAdded, FolderWatcher, RepositoryBackend};
+use super::ports::{FolderAdded, FolderRules, FolderWatcher, RepositoryBackend};
 use super::watched::GIT_DIR_FOLDERS;
 
+/// What keeps a folder out of the watch.
+pub enum Hiding {
+    /// A repository: what git ignores, and a repository inside it (a submodule, a clone), whose
+    /// files are not its own. The git dir's folders that count are watched too.
+    Git { git_dir: PathBuf },
+    /// A folder without git: the rules its walk lists files by.
+    Rules(Box<dyn FolderRules>),
+}
+
 pub struct WatchedFolders {
-    /// As git names it: git is asked about folders relative to it.
+    /// As git, or the system's watcher, names it: folders are asked about relative to it.
     root: PathBuf,
     watcher: Arc<dyn FolderWatcher>,
+    hiding: Hiding,
     /// Absolute.
     watched: HashSet<PathBuf>,
     /// The system's limit on watches was reached: nothing more is added.
@@ -21,47 +32,54 @@ pub struct WatchedFolders {
 }
 
 impl WatchedFolders {
-    /// Watches the git dir's folders that count, then the working tree's folders git does not
-    /// ignore, each before reading it, so a folder created meanwhile is seen.
+    /// Watches a repository's git dir's folders that count, then the folders `hiding` does not
+    /// keep out, each before reading it, so a folder created meanwhile is seen.
     pub fn start(
         backend: &dyn RepositoryBackend,
         watcher: Arc<dyn FolderWatcher>,
         root: &Path,
-        git_dir: &Path,
+        hiding: Hiding,
     ) -> Self {
+        let git_dir = match &hiding {
+            Hiding::Git { git_dir } => Some(git_dir.clone()),
+            Hiding::Rules(_) => None,
+        };
         let mut folders = Self {
             root: root.to_path_buf(),
             watcher,
+            hiding,
             watched: HashSet::new(),
             full: false,
         };
-        // index, HEAD and the other files directly in it
-        folders.add(git_dir);
-        for name in GIT_DIR_FOLDERS {
-            folders.add_all(backend, git_dir, PathBuf::from(name));
+        if let Some(git_dir) = git_dir {
+            // index, HEAD and the other files directly in it
+            folders.add(&git_dir);
+            for name in GIT_DIR_FOLDERS {
+                folders.add_all(backend, &git_dir, PathBuf::from(name));
+            }
         }
         folders.walk(backend, vec![PathBuf::new()]);
         tracing::debug!(folders = folders.watched.len(), "folders watched");
         folders
     }
 
-    /// Watches the folders a batch created among `paths` (relative, not ignored by git), and the
-    /// folders under them git does not ignore: before the change is told, so the read it brings
-    /// sees what they hold and their next changes are seen too.
+    /// Watches the folders a batch created among `paths` (relative, shown), and the folders under
+    /// them not kept out: before the change is told, so the read it brings sees what they hold
+    /// and their next changes are seen too.
     pub fn add_created(&mut self, backend: &dyn RepositoryBackend, paths: &[&Path]) {
         let created = self.created_folders(backend, paths.iter().copied());
         self.walk(backend, created);
     }
 
-    /// Like `add_created` for paths changed while nobody looked (absolute, maybe ignored), once git
-    /// may run again; looks at every folder again when a `.gitignore` was among them.
+    /// Like `add_created` for paths changed while nobody looked (absolute, maybe hidden), once git
+    /// may run again; looks at every folder again when an ignore file was among them.
     pub fn add_missed(&mut self, backend: &dyn RepositoryBackend, paths: &[PathBuf]) {
         let root = self.root.clone();
         let relative: Vec<&Path> = paths
             .iter()
             .filter_map(|path| path.strip_prefix(&root).ok())
             .collect();
-        if relative.iter().any(|rel| changes_rules(rel)) {
+        if relative.iter().any(|rel| self.changes_rules(rel)) {
             self.rescan(backend);
             return;
         }
@@ -70,11 +88,22 @@ impl WatchedFolders {
         self.walk(backend, visible);
     }
 
-    /// What git ignores may have changed (a `.gitignore`), or git could not tell: every folder is
-    /// looked at again and those now shown are added. A folder git now ignores stays watched
-    /// until the repository is watched again; its changes are dropped by the filter.
+    /// What is kept out may have changed (an ignore file), or git could not tell: every folder is
+    /// looked at again and those now shown are added. A folder now kept out stays watched until
+    /// the folder is watched again; its changes are dropped by the filter.
     pub fn rescan(&mut self, backend: &dyn RepositoryBackend) {
+        if let Hiding::Rules(rules) = &mut self.hiding {
+            *rules = backend.folder_rules(&self.root);
+        }
         self.walk(backend, vec![PathBuf::new()]);
+    }
+
+    /// Whether a change to `path` (relative) may change what is kept out.
+    fn changes_rules(&self, path: &Path) -> bool {
+        match &self.hiding {
+            Hiding::Git { .. } => changes_rules(path),
+            Hiding::Rules(rules) => rules.is_rules_file(path),
+        }
     }
 
     /// The folders among `paths` (relative) not watched yet. A path that is no longer a folder
@@ -99,8 +128,8 @@ impl WatchedFolders {
         created
     }
 
-    /// Watches `start` (folders relative to the root, not ignored by git) and the folders under
-    /// them git does not ignore, one level at a time: git is asked once per level.
+    /// Watches `start` (folders relative to the root, shown) and the folders under them not kept
+    /// out, one level at a time: git is asked once per level.
     fn walk(&mut self, backend: &dyn RepositoryBackend, start: Vec<PathBuf>) {
         let mut level = start;
         while !level.is_empty() {
@@ -111,7 +140,8 @@ impl WatchedFolders {
                 }
                 // a repository inside (a submodule, a clone) is not this one's files: git refuses
                 // to answer about paths in a submodule
-                let inner = !folder.as_os_str().is_empty()
+                let inner = matches!(self.hiding, Hiding::Git { .. })
+                    && !folder.as_os_str().is_empty()
                     && backend.has_entry(&self.root, &folder.join(".git"));
                 if inner {
                     continue;
@@ -140,11 +170,21 @@ impl WatchedFolders {
         }
     }
 
-    /// The folders (relative) git does not ignore. When git cannot answer, all of them: a folder
-    /// watched for nothing costs less than a change missed.
-    fn not_ignored(&self, backend: &dyn RepositoryBackend, folders: Vec<PathBuf>) -> Vec<PathBuf> {
+    /// The folders (relative) not kept out. When git cannot answer, all of them: a folder watched
+    /// for nothing costs less than a change missed.
+    fn not_ignored(
+        &mut self,
+        backend: &dyn RepositoryBackend,
+        folders: Vec<PathBuf>,
+    ) -> Vec<PathBuf> {
         if folders.is_empty() {
             return folders;
+        }
+        if let Hiding::Rules(rules) = &mut self.hiding {
+            return folders
+                .into_iter()
+                .filter(|folder| !rules.is_hidden(folder))
+                .collect();
         }
         let asked: BTreeSet<&Path> = folders.iter().map(PathBuf::as_path).collect();
         let Some(ignored) = check_ignore(backend, &self.root, &asked) else {

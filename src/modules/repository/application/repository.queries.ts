@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { changeTouches } from '../model/changed-paths';
 import { commitRequest } from '../model/commits';
 import type { DiffLine } from '../model/diff-parser';
@@ -19,6 +20,7 @@ import type {
     CommitRequest,
     Directory,
     FileDiffRequest,
+    FolderKind,
     RepositorySnapshot,
     SyntaxColors,
 } from '../model/repository.types';
@@ -40,6 +42,9 @@ import { useRepositoryPort } from './repository.port';
 export const repositoryKeys = {
     all: ['repository'] as const,
     of: (projectId: string) => [...repositoryKeys.all, projectId] as const,
+    /** Asked by the cards (`start` false) and by the project opened apart: only one starts a distro. */
+    kind: (projectId: string, start: boolean) =>
+        [...repositoryKeys.of(projectId), 'kind', start] as const,
     snapshot: (projectId: string) => [...repositoryKeys.of(projectId), 'snapshot'] as const,
     summary: (projectId: string) => [...repositoryKeys.of(projectId), 'summary'] as const,
     diff: (projectId: string, request: FileDiffRequest) =>
@@ -84,6 +89,8 @@ export function worktreeChangeTouches(
 ): boolean {
     const [, , kind, ...rest] = queryKey;
     switch (kind) {
+        // a change of kind is told as such
+        case 'kind':
         case 'commits':
             return false;
         case 'diff': {
@@ -139,7 +146,38 @@ function isOld({ state }: { state: QueryState<unknown> }): boolean {
     return Date.now() - readAt > READ_AGAIN_AFTER_MS;
 }
 
-export function useRepositorySnapshot(projectId: string) {
+/**
+ * What a project's folder is, for the panels it has: `null` without folder, `waiting` until read.
+ * No git runs, so it answers at once. `start` starts a stopped WSL distro (the project opened);
+ * the cards never do, and their answer stands in while the project opened reads its own. A kind
+ * that cannot be read counts as a repository, as every folder did before: its panels and the
+ * problems tell why.
+ */
+export function useFolderKind(
+    project: ProjectInfo | null,
+    { start = false, freshOnShow = false } = {},
+): { kind: FolderKind | null; waiting: boolean } {
+    const port = useRepositoryPort();
+    const queryClient = useQueryClient();
+    const projectId = project && projectFolder(project) ? project.id : null;
+    const query = useQuery({
+        queryKey: repositoryKeys.kind(projectId ?? '', start),
+        queryFn: () => port.getFolderKind(projectId ?? '', start),
+        enabled: projectId !== null,
+        staleTime: Number.POSITIVE_INFINITY,
+        placeholderData: () =>
+            start && projectId
+                ? queryClient.getQueryData<FolderKind>(repositoryKeys.kind(projectId, false))
+                : undefined,
+        refetchOnMount: freshOnShow ? (query) => (isOld(query) ? 'always' : false) : true,
+    });
+    if (!projectId) return { kind: null, waiting: false };
+    if (query.isError) return { kind: 'repository', waiting: false };
+    return { kind: query.data ?? null, waiting: query.isPending };
+}
+
+/** A repository's snapshot; none read for a folder without git (`repository` false). */
+export function useRepositorySnapshot(projectId: string, repository: boolean) {
     const port = useRepositoryPort();
     const queryClient = useQueryClient();
     return useQuery({
@@ -150,6 +188,7 @@ export function useRepositorySnapshot(projectId: string) {
             queryClient.setQueryData(repositoryKeys.summary(projectId), snapshot.summary);
             return snapshot;
         },
+        enabled: repository,
     });
 }
 
@@ -381,7 +420,12 @@ function failedProjects(cache: QueryCache): string {
 export function useProjectFailures(): ReadonlyMap<string, ProjectFailure> {
     const cache = useQueryClient().getQueryCache();
     const failed = useSyncExternalStore(
-        (onChange) => cache.subscribe(onChange),
+        // only a read ending or going changes a failure: not a query made, as one is while a
+        // component renders
+        (onChange) =>
+            cache.subscribe(({ type }) => {
+                if (type === 'updated' || type === 'removed') onChange();
+            }),
         () => failedProjects(cache),
     );
     return useMemo(
@@ -429,9 +473,15 @@ export function useRepositoryChangeSubscription() {
     const queryClient = useQueryClient();
     useEffect(
         () =>
-            port.onRepositoryChanged(({ projectId, gitDir, paths }) => {
+            port.onRepositoryChanged(({ projectId, gitDir, paths, kindChanged }) => {
+                const queryKey = repositoryKeys.of(projectId);
+                // the folder is now the other kind: what was read of it goes, its kind read again
+                if (kindChanged) {
+                    void queryClient.resetQueries({ queryKey });
+                    return;
+                }
                 void queryClient.invalidateQueries({
-                    queryKey: repositoryKeys.of(projectId),
+                    queryKey,
                     predicate: ({ queryKey }) => gitDir || worktreeChangeTouches(queryKey, paths),
                 });
             }),

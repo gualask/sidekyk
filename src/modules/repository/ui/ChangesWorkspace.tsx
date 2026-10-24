@@ -62,7 +62,7 @@ export function ChangesWorkspace({
         setSelection,
         change: selected,
         path: selectedPath,
-    } = useSelectedFile(project.id);
+    } = useSelectedFile(project.id, true);
     const commitView = useCommitView(project.id);
     const { commit: viewed, file: commitFile } = commitView;
     // the file shown, whose find bar goes when another shows
@@ -312,7 +312,7 @@ export function ChangesWorkspace({
                     ) : snapshot.isPending && folder?.kind === 'wsl' ? (
                         // the first read may start the distro and Sidekyk's helper in it
                         <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
-                            {i18n.t('changes.starting', { distro: folder.distro })}
+                            {i18n.t('projects.starting', { distro: folder.distro })}
                         </div>
                     ) : null}
                 </main>

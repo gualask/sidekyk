@@ -124,8 +124,8 @@ pub enum Relocation {
     },
 }
 
-/// A folder picked for a new project: a repository no project follows yet (`path` as picked, to
-/// give back on creating it; `name` its repository's), another project's, or not a repository.
+/// A folder picked for a new project: one no project has yet (`path` as picked, to give back on
+/// creating it; `name` its folder's), or another project's.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum FolderChoice {
@@ -136,11 +136,7 @@ pub enum FolderChoice {
         location: Location,
     },
     #[serde(rename_all = "camelCase")]
-    InProject {
-        id: String,
-        name: String,
-    },
-    NotRepository,
+    InProject { id: String, name: String },
 }
 
 /// A project as stored: today `{ id, name, folders }`. Older forms are read too: one location
@@ -390,10 +386,6 @@ mod tests {
         assert_eq!(
             serde_json::to_value(in_project).unwrap()["kind"],
             "inProject"
-        );
-        assert_eq!(
-            serde_json::to_value(FolderChoice::NotRepository).unwrap(),
-            serde_json::json!({ "kind": "notRepository" })
         );
     }
 

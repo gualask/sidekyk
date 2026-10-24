@@ -345,7 +345,7 @@ pub(crate) async fn count_notes(app: tauri::AppHandle, book: String) -> Result<u
 
 #[tauri::command]
 /// Asks where to save a project's notes as Markdown and writes them there; the path written, or
-/// `None` when cancelled. Never inside a project's repository: Sidekyk writes in none.
+/// `None` when cancelled. Never inside a project's folder: Sidekyk writes in none.
 pub(crate) async fn export_notes(
     app: tauri::AppHandle,
     project_id: String,

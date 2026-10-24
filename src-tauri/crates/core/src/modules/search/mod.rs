@@ -27,15 +27,6 @@ use crate::modules::repository::{ChangeKind, ChangedFile, FileTree};
 /// At most this many files go back: the palette shows the best, the rest are counted.
 const FILE_LIMIT: usize = 500;
 
-/// Threads a search runs on at most, so a key typed never takes the whole machine.
-const MAX_THREADS: usize = 8;
-
-fn threads() -> usize {
-    std::thread::available_parallelism()
-        .map_or(1, std::num::NonZero::get)
-        .min(MAX_THREADS)
-}
-
 /// A project's files: those git lists, and how they changed as its last snapshot found.
 pub struct ProjectFiles {
     pub tree: Arc<FileTree>,

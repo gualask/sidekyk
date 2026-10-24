@@ -22,6 +22,7 @@ import {
     changesPanel,
     filesPanel,
     fileTarget,
+    useFolderKind,
     useReadProjectAgain,
     useRepositoryChangeSubscription,
     useShownFile,
@@ -30,8 +31,8 @@ import { loadCommandPalette, type PaletteActions, type PaletteMode } from '@/mod
 import { loadSettingsDialog, useSettingsWhenRead } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
-import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { PanelDefinition, PanelProps, PanelTarget, SummaryPart } from '@/shared/panels/panel';
+import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
@@ -101,12 +102,20 @@ export function AppShell() {
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
-    // the project's panels, from what it has; none at all projects without projects
-    const tiles = project ? projectTiles(project) : null;
+    // what its folder is: opening the project starts a stopped WSL distro, all projects does not
+    const folderKind = useFolderKind(project, { start: zoomLevel > 0 });
+    // the project's panels, from what it has; none at all projects without projects, and not yet
+    // while its folder's kind is read
+    const tiles = project && !folderKind.waiting ? projectTiles(folderKind.kind) : null;
+    const hasChanges = tiles?.panels.includes(changesPanel) ?? false;
     // as deep as the project goes: a project with one panel has no level 2, and without projects
     // only all projects shows. The level kept follows the one shown, so another project opens at
-    // the level seen
-    const level = tiles ? (Math.min(zoomLevel, deepestLevel(tiles)) as ZoomLevel) : 0;
+    // the level seen; while the panels wait, it stays
+    const level = !project
+        ? 0
+        : tiles
+          ? (Math.min(zoomLevel, deepestLevel(tiles)) as ZoomLevel)
+          : zoomLevel;
     if (projects.data && level !== zoomLevel) setLevel(level);
     // a panel the project does not have gives way to its main one
     const panel = tiles && !tiles.panels.includes(shownPanel) ? tiles.main : shownPanel;
@@ -238,18 +247,22 @@ export function AppShell() {
             const next = panelById(id);
             if (next && tiles?.fullScreen.includes(next)) zoom(2, next);
         },
-        // as a file picked in the tree: in Files' own viewer when it is full screen, else Changes
+        // as a file picked in the tree: in Files' own viewer when it is full screen or there is no
+        // Changes, else Changes
         openFile: (path, find) =>
             show(
-                level === 2 && panel === filesPanel ? filesPanel.id : changesPanel.id,
+                (level === 2 && panel === filesPanel) || !hasChanges
+                    ? filesPanel.id
+                    : changesPanel.id,
                 fileTarget(path, null, find ?? null),
             ),
         // in Notes, at the same zoom
         openNotes: (list, note) => show(notesPanel.id, notesTarget(list, note)),
     };
 
+    // every project has its panels (level 1), whatever its folder turns out to be
     const zoomIn = () => {
-        if (tiles && level < deepestLevel(tiles)) zoom((level + 1) as ZoomLevel);
+        if (project && level < (tiles ? deepestLevel(tiles) : 1)) zoom((level + 1) as ZoomLevel);
     };
     const zoomOut = () => {
         if (level > 0) zoom((level - 1) as ZoomLevel);
@@ -321,6 +334,7 @@ export function AppShell() {
                         : []
                 }
                 onRestore={restore}
+                facts={level >= 1 && hasChanges}
             />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
@@ -426,7 +440,7 @@ function Workspace({
 }: {
     list: ProjectList;
     project: ProjectInfo | null;
-    /** The project's panels; null with no project. */
+    /** The project's panels; null with no project, or while its folder's kind is read. */
     tiles: ProjectTiles | null;
     level: ZoomLevel;
     /** Full screen at level 2 (and at level 1 with one panel), the selected tile at level 1. */
@@ -448,7 +462,7 @@ function Workspace({
     const targetOf = (id: string) =>
         target?.project === project?.id && target?.panel === id ? target.target : null;
     // all projects: the Inbox, then the cards, which give way first in a narrow window
-    if (!project || !tiles || level === 0) {
+    if (!project || level === 0) {
         return (
             <div className="flex h-full">
                 <InboxColumn focusComposer={focusInbox} onComposerFocused={onInboxFocused} />
@@ -456,17 +470,12 @@ function Workspace({
                     list={list}
                     onOpen={() => zoom(1)}
                     onRemove={onRemove}
-                    summary={(card, part) =>
-                        projectTiles(card).summaries.map(({ id, Component }) => (
-                            <Suspense key={id} fallback={null}>
-                                <Component project={card} part={part} />
-                            </Suspense>
-                        ))
-                    }
+                    summary={(card, part) => <CardSummaries project={card} part={part} />}
                 />
             </div>
         );
     }
+    if (!tiles) return <WaitingPanels project={project} />;
     // full screen, and a project's one panel at level 1
     if (level === 2 || tiles.side.length === 0) {
         return (
@@ -521,6 +530,38 @@ function Workspace({
                     )}
                 />
             ) : null}
+        </div>
+    );
+}
+
+/**
+ * What a project's panels tell on its card at all projects, from what its folder is: nothing until
+ * that is read, which the cards ask without starting a WSL distro.
+ */
+function CardSummaries({ project, part }: { project: ProjectInfo; part: SummaryPart }) {
+    const folderKind = useFolderKind(project, { freshOnShow: true });
+    if (folderKind.waiting) return null;
+    const repository = folderKind.kind === 'repository';
+    return projectTiles(folderKind.kind).summaries.map(({ id, Component }) => (
+        <Suspense key={id} fallback={null}>
+            <Component project={project} part={part} repository={repository} />
+        </Suspense>
+    ));
+}
+
+/**
+ * A project's panels before its folder's kind is read, as they wait for what they read: nothing
+ * drawn, but for a WSL project, whose first read may start the distro and Sidekyk's helper in it.
+ */
+function WaitingPanels({ project }: { project: ProjectInfo }) {
+    const { t } = useTranslation();
+    const folder = projectFolder(project);
+    return (
+        <div
+            className="flex h-full items-center justify-center text-sm text-ui-text-muted"
+            style={PROJECT_ZOOM}
+        >
+            {folder?.kind === 'wsl' ? t('projects.starting', { distro: folder.distro }) : null}
         </div>
     );
 }

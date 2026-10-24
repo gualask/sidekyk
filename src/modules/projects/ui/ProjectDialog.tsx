@@ -18,10 +18,10 @@ type ChosenFolder = Extract<FolderChoice, { kind: 'usable' }>;
 type FolderNotice = Exclude<FolderChoice, ChosenFolder>;
 
 /**
- * New project, the same for everyone: a name, and a folder if wanted (a repository: its name fills
- * an empty name). A folder that is another project's, or not a repository, is said under the
- * field and not taken. `↵` creates. Renaming a project is the same dialog, with its name only.
- * Loaded with its first opening.
+ * New project, the same for everyone: a name, and a folder if wanted (any folder, inside a
+ * repository the repository's: its name fills an empty name). A folder that is another project's
+ * is said under the field and not taken. `↵` creates. Renaming a project is the same dialog, with
+ * its name only. Loaded with its first opening.
  */
 export function ProjectDialog({
     renaming,
@@ -189,13 +189,6 @@ function FolderMessage({
         );
     }
     if (!notice) return null;
-    if (notice.kind === 'notRepository') {
-        return (
-            <p role="alert" className="text-xs text-ui-warning-soft-text">
-                {t('error.notARepository')}
-            </p>
-        );
-    }
     return (
         <p role="alert" className="flex items-center gap-2 text-xs text-ui-warning-soft-text">
             {t('projects.alreadyProject', { name: notice.name })}

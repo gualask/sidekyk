@@ -27,8 +27,14 @@ pub fn existing_root<'a>(
     repository: &'a RepositoryInfo,
 ) -> anyhow::Result<&'a Path> {
     let root = Path::new(&repository.root);
+    existing_folder(backend, root)?;
+    Ok(root)
+}
+
+/// Whether a project's folder is still there: one moved or deleted is `repository_missing`.
+pub fn existing_folder(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<()> {
     if backend.is_dir(root) {
-        Ok(root)
+        Ok(())
     } else {
         Err(user_facing(UserFacingErrorCode::RepositoryMissing))
     }
@@ -39,22 +45,20 @@ pub fn resolve_repository(
     backend: &dyn RepositoryBackend,
     candidate: &Path,
 ) -> anyhow::Result<ResolvedRepository> {
-    if !backend.is_dir(candidate) {
-        return Err(user_facing(UserFacingErrorCode::NotARepository));
-    }
+    existing_folder(backend, candidate)?;
     let out = backend.git(
         candidate,
         &["rev-parse", "--show-toplevel", "--absolute-git-dir"],
         MAX_REV_PARSE_BYTES,
     )?;
     if out.code != 0 {
-        return Err(user_facing(UserFacingErrorCode::NotARepository));
+        anyhow::bail!("git finds no repository: {}", out.stderr.trim());
     }
 
     let stdout = String::from_utf8_lossy(&out.stdout);
     let mut lines = stdout.lines();
     let (Some(root), Some(git_dir)) = (lines.next(), lines.next()) else {
-        return Err(user_facing(UserFacingErrorCode::NotARepository));
+        anyhow::bail!("git named no root or git dir");
     };
     Ok(ResolvedRepository {
         info: RepositoryInfo {

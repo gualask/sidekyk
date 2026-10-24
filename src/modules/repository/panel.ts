@@ -19,8 +19,12 @@ export const filesPanel = definePanel({
     id: 'files',
     title: 'panel.files',
     icon: IconFolder,
-    needs: 'repository',
+    needs: 'folder',
     tileMinWidth: FILES_TREE_WIDTH.min,
     load: () => import('./ui/FilesWorkspace'),
     pick: (module) => module.FilesWorkspace,
+    summary: {
+        load: () => import('./ui/FilesSummary'),
+        pick: (module) => module.FilesSummary,
+    },
 });

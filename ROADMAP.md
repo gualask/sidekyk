@@ -22,10 +22,8 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 has.
 
 - [ ] `⌘K` at level 0 finds notes of every project and of the Inbox
-- [ ] Folders without git: Files and Notes, no Changes; file list behind a port; watcher filter
-      without git (`.gitignore`/`.ignore` rules)
-- [ ] Layout without git: what takes Changes' tile (Notes leaning, decided with Capture); level 0
-      card and top bar without branch and commits
+- [ ] Layout without git: what takes Changes' tile (today Files; Notes leaning, decided with
+      Capture)
 - [ ] What changed without git: recently modified files, no diffs
 - [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
       section per repository in Changes
@@ -69,10 +67,12 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
 - [ ] Signed builds and self-update (as in Fyler), built by a release workflow on a `v*` tag that
       runs `ci.yml` first; update check at startup or on demand only
 - [ ] Verify on the packaged app and other systems:
-  - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, `⌘W` hides and
-    `⌘Q` quits, no blank frame at startup
+  - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
+    icon shows the window, `⌘W` hides and `⌘Q` quits, no blank frame at startup; without the
+    Command Line Tools, a folder without git picked asks nothing to install
   - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
-    git-dir check, case included; snapshot timings (process start, Defender); a repo on `C:\`
+    git-dir check, case included; a folder without git (`real_path` as given, its walk and
+    rules, `git init` and `.git` removed while on screen); snapshot timings (process start, Defender); a repo on `C:\`
     edited from WSL (`/mnt/c`): events reach the watcher, Linux and Windows git on one index
     (stat data, filemode, autocrlf)
   - Linux and Windows: `navigator.languages` gives the system's language at the first start
@@ -81,7 +81,8 @@ Linux by `build.yml`, in the container fixture (`docs/testing.md`).
   - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
     runs View Transitions
   - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
-    log; a new folder's files told, an ignored folder silent)
+    log; a new folder's files told, an ignored folder silent); a WSL folder without git through
+    the real `wsl.exe` (its card without starting the distro, "Starting …" on opening it)
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
     follows the window theme
@@ -99,7 +100,6 @@ No measuring code in the app: a question below is measured with a temporary setu
 becomes a problem (decided 2026-10-21).
 
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
-- [ ] Tray count while hidden: watcher mark only, or a throttled `git status`
 - [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
       interval? skip `check-ignore` for tracked paths?
 - [ ] Prefetch neighbouring diffs, if switching shows a wait

@@ -17,7 +17,6 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     helper_failed: 'error.helperFailed',
     invalid_commit: 'error.invalidCommit',
     invalid_shortcut: 'error.invalidShortcut',
-    not_a_repository: 'error.notARepository',
     note_list_missing: 'error.noteListMissing',
     note_missing: 'error.noteMissing',
     note_too_long: 'error.noteTooLong',

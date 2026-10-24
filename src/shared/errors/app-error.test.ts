@@ -6,18 +6,16 @@ const en = createTranslator('en', 'en');
 
 describe('errorMessage', () => {
     it('maps known codes and falls back to the backend message', () => {
-        expect(errorMessage({ code: 'not_a_repository', message: 'not_a_repository' }, en)).toBe(
-            'That folder is not inside a git repository.',
+        expect(errorMessage({ code: 'file_missing', message: 'file_missing' }, en)).toBe(
+            en.t('error.fileMissing'),
         );
         expect(
             errorMessage({ code: 'unknown', message: 'git status exited with code 128' }, en),
         ).toBe('git status exited with code 128');
-        expect(
-            errorMessage(
-                { code: 'not_a_repository', message: 'not_a_repository' },
-                createTranslator('it', 'it'),
-            ),
-        ).toBe('Quella cartella non è dentro un repository git.');
+        const it = createTranslator('it', 'it');
+        expect(errorMessage({ code: 'file_missing', message: 'file_missing' }, it)).toBe(
+            it.t('error.fileMissing'),
+        );
     });
 
     it('reads plain errors and strings', () => {
@@ -30,7 +28,7 @@ describe('hasErrorCode', () => {
     it('matches the code of a native error only', () => {
         const missing = { code: 'repository_missing', message: 'repository_missing' };
         expect(hasErrorCode(missing, 'repository_missing')).toBe(true);
-        expect(hasErrorCode(missing, 'not_a_repository')).toBe(false);
+        expect(hasErrorCode(missing, 'file_missing')).toBe(false);
         expect(hasErrorCode(new Error('repository_missing'), 'repository_missing')).toBe(false);
     });
 });

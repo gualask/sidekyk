@@ -10,9 +10,13 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        └─▶ Linux: one watch per folder git does not ignore (Watching below)
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
-                       └─▶ paths git ignores skipped (check-ignore, cached per directory)
-                       └─▶ "repository-changed" { version: 3, projectId, gitDir, paths }
+                       └─▶ paths git ignores skipped (check-ignore, cached per directory);
+                           without git, those the walk's rules hide (`ignore`, no git)
+                       └─▶ `.git` come or gone at the root: watched again as the other kind
+                       └─▶ "repository-changed" { version: 4, projectId, gitDir, paths,
+                                                  kindChanged }
                              └─▶ frontend invalidates ['repository', projectId, …]
+                                 (kindChanged: resets them, the folder's kind read again)
                                  (recent commits and staged diffs only when gitDir: index,
                                  HEAD, refs; the open file, diff and colors only when paths
                                  touch them; paths null over 100 or when unknown)
@@ -46,8 +50,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - `modules/settings/`: settings queries and dialog (lazy chunk).
 - `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`); ranking and
   reading are the backend's; the app decides what an item opens (`PaletteActions`).
-- `modules/repository/`: the repository on screen as two panels (`panel.ts`): Changes (review
-  and the viewer of any file) and Files (the tree).
+- `modules/repository/`: the project's folder on screen as two panels (`panel.ts`): Changes
+  (review and the viewer of any file, a repository only) and Files (the tree, with its own viewer
+  where there is no Changes); the folder's kind (`useFolderKind`).
   - `model/`: wire types, diff parser, whole-file hunks, copy format, file grouping, tree rows and
     keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`),
     matches of the find bar (`find.ts`), syntax blocks (`syntax.ts`).
@@ -131,8 +136,12 @@ In the core:
 - `modules/repositories/`: the `Repositories` port (`port.rs`), one method per read, and
   `LocalRepositories`, which reads this machine's: per-repository coalesced snapshot/summary/tree
   reads, the cached tree, the changed files the palette ranks, the last search in contents,
-  syntax colors (`ColorCache`), and the watched repository (`watch.rs`: a batch through
-  `classify`, the ignored filter and the tree check; only a mark while the window is hidden).
+  syntax colors (`ColorCache`), and the watched folder (`watch.rs`: a batch through `classify`,
+  the filter of its kind (`Filter`: git's ignored paths or the walk's rules) and the tree check;
+  a change of kind watches it again; only a mark while the window is hidden).
+- `modules/folder/`: a folder without git, free of git: its kind (`folder_kind`), the folder a
+  project takes (`resolve_folder`), its tree (`load_folder_tree`), the changes that show
+  (`FolderChanges`), the names always hidden (`always_hidden`).
 - `infrastructure/agent/`: the helper's protocol (`protocol.rs`), its side (`server.rs`, over
   `LocalRepositories`) and the app's (`client.rs`, `AgentRepositories`: the same port through a
   child process). The app reads local projects through `LocalRepositories` (in dev builds with
@@ -146,10 +155,11 @@ In the core:
   which watched changes matter (`watched.rs`), which folders to watch where the system watches one
   at a time (`folders.rs`), contracts. No Tauri, no disk of its own: it declares the
   `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`, `has_entry`,
-  `folders`) and the `RepositoryWatcher` port (changed paths after a quiet period; on inotify a
+  `folders`, `walk`, `folder_rules`, `real_path`) and the `RepositoryWatcher` port (changed paths after a quiet period; on inotify a
   `FolderWatcher` to add folders through), so it can run on another machine
   (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `process.rs` (a child within an output size and a
+- `infrastructure/`: `git_cli.rs` (bounded git), `folder_walk.rs` (the walk and its rules,
+  `ignore`), `process.rs` (a child within an output size and a
   time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
   command's reads would refresh again, without end; found by CI 2026-10-18; on Linux one
   non-recursive watch per folder added), `agent/` (above),
@@ -185,6 +195,16 @@ In the core:
   ignore (`check-ignore` once per level; a folder holding tracked files is not ignored), empty
   ones included, each before reading it; not inside a repository within (a submodule) nor through
   a link. Git dir: itself, `refs/`, `info/`.
+- A folder without git (2026-10-24): no git dir; `classify` takes every path under the root,
+  `folder::FolderChanges` drops what the walk's rules hide (`RepositoryBackend::folder_rules`:
+  `ignore`'s `IncrementalIgnore` from the walk's own `WalkBuilder`, so both answer alike, global
+  excludes included), and on Linux `folders.rs` keeps out the folders the same rules hide
+  (`Hiding::Rules`; a repository inside is walked as any folder). An ignore file changed: rules
+  read again, every folder looked at again.
+- Kind: a batch holding `<root>/.git` whose presence no longer matches the watch (a `.git` at the
+  root, `folder::folder_kind`) restarts the watch as the other kind on a thread of its own (the
+  watcher's thread stops with its watch), then tells `kind_changed`; told even while hidden (rare,
+  no git).
 - A folder a batch created is watched before the change is told, so the read it brings sees what
   it holds; one created while hidden when the window shows (no git runs before). A `.gitignore`
   changed: every folder is looked at again. At the system's limit the folders watched stay, one

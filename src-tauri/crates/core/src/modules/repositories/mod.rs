@@ -12,6 +12,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
+use crate::modules::folder::{self, FolderKind};
 use crate::modules::repository::{
     self, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
     Directory, FileContent, FileDiffRequest, FileTree, RecentCommits, RepositoryBackend,
@@ -59,7 +60,7 @@ impl<T: Clone> PerRepository<T> {
     }
 }
 
-/// A repository's files, as the Files panel shows them.
+/// A project's files, as the Files panel shows them.
 #[derive(Default)]
 struct CachedTree {
     tree: Option<Arc<FileTree>>,
@@ -97,7 +98,7 @@ pub struct LocalRepositories {
     /// The changed files of each repository's last snapshot, which the palette searches without
     /// running git. Only the repository on screen has snapshots.
     changed: Mutex<HashMap<String, Arc<[ChangedFile]>>>,
-    /// The files of the repository on screen: read when first asked for, and again only after its
+    /// The files of the folder on screen: read when first asked for, and again only after its
     /// watcher saw a file added or removed, or the git dir change.
     trees: Mutex<HashMap<String, CachedTree>>,
     tree_reads: PerRepository<Arc<FileTree>>,
@@ -186,8 +187,8 @@ impl LocalRepositories {
         })
     }
 
-    /// A repository's files, read again only when they may have changed, sharing the read in
-    /// flight.
+    /// A project's files, read again only when they may have changed, sharing the read in flight:
+    /// those git lists in a repository, those the walk lists in a folder without git.
     fn file_tree(&self, info: &RepositoryInfo) -> anyhow::Result<Arc<FileTree>> {
         let root = info.root.as_str();
         let cached = || lock(&self.trees).get(root).and_then(|c| c.tree.clone());
@@ -203,7 +204,12 @@ impl LocalRepositories {
                 .entry(root.to_string())
                 .or_default()
                 .changes;
-            let tree = Arc::new(repository::load_file_tree(&*self.backend, info)?);
+            let backend = &*self.backend;
+            let tree = match folder::folder_kind(backend, Path::new(root))? {
+                FolderKind::Repository => repository::load_file_tree(backend, info)?,
+                FolderKind::Plain => folder::load_folder_tree(backend, Path::new(root)),
+            };
+            let tree = Arc::new(tree);
             let mut trees = lock(&self.trees);
             let entry = trees.entry(root.to_string()).or_default();
             if entry.changes == before {
@@ -229,7 +235,11 @@ impl LocalRepositories {
 
 impl Repositories for LocalRepositories {
     fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo> {
-        Ok(repository::resolve_repository(&*self.backend, candidate)?.info)
+        folder::resolve_folder(&*self.backend, candidate)
+    }
+
+    fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind> {
+        folder::folder_kind(&*self.backend, Path::new(&info.root))
     }
 
     fn snapshot(&self, info: &RepositoryInfo) -> anyhow::Result<RepositorySnapshot> {

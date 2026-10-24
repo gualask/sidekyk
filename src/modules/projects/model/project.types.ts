@@ -23,13 +23,12 @@ export type Relocation =
     | { kind: 'inProject'; id: string; name: string };
 
 /**
- * A folder picked for a new project: a repository no project follows yet (`path` as picked, given
- * back to create the project; `name` its repository's), another project's, or not a repository.
+ * A folder picked for a new project: one no project has yet (`path` as picked, given back to create
+ * the project; `name` its folder's, inside a repository the repository's), or another project's.
  */
 export type FolderChoice =
     | { kind: 'usable'; path: string; name: string; location: ProjectLocation }
-    | { kind: 'inProject'; id: string; name: string }
-    | { kind: 'notRepository' };
+    | { kind: 'inProject'; id: string; name: string };
 
 /** A project's tiles, as the user left them. */
 export interface TilesLayout {

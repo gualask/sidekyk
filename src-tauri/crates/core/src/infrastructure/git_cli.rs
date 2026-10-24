@@ -1,5 +1,6 @@
-//! The `git` CLI as the repository module's backend. No libgit2: every answer is what the user's
-//! own git would print.
+//! The repository and folder modules' backend on this machine: the `git` CLI (no libgit2: every
+//! answer is what the user's own git would print), the disk read directly, and the walk of a
+//! folder without git (`folder_walk`).
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -7,9 +8,12 @@ use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
+use super::folder_walk;
 use super::hide_console;
 use super::process::{self, TimedOut};
-use crate::modules::repository::{GitOutput, RepositoryBackend, WorktreeEntry};
+use crate::modules::repository::{
+    FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
+};
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
 
 /// No git call takes longer: past it git is killed and the call fails with `git_timed_out`, so a
@@ -195,6 +199,27 @@ impl RepositoryBackend for LocalRepositoryBackend {
                 .collect(),
         )
     }
+
+    fn walk(&self, root: &Path, max: usize) -> Walked {
+        folder_walk::walk(root, max)
+    }
+
+    fn folder_rules(&self, root: &Path) -> Box<dyn FolderRules> {
+        folder_walk::rules(root)
+    }
+
+    #[cfg(unix)]
+    fn real_path(&self, path: &Path) -> Option<PathBuf> {
+        std::fs::canonicalize(path).ok()
+    }
+
+    /// `canonicalize` would give `\\?\C:\…`, which no other path has; `ReadDirectoryChangesW`
+    /// reports what changed under the path watched, as it was given.
+    #[cfg(windows)]
+    fn real_path(&self, path: &Path) -> Option<PathBuf> {
+        std::fs::symlink_metadata(path).ok()?;
+        std::path::absolute(path).ok()
+    }
 }
 
 /// `path` (relative) under `root` and what is there, not following a link, or `None` when nothing
@@ -218,12 +243,13 @@ mod tests {
     //! End to end against a real git in a scratch repository.
 
     use super::*;
+    use crate::modules::folder::{folder_kind, load_folder_tree, resolve_folder, FolderKind};
     use crate::modules::repository::{
         load_commit_activity, load_commit_file_diff, load_commit_files, load_file_content,
         load_file_diff, load_file_tree, load_recent_commits, load_snapshot, load_summary,
         load_version_text, repository_name, resolve_repository, ChangeKind, Commit,
         CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
-        FolderAdded, FolderWatcher, IgnoredPaths, RepositoryInfo, RepositorySnapshot,
+        FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryInfo, RepositorySnapshot,
         RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
     };
     use crate::modules::search::{
@@ -828,12 +854,65 @@ mod tests {
     }
 
     #[test]
-    fn a_folder_outside_any_repository_is_refused() {
+    fn a_folder_is_taken_as_the_repository_holding_it_or_as_it_is() {
+        let backend = LocalRepositoryBackend::default();
+        let root_of = |candidate: &Path| resolve_folder(&backend, candidate).unwrap().root;
+        let real = |path: &Path| {
+            backend
+                .real_path(path)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string()
+        };
+
+        let repo = scratch_repo();
+        let repo_root = resolve_repository(&backend, repo.path()).unwrap().info.root;
+        assert_eq!(root_of(repo.path()), repo_root);
+        assert_eq!(root_of(&repo.path().join("src")), repo_root);
+
         let dir = tempfile::tempdir().unwrap();
-        let err = resolve_repository(&LocalRepositoryBackend::default(), dir.path())
-            .err()
-            .unwrap();
-        assert_eq!(err.to_string(), "not_a_repository");
+        std::fs::create_dir(dir.path().join("docs")).unwrap();
+        let docs = resolve_folder(&backend, &dir.path().join("docs")).unwrap();
+        assert_eq!(docs.root, real(&dir.path().join("docs")));
+        assert_eq!(docs.name, "docs");
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(dir.path().join("docs"), dir.path().join("link")).unwrap();
+            assert_eq!(root_of(&dir.path().join("link")), docs.root);
+        }
+        // a `.git` git refuses still makes the root
+        write(dir.path(), "broken/.git", "not a git dir\n");
+        std::fs::create_dir(dir.path().join("broken/sub")).unwrap();
+        assert_eq!(
+            root_of(&dir.path().join("broken/sub")),
+            real(&dir.path().join("broken"))
+        );
+
+        let gone = resolve_folder(&backend, &dir.path().join("gone")).unwrap_err();
+        assert_eq!(
+            user_facing_code(&gone),
+            Some(UserFacingErrorCode::RepositoryMissing)
+        );
+    }
+
+    #[test]
+    fn a_folder_is_a_repository_by_the_git_at_its_root() {
+        let backend = LocalRepositoryBackend::default();
+        let repo = scratch_repo();
+        assert_eq!(
+            folder_kind(&backend, repo.path()).unwrap(),
+            FolderKind::Repository
+        );
+        assert_eq!(
+            folder_kind(&backend, &repo.path().join("src")).unwrap(),
+            FolderKind::Plain
+        );
+        let gone = folder_kind(&backend, &repo.path().join("gone")).unwrap_err();
+        assert_eq!(
+            user_facing_code(&gone),
+            Some(UserFacingErrorCode::RepositoryMissing)
+        );
     }
 
     /// The local watcher, keeping every path it reports: a failure tells what the system sent.
@@ -844,7 +923,7 @@ mod tests {
         fn watch(
             &self,
             root: &Path,
-            git_dir: &Path,
+            git_dir: Option<&Path>,
             mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
         ) -> anyhow::Result<Watch> {
             let seen = self.0.clone();
@@ -923,6 +1002,95 @@ mod tests {
         repositories.watch(None, Box::new(|_| {}));
     }
 
+    #[test]
+    fn a_folder_without_git_is_listed_and_watched_by_its_rules_and_changes_kind() {
+        folder_without_git_watched(LocalRepositoryWatcher::default());
+    }
+
+    #[test]
+    fn a_folder_without_git_is_watched_one_folder_at_a_time_as_on_linux() {
+        folder_without_git_watched(LocalRepositoryWatcher::per_folder());
+    }
+
+    fn folder_without_git_watched(watcher: LocalRepositoryWatcher) {
+        const QUIET: Duration = Duration::from_secs(1);
+        const DEADLINE: Duration = Duration::from_secs(10);
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), ".gitignore", "build/\n");
+        write(dir.path(), "notes/a.md", "a\n");
+        write(dir.path(), "build/out.o", "");
+        let repositories = LocalRepositories::new(
+            Arc::new(LocalRepositoryBackend::default()),
+            Arc::new(watcher),
+        );
+        let info = repositories.resolve(dir.path()).unwrap();
+        let root = Path::new(&info.root);
+        let paths = |folder: &str| -> Vec<String> {
+            let directory = repositories.directory(&info, folder).unwrap();
+            directory.entries.into_iter().map(|e| e.path).collect()
+        };
+        assert_eq!(paths(""), ["notes", ".gitignore"]);
+
+        let (sent, received) = std::sync::mpsc::channel();
+        repositories.watch(
+            Some(&info),
+            Box::new(move |event| {
+                let _ = sent.send(event);
+            }),
+        );
+        let settle = || {
+            let started = Instant::now();
+            while received.recv_timeout(QUIET).is_ok() {
+                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
+            }
+        };
+        let kind_changed = || {
+            let started = Instant::now();
+            while started.elapsed() < DEADLINE {
+                if received
+                    .recv_timeout(DEADLINE)
+                    .is_ok_and(|e| e.kind_changed)
+                {
+                    return;
+                }
+            }
+            panic!("the change of kind was never told");
+        };
+        settle();
+
+        write(root, "build/more.o", "");
+        if let Ok(event) = received.recv_timeout(QUIET) {
+            panic!("a path the rules hide shows nothing: {event:?}");
+        }
+        write(root, "notes/b.md", "b\n");
+        let event = received.recv_timeout(DEADLINE).unwrap();
+        assert!(!event.kind_changed);
+        let changed = event.paths.unwrap_or_default();
+        assert!(
+            changed.iter().any(|path| path == "notes/b.md"),
+            "{changed:?}"
+        );
+        assert_eq!(paths("notes"), ["notes/a.md", "notes/b.md"]);
+        settle();
+
+        git(root, &["init", "-q"]);
+        kind_changed();
+        assert_eq!(
+            repositories.folder_kind(&info).unwrap(),
+            FolderKind::Repository
+        );
+        settle();
+        write(root, "notes/c.md", "c\n");
+        let event = received.recv_timeout(DEADLINE).unwrap();
+        assert!(!event.kind_changed, "watched as a repository now");
+        settle();
+
+        std::fs::remove_dir_all(root.join(".git")).unwrap();
+        kind_changed();
+        assert_eq!(repositories.folder_kind(&info).unwrap(), FolderKind::Plain);
+        repositories.watch(None, Box::new(|_| {}));
+    }
+
     /// Records the folders added, refusing past `limit` as the system would.
     struct RecordingFolders {
         added: Mutex<Vec<PathBuf>>,
@@ -973,7 +1141,14 @@ mod tests {
         std::os::unix::fs::symlink(root.join("src"), root.join("link")).unwrap();
 
         let recording = RecordingFolders::up_to(usize::MAX);
-        let mut folders = WatchedFolders::start(&backend, recording.clone(), root, &repo.git_dir);
+        let mut folders = WatchedFolders::start(
+            &backend,
+            recording.clone(),
+            root,
+            Hiding::Git {
+                git_dir: repo.git_dir.clone(),
+            },
+        );
         let times = |rel: &str| recording.times(&root.join(rel));
         // a folder holding tracked files counts, though its rules say ignored; an empty one too,
         // for what is written in it later; a repository inside only for itself
@@ -1031,7 +1206,14 @@ mod tests {
         let repo = resolve_repository(&backend, dir.path()).unwrap();
         let root = Path::new(&repo.info.root);
         let recording = RecordingFolders::up_to(3);
-        let mut folders = WatchedFolders::start(&backend, recording.clone(), root, &repo.git_dir);
+        let mut folders = WatchedFolders::start(
+            &backend,
+            recording.clone(),
+            root,
+            Hiding::Git {
+                git_dir: repo.git_dir.clone(),
+            },
+        );
         write(root, "new/a.ts", "");
         folders.add_created(&backend, &[Path::new("new")]);
         folders.rescan(&backend);
@@ -1111,6 +1293,21 @@ mod tests {
         repositories.watch(None, Box::new(|_| {}));
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn a_real_path_resolves_links_as_the_watcher_reports_them() {
+        let dir = tempfile::tempdir().unwrap();
+        let real = std::fs::canonicalize(dir.path()).unwrap();
+        std::fs::create_dir(real.join("notes")).unwrap();
+        std::os::unix::fs::symlink(real.join("notes"), real.join("link")).unwrap();
+        let backend = LocalRepositoryBackend::default();
+        assert_eq!(
+            backend.real_path(&real.join("link")),
+            Some(real.join("notes"))
+        );
+        assert_eq!(backend.real_path(&real.join("gone")), None);
+    }
+
     #[test]
     fn a_repository_moved_away_is_reported_as_missing() {
         let dir = tempfile::tempdir().unwrap();
@@ -1145,7 +1342,7 @@ mod tests {
 
     /// Times the snapshot, the summary, the file tree, the palette's search over it, the recent
     /// commits with the files of the newest, and the diff of the largest changed file on a real
-    /// repository:
+    /// repository, and its files walked as a folder without git's are:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
     #[test]
     #[ignore = "benchmark, needs SIDEKYK_BENCH_REPO"]
@@ -1174,6 +1371,16 @@ mod tests {
             })
         );
         let tree = std::sync::Arc::new(load_file_tree(&backend, &repo.info).unwrap());
+        // the same folder as one without git would be listed: the walk and its rules
+        let root = Path::new(&repo.info.root);
+        println!(
+            "folder tree, walked ({} files, git lists {}): {}",
+            load_folder_tree(&backend, root).files().len(),
+            tree.files().len(),
+            time(20, || {
+                load_folder_tree(&backend, root);
+            })
+        );
         println!(
             "root folder: {}",
             time(20, || {

@@ -15,9 +15,9 @@ use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::{BinaryDetection, Searcher, SearcherBuilder, Sink, SinkMatch};
 
 use super::contracts::{ContentFile, ContentLine, Highlight};
-use super::threads;
 use crate::modules::repository::{RepositoryBackend, MAX_FILE_BYTES};
 use crate::shared::sync::lock;
+use crate::shared::threads::threads;
 
 /// Shorter texts match nearly every line of a project (the palette's `MIN_CONTENT_QUERY`).
 const MIN_QUERY_CHARS: usize = 2;
@@ -258,7 +258,7 @@ pub fn narrows(previous: &str, next: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::{GitOutput, WorktreeEntry};
+    use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
     use std::collections::HashMap;
 
     /// Files by path, read from memory.
@@ -302,6 +302,18 @@ mod tests {
         fn open_file(&self, _root: &Path, path: &Path) -> Option<Box<dyn Read + Send>> {
             let bytes = self.0.get(path.to_str()?)?.clone();
             Some(Box::new(std::io::Cursor::new(bytes)))
+        }
+
+        fn walk(&self, _root: &Path, _max: usize) -> Walked {
+            unreachable!()
+        }
+
+        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
+            unreachable!()
+        }
+
+        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
+            unreachable!()
         }
     }
 

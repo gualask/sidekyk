@@ -1,7 +1,6 @@
 import { notesPanel } from '@/modules/notes';
-import { changesPanel, FILES_TREE_WIDTH, filesPanel } from '@/modules/repository';
+import { changesPanel, FILES_TREE_WIDTH, type FolderKind, filesPanel } from '@/modules/repository';
 import type { PanelDefinition, PanelNeed } from '@/shared/panels/panel';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 
 /**
  * Every panel, in the order of their shortcuts (`1`, `2`, …), which is also their order as tiles
@@ -31,11 +30,11 @@ export function sideMinWidth(panels: readonly PanelDefinition[]): number {
 
 /**
  * A project's panels, from what it has: those whose needs it meets, in their order. With several,
- * level 1 lays them out as tiles: the first on the left (Changes for a repository), filling what
- * the side column leaves; the others in that column, top to bottom (Files above Notes), each can be
- * minimized to the top bar; the column is as wide as Files' tree, wider while Notes is in it,
- * and gives way first. With one (Notes, without folder), level 1 shows it as full screen does and
- * there is no level 2.
+ * level 1 lays them out as tiles: the first on the left (Changes for a repository, Files for a
+ * folder without git), filling what the side column leaves; the others in that column, top to
+ * bottom (Files above Notes), each can be minimized to the top bar; the column is as wide as
+ * Files' tree, wider while Notes is in it, and gives way first. With one (Notes, without folder),
+ * level 1 shows it as full screen does and there is no level 2.
  */
 export interface ProjectTiles {
     panels: readonly PanelDefinition[];
@@ -70,11 +69,13 @@ function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
 /** One value per kind of project, so the panels of a project keep their identity across renders. */
 const TILES = {
     repository: tilesMeeting(() => true),
+    plain: tilesMeeting((need) => need === 'folder'),
     none: tilesMeeting(() => false),
 };
 
-export function projectTiles(project: ProjectInfo): ProjectTiles {
-    return projectFolder(project) ? TILES.repository : TILES.none;
+/** A project's panels, from what its folder is (`useFolderKind`): `null` without folder. */
+export function projectTiles(kind: FolderKind | null): ProjectTiles {
+    return TILES[kind ?? 'none'];
 }
 
 /** The deepest level a project zooms to: 2 when its panels are tiles, else 1. */

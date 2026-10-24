@@ -68,6 +68,9 @@ pub fn serve(
             Request::Resolve { candidate } => {
                 on_thread(Box::new(move |r| value(r.resolve(&candidate)?)));
             }
+            Request::FolderKind { repository } => {
+                on_thread(Box::new(move |r| value(r.folder_kind(&repository)?)));
+            }
             Request::Snapshot { repository } => {
                 on_thread(Box::new(move |r| value(r.snapshot(&repository)?)));
             }
@@ -191,6 +194,7 @@ fn send_message(output: &Output, message: &Message) {
 fn request_name(request: &Request) -> &'static str {
     match request {
         Request::Resolve { .. } => "resolve",
+        Request::FolderKind { .. } => "folderKind",
         Request::Snapshot { .. } => "snapshot",
         Request::Summary { .. } => "summary",
         Request::FileDiff { .. } => "fileDiff",

@@ -36,9 +36,13 @@ machine at hand (the Mac); every platform is checked before a release.
 in-memory ports. Scenarios: `review` (changes, commits, notes, long files changed in many places),
 `clean`, `no-repo`, `large`, `problems` (a missing repository; WSL projects whose distro is
 stopped, gone or without git). `review` has a WSL clone of its project, whose helper takes 1.5 s
-to start. `&open=<name>` starts as `sidekyk <folder>` does, and `sidekykDev.openFolder('<name>')`
-in the console opens one while the app runs: the project of that name, else one made for a folder
-of that name. UI changes are checked there, in light and dark.
+to start. `review` and `clean` have `Vault`, a folder without git (Markdown notes, an `.ignore`);
+New project picks a repository, the scenario's own, then a folder without git in turn.
+`&open=<name>` starts as `sidekyk <folder>` does, and `sidekykDev.openFolder('<name>')` in the
+console opens one while the app runs: the project of that name, else one made for a folder of that
+name. `sidekykDev.gitInit('<name>')` and `gitRemove('<name>')` stand in for `git init` and `.git`
+removed in a project's folder, told as the watcher would. UI changes are checked there, in light
+and dark.
 
 ## Timing tests
 
@@ -142,7 +146,9 @@ Watching): the Linux half of `ci.yml`'s tests without CI, for a change to the co
 built for the fixture's arch (by default the one `test` built, glibc; `build.yml`'s static
 `sidekyk-agent-linux-arm64` on Apple Silicon for the shipped one), installed
 in `~/.sidekyk-server/` through `docker exec -i` as in a WSL distro, then read, watched (an edit
-from inside, a write under ignored `build/`), told the window hid and showed, and closed once idle.
+from inside, a write under ignored `build/`), told the window hid and showed, a folder without git
+read and watched (a write its `.ignore` hides, a note added, `git init` told as a change of kind),
+and closed once idle.
 Timings printed (`--nocapture`); measured in `plans/remote-projects.md`.
 
 ### Never a bind mount

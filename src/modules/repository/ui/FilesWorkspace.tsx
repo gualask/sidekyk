@@ -11,7 +11,7 @@ import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSessionState } from '@/shared/ui/session-state';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useFileFind } from '../application/find';
-import { useTreeDirectories } from '../application/repository.queries';
+import { useFolderKind, useTreeDirectories } from '../application/repository.queries';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
 import { changeMarks, foldersAbove, treeMove, treeRows } from '../model/file-tree';
@@ -49,10 +49,11 @@ const FULL_KEYS = new Set([
 
 /**
  * The Files panel: the project's files as a tree. The file shown is the one of Changes (one
- * selection for both): the tree reveals it, and a file picked in the tree shows there. In a tile
- * Files is the tree alone, Changes being the viewer; full screen the file shows next to the tree,
- * a changed one whole with its changes marked, any other as its text. No filter here: the command
- * palette finds files, and shows them in the tree.
+ * selection for both): the tree reveals it, and a file picked in the tree shows there. In a
+ * repository's tile Files is the tree alone, Changes being the viewer; full screen, and in a
+ * folder without git where there is no Changes, the file shows next to the tree, a changed one
+ * whole with its changes marked, any other as its text. No filter here: the command palette finds
+ * files, and shows them in the tree.
  */
 export function FilesWorkspace({
     project,
@@ -68,8 +69,15 @@ export function FilesWorkspace({
     const projectId = project.id;
     const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
     const { open, selected } = state;
+    const repository = useFolderKind(project, { start: true }).kind === 'repository';
     // the file shown, one for both panels: Changes selects it in its list
-    const { snapshot, files, setSelection, change, path: file } = useSelectedFile(projectId);
+    const {
+        snapshot,
+        files,
+        setSelection,
+        change,
+        path: file,
+    } = useSelectedFile(projectId, repository);
     const find = useFileFind(projectId, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
@@ -195,7 +203,7 @@ export function FilesWorkspace({
         />
     );
 
-    if (place === 'tile') {
+    if (place === 'tile' && repository) {
         // in a tile the tree fills it; the app sets its width, the tree's (one setting)
         return (
             <div
@@ -238,7 +246,7 @@ export function FilesWorkspace({
             <p className="text-sm">{i18n.t('files.pick')}</p>
             <p className="text-xs">{i18n.t('files.readOnly')}</p>
         </div>
-    ) : !snapshot.isSuccess ? null : (
+    ) : repository && !snapshot.isSuccess ? null : (
         <TextFileView
             key={file}
             projectId={projectId}

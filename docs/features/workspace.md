@@ -15,7 +15,13 @@ problems. Why semantic zoom: `../product.md`.
 - Panels from the project (2026-10-23): a repository has Changes, Files and Notes as tiles; a
   project without folder has Notes only, shown at level 1 as full screen shows it (lists on the
   left, no tiles), and no level 2: `↵`, zooming in and `1`-`9` do nothing, `Esc` goes to level 0;
-  the palette offers no panel and no search in files; no facts in the top bar.
+  the palette offers no panel and no search in files; no facts in the top bar. A folder without
+  git (2026-10-24) has Files and Notes: Files the main tile with its own viewer, Notes beside
+  (revisited with Capture); level 2 as for a repository; the top bar the breadcrumb only; a file
+  picked in the palette opens in Files. `git init` brings Changes back to the left, `.git`
+  removed takes it away, at the level shown.
+- Until the folder's kind is read the panels wait, as for their first read, at the level kept:
+  nothing drawn, "Starting Ubuntu…" for a WSL project whose distro starts.
 - Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the
   Inbox, down to 320 px; the window's least width (760 px) fits both.
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes on the left keeps 560 px;
@@ -81,7 +87,8 @@ problems. Why semantic zoom: `../product.md`.
   workspace skips handled keys.
 - `app/zoom-gestures.ts`: the wheel listener exists only while `⌘`/`Ctrl` is held.
 - A project's panels (`app/panels.ts`, `projectTiles`): each panel says what it needs
-  (`PanelDefinition.needs`: Changes and Files a repository, Notes nothing); a project's panels are
+  (`PanelDefinition.needs`: Changes a repository, Files a folder, Notes nothing); a project's panels
+  come from its folder's kind (`projectTiles(kind)`, `useFolderKind`) and are
   those whose needs it meets, the first the main tile, the others the side column, and with those
   its card's summaries and the panels that open full screen (by key or palette: none with one
   panel, `deepestLevel` 1). One value per kind of project. The panel asked for that a project does

@@ -34,6 +34,9 @@ pub enum Request {
     Resolve {
         candidate: PathBuf,
     },
+    FolderKind {
+        repository: RepositoryInfo,
+    },
     Snapshot {
         repository: RepositoryInfo,
     },
@@ -188,6 +191,7 @@ mod tests {
                 root: "/r".into(),
                 git_dir: false,
                 paths: Some(vec!["src/a.ts".into()]),
+                kind_changed: false,
             }),
         )
         .unwrap();

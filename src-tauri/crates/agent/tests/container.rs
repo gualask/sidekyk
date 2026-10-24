@@ -11,9 +11,13 @@ use std::time::{Duration, Instant};
 
 use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::linux_helper::{LinuxHelper, LinuxMachine, SERVER_DIR};
+use sidekyk_core::modules::folder::FolderKind;
 use sidekyk_core::modules::repositories::Repositories;
+use sidekyk_core::modules::repository::{RepositoryChange, RepositoryInfo};
 
 const PROJECT: &str = "/home/ubuntu/project";
+/// A folder without git, made by the test and removed after.
+const VAULT: &str = "/home/ubuntu/vault";
 const HOME: &str = "/home/ubuntu";
 /// Past the watcher's quiet period (250 ms) and the trip out of the container.
 const QUIET: Duration = Duration::from_secs(1);
@@ -50,6 +54,26 @@ impl Container {
             String::from_utf8_lossy(&output.stderr)
         );
         String::from_utf8(output.stdout).unwrap()
+    }
+}
+
+/// Watches `info` through the helper: what it tells comes out of the receiver.
+fn watched(agent: &AgentRepositories, info: &RepositoryInfo) -> mpsc::Receiver<RepositoryChange> {
+    let (sent, received) = mpsc::channel();
+    agent.watch(
+        Some(info),
+        Box::new(move |change| {
+            let _ = sent.send(change);
+        }),
+    );
+    received
+}
+
+/// Waits for the watcher to go quiet: events still on their way are dropped.
+fn settle(received: &mpsc::Receiver<RepositoryChange>) {
+    let started = Instant::now();
+    while received.recv_timeout(QUIET).is_ok() {
+        assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
     }
 }
 
@@ -102,24 +126,12 @@ fn the_linux_helper_installs_reads_watches_and_closes_in_the_fixture() {
     );
 
     // changes from inside, as an agent's
-    let (sent, received) = mpsc::channel();
-    agent.watch(
-        Some(&info),
-        Box::new(move |change| {
-            let _ = sent.send(change);
-        }),
-    );
-    let settle = || {
-        let started = Instant::now();
-        while received.recv_timeout(QUIET).is_ok() {
-            assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
-        }
-    };
-    settle();
+    let received = watched(&agent, &info);
+    settle(&received);
     container.run(&format!("echo '// edited' >> {PROJECT}/src/cart.ts"));
     let change = received.recv_timeout(DEADLINE).unwrap();
     assert_eq!(change.root, PROJECT);
-    settle();
+    settle(&received);
     container.run(&format!("echo rebuilt > {PROJECT}/build/out.js"));
     if let Ok(change) = received.recv_timeout(QUIET) {
         panic!("a path git ignores shows nothing: {change:?}");
@@ -138,6 +150,44 @@ fn the_linux_helper_installs_reads_watches_and_closes_in_the_fixture() {
         assert!(started.elapsed() < DEADLINE, "the missed change never came");
     };
     assert_eq!(missed.root, PROJECT);
+
+    // a folder without git: listed by its rules, watched with inotify, a repository once `git init`
+    container.run(&format!(
+        "rm -rf {VAULT} && mkdir -p {VAULT}/notes {VAULT}/drafts && cd {VAULT} \
+         && printf 'drafts/\\n' > .ignore && echo a > notes/a.md && echo d > drafts/d.md"
+    ));
+    let vault = agent.resolve(Path::new(VAULT)).unwrap();
+    assert_eq!(vault.root, VAULT);
+    assert_eq!(agent.folder_kind(&vault).unwrap(), FolderKind::Plain);
+    let names: Vec<String> = agent
+        .directory(&vault, "")
+        .unwrap()
+        .entries
+        .into_iter()
+        .map(|entry| entry.name)
+        .collect();
+    assert_eq!(names, ["notes", ".ignore"]);
+    let vault_received = watched(&agent, &vault);
+    settle(&vault_received);
+    container.run(&format!("echo again > {VAULT}/drafts/d.md"));
+    if let Ok(change) = vault_received.recv_timeout(QUIET) {
+        panic!("a path the rules hide shows nothing: {change:?}");
+    }
+    container.run(&format!("echo b > {VAULT}/notes/b.md"));
+    let change = vault_received.recv_timeout(DEADLINE).unwrap();
+    assert_eq!(change.root, VAULT);
+    assert!(!change.kind_changed);
+    settle(&vault_received);
+    container.run(&format!("cd {VAULT} && git init -q"));
+    let started = Instant::now();
+    while !vault_received
+        .recv_timeout(DEADLINE)
+        .is_ok_and(|change| change.kind_changed)
+    {
+        assert!(started.elapsed() < DEADLINE, "git init was never told");
+    }
+    assert_eq!(agent.folder_kind(&vault).unwrap(), FolderKind::Repository);
+    container.run(&format!("rm -rf {VAULT}"));
 
     // watching nothing, it closes once idle; the next read starts it again, installed already
     agent.watch(None, Box::new(|_| {}));

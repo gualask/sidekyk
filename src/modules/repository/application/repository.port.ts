@@ -7,6 +7,7 @@ import type {
     Directory,
     FileContent,
     FileDiffRequest,
+    FolderKind,
     RecentCommits,
     RepositoryChangedEvent,
     RepositorySnapshot,
@@ -21,6 +22,11 @@ import type {
  * repository is named by its project's id, which must be a project the user added.
  */
 export interface RepositoryPort {
+    /**
+     * Whether a project's folder is a repository or a folder without git: no git runs. `start`
+     * starts a stopped WSL distro holding it, as opening the project does; the cards never do.
+     */
+    getFolderKind(projectId: string, start: boolean): Promise<FolderKind>;
     getSnapshot(projectId: string): Promise<RepositorySnapshot>;
     /** Branch, changed paths and line totals, cheap enough for every project on screen. */
     getSummary(projectId: string): Promise<RepositorySummary>;

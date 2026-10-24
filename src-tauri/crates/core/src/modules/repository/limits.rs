@@ -12,9 +12,9 @@ pub(super) const MAX_NUMSTAT_BYTES: usize = 4 * 1024 * 1024;
 /// Larger diffs are cut at the last whole line before this size.
 pub(super) const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
 
-/// The Files panel shows at most this many files of a repository: past them (an unignored
+/// The Files panel shows at most this many files of a project's folder: past them (an unignored
 /// `node_modules` of hundreds of thousands), the tree stops there.
-pub(super) const MAX_TREE_PATHS: usize = 200_000;
+pub const MAX_TREE_PATHS: usize = 200_000;
 
 /// The Files panel shows a file's first 2 MiB, cut at the last whole line, as a diff is.
 pub const MAX_FILE_BYTES: usize = MAX_DIFF_BYTES;

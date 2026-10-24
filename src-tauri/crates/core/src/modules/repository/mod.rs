@@ -28,13 +28,13 @@ pub use contracts::{
     REPOSITORY_CHANGED_EVENT,
 };
 pub use diff::load_file_diff;
-pub use folders::WatchedFolders;
+pub use folders::{Hiding, WatchedFolders};
 pub use ignored::{IgnoredPaths, Visible};
-pub use limits::MAX_FILE_BYTES;
-pub use open::{repository_name, resolve_repository};
+pub use limits::{MAX_FILE_BYTES, MAX_TREE_PATHS};
+pub use open::{existing_folder, repository_name, resolve_repository};
 pub use ports::{
-    FolderAdded, FolderWatcher, GitOutput, RepositoryBackend, RepositoryWatcher, Watch,
-    WorktreeEntry,
+    FolderAdded, FolderRules, FolderWatcher, GitOutput, RepositoryBackend, RepositoryWatcher,
+    Walked, Watch, WorktreeEntry,
 };
 pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_tree, FileTree};
