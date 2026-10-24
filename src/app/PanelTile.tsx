@@ -51,9 +51,11 @@ export function PanelTile({
     /** Selects the tile, which then takes the keys. */
     onSelect?: () => void;
 }) {
-    const shortcut = panelShortcut(panel);
     const { t } = useTranslation();
     const title = t(panel.title);
+    // what a tooltip adds: the key that opens the panel, if one does
+    const shortcut = panelShortcut(panel);
+    const key = shortcut ? ` (${shortcut})` : '';
     const [header, setHeader] = useState<HTMLElement | null>(null);
 
     return (
@@ -82,7 +84,7 @@ export function PanelTile({
                     <span
                         role="img"
                         className="grid shrink-0 place-items-center text-ui-text-muted"
-                        title={`${title} (${shortcut})`}
+                        title={`${title}${key}`}
                         aria-label={title}
                     >
                         <panel.icon size={15} stroke={1.75} />
@@ -105,7 +107,7 @@ export function PanelTile({
                         type="button"
                         data-zoom-in
                         className={`btn-icon h-[26px] w-[26px] ${onMinimize ? '' : 'ml-auto'}`}
-                        title={`${t('tile.zoomInto', { panel: title })} (${shortcut})`}
+                        title={`${t('tile.zoomInto', { panel: title })}${key}`}
                         aria-label={t('tile.zoomInto', { panel: title })}
                         onClick={onZoomIn}
                     >

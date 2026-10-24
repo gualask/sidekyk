@@ -58,10 +58,12 @@ repository, or a folder without git).
 
 - WSL projects (Windows): a folder of a distro (`\\wsl.localhost\<distro>\…` from the folder
   picker, Locate… or the command line) is read in that distro by Sidekyk's helper, never through
-  Windows' view of its files. Its card never starts a stopped distro: "Ubuntu is not running.
-  Open the project to start it."; opening it starts the distro and the
-  helper ("Starting Ubuntu…" until the first read). The distro gone, no git there, or the helper
-  not starting: a problem in the top bar (Remove, Try again).
+  Windows' view of its files. Nothing but its Start button starts a stopped distro (2026-10-24):
+  the card says "Ubuntu is not running."; the project opened (its card, `[`/`]`, the palette)
+  shows Notes, and in place of the folder's panels a Start panel ("Start Ubuntu", then "Starting
+  Ubuntu…"), which gives way to them once the distro runs. A distro that runs already opens at
+  once (its helper started by the first read, "Starting Ubuntu…" meanwhile). The distro gone, no
+  git there, or the helper not starting: a problem in the top bar (Remove, Try again).
 
 ## How it is built
 
@@ -108,10 +110,13 @@ repository, or a folder without git).
   folder when git fails (missing, a broken `.git`); no `.git` found, the folder itself and no git
   runs (on macOS without the Command Line Tools `/usr/bin/git` asks to install them).
 - Folder kind (`get_folder_kind(projectId, start)`, `folder::folder_kind`): `repository_missing`
-  for a folder gone, else whether `.git` is at the root; no git. The cards ask with `start: false`
-  (never starting a distro, `distro_stopped` as the summary), the project opened with `true`, the
-  cards' answer its placeholder; a kind that cannot be read counts as a repository, its panels and
-  the problems telling why (`useFolderKind`). A change of kind comes from the watcher
+  for a folder gone, else whether `.git` is at the root; no git. The cards and the project opened
+  ask with `start: false` (one query: never starting a distro, `distro_stopped` as the summary),
+  which level 1 shows as the Start panel (`projectTiles('stopped')`, `StartFolder`, no key opens
+  it); only its button asks with `true` (`useStartFolder`), its answer the kind. A kind that
+  cannot be read otherwise counts as a repository, its panels and the problems telling why
+  (`useFolderKind`). The palette's files and `search_contents` check
+  `readable_without_starting` first: no files while the distro is stopped. A change of kind comes from the watcher
   (`RepositoryChange.kind_changed`): the frontend resets the project's queries.
 - New project and rename (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says
   what it is (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`),

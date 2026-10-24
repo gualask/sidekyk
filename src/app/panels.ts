@@ -1,5 +1,11 @@
 import { notesPanel } from '@/modules/notes';
-import { changesPanel, FILES_TREE_WIDTH, type FolderKind, filesPanel } from '@/modules/repository';
+import {
+    changesPanel,
+    FILES_TREE_WIDTH,
+    type FolderKind,
+    filesPanel,
+    startPanel,
+} from '@/modules/repository';
 import type { PanelDefinition, PanelNeed } from '@/shared/panels/panel';
 
 /**
@@ -66,15 +72,34 @@ function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
     };
 }
 
+/**
+ * A folder in a stopped WSL distro: its Start panel in place of the folder's panels, Notes beside
+ * as for any project.
+ */
+function stoppedTiles(): ProjectTiles {
+    const panels = [startPanel, notesPanel];
+    return {
+        panels,
+        main: startPanel,
+        side: [notesPanel],
+        summaries: summariesOf(panels),
+        fullScreen: panels,
+    };
+}
+
 /** One value per kind of project, so the panels of a project keep their identity across renders. */
 const TILES = {
     repository: tilesMeeting(() => true),
     plain: tilesMeeting((need) => need === 'folder'),
+    stopped: stoppedTiles(),
     none: tilesMeeting(() => false),
 };
 
-/** A project's panels, from what its folder is (`useFolderKind`): `null` without folder. */
-export function projectTiles(kind: FolderKind | null): ProjectTiles {
+/**
+ * A project's panels, from what its folder is (`useFolderKind`): `null` without folder, `stopped`
+ * while the WSL distro that holds it is.
+ */
+export function projectTiles(kind: FolderKind | 'stopped' | null): ProjectTiles {
     return TILES[kind ?? 'none'];
 }
 
@@ -120,7 +145,8 @@ export function panelForKey(key: string): PanelDefinition | undefined {
     return /^[1-9]$/.test(key) ? PANELS[Number(key) - 1] : undefined;
 }
 
-/** The key that opens a panel, named in its tooltips. */
-export function panelShortcut(panel: PanelDefinition): string {
-    return String(PANELS.indexOf(panel) + 1);
+/** The key that opens a panel, named in its tooltips; none for one that stands in (Start). */
+export function panelShortcut(panel: PanelDefinition): string | null {
+    const index = PANELS.indexOf(panel);
+    return index < 0 ? null : String(index + 1);
 }

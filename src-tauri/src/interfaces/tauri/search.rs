@@ -42,7 +42,7 @@ pub(crate) async fn search(
 
 #[tauri::command]
 /// The lines of the project's files where `query` is, sent through `on_files` as they are found
-/// (`⌘F`); a newer search stops this one.
+/// (`⌘F`); a newer search stops this one. A stopped WSL distro is not started for it.
 pub(crate) async fn search_contents(
     app: tauri::AppHandle,
     project_id: String,
@@ -50,6 +50,9 @@ pub(crate) async fn search_contents(
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
     on_project("search_contents", app, project_id, move |on| {
+        on.app
+            .state::<ProjectsState>()
+            .readable_without_starting(on.folder)?;
         on.repositories.search_contents(on.info, &query, &|files| {
             // the page went away: nothing left to stop
             let _ = on_files.send(files);

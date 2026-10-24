@@ -31,6 +31,6 @@ export {
 } from './model/repository.types';
 export { lineCheck } from './model/syntax';
 export { fileTarget } from './model/targets';
-export { changesPanel, filesPanel } from './panel';
+export { changesPanel, filesPanel, startPanel } from './panel';
 export { ProjectFacts } from './ui/ProjectFacts';
 export { FILES_TREE_WIDTH } from './ui/tree-layout';

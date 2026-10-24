@@ -21,7 +21,9 @@ problems. Why semantic zoom: `../product.md`.
   picked in the palette opens in Files. `git init` brings Changes back to the left, `.git`
   removed takes it away, at the level shown.
 - Until the folder's kind is read the panels wait, as for their first read, at the level kept:
-  nothing drawn, "Starting Ubuntu…" for a WSL project whose distro starts.
+  nothing drawn, "Starting Ubuntu…" for a WSL project whose helper starts. A WSL project whose
+  distro is stopped shows its Start panel in place of the folder's panels (the main tile, no key,
+  full screen as any tile) and Notes beside; started, the folder's panels take its place.
 - Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the
   Inbox, down to 320 px; the window's least width (760 px) fits both.
 - Tiles are the only level 1 layout (tabs dropped 2026-10-13). Changes on the left keeps 560 px;

@@ -128,6 +128,8 @@ export interface BrowserRuntime {
     gitInit: (name: string) => void;
     /** As its `.git` removed. */
     gitRemove: (name: string) => void;
+    /** As `wsl --shutdown` of the distro of the project of that name: started again by a read. */
+    stopDistro: (name: string) => void;
 }
 
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
@@ -183,14 +185,22 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         if (projectId === NO_GIT_PROJECT.id) throw failure('git_not_found');
         if (kindOf(projectId) === 'plain') throw failure('unknown');
     };
-    // as the backend: a card never starts a distro, opening a project starts it and the helper
+    // as the backend: the kind and the summary never start a distro, the Start panel does; a
+    // distro running gets its helper started by the first read
     const running = new Set(['Ubuntu', 'Alpine']);
     const helpers = new Set<string>();
     const distroOf = (projectId: string) => {
         const folder = projectFolder(project(projectId));
         return folder?.kind === 'wsl' ? folder.distro : null;
     };
-    // opening a WSL project starts its distro, and the helper takes a while the first time
+    // `distro_stopped` unless the project's distro runs, as `readable_without_starting`
+    const readableWithoutStarting = (projectId: string) => {
+        const distro = distroOf(projectId);
+        if (distro && !helpers.has(distro) && !running.has(distro)) {
+            throw failure('distro_stopped');
+        }
+    };
+    // the helper takes a while the first time, the distro started with it
     const startHelper = async (projectId: string) => {
         const distro = distroOf(projectId);
         if (distro && !helpers.has(distro)) {
@@ -225,6 +235,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const searchedFiles = (projectId: string | null) => {
         if (!projectId) return null;
         try {
+            readableWithoutStarting(projectId);
             const changed = kindOf(projectId) === 'plain' ? [] : snapshot(projectId).files;
             return { paths: tree(projectId).files, changed };
         } catch {
@@ -426,14 +437,11 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             },
         },
         repository: {
-            // as the backend: no git, and a card never starts a distro
+            // as the backend: no git, and only the Start panel starts a distro
             getFolderKind: async (projectId, start) => {
                 present(projectId);
-                const distro = distroOf(projectId);
                 if (start) await startHelper(projectId);
-                else if (distro && !helpers.has(distro) && !running.has(distro)) {
-                    throw failure('distro_stopped');
-                }
+                else readableWithoutStarting(projectId);
                 return kindOf(projectId);
             },
             getSnapshot: async (projectId) => {
@@ -443,10 +451,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             },
             getSummary: async (projectId) => {
                 readable(projectId);
-                const distro = distroOf(projectId);
-                if (distro && !helpers.has(distro) && !running.has(distro)) {
-                    throw failure('distro_stopped');
-                }
+                readableWithoutStarting(projectId);
                 return snapshot(projectId).summary;
             },
             getFileDiff: async (projectId, request) => {
@@ -505,6 +510,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                     searchedNotes(request.projectId),
                 ),
             searchContents: async (projectId, query, onFiles) => {
+                readableWithoutStarting(projectId);
                 const { files, end } = fixtureContentSearch(
                     tree(projectId).files,
                     query,
@@ -550,5 +556,12 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         openFolder,
         gitInit: (name) => setKind(name, 'repository'),
         gitRemove: (name) => setKind(name, 'plain'),
+        stopDistro: (name) => {
+            const found = list.projects.find((p) => p.name === name);
+            const distro = found ? distroOf(found.id) : null;
+            if (!distro) return;
+            running.delete(distro);
+            helpers.delete(distro);
+        },
     };
 }

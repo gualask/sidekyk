@@ -3,6 +3,7 @@ import {
     type QueryKey,
     type QueryState,
     type UseQueryResult,
+    useMutation,
     useQueries,
     useQuery,
     useQueryClient,
@@ -42,9 +43,7 @@ import { useRepositoryPort } from './repository.port';
 export const repositoryKeys = {
     all: ['repository'] as const,
     of: (projectId: string) => [...repositoryKeys.all, projectId] as const,
-    /** Asked by the cards (`start` false) and by the project opened apart: only one starts a distro. */
-    kind: (projectId: string, start: boolean) =>
-        [...repositoryKeys.of(projectId), 'kind', start] as const,
+    kind: (projectId: string) => [...repositoryKeys.of(projectId), 'kind'] as const,
     snapshot: (projectId: string) => [...repositoryKeys.of(projectId), 'snapshot'] as const,
     summary: (projectId: string) => [...repositoryKeys.of(projectId), 'summary'] as const,
     diff: (projectId: string, request: FileDiffRequest) =>
@@ -137,7 +136,7 @@ const commitKeys = {
 const READ_AGAIN_AFTER_MS = 30_000;
 
 /**
- * A read that failed is never fresh: what fixed it outside (a WSL distro started by opening
+ * A read that failed is never fresh: what fixed it outside (a WSL distro started from
  * another of its projects, a folder put back) shows the next time.
  */
 function isOld({ state }: { state: QueryState<unknown> }): boolean {
@@ -148,32 +147,43 @@ function isOld({ state }: { state: QueryState<unknown> }): boolean {
 
 /**
  * What a project's folder is, for the panels it has: `null` without folder, `waiting` until read.
- * No git runs, so it answers at once. `start` starts a stopped WSL distro (the project opened);
- * the cards never do, and their answer stands in while the project opened reads its own. A kind
- * that cannot be read counts as a repository, as every folder did before: its panels and the
- * problems tell why.
+ * No git runs, so it answers at once. Never starts a stopped WSL distro, for a card or for the
+ * project opened: `stopped` says so, and `useStartFolder` starts it. A kind that cannot be read
+ * otherwise counts as a repository, as every folder did before: its panels and the problems tell
+ * why.
  */
 export function useFolderKind(
     project: ProjectInfo | null,
-    { start = false, freshOnShow = false } = {},
-): { kind: FolderKind | null; waiting: boolean } {
+    { freshOnShow = false } = {},
+): { kind: FolderKind | null; waiting: boolean; stopped: boolean } {
     const port = useRepositoryPort();
-    const queryClient = useQueryClient();
     const projectId = project && projectFolder(project) ? project.id : null;
     const query = useQuery({
-        queryKey: repositoryKeys.kind(projectId ?? '', start),
-        queryFn: () => port.getFolderKind(projectId ?? '', start),
+        queryKey: repositoryKeys.kind(projectId ?? ''),
+        queryFn: () => port.getFolderKind(projectId ?? '', false),
         enabled: projectId !== null,
         staleTime: Number.POSITIVE_INFINITY,
-        placeholderData: () =>
-            start && projectId
-                ? queryClient.getQueryData<FolderKind>(repositoryKeys.kind(projectId, false))
-                : undefined,
         refetchOnMount: freshOnShow ? (query) => (isOld(query) ? 'always' : false) : true,
     });
-    if (!projectId) return { kind: null, waiting: false };
-    if (query.isError) return { kind: 'repository', waiting: false };
-    return { kind: query.data ?? null, waiting: query.isPending };
+    if (!projectId) return { kind: null, waiting: false, stopped: false };
+    if (query.isError) {
+        const stopped = hasErrorCode(query.error, 'distro_stopped');
+        return { kind: 'repository', waiting: false, stopped };
+    }
+    return { kind: query.data ?? null, waiting: query.isPending, stopped: false };
+}
+
+/**
+ * Starts the stopped WSL distro that holds a project's folder, as its Start button asks: the
+ * one read that may, its answer the folder's kind.
+ */
+export function useStartFolder(projectId: string) {
+    const port = useRepositoryPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: () => port.getFolderKind(projectId, true),
+        onSuccess: (kind) => queryClient.setQueryData(repositoryKeys.kind(projectId), kind),
+    });
 }
 
 /** A repository's snapshot; none read for a folder without git (`repository` false). */

@@ -310,7 +310,7 @@ export function ChangesWorkspace({
                             <p className="text-sm">{i18n.t('changes.nothing')}</p>
                         </div>
                     ) : snapshot.isPending && folder?.kind === 'wsl' ? (
-                        // the first read may start the distro and Sidekyk's helper in it
+                        // the first read may start Sidekyk's helper in the distro
                         <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
                             {i18n.t('projects.starting', { distro: folder.distro })}
                         </div>

@@ -120,9 +120,10 @@ export function TopBar({
                                 // into the other
                                 style={{ viewTransitionName: ZOOM_NAMES.panel(panel.id) }}
                                 className="flex h-[26px] items-center gap-1.5 rounded-[7px] border border-ui-border bg-ui-surface-subtle px-2.5 text-xs font-semibold text-ui-text-secondary hover:border-ui-border-hover hover:text-ui-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-accent-muted"
+                                // a tile that waits there is a side one, which a key opens
                                 title={t('topBar.restore', {
                                     panel: t(panel.title),
-                                    key: panelShortcut(panel),
+                                    key: panelShortcut(panel) ?? '',
                                 })}
                                 onClick={() => onRestore(panel)}
                             >

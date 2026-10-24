@@ -112,8 +112,9 @@ impl ProjectsState {
     }
 
     /// The palette's matches: the projects, the panels the frontend names, and the files of the
-    /// project asked for, ranked where its files are kept. Its notes are `notes_of`'s, asked only
-    /// for a project of the list.
+    /// project asked for, ranked where its files are kept: none while its WSL distro is stopped,
+    /// which only its Start button starts. Its notes are `notes_of`'s, asked only for a project of
+    /// the list.
     pub(crate) fn search(
         &self,
         request: &SearchRequest,
@@ -122,6 +123,7 @@ impl ProjectsState {
         let list = self.list();
         let files_of = |id: &str| {
             let (folder, info) = list.find(id).ok()?.repository()?;
+            self.readable_without_starting(folder).ok()?;
             self.repositories_at(folder)
                 .search_files(&info, &request.query)
         };

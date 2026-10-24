@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { notesPanel } from '@/modules/notes';
-import { changesPanel, filesPanel } from '@/modules/repository';
-import { deepestLevel, projectTiles, tileBeside } from './panels';
+import { changesPanel, filesPanel, startPanel } from '@/modules/repository';
+import { deepestLevel, panelShortcut, projectTiles, tileBeside } from './panels';
 
 describe('projectTiles', () => {
     it('gives a repository every panel, Changes on the left', () => {
@@ -32,6 +32,17 @@ describe('projectTiles', () => {
         expect(tiles.fullScreen).toEqual([]);
         expect(tiles.summaries.map((summary) => summary.id)).toEqual(['notes']);
         expect(deepestLevel(tiles)).toBe(1);
+    });
+
+    it('puts the Start panel in place of the folder in a stopped distro, Notes beside', () => {
+        const tiles = projectTiles('stopped');
+        expect(tiles.panels).toEqual([startPanel, notesPanel]);
+        expect(tiles.main).toBe(startPanel);
+        expect(tiles.side).toEqual([notesPanel]);
+        expect(deepestLevel(tiles)).toBe(2);
+        // no key opens it: it stands in for the folder's panels
+        expect(panelShortcut(startPanel)).toBeNull();
+        expect(panelShortcut(notesPanel)).toBe('3');
     });
 
     it('keeps one value per kind of project', () => {

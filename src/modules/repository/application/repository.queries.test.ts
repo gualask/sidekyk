@@ -32,7 +32,7 @@ describe('a change in the working tree', () => {
         expect(worktreeChangeTouches(index, changed)).toBe(false);
         expect(worktreeChangeTouches(repositoryKeys.commits('p'), null)).toBe(false);
         // a change of kind is told as such
-        expect(worktreeChangeTouches(repositoryKeys.kind('p', true), null)).toBe(false);
+        expect(worktreeChangeTouches(repositoryKeys.kind('p'), null)).toBe(false);
     });
 
     it('reads again the snapshot and folders always, the rest when the paths are unknown', () => {

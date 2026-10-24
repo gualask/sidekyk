@@ -84,10 +84,14 @@ bar (the rail's tooltip too, until the rail went); no middle dot, the form VS Co
 indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problems`, and the
 `review` scenario's WSL project, which takes 1.5 s to start):
 
-- A stopped distro's card: "Ubuntu is not running. Open the project to start it." instead of
-  the counts (its `stopped` chip went with the card's chips, 2026-10-18).
-- Opening it the first time (distro, helper copied): the panels' own loading state, with
-  "Starting Ubuntu…".
+- A stopped distro's card: "Ubuntu is not running." instead of the counts (its `stopped` chip
+  went with the card's chips, 2026-10-18).
+- Started only from its Start panel (2026-10-24): opening the project, a note found in it or
+  `[`/`]` passing through starts nothing; Notes works, a Start panel stands in for the folder's
+  ("Start Ubuntu", then "Starting Ubuntu…"). One rule for every way in, not by intent; the
+  machine's (`readable_without_starting`), so containers follow it.
+- Opening it the first time (helper copied): the panels' own loading state, with "Starting
+  Ubuntu…".
 - Problems, as `repository_missing`: WSL or the distro gone, "Ubuntu is not installed" (Try again,
   Remove); no git in the distro, "git is not installed in Ubuntu", installed with the distro's
   package manager (`sudo apt install git` on Ubuntu and Debian) (Try again); the helper fails,
@@ -143,8 +147,8 @@ indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problem
   `wsl.exe --list --running --quiet` and `--list --quiet` (2026-10-18), names only: the columns
   of `--list --verbose` (VS Code's, before starting its server) are in the language of Windows,
   `Running` a translated word. `WSL_UTF8=1`, and UTF-16LE read too for an older `wsl.exe`.
-  It starts when its project is opened. Zed and VS Code do not check: opening starts the distro,
-  their recent lists do not touch it.
+  It starts from its project's Start panel only (2026-10-24). Zed and VS Code do not check:
+  opening starts the distro, their recent lists do not touch it.
 
 ### Trying it without Windows
 
@@ -167,7 +171,8 @@ indicator uses. Built too (`../features/projects.md`; `?dev=app&scenario=problem
 - On Windows 11 x64, from `build.yml`'s unsigned build: the protocol's cost through `wsl.exe`;
   `wsl.exe`'s and the helper's start time; `--list --running --quiet` leaves a stopped distro
   stopped; distro names and case; the folder dialog's form of a WSL path; `--exec env <path from
-  ~>`; the install through `wslpath` from the resources (`\\?\` dropped) and through stdin.
+  ~>`; the install through `wslpath` from the resources (`\\?\` dropped) and through stdin; a
+  stopped distro's project opened, its notes read and `[`/`]` through it start nothing until Start.
 - The palette lists two `shop`s alike (a local and a WSL clone): name the distro there too? Ask
   with a preview first.
 

@@ -41,7 +41,9 @@ New project picks a repository, the scenario's own, then a folder without git in
 `&open=<name>` starts as `sidekyk <folder>` does, and `sidekykDev.openFolder('<name>')` in the
 console opens one while the app runs: the project of that name, else one made for a folder of that
 name. `sidekykDev.gitInit('<name>')` and `gitRemove('<name>')` stand in for `git init` and `.git`
-removed in a project's folder, told as the watcher would. UI changes are checked there, in light
+removed in a project's folder, told as the watcher would; `sidekykDev.stopDistro('<name>')` stops
+the distro of a WSL project (`wsl --shutdown`), whose next read starts it again. In `problems`,
+`api`'s distro (Debian) is stopped: its Start panel. UI changes are checked there, in light
 and dark.
 
 ## Timing tests

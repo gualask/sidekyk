@@ -73,6 +73,7 @@ export function CommandPalette({
     projectName,
     projectId,
     hasFiles,
+    stoppedDistro,
     currentFile,
     panels,
     actions,
@@ -89,6 +90,8 @@ export function CommandPalette({
     projectId: string | null;
     /** Whether that project has files to search: a folder. */
     hasFiles: boolean;
+    /** The WSL distro holding that project's folder while it is stopped: no files until started. */
+    stoppedDistro: string | null;
     /** The file the project shows, whose lines found come first. */
     currentFile: string | null;
     panels: readonly PalettePanel[];
@@ -110,6 +113,7 @@ export function CommandPalette({
                         projectName={projectName}
                         projectId={projectId}
                         hasFiles={hasFiles}
+                        stoppedDistro={stoppedDistro}
                         currentFile={currentFile}
                         panels={panels}
                         onOpen={(item, query) => {
@@ -139,6 +143,7 @@ function Palette({
     projectName,
     projectId,
     hasFiles,
+    stoppedDistro,
     currentFile,
     panels,
     onOpen,
@@ -149,6 +154,7 @@ function Palette({
     projectName: string | null;
     projectId: string | null;
     hasFiles: boolean;
+    stoppedDistro: string | null;
     currentFile: string | null;
     panels: readonly PalettePanel[];
     onOpen: (item: PaletteItem, query: string) => void;
@@ -223,7 +229,14 @@ function Palette({
                 )}
                 <Autocomplete.Input
                     aria-label={t(contents ? 'common.findInFiles' : 'common.goTo')}
-                    placeholder={placeholder(mode, projectId, hasFiles, projectName, i18n)}
+                    placeholder={placeholder(
+                        mode,
+                        projectId,
+                        hasFiles,
+                        stoppedDistro,
+                        projectName,
+                        i18n,
+                    )}
                     spellCheck={false}
                     autoComplete="off"
                     className="h-[50px] min-w-0 flex-1 border-0 bg-transparent text-[15px] text-ui-text outline-none placeholder:text-ui-text-muted"
@@ -317,6 +330,7 @@ function placeholder(
     mode: PaletteMode,
     projectId: string | null,
     hasFiles: boolean,
+    stoppedDistro: string | null,
     projectName: string | null,
     { t }: Translator,
 ): string {
@@ -325,6 +339,9 @@ function placeholder(
         return t(hasFiles ? 'palette.placeholder.names' : 'palette.placeholder.namesNotes');
     }
     if (!projectId) return t('palette.placeholder.contentsNoProject');
+    if (stoppedDistro) {
+        return t('palette.placeholder.contentsStopped', { distro: stoppedDistro });
+    }
     if (!hasFiles) return t('palette.placeholder.contentsNoFolder');
     return projectName
         ? t('palette.placeholder.contents', { name: projectName })

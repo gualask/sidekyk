@@ -102,11 +102,14 @@ export function AppShell() {
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
-    // what its folder is: opening the project starts a stopped WSL distro, all projects does not
-    const folderKind = useFolderKind(project, { start: zoomLevel > 0 });
+    // what its folder is: read without starting a stopped WSL distro, which its Start panel starts
+    const folderKind = useFolderKind(project);
     // the project's panels, from what it has; none at all projects without projects, and not yet
     // while its folder's kind is read
-    const tiles = project && !folderKind.waiting ? projectTiles(folderKind.kind) : null;
+    const tiles =
+        project && !folderKind.waiting
+            ? projectTiles(folderKind.stopped ? 'stopped' : folderKind.kind)
+            : null;
     const hasChanges = tiles?.panels.includes(changesPanel) ?? false;
     // as deep as the project goes: a project with one panel has no level 2, and without projects
     // only all projects shows. The level kept follows the one shown, so another project opens at
@@ -123,14 +126,25 @@ export function AppShell() {
     // panels
     const palettePanels = useMemo(
         () =>
-            (level > 0 && tiles ? tiles.fullScreen : []).map((offered) => ({
-                id: offered.id,
-                title: i18n.t(offered.title),
-                icon: offered.icon,
-                shortcut: panelShortcut(offered),
-            })),
+            (level > 0 && tiles ? tiles.fullScreen : []).flatMap((offered) => {
+                // a panel no key opens stands in for others (Start): nothing to go to
+                const shortcut = panelShortcut(offered);
+                return shortcut
+                    ? [
+                          {
+                              id: offered.id,
+                              title: i18n.t(offered.title),
+                              icon: offered.icon,
+                              shortcut,
+                          },
+                      ]
+                    : [];
+            }),
         [level, tiles, i18n],
     );
+    // the distro to start before the project's files are searched, while it is stopped
+    const folder = project ? projectFolder(project) : null;
+    const stoppedDistro = folderKind.stopped && folder?.kind === 'wsl' ? folder.distro : null;
     // the Inbox's field takes the focus (`⌘N` at all projects)
     const [focusInbox, setFocusInbox] = useState(false);
     const inboxFocused = useCallback(() => setFocusInbox(false), []);
@@ -393,6 +407,7 @@ export function AppShell() {
                         projectName={project?.name ?? null}
                         projectId={level > 0 ? (project?.id ?? null) : null}
                         hasFiles={tiles?.panels.includes(filesPanel) ?? false}
+                        stoppedDistro={stoppedDistro}
                         currentFile={palette.open ? shownFile() : null}
                         panels={palettePanels}
                         actions={paletteActions}
@@ -551,7 +566,7 @@ function CardSummaries({ project, part }: { project: ProjectInfo; part: SummaryP
 
 /**
  * A project's panels before its folder's kind is read, as they wait for what they read: nothing
- * drawn, but for a WSL project, whose first read may start the distro and Sidekyk's helper in it.
+ * drawn, but for a WSL project, whose first read may start Sidekyk's helper in its distro.
  */
 function WaitingPanels({ project }: { project: ProjectInfo }) {
     const { t } = useTranslation();

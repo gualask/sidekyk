@@ -49,8 +49,8 @@ pub(super) async fn on_project<T: Send + 'static>(
 
 #[tauri::command]
 /// Whether a project's folder is a repository or a folder without git. No git runs, so the
-/// cards ask it at once; `start` starts a stopped WSL distro that holds it, as opening the project
-/// does and the cards do not.
+/// cards ask it at once; `start` starts a stopped WSL distro that holds it: the project's Start
+/// button, and nothing else, asks for that.
 pub(crate) async fn get_folder_kind(
     app: tauri::AppHandle,
     project_id: String,

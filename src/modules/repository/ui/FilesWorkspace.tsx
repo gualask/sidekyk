@@ -69,7 +69,7 @@ export function FilesWorkspace({
     const projectId = project.id;
     const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
     const { open, selected } = state;
-    const repository = useFolderKind(project, { start: true }).kind === 'repository';
+    const repository = useFolderKind(project).kind === 'repository';
     // the file shown, one for both panels: Changes selects it in its list
     const {
         snapshot,

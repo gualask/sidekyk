@@ -28,3 +28,15 @@ export const filesPanel = definePanel({
         pick: (module) => module.FilesSummary,
     },
 });
+
+/**
+ * Stands in for the folder's panels while the WSL distro that holds it is stopped, its button
+ * the only thing that starts it. Not among the panels a key opens: it goes once started.
+ */
+export const startPanel = definePanel({
+    id: 'start',
+    title: 'panel.folder',
+    icon: IconFolder,
+    load: () => import('./ui/StartFolder'),
+    pick: (module) => module.StartFolder,
+});
