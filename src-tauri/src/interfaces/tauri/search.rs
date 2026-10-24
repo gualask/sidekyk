@@ -50,9 +50,7 @@ pub(crate) async fn search_contents(
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
     on_project("search_contents", app, project_id, move |on| {
-        on.app
-            .state::<ProjectsState>()
-            .readable_without_starting(on.folder)?;
+        on.readable_without_starting()?;
         on.repositories.search_contents(on.info, &query, &|files| {
             // the page went away: nothing left to stop
             let _ = on_files.send(files);

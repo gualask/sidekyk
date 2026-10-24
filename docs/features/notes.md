@@ -60,18 +60,24 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   (text, list, position, edited, done). Order by a number per note, a move takes the middle of its
   neighbors (renumbering the list only when no room is left). Layout in `modules/notes/store.rs`;
   folder by project id from each `project.json`, scanned once.
-- The book read last stays in memory; a change writes only the files it touched (written
-  beside, `sync_all`, renamed over; a leftover `.tmp` is removed when read), a failed write drops
-  the memory copy. Nothing is written for a book until its first change; until then its first
-  list has a fixed id, so the one the frontend was given is still there after another book was
-  read. Ids: 16 hex digits, the only names let through to files.
+- Every book read stays in memory (`NotesStore::books`, one lock) until the app quits or the
+  book is deleted: the cards read every book at start, so files are read once per session.
+  Summaries, counts, the palette, an export and a project switch use what is kept. A change
+  writes at once only the files it touched (written beside, `sync_all`, renamed over; a leftover
+  `.tmp` is removed when read); a failed write drops that book, read again from its files at the
+  next call. Safe because only the app writes there (single instance, every change through the
+  store); a sync (`notes-sync.md`) must write through it too. Nothing is written for a book until
+  its first change; until then its first list has a fixed id, so the one the frontend was given
+  is still there after a failed write. Ids: 16 hex digits, the only names let through to files.
+- `with_every_book`: the lists and notes of the books named, read when missing, looked at under
+  the lock; one that cannot be read is left out.
 - Moving (`move_note`, `move_list`): a note goes
   to another book, or another list of its own, with its id, on top of the list's open notes
   (`ListTarget`: the open list, a list, a new one); done stays done, but into the Inbox. A list
   goes to another project whole: into its list of the same name (case aside), its open notes
   below, else added last; the last list of a project stays. The book that takes is written first,
-  so a failure between leaves the notes in both, never in neither (`NotesStore::exchange`; the
-  book in memory stays, the other is read for the move). Undo: `unmove_note` puts the note back
+  so a failure between leaves the notes in both, never in neither (`NotesStore::exchange`; a
+  failure drops both books from memory). Undo: `unmove_note` puts the note back
   as it was, `unmove_list` brings the list back as a deleted one and takes its notes out of the
   other project, with the list made for them when nothing else is in it. A move to a new project
   (`BookTarget::NewProject`) makes it, without folder, in the interface, and removes it with
@@ -92,12 +98,12 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
 - Export (`export_notes`): Markdown (`to_markdown`: a section per list, notes between `---`, done
   ones under `### Done`) where the save dialog says, never inside a project's repository
   (`export_in_repository`; `ProjectList::holds`: paths resolved by the file system, links
-  included, compared without case on macOS and Windows). The export reads the notes without
-  replacing those in memory (`read_notes`).
+  included, compared without case on macOS and Windows). The export reads the notes kept in
+  memory (`with_notes`).
 - Removing a project deletes its notes first (`remove_project`; if they cannot go, the project
   stays). The frontend asks before (`RemoveProjectDialog`, notes module, lazy, from the overview's ⋯
-  and the problems of a repository moved or a WSL distro gone): no notes (`count_notes`, files
-  counted, nothing read), it goes at once; else export then remove, or remove and delete; a count
+  and the problems of a repository moved or a WSL distro gone): no notes (`count_notes`, from the
+  book in memory), it goes at once; else export then remove, or remove and delete; a count
   that fails asks too.
 - Frontend (`NotesWorkspace`): lists on the left full screen, cards of the open list (virtualized,
   measured heights: `useCardRows`, `CardRows`), reorder mode. `InboxColumn` (exported, the app
@@ -115,10 +121,17 @@ Cards in lists, per project, stored in the app data directory (built 2026-10-17,
   `show` to Notes with `newNoteTarget`.
 - Caches of a book's notes are one family: `['notes', book]`, its card's summary (open, done,
   last edit) and its count below it; every change makes the summary stale, rereading or forgetting a project's notes
-  takes all three. The backend's summary cache is read and filled under the same lock as changes.
+  takes all three. The backend computes a summary from the book in memory, under the lock changes
+  take.
 - `notes_timings` (release, 1,000 notes): read 26 ms, a change 5 ms (mostly `sync_all`).
+- Every book in memory, measured 2026-10-24 (release, warm cache, notes of ~470 characters, 10 /
+  30 / 60 projects of 100 / 300 / 500 notes): kept 0.65 / 6.2 / 18.6 MB; the cards at start
+  23 / 280 / 1,030 ms, as before; a project switch 0.01–0.05 ms, was 2.2 / 6.5 / 11.3 ms (its
+  book read again).
 
 ## Decisions
 
 - One file per note (2026-10-17): a change writes one file, a sync conflict is one note.
 - Removing a project never leaves its notes on disk (2026-10-17): it asks, export or delete.
+- Every book kept in memory once read (2026-10-24): memory over disk reads, about 0.6 MB per
+  1,000 notes; no eviction, no index until a measure asks.

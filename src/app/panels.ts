@@ -60,8 +60,7 @@ function summariesOf(panels: readonly PanelDefinition[]): PanelSummary[] {
     return panels.flatMap((panel) => (panel.summary ? [{ id: panel.id, ...panel.summary }] : []));
 }
 
-function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
-    const panels = PANELS.filter((panel) => !panel.needs || met(panel.needs));
+function tilesOf(panels: readonly PanelDefinition[]): ProjectTiles {
     const [main, ...side] = panels;
     return {
         panels,
@@ -72,26 +71,16 @@ function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
     };
 }
 
-/**
- * A folder in a stopped WSL distro: its Start panel in place of the folder's panels, Notes beside
- * as for any project.
- */
-function stoppedTiles(): ProjectTiles {
-    const panels = [startPanel, notesPanel];
-    return {
-        panels,
-        main: startPanel,
-        side: [notesPanel],
-        summaries: summariesOf(panels),
-        fullScreen: panels,
-    };
+function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
+    return tilesOf(PANELS.filter((panel) => !panel.needs || met(panel.needs)));
 }
 
 /** One value per kind of project, so the panels of a project keep their identity across renders. */
 const TILES = {
     repository: tilesMeeting(() => true),
     plain: tilesMeeting((need) => need === 'folder'),
-    stopped: stoppedTiles(),
+    // a folder in a stopped WSL distro: its Start panel in place of the folder's, Notes beside
+    stopped: tilesOf([startPanel, notesPanel]),
     none: tilesMeeting(() => false),
 };
 

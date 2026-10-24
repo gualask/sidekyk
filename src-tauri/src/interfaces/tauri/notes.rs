@@ -373,7 +373,7 @@ pub(crate) async fn export_notes(
         if inside {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
         }
-        let markdown = store.read_notes(files, &project_book(&project), |lists, notes| {
+        let markdown = store.with_notes(files, &project_book(&project), |lists, notes| {
             to_markdown(&project.name, lists, notes, &texts.export)
         })?;
         write_chosen_file(&path, markdown.as_bytes())?;

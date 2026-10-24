@@ -18,6 +18,8 @@ runs until an account is connected.
 - Local first, sync in the background after edits (debounced), at startup and on focus, never
   polling; network only in Rust; conflicts keep both versions (one file per note: a conflict is
   one note).
+- What sync brings in goes through `NotesStore`, never straight to the files: every book read
+  stays in memory and the files are not read again (`../features/notes.md`).
 - A setting in Notes (settings dialog).
 
 ## Rules when it lands

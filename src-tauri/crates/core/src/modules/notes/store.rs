@@ -10,10 +10,11 @@
 //!
 //! A project's folder is named after it; the Inbox's is `inbox`, without `project.json`.
 //!
-//! The book read last stays in memory: every change goes to it, then to its files.
+//! Every book read stays in memory until the app quits or the book is deleted: every change goes
+//! to it, then at once to its files, which are read again only after a write failed.
 
 use std::collections::{HashMap, HashSet};
-use std::sync::{Mutex, MutexGuard};
+use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use super::book::{NoteBook, Touched, MAX_NOTE_BYTES};
@@ -123,8 +124,7 @@ fn write_json(
     storage.write(folder, file, &serde_json::to_vec_pretty(value)?)
 }
 
-struct OpenBook {
-    book: Book,
+struct KeptBook {
     /// `None` until something of the book is written.
     folder: Option<String>,
     notes: NoteBook,
@@ -132,10 +132,11 @@ struct OpenBook {
     pending: Vec<Touched>,
 }
 
-impl OpenBook {
-    fn is(&self, book: &Book) -> bool {
-        self.book.key() == book.key()
-    }
+/// A book's lists and notes, where the store keeps them (`with_every_book`).
+pub struct BookNotes<'a> {
+    pub book: &'a Book,
+    pub lists: &'a [NoteList],
+    pub notes: &'a [Note],
 }
 
 /// Every book's notes, through the storage given to each call.
@@ -143,9 +144,9 @@ impl OpenBook {
 pub struct NotesStore {
     /// Which folder holds each project's notes, by project id: read once.
     folders: Mutex<Option<HashMap<String, String>>>,
-    open: Mutex<Option<OpenBook>>,
-    /// What the books tell of their notes, by book, once read: notes change only through here.
-    summaries: Mutex<HashMap<String, NotesSummary>>,
+    /// Every book read, by key: notes change only through here, so they stay until the app quits
+    /// or the book is deleted.
+    books: Mutex<HashMap<String, KeptBook>>,
     /// The name of a book's first list, `FIRST_LIST_NAME` until named.
     first_list_name: Mutex<Option<&'static str>>,
 }
@@ -196,7 +197,7 @@ impl NotesStore {
         }
     }
 
-    fn load(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<OpenBook> {
+    fn load(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<KeptBook> {
         let started = Instant::now();
         let folder = self.folder_of(storage, book)?;
         let mut lists = Vec::new();
@@ -237,48 +238,58 @@ impl NotesStore {
             ms = started.elapsed().as_millis() as u64,
             "notes read"
         );
-        Ok(OpenBook {
-            book: book.clone(),
+        Ok(KeptBook {
             folder,
             notes,
             pending,
         })
     }
 
-    /// The book kept in memory, made `book` first unless it is already.
-    fn opened<'a>(
+    /// A book's notes in memory, read first when they are not.
+    fn kept_book<'a>(
         &self,
-        open: &'a mut MutexGuard<Option<OpenBook>>,
+        books: &'a mut HashMap<String, KeptBook>,
         storage: &dyn NotesStorage,
         book: &Book,
-    ) -> anyhow::Result<&'a mut OpenBook> {
-        if !open.as_ref().is_some_and(|o| o.is(book)) {
-            **open = Some(self.load(storage, book)?);
+    ) -> anyhow::Result<&'a mut KeptBook> {
+        if !books.contains_key(book.key()) {
+            books.insert(book.key().into(), self.load(storage, book)?);
         }
-        Ok(open.as_mut().expect("just read"))
+        Ok(books.get_mut(book.key()).expect("just read"))
     }
 
-    /// Runs a change on a book's notes, read first unless they are the last read, then writes
-    /// what it touched. A failed write drops what is in memory: the next call reads the files.
+    /// Looks at a book's notes in memory, read first when they are not.
+    fn with_book<T>(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        look: impl FnOnce(&NoteBook) -> T,
+    ) -> anyhow::Result<T> {
+        let mut books = lock(&self.books);
+        Ok(look(&self.kept_book(&mut books, storage, book)?.notes))
+    }
+
+    /// Runs a change on a book's notes, then writes what it touched. A failed write drops the
+    /// book from memory: the next call reads its files.
     fn change<T>(
         &self,
         storage: &dyn NotesStorage,
         book: &Book,
         change: impl FnOnce(&mut NoteBook) -> anyhow::Result<(T, Vec<Touched>)>,
     ) -> anyhow::Result<T> {
-        let mut open = lock(&self.open);
-        let current = self.opened(&mut open, storage, book)?;
-        let (value, touched) = change(&mut current.notes)?;
-        if let Err(error) = self.commit(storage, current, touched) {
-            *open = None;
+        let mut books = lock(&self.books);
+        let kept = self.kept_book(&mut books, storage, book)?;
+        let (value, touched) = change(&mut kept.notes)?;
+        if let Err(error) = self.write(storage, book, kept, touched) {
+            books.remove(book.key());
             return Err(error);
         }
         Ok(value)
     }
 
     /// Runs a change that moves notes from `giver` to `taker`, two books, and writes `taker`'s
-    /// files first: a failure between leaves notes in both, never in neither. The book kept in
-    /// memory stays if it is one of them, else `giver` is; a failure drops it.
+    /// files first: a failure between leaves notes in both, never in neither. A failure drops
+    /// both books from memory.
     fn exchange<T>(
         &self,
         storage: &dyn NotesStorage,
@@ -290,17 +301,18 @@ impl NotesStore {
         ) -> anyhow::Result<(T, Vec<Touched>, Vec<Touched>)>,
     ) -> anyhow::Result<T> {
         anyhow::ensure!(giver.key() != taker.key(), "notes move to another book");
-        let mut open = lock(&self.open);
-        let result = self.exchange_with(&mut open, storage, giver, taker, change);
+        let mut books = lock(&self.books);
+        let result = self.exchange_in(&mut books, storage, giver, taker, change);
         if result.is_err() {
-            *open = None;
+            books.remove(giver.key());
+            books.remove(taker.key());
         }
         result
     }
 
-    fn exchange_with<T>(
+    fn exchange_in<T>(
         &self,
-        open: &mut MutexGuard<Option<OpenBook>>,
+        books: &mut HashMap<String, KeptBook>,
         storage: &dyn NotesStorage,
         giver: &Book,
         taker: &Book,
@@ -309,47 +321,31 @@ impl NotesStore {
             &mut NoteBook,
         ) -> anyhow::Result<(T, Vec<Touched>, Vec<Touched>)>,
     ) -> anyhow::Result<T> {
-        let taker_open = open.as_ref().is_some_and(|o| o.is(taker));
-        let (kept, other) = if taker_open {
-            (taker, giver)
-        } else {
-            (giver, taker)
-        };
-        let kept = self.opened(open, storage, kept)?;
-        let mut other = self.load(storage, other)?;
-        let (giving, taking) = if taker_open {
-            (&mut other, kept)
-        } else {
-            (kept, &mut other)
+        self.kept_book(books, storage, giver)?;
+        self.kept_book(books, storage, taker)?;
+        let [Some(giving), Some(taking)] = books.get_disjoint_mut([giver.key(), taker.key()])
+        else {
+            unreachable!("both just read");
         };
         let (value, gave, took) = change(&mut giving.notes, &mut taking.notes)?;
-        self.commit(storage, taking, took)?;
-        self.commit(storage, giving, gave)?;
+        self.write(storage, taker, taking, took)?;
+        self.write(storage, giver, giving, gave)?;
         Ok(value)
     }
 
-    /// Writes what a change touched, if anything, and forgets what the book's summary was.
-    fn commit(
+    /// Writes what a change touched, if anything, with what reading mended.
+    fn write(
         &self,
         storage: &dyn NotesStorage,
-        open: &mut OpenBook,
-        touched: Vec<Touched>,
+        book: &Book,
+        kept: &mut KeptBook,
+        mut touched: Vec<Touched>,
     ) -> anyhow::Result<()> {
         if touched.is_empty() {
             return Ok(());
         }
-        lock(&self.summaries).remove(open.book.key());
-        self.write(storage, open, touched)
-    }
-
-    fn write(
-        &self,
-        storage: &dyn NotesStorage,
-        open: &mut OpenBook,
-        mut touched: Vec<Touched>,
-    ) -> anyhow::Result<()> {
-        touched.append(&mut open.pending);
-        let folder = match (&open.folder, &open.book) {
+        touched.append(&mut kept.pending);
+        let folder = match (&kept.folder, book) {
             (Some(folder), _) => folder.clone(),
             (None, Book::Inbox) => unreachable!("the Inbox's folder is known"),
             (None, Book::Project { id, name }) => {
@@ -366,7 +362,7 @@ impl NotesStore {
                 lock(&self.folders)
                     .get_or_insert_with(HashMap::new)
                     .insert(id.clone(), folder.clone());
-                open.folder = Some(folder.clone());
+                kept.folder = Some(folder.clone());
                 // the first list was made in memory
                 touched.push(Touched::Lists);
                 folder
@@ -374,7 +370,7 @@ impl NotesStore {
         };
         let mut seen = HashSet::new();
         touched.retain(|t| seen.insert(t.clone()));
-        let notes = &open.notes;
+        let notes = &kept.notes;
         for touched in touched {
             match touched {
                 Touched::Note(id) => match notes.note(&id) {
@@ -414,82 +410,71 @@ impl NotesStore {
 
     /// A book's notes; none written yet is a first, empty list.
     pub fn notes(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<ProjectNotes> {
-        self.change(storage, book, |notes| Ok((notes.snapshot(), Vec::new())))
+        self.with_book(storage, book, NoteBook::snapshot)
     }
 
-    /// What a book tells of its notes: from those in memory, else read once (without replacing
-    /// those in memory) and kept until they change.
+    /// What a book tells of its notes: a project's card at all projects.
     pub fn summary(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<NotesSummary> {
-        // held throughout, as a change holds it: a summary read meanwhile could keep notes older
-        // than the change that cleared it
-        let open = lock(&self.open);
-        if let Some(open) = open.as_ref().filter(|o| o.is(book)) {
-            return Ok(open.notes.summary());
-        }
-        if let Some(summary) = lock(&self.summaries).get(book.key()) {
-            return Ok(summary.clone());
-        }
-        let summary = self.load(storage, book)?.notes.summary();
-        lock(&self.summaries).insert(book.key().into(), summary.clone());
-        Ok(summary)
+        self.with_book(storage, book, NoteBook::summary)
     }
 
-    /// How many notes a book has, open and done, counted from its files without reading them.
+    /// How many notes a book has, open and done.
     pub fn count(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<usize> {
-        let Some(folder) = self.folder_of(storage, book)? else {
-            return Ok(0);
-        };
-        Ok(storage
-            .files(&folder)?
-            .iter()
-            .filter(|file| file.strip_suffix(".json").is_some_and(is_id))
-            .count())
+        self.with_book(storage, book, |notes| notes.notes.len())
     }
 
     /// Deletes a project's notes, its folder with them: the project goes. The Inbox stays.
     pub fn delete_book(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<()> {
         anyhow::ensure!(!matches!(book, Book::Inbox), "the Inbox is never deleted");
-        let mut open = lock(&self.open);
+        let mut books = lock(&self.books);
         if let Some(folder) = self.folder_of(storage, book)? {
             storage.remove_folder(&folder)?;
         }
         if let Some(found) = lock(&self.folders).as_mut() {
             found.remove(book.key());
         }
-        lock(&self.summaries).remove(book.key());
-        if open.as_ref().is_some_and(|o| o.is(book)) {
-            *open = None;
-        }
+        books.remove(book.key());
         Ok(())
     }
 
-    /// Looks at a book's lists and notes without making them the ones kept in memory: those of
-    /// the project on screen stay (an export from all projects).
-    pub fn read_notes<T>(
-        &self,
-        storage: &dyn NotesStorage,
-        book: &Book,
-        look: impl FnOnce(&[NoteList], &[Note]) -> T,
-    ) -> anyhow::Result<T> {
-        let open = lock(&self.open);
-        if let Some(open) = open.as_ref().filter(|o| o.is(book)) {
-            return Ok(look(&open.notes.lists, &open.notes.notes));
-        }
-        let other = self.load(storage, book)?;
-        Ok(look(&other.notes.lists, &other.notes.notes))
-    }
-
     /// Looks at a book's lists and notes where they are kept, without a copy: the palette
-    /// searches them at every key.
+    /// searches them at every key, an export writes them.
     pub fn with_notes<T>(
         &self,
         storage: &dyn NotesStorage,
         book: &Book,
         look: impl FnOnce(&[NoteList], &[Note]) -> T,
     ) -> anyhow::Result<T> {
-        self.change(storage, book, |notes| {
-            Ok((look(&notes.lists, &notes.notes), Vec::new()))
-        })
+        self.with_book(storage, book, |notes| look(&notes.lists, &notes.notes))
+    }
+
+    /// Looks at the lists and notes of every book named where they are kept, reading those that
+    /// are not: the palette at all projects searches them at every key. A book that cannot be
+    /// read is left out.
+    pub fn with_every_book<T>(
+        &self,
+        storage: &dyn NotesStorage,
+        books: &[Book],
+        look: impl FnOnce(&[BookNotes]) -> T,
+    ) -> T {
+        let mut kept = lock(&self.books);
+        for book in books {
+            if let Err(error) = self.kept_book(&mut kept, storage, book) {
+                tracing::debug!(book = book.key(), error = %format!("{error:#}"), "notes not read");
+            }
+        }
+        let found: Vec<BookNotes> = books
+            .iter()
+            .filter_map(|book| {
+                let notes = &kept.get(book.key())?.notes;
+                Some(BookNotes {
+                    book,
+                    lists: &notes.lists,
+                    notes: &notes.notes,
+                })
+            })
+            .collect();
+        look(&found)
     }
 
     pub fn add_note(
@@ -717,11 +702,13 @@ pub mod tests {
     use std::collections::BTreeMap;
     use std::sync::atomic::Ordering;
 
-    /// Folders of files in memory; `fail_writes` makes every write fail.
+    /// Folders of files in memory; `fail_writes` makes every write fail, `reads` counts the
+    /// folders listed and the files read.
     #[derive(Default)]
     pub struct MemoryStorage {
         pub files: Mutex<BTreeMap<(String, String), Vec<u8>>>,
         pub fail_writes: std::sync::atomic::AtomicBool,
+        pub reads: std::sync::atomic::AtomicUsize,
     }
 
     impl NotesStorage for MemoryStorage {
@@ -733,6 +720,7 @@ pub mod tests {
         }
 
         fn files(&self, folder: &str) -> anyhow::Result<Vec<String>> {
+            self.reads.fetch_add(1, Ordering::Relaxed);
             Ok(lock(&self.files)
                 .keys()
                 .filter(|(f, _)| f == folder)
@@ -741,6 +729,7 @@ pub mod tests {
         }
 
         fn read(&self, folder: &str, file: &str, limit: u64) -> anyhow::Result<Option<Vec<u8>>> {
+            self.reads.fetch_add(1, Ordering::Relaxed);
             let files = lock(&self.files);
             let Some(bytes) = files.get(&(folder.into(), file.into())) else {
                 return Ok(None);
@@ -769,6 +758,11 @@ pub mod tests {
     impl MemoryStorage {
         fn names(&self) -> Vec<(String, String)> {
             lock(&self.files).keys().cloned().collect()
+        }
+
+        /// What was read since the last call.
+        fn reads(&self) -> usize {
+            self.reads.swap(0, Ordering::Relaxed)
         }
     }
 
@@ -945,22 +939,106 @@ pub mod tests {
         assert_eq!(notes.notes.len(), 1);
     }
 
-    #[test]
-    fn a_summary_is_kept_until_the_notes_change() {
+    /// Two books with a note each, written by another store: on disk, none in memory.
+    fn two_books_on_disk() -> MemoryStorage {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
         for book in [shop(), docs()] {
             let list = store.notes(&storage, &book).unwrap().open_list;
             store.add_note(&storage, &book, &list, "a".into()).unwrap();
         }
-        // shop is not the one in memory: read once, kept
-        assert_eq!(store.summary(&storage, &shop()).unwrap().open, 1);
+        storage.reads();
+        storage
+    }
+
+    #[test]
+    fn every_book_read_stays_in_memory() {
+        let storage = two_books_on_disk();
+        let store = NotesStore::default();
+        // the cards read every book
+        for book in [shop(), docs()] {
+            assert_eq!(store.summary(&storage, &book).unwrap().open, 1);
+        }
+        assert!(storage.reads() > 0);
+        // a project switch, its card, an export, the palette: no file read again
+        store.notes(&storage, &shop()).unwrap();
+        store.notes(&storage, &docs()).unwrap();
+        store.summary(&storage, &shop()).unwrap();
+        store.with_notes(&storage, &shop(), |_, _| ()).unwrap();
+        assert_eq!(store.count(&storage, &docs()).unwrap(), 1);
+        assert_eq!(storage.reads(), 0);
+    }
+
+    #[test]
+    fn a_summary_comes_from_the_notes_changed() {
+        let storage = two_books_on_disk();
+        let store = NotesStore::default();
         let list = store.notes(&storage, &shop()).unwrap().open_list;
         store
             .add_note(&storage, &shop(), &list, "b".into())
             .unwrap();
         store.notes(&storage, &docs()).unwrap();
         assert_eq!(store.summary(&storage, &shop()).unwrap().open, 2);
+        assert_eq!(store.count(&storage, &shop()).unwrap(), 2);
+    }
+
+    #[test]
+    fn a_failed_write_drops_that_book_only() {
+        let storage = two_books_on_disk();
+        let store = NotesStore::default();
+        let note = store.notes(&storage, &shop()).unwrap().notes.remove(0);
+        store.notes(&storage, &docs()).unwrap();
+        storage.reads();
+        storage.fail_writes.store(true, Ordering::Relaxed);
+        assert!(store
+            .set_note_text(&storage, &shop(), &note.id, "b".into())
+            .is_err());
+        storage.fail_writes.store(false, Ordering::Relaxed);
+        store.notes(&storage, &docs()).unwrap();
+        assert_eq!(storage.reads(), 0);
+        assert_eq!(store.notes(&storage, &shop()).unwrap().notes[0].text, "a");
+        assert!(storage.reads() > 0);
+    }
+
+    #[test]
+    fn a_move_keeps_both_books_in_memory() {
+        let storage = two_books_on_disk();
+        let store = NotesStore::default();
+        let note = store.notes(&storage, &shop()).unwrap().notes.remove(0);
+        store
+            .move_note(&storage, &shop(), &note.id, &docs(), ListTarget::Open)
+            .unwrap();
+        storage.reads();
+        assert!(store.notes(&storage, &shop()).unwrap().notes.is_empty());
+        assert_eq!(store.notes(&storage, &docs()).unwrap().notes.len(), 2);
+        assert_eq!(storage.reads(), 0);
+    }
+
+    #[test]
+    fn every_book_is_looked_at_reading_only_those_missing() {
+        let storage = two_books_on_disk();
+        let store = NotesStore::default();
+        store.notes(&storage, &shop()).unwrap();
+        storage.reads();
+        let books = [shop(), docs(), Book::Inbox];
+        let seen = store.with_every_book(&storage, &books, |found| {
+            found
+                .iter()
+                .map(|b| (b.book.key().to_owned(), b.notes.len()))
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            seen,
+            [
+                (SHOP.into(), 1),
+                ("/dev/docs".into(), 1),
+                (INBOX_BOOK.into(), 0)
+            ]
+        );
+        // docs' folder listed and its files read, the Inbox's folder listed
+        assert!(storage.reads() > 0);
+        store.with_every_book(&storage, &books, |_| ());
+        assert_eq!(storage.reads(), 0);
     }
 
     #[test]
@@ -984,6 +1062,7 @@ pub mod tests {
 
         store.delete_book(&storage, &shop()).unwrap();
         assert!(storage.names().is_empty());
+        // gone from memory too
         assert_eq!(store.count(&storage, &shop()).unwrap(), 0);
         // added again, it starts with none
         assert!(store.notes(&storage, &shop()).unwrap().notes.is_empty());
@@ -1119,8 +1198,12 @@ pub mod tests {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
         let list = store.notes(&storage, &Book::Inbox).unwrap().open_list;
-        // another book read meanwhile: the Inbox is read again, still without files
-        store.notes(&storage, &shop()).unwrap();
+        // the first write fails: the Inbox, still without files, is read again
+        storage.fail_writes.store(true, Ordering::Relaxed);
+        assert!(store
+            .add_note(&storage, &Book::Inbox, &list, "a".into())
+            .is_err());
+        storage.fail_writes.store(false, Ordering::Relaxed);
         store
             .add_note(&storage, &Book::Inbox, &list, "a".into())
             .unwrap();

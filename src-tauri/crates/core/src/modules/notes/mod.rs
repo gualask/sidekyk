@@ -15,4 +15,4 @@ pub use contracts::{
 };
 pub use markdown::{to_markdown, ExportWords};
 pub use ports::NotesStorage;
-pub use store::NotesStore;
+pub use store::{BookNotes, NotesStore};

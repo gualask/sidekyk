@@ -25,6 +25,16 @@ pub(super) struct OnProject<'a> {
     pub(super) info: &'a RepositoryInfo,
 }
 
+impl OnProject<'_> {
+    /// Fails, `distro_stopped`, when reading the folder would start the WSL distro that holds it:
+    /// only the project's Start button may.
+    pub(super) fn readable_without_starting(&self) -> anyhow::Result<()> {
+        self.app
+            .state::<ProjectsState>()
+            .readable_without_starting(self.folder)
+    }
+}
+
 /// Runs `work` off the async runtime on a project the user added, with what reads its folder.
 pub(super) async fn on_project<T: Send + 'static>(
     command: &'static str,
@@ -58,9 +68,7 @@ pub(crate) async fn get_folder_kind(
 ) -> Result<FolderKind, AppError> {
     on_project("get_folder_kind", app, project_id, move |on| {
         if !start {
-            on.app
-                .state::<ProjectsState>()
-                .readable_without_starting(on.folder)?;
+            on.readable_without_starting()?;
         }
         on.repositories.folder_kind(on.info)
     })
@@ -87,9 +95,7 @@ pub(crate) async fn get_repository_summary(
 ) -> Result<RepositorySummary, AppError> {
     on_project("get_repository_summary", app, project_id, |on| {
         // the cards never start a stopped WSL distro
-        on.app
-            .state::<ProjectsState>()
-            .readable_without_starting(on.folder)?;
+        on.readable_without_starting()?;
         on.repositories.summary(on.info)
     })
     .await

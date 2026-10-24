@@ -86,8 +86,8 @@ impl ProjectsState {
         self.machines.of(folder)
     }
 
-    /// Whether the repository at `folder` can be read without starting what holds it, as the
-    /// projects' cards are.
+    /// Whether the folder at `folder` can be read without starting what holds it: everything but
+    /// a project's Start button reads it so.
     pub(crate) fn readable_without_starting(&self, folder: &Location) -> anyhow::Result<()> {
         self.machines.readable_without_starting(folder)
     }
