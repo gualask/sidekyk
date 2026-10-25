@@ -1,4 +1,5 @@
 import type { ChangedFile, Directory, FileContent, TreeEntry } from '@/modules/repository';
+import { FILE_TEXTS, VAULT_PATHS } from './fixture-files';
 
 /** The files git lists in the review scenario's repository, besides the changed ones. */
 const REVIEW_PATHS = [
@@ -24,20 +25,6 @@ const REVIEW_PATHS = [
     'src/legacy/old-cart.ts',
     'src/utils/dates.ts',
     'vendor/payments-sdk',
-];
-
-/**
- * A folder without git, of notes in Markdown: what its walk lists. Its `.ignore` hides `drafts/`,
- * which is not listed.
- */
-const DOCUMENT_PATHS = [
-    '.ignore',
-    'index.md',
-    'ideas.md',
-    'journal/2026-10-23.md',
-    'journal/2026-10-24.md',
-    'reading/papers.md',
-    'reading/books.md',
 ];
 
 /** In the large scenario: enough files that the tree is virtualized, and a folder too large to list. */
@@ -123,7 +110,7 @@ const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base'
 
 /** A folder without git's tree, as its walk lists it. */
 export function fixtureFolderTree() {
-    return new FixtureTree(DOCUMENT_PATHS);
+    return new FixtureTree(VAULT_PATHS);
 }
 
 /** The repository's tree, with the changed files in it and the deleted ones out. */
@@ -145,17 +132,9 @@ function textOf(path: string, lines: number): string {
     return `${body.join('\n')}\n`;
 }
 
-/** A note in Markdown, after its file's name. */
-function noteOf(path: string): string {
-    const title = (path.split('/').at(-1) ?? path).replace(/\.md$/, '');
-    return `# ${title}\n\n- [ ] Read it again\n- [x] Write it down\n\nA note, for the fixtures.\n`;
-}
-
+/** The repository's own texts; its Markdown and the Vault's files are files (`fixture-files/`). */
 const TEXTS: Record<string, string> = {
-    '.ignore': 'drafts/\n',
-    'index.md':
-        '# Vault\n\nNotes kept in Markdown, without git.\n\n- [[ideas]]\n- [[reading/papers]]\n',
-    'README.md': '# shop\n\nA small shop, for the fixtures.\n\n## Run\n\n    pnpm dev\n',
+    ...FILE_TEXTS,
     '.gitignore': 'node_modules/\ndist/\n*.log\n',
     'src/cart/cart.ts':
         "import type { Item } from './index';\n\nexport interface Cart {\n\titems: Item[];\n\tcoupon: string | null;\n}\n",
@@ -168,6 +147,6 @@ export function fixtureFileContent(path: string): FileContent {
     if (path === 'vendor/payments-sdk') return { kind: 'folder' };
     if (path === 'generated/big.ts')
         return { kind: 'text', text: textOf(path, 60_000), truncated: true };
-    const text = TEXTS[path] ?? (path.endsWith('.md') ? noteOf(path) : textOf(path, 40));
+    const text = TEXTS[path] ?? textOf(path, 40);
     return { kind: 'text', text, truncated: false };
 }

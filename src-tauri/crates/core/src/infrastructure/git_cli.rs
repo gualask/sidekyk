@@ -12,7 +12,7 @@ use super::folder_walk;
 use super::hide_console;
 use super::process::{self, TimedOut};
 use crate::modules::repository::{
-    FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
+    FileStamp, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
 };
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
 
@@ -165,6 +165,22 @@ impl RepositoryBackend for LocalRepositoryBackend {
         Some(WorktreeEntry::File { head, truncated })
     }
 
+    fn file_stamp(&self, root: &Path, path: &Path) -> Option<FileStamp> {
+        let (_, meta) = inside(root, path)?;
+        if !meta.is_file() {
+            return None;
+        }
+        let modified = meta
+            .modified()
+            .ok()?
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?;
+        Some(FileStamp {
+            size: meta.len(),
+            modified: i64::try_from(modified.as_millis()).unwrap_or(i64::MAX),
+        })
+    }
+
     fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>> {
         let (full, meta) = inside(root, path)?;
         if !meta.is_file() {
@@ -244,13 +260,15 @@ mod tests {
 
     use super::*;
     use crate::modules::folder::{folder_kind, load_folder_tree, resolve_folder, FolderKind};
+    use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
         load_commit_activity, load_commit_file_diff, load_commit_files, load_file_content,
-        load_file_diff, load_file_tree, load_recent_commits, load_snapshot, load_summary,
-        load_version_text, repository_name, resolve_repository, ChangeKind, Commit,
-        CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
-        FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryInfo, RepositorySnapshot,
-        RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
+        load_file_diff, load_file_stamp, load_file_tree, load_image, load_recent_commits,
+        load_snapshot, load_summary, load_version_text, repository_name, resolve_repository,
+        ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest,
+        FileVersion, FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryInfo,
+        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
+        MAX_IMAGE_BYTES,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
@@ -732,6 +750,52 @@ mod tests {
                 }
             );
             assert!(content("linked/secret.txt").is_err(), "through a link");
+        }
+    }
+
+    #[test]
+    fn images_and_stamps_are_read_bounded_never_through_a_link() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, "logo.png", "PNG\0data");
+        let huge = std::fs::File::create(root.join("huge.png")).unwrap();
+        huge.set_len(MAX_IMAGE_BYTES as u64 + 1).unwrap();
+
+        assert_eq!(
+            load_image(&backend, &repo.info, "logo.png").unwrap(),
+            b"PNG\0data"
+        );
+        let stamp = load_file_stamp(&backend, &repo.info, "logo.png").unwrap();
+        assert_eq!(stamp.size, 8);
+        assert!(stamp.modified > 0);
+        assert!(
+            load_image(&backend, &repo.info, "huge.png").is_err(),
+            "too large"
+        );
+        assert!(load_image(&backend, &repo.info, "../logo.png").is_err());
+        assert!(
+            load_file_stamp(&backend, &repo.info, "src").is_err(),
+            "a folder"
+        );
+        assert!(load_file_stamp(&backend, &repo.info, "gone.png").is_err());
+
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            write(outside.path(), "secret.png", "s");
+            std::os::unix::fs::symlink(outside.path(), root.join("linked")).unwrap();
+            std::os::unix::fs::symlink("logo.png", root.join("alias.png")).unwrap();
+            assert!(
+                load_image(&backend, &repo.info, "alias.png").is_err(),
+                "a link"
+            );
+            assert!(
+                load_file_stamp(&backend, &repo.info, "alias.png").is_err(),
+                "a link"
+            );
+            assert!(load_image(&backend, &repo.info, "linked/secret.png").is_err());
         }
     }
 
@@ -1387,6 +1451,28 @@ mod tests {
                 tree.directory("");
             })
         );
+
+        // the largest Markdown file's preview: read, parsed, as JSON for the frontend
+        let largest = tree
+            .files()
+            .iter()
+            .filter(|path| path.ends_with(".md"))
+            .max_by_key(|path| root.join(path).metadata().map_or(0, |meta| meta.len()));
+        if let Some(path) = largest {
+            let is_file = |other: &str| tree.contains_file(other);
+            println!(
+                "markdown preview of {path}: {}",
+                time(20, || {
+                    let FileContent::Text { text, truncated } =
+                        load_file_content(&backend, &repo.info, path).unwrap()
+                    else {
+                        return;
+                    };
+                    let document = parse_markdown(&text, path, &is_file, truncated);
+                    serde_json::to_vec(&document).unwrap();
+                })
+            );
+        }
 
         // the palette over every file of the tree, as at each key typed
         let changed: std::sync::Arc<[_]> =

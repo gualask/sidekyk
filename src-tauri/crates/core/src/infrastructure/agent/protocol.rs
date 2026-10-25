@@ -70,6 +70,19 @@ pub enum Request {
         repository: RepositoryInfo,
         path: String,
     },
+    MarkdownPreview {
+        repository: RepositoryInfo,
+        path: String,
+    },
+    FileStamp {
+        repository: RepositoryInfo,
+        path: String,
+    },
+    /// Answered with `Message::Bytes`.
+    Image {
+        repository: RepositoryInfo,
+        path: String,
+    },
     SyntaxColors {
         repository: RepositoryInfo,
         request: SyntaxRequest,
@@ -103,6 +116,9 @@ pub enum Message {
         id: u64,
         result: Result<Box<RawValue>, WireError>,
     },
+    /// The answer to request `id` is the frame right after this one, bytes as they are (an
+    /// image), neither JSON nor base64.
+    Bytes { id: u64 },
     /// Files a search in contents (request `id`) found, before its reply.
     Contents { id: u64, files: Vec<ContentFile> },
     /// A change of the repository watched that shows.
@@ -142,6 +158,42 @@ pub fn write_frame(out: &mut impl Write, message: &impl Serialize) -> io::Result
     out.write_all(&length.to_le_bytes())?;
     out.write_all(&body)?;
     out.flush()
+}
+
+/// A message followed by a frame of bytes as they are, the two written together; neither is
+/// written when either is too long, so the stream never holds a message without its bytes.
+pub fn write_bytes(out: &mut impl Write, message: &impl Serialize, bytes: &[u8]) -> io::Result<()> {
+    let body = serde_json::to_vec(message)?;
+    let frames = [body.as_slice(), bytes];
+    let lengths = frames.map(|frame| {
+        u32::try_from(frame.len())
+            .ok()
+            .filter(|&length| length as usize <= MAX_FRAME_BYTES)
+    });
+    let [Some(first), Some(second)] = lengths else {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "frame too long",
+        ));
+    };
+    for (length, frame) in [first, second].into_iter().zip(frames) {
+        out.write_all(&length.to_le_bytes())?;
+        out.write_all(frame)?;
+    }
+    out.flush()
+}
+
+/// The frame of bytes after a `Message::Bytes`.
+pub fn read_bytes(input: &mut impl Read) -> io::Result<Vec<u8>> {
+    let mut length = [0u8; 4];
+    input.read_exact(&mut length)?;
+    let length = u32::from_le_bytes(length) as usize;
+    if length > MAX_FRAME_BYTES {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "frame too long"));
+    }
+    let mut bytes = vec![0u8; length];
+    input.read_exact(&mut bytes)?;
+    Ok(bytes)
 }
 
 /// The next frame, or `None` when the stream ended between two frames.
@@ -207,6 +259,30 @@ mod tests {
                 if event.root == "/r" && !event.git_dir && event.paths == Some(vec!["src/a.ts".into()])
         ));
         assert!(read_frame::<Message>(&mut input).unwrap().is_none());
+    }
+
+    #[test]
+    fn bytes_follow_their_message_as_they_are_and_a_cut_stream_fails() {
+        let image = [0x89, b'P', b'N', b'G', 0, 0xFF];
+        let mut stream = Vec::new();
+        write_bytes(&mut stream, &Message::Bytes { id: 3 }, &image).unwrap();
+        write_frame(&mut stream, &Message::Bytes { id: 4 }).unwrap();
+        let mut input = stream.as_slice();
+        let Some(Message::Bytes { id }) = read_frame(&mut input).unwrap() else {
+            panic!("not bytes");
+        };
+        assert_eq!(id, 3);
+        assert_eq!(read_bytes(&mut input).unwrap(), image);
+        let Some(Message::Bytes { id: 4 }) = read_frame(&mut input).unwrap() else {
+            panic!("not the next message");
+        };
+        assert!(read_bytes(&mut input).is_err());
+
+        let mut untouched = Vec::new();
+        let too_long = vec![0u8; MAX_FRAME_BYTES + 1];
+        let error = write_bytes(&mut untouched, &Message::Bytes { id: 5 }, &too_long).unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        assert!(untouched.is_empty(), "nothing written");
     }
 
     #[test]

@@ -83,6 +83,7 @@ export function DiffList({
     widest,
     scrollElement,
     openOn,
+    openOnRow = null,
     linesAbove,
     reader,
     current,
@@ -102,6 +103,8 @@ export function DiffList({
     widest: number;
     scrollElement: HTMLDivElement;
     openOn: number | null;
+    /** A row to open on instead, at the top: a file's line its preview was read at. */
+    openOnRow?: number | null;
     linesAbove: number;
     reader: RefObject<HunkReader | null>;
     /** The hunk gone to (`n`/`p`, the map, the one opened on): where the next step starts. */
@@ -125,7 +128,10 @@ export function DiffList({
         // the rows start below the room left above them
         scrollMargin: topSpace,
         // read once, when the list first shows: a refresh of the same file keeps the scroll
-        initialOffset: () => openingOffset(layout, openOn, linesAbove),
+        initialOffset: () =>
+            openOnRow === null
+                ? openingOffset(layout, openOn, linesAbove)
+                : (layout.starts[openOnRow] ?? 0),
     });
 
     // the hunk gone to is where the next step starts from, even when the list cannot scroll to it

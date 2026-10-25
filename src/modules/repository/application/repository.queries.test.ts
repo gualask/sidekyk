@@ -15,6 +15,14 @@ describe('a change in the working tree', () => {
         );
         expect(worktreeChangeTouches(repositoryKeys.file('p', 'src/cart.ts'), changed)).toBe(true);
         expect(worktreeChangeTouches(repositoryKeys.file('p', 'README.md'), changed)).toBe(false);
+        expect(worktreeChangeTouches(repositoryKeys.preview('p', 'src/cart.ts'), changed)).toBe(
+            true,
+        );
+        expect(worktreeChangeTouches(repositoryKeys.preview('p', 'README.md'), changed)).toBe(
+            false,
+        );
+        expect(worktreeChangeTouches(repositoryKeys.stamp('p', 'src/cart.ts'), changed)).toBe(true);
+        expect(worktreeChangeTouches(repositoryKeys.stamp('p', 'logo.png'), changed)).toBe(false);
         const colors = (path: string) =>
             repositoryKeys.colors('p', { path, version: { kind: 'worktree' } }, 0);
         expect(worktreeChangeTouches(colors('src/cart.ts'), changed)).toBe(true);

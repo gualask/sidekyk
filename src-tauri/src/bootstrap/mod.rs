@@ -33,13 +33,25 @@ fn folder_argument(args: &[String]) -> Option<PathBuf> {
 
 /// Creates the windows `tauri.conf.json` leaves to the app (`create: false`), already in the theme
 /// of the settings: their first paint has the right colors, with no flash of the system's theme.
+/// The page never leaves the app nor opens another window: a link in a file the app shows opens
+/// outside it through `open_url`, if at all.
 fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()> {
     for config in app.config().app.windows.iter().filter(|w| !w.create) {
         WebviewWindowBuilder::from_config(app, config)?
             .theme(Some(window_theme(theme)))
+            .on_navigation(is_app_page)
+            .on_new_window(|_, _| ::tauri::webview::NewWindowResponse::Deny)
             .build()?;
     }
     Ok(())
+}
+
+/// The app's own page: `tauri://localhost` (`http://tauri.localhost` on Windows), or Vite's while
+/// developing.
+fn is_app_page(url: &::tauri::Url) -> bool {
+    url.scheme() == "tauri"
+        || url.host_str() == Some("tauri.localhost")
+        || (::tauri::is_dev() && url.host_str() == Some("localhost"))
 }
 
 /// Adds and shows a folder named at launch, off the main thread: a WSL distro's may take a
@@ -78,6 +90,17 @@ pub(crate) fn run() {
 
     builder
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
+        .register_asynchronous_uri_scheme_protocol(
+            tauri_commands::project_file::SCHEME,
+            |context, request, responder| {
+                tauri_commands::project_file::respond(
+                    context.app_handle(),
+                    request.uri().path(),
+                    responder,
+                )
+            },
+        )
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
@@ -144,6 +167,9 @@ pub(crate) fn run() {
             tauri_commands::repository::get_commit_file_diff,
             tauri_commands::repository::get_directory,
             tauri_commands::repository::get_file_content,
+            tauri_commands::repository::get_markdown_preview,
+            tauri_commands::repository::get_file_stamp,
+            tauri_commands::links::open_url,
             tauri_commands::repository::get_syntax_colors,
             tauri_commands::notes::get_notes,
             tauri_commands::notes::add_note,

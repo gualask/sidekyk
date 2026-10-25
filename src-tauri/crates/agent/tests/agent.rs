@@ -63,7 +63,13 @@ fn scratch_repo() -> tempfile::TempDir {
     git(root, &["config", "commit.gpgsign", "false"]);
     write(root, ".gitignore", "build/\n");
     write(root, "src/cart.ts", "a\nb\nc\n");
-    write(root, "README.md", "hello\n");
+    write(root, "README.md", "hello\n\n![logo](docs/logo.png)\n");
+    std::fs::create_dir_all(root.join("docs")).unwrap();
+    std::fs::write(
+        root.join("docs/logo.png"),
+        [0x89, b'P', b'N', b'G', 0, 0xFF, b'\n'],
+    )
+    .unwrap();
     git(root, &["add", "."]);
     git(root, &["commit", "-q", "-m", "init"]);
     write(root, "src/cart.ts", "a\nB\nc\nd\n");
@@ -122,6 +128,24 @@ fn the_helper_answers_as_the_app_reads_directly() {
     ));
     let files = agent.search_files(&info, "cart").unwrap();
     assert_eq!(files.files[0].path, "src/cart.ts");
+    // a preview, an image's bytes as they are, and its stamp
+    assert_eq!(
+        json(&agent.markdown_preview(&info, "README.md").unwrap()),
+        json(&local.markdown_preview(&info, "README.md").unwrap())
+    );
+    assert_eq!(
+        agent.image(&info, "docs/logo.png").unwrap(),
+        [0x89, b'P', b'N', b'G', 0, 0xFF, b'\n']
+    );
+    assert_eq!(
+        agent.file_stamp(&info, "docs/logo.png").unwrap(),
+        local.file_stamp(&info, "docs/logo.png").unwrap()
+    );
+    let not_an_image = agent.image(&info, "src/cart.ts").unwrap_err();
+    assert_eq!(
+        user_facing_code(&not_an_image),
+        Some(UserFacingErrorCode::FileMissing)
+    );
 
     let found = Mutex::new(Vec::new());
     let end = agent

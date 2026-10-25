@@ -18,3 +18,7 @@ pub const MAX_TREE_PATHS: usize = 200_000;
 
 /// The Files panel shows a file's first 2 MiB, cut at the last whole line, as a diff is.
 pub const MAX_FILE_BYTES: usize = MAX_DIFF_BYTES;
+
+/// Larger images are not shown, in the viewer or a Markdown preview (the frontend's
+/// `MAX_IMAGE_BYTES` says the same).
+pub const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;

@@ -24,6 +24,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                    ├─▶ get_recent_commits        only while unfolded
                                    ├─▶ get_directory             each open folder, from memory
                                    ├─▶ get_file_content          the unchanged file shown
+                                   ├─▶ get_markdown_preview      a Markdown file as it reads
+                                   ├─▶ get_file_stamp            an image's size and mtime
                                    └─▶ get_syntax_colors         blocks of lines on screen
 ```
 
@@ -78,7 +80,7 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - `modules/folder/`: a folder without git: kind, `resolve_folder`, tree, `FolderChanges`,
     `always_hidden`.
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
-    `NotesStorage`), `syntax`.
+    `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure).
   - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
     output size and a time), `watcher.rs` (notify), `agent/`, `linux_helper.rs`, `wsl.rs`,
     `machines.rs` (`features/wsl.md`).

@@ -31,6 +31,10 @@ two-face = { version = "0.5", default-features = false, features = ["syntect-oni
 # and git's global excludes as git applies them, a parallel walk (2026-10-24, chosen over
 # `walkdir` plus our own parser, `jwalk`, `gix`'s dirwalk).
 ignore = "0.4"
+# The viewer's Markdown preview: events with their byte ranges, turned into a tree the frontend
+# renders, so no HTML writer (2026-10-25, over comrak: 3x faster, half the memory on 2 MiB;
+# `.local/markdown-renderers/`, docs/features/previews.md).
+pulldown-cmark = { version = "0.13", default-features = false }
 
 [dev-dependencies]
 tempfile.workspace = true

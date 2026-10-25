@@ -33,7 +33,7 @@ problems. Why semantic zoom: `../product.md`.
   top bar, each with its fix.
 - Settings: a modal (`⌘,`), applied at once: theme (dark by default, no system following),
   language (`languages.md`), diff view and scrollbar width, long lines in code and in notes, copy
-  template, global shortcut.
+  template, how Markdown and SVG open (`previews.md`), global shortcut.
 
 ## Keys
 

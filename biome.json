@@ -6,7 +6,14 @@
         "useIgnoreFile": true
     },
     "files": {
-        "includes": ["src/**", "*.json", "*.js", "*.ts", "*.html"]
+        "includes": [
+            "src/**",
+            "!src/dev/fixture-files/previews.json",
+            "*.json",
+            "*.js",
+            "*.ts",
+            "*.html"
+        ]
     },
     "formatter": {
         "indentStyle": "space",

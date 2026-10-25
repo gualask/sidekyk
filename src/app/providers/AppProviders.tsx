@@ -91,15 +91,16 @@ function TranslationBridge({ children }: { children: ReactNode }) {
 
 /**
  * What the Changes and Files panels take from the settings, which they cannot import: the view a
- * diff opens in, the copy template, the scrollbar's width and how long lines show, the defaults
- * until the settings are read. Read at startup alongside the projects, from the backend's memory,
- * so the first diff asks for the right view.
+ * diff opens in, the one a file with a preview opens in, the copy template, the scrollbar's width
+ * and how long lines show, the defaults until the settings are read. Read at startup alongside
+ * the projects, from the backend's memory, so the first diff asks for the right view.
  */
 function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
+            fileView: settings?.fileView ?? 'preview',
             copyTemplate: settings?.copyTemplate ?? DEFAULT_COPY_TEMPLATE,
             scrollbar: settings?.diffScrollbar ?? 'narrow',
             codeLines: settings?.codeLines ?? 'scroll',

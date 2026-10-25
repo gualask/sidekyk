@@ -6,12 +6,13 @@ use tauri::Manager;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use sidekyk_core::modules::folder::FolderKind;
+use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-    UnifiedDiff,
+    FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
@@ -188,6 +189,32 @@ pub(crate) async fn get_file_content(
 ) -> Result<FileContent, AppError> {
     on_project("get_file_content", app, project_id, move |on| {
         on.repositories.file_content(on.info, &path)
+    })
+    .await
+}
+
+#[tauri::command]
+/// The size and last change of a file of a project's tree: an image's URL carries it.
+pub(crate) async fn get_file_stamp(
+    app: tauri::AppHandle,
+    project_id: String,
+    path: String,
+) -> Result<FileStamp, AppError> {
+    on_project("get_file_stamp", app, project_id, move |on| {
+        on.repositories.file_stamp(on.info, &path)
+    })
+    .await
+}
+
+#[tauri::command]
+/// A Markdown file of a project's tree as its preview shows it; none when it is not text.
+pub(crate) async fn get_markdown_preview(
+    app: tauri::AppHandle,
+    project_id: String,
+    path: String,
+) -> Result<Option<MarkdownDocument>, AppError> {
+    on_project("get_markdown_preview", app, project_id, move |on| {
+        on.repositories.markdown_preview(on.info, &path)
     })
     .await
 }

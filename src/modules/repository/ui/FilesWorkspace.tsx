@@ -14,6 +14,7 @@ import { useFileFind } from '../application/find';
 import { useFolderKind, useTreeDirectories } from '../application/repository.queries';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
+import { useFileViewChoice, useLinkedAnchor } from '../application/view-choice';
 import { changeMarks, foldersAbove, treeMove, treeRows } from '../model/file-tree';
 import { selectionOf } from '../model/selection';
 import { fileTarget } from '../model/targets';
@@ -81,6 +82,9 @@ export function FilesWorkspace({
     const find = useFileFind(projectId, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
+    // how a file with a preview shows, and the element a link of one named in the file it leads to
+    const fileView = useFileViewChoice();
+    const linked = useLinkedAnchor(file);
     const marks = useMemo(() => changeMarks(files), [files]);
     const { read, error } = useTreeDirectories(projectId, open);
     const rows = useMemo(() => treeRows(open, read), [open, read]);
@@ -253,7 +257,16 @@ export function FilesWorkspace({
             path={file}
             header={header}
             finder={find.finderFor(file)}
-            renderHeader={(pane) => <FileHeader path={file} uncolored={pane.uncolored} />}
+            view={fileView.view}
+            onView={fileView.choose}
+            anchor={linked.anchorFor(file)}
+            openFile={(path, anchor) => {
+                openFile(path);
+                linked.link(path, anchor);
+            }}
+            renderHeader={({ uncolored, view }) => (
+                <FileHeader path={file} uncolored={uncolored} view={view} />
+            )}
         />
     );
 

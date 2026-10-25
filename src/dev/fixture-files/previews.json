@@ -1,0 +1,1894 @@
+{
+  "previews": {
+    "edits/vault/guide.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Vault guide"
+            }
+          ],
+          "id": "user-content-vault-guide",
+          "kind": "heading",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "alert": "tip",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "An agent added this while the guide was on screen."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 8
+            }
+          ],
+          "kind": "quote",
+          "line": 7
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Notes kept as "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Markdown"
+                }
+              ],
+              "kind": "strong"
+            },
+            {
+              "kind": "text",
+              "text": ", read in "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Sidekyk"
+                }
+              ],
+              "kind": "emphasis"
+            },
+            {
+              "kind": "text",
+              "text": " with "
+            },
+            {
+              "kind": "code",
+              "text": "code"
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "gone"
+                }
+              ],
+              "kind": "strikethrough"
+            },
+            {
+              "kind": "text",
+              "text": " and a line"
+            },
+            {
+              "kind": "break"
+            },
+            {
+              "kind": "text",
+              "text": "broken here.\nSee "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "the index"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "index.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "ideas at their top"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "anchor": "user-content-ideas",
+                "kind": "file",
+                "path": "ideas.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "a missing note"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "missing",
+                "path": "gone.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ",\n"
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "the website"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "web",
+                "url": "https://example.com"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "a script"
+                }
+              ],
+              "kind": "link",
+              "target": null,
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": " and "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Setup"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "id": "user-content-setup",
+                "kind": "anchor"
+              },
+              "title": null
+            },
+            {
+              "kind": "footnoteRef",
+              "nth": 1,
+              "number": 1
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 10
+        },
+        {
+          "content": [
+            {
+              "content": [
+                {
+                  "alt": "Build status",
+                  "kind": "image",
+                  "target": {
+                    "kind": "web",
+                    "url": "https://img.shields.io/badge/build-passing-green"
+                  },
+                  "title": null
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "web",
+                "url": "https://example.com/ci"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 14
+        },
+        {
+          "content": [
+            {
+              "alt": "The app beside an agent",
+              "kind": "image",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "images/screenshot.png"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 16
+        },
+        {
+          "content": [
+            {
+              "alt": "Who edits what",
+              "kind": "image",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "images/diagram.svg"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 18
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Setup"
+            }
+          ],
+          "id": "user-content-setup",
+          "kind": "heading",
+          "level": 2,
+          "line": 20
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Open the folder"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 22
+                }
+              ],
+              "line": 22,
+              "task": null
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read the notes"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 23
+                }
+              ],
+              "line": 23,
+              "task": null
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write more"
+                    },
+                    {
+                      "kind": "footnoteRef",
+                      "nth": 2,
+                      "number": 1
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 24
+                }
+              ],
+              "line": 24,
+              "task": null
+            }
+          ],
+          "kind": "list",
+          "line": 22,
+          "start": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Install the app"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 26
+                }
+              ],
+              "line": 26,
+              "task": true
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Try the preview"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 27
+                }
+              ],
+              "line": 27,
+              "task": false
+            }
+          ],
+          "kind": "list",
+          "line": 26,
+          "start": null
+        },
+        {
+          "kind": "code",
+          "language": "ts",
+          "line": 29,
+          "lines": [
+            {
+              "from": 0,
+              "number": 30,
+              "text": "export function greet(name: string): string {"
+            },
+            {
+              "from": 0,
+              "number": 31,
+              "text": "    return `Hello, ${name}`;"
+            },
+            {
+              "from": 0,
+              "number": 32,
+              "text": "}"
+            }
+          ]
+        },
+        {
+          "alert": null,
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "A quote, as plain as it gets."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 35
+            }
+          ],
+          "kind": "quote",
+          "line": 35
+        },
+        {
+          "alert": "note",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Notes stay on this machine."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 38
+            }
+          ],
+          "kind": "quote",
+          "line": 37
+        },
+        {
+          "alert": "important",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "The preview reads; your editor writes."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 41
+            }
+          ],
+          "kind": "quote",
+          "line": 40
+        },
+        {
+          "alert": "warning",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Nothing here runs: alert(1) stays text."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 44
+            }
+          ],
+          "kind": "quote",
+          "line": 43
+        },
+        {
+          "align": [
+            "left",
+            "right",
+            "center"
+          ],
+          "head": [
+            [
+              {
+                "kind": "text",
+                "text": "Note"
+              }
+            ],
+            [
+              {
+                "kind": "text",
+                "text": "Words"
+              }
+            ],
+            [
+              {
+                "kind": "text",
+                "text": "Kind"
+              }
+            ]
+          ],
+          "kind": "table",
+          "line": 46,
+          "rows": [
+            [
+              [
+                {
+                  "kind": "text",
+                  "text": "ideas"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "120"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "list"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "kind": "text",
+                  "text": "papers"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "3400"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "reading"
+                }
+              ]
+            ]
+          ]
+        },
+        {
+          "kind": "code",
+          "language": null,
+          "line": 51,
+          "lines": [
+            {
+              "from": 4,
+              "number": 51,
+              "text": "    an indented block, as code"
+            }
+          ]
+        },
+        {
+          "kind": "rule",
+          "line": 53
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Setup"
+            }
+          ],
+          "id": "user-content-setup-1",
+          "kind": "heading",
+          "level": 2,
+          "line": 55
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "The same heading twice gets another id"
+            },
+            {
+              "kind": "footnoteRef",
+              "nth": 1,
+              "number": 2
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 57
+        },
+        {
+          "kind": "footnotes",
+          "line": 59,
+          "notes": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Because a guide helps."
+                    }
+                  ],
+                  "kind": "paragraph",
+                  "line": 59
+                }
+              ],
+              "line": 59,
+              "number": 1,
+              "references": 2
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "GitHub numbers repeats "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "-1"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "-2"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  "kind": "paragraph",
+                  "line": 60
+                }
+              ],
+              "line": 60,
+              "number": 2,
+              "references": 1
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "shop/README.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "shop"
+            }
+          ],
+          "id": "user-content-shop",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A small shop, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 3
+        },
+        {
+          "alert": "tip",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Coupons apply at checkout: see "
+                },
+                {
+                  "kind": "code",
+                  "text": "src/cart/coupon.ts"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 6
+            }
+          ],
+          "kind": "quote",
+          "line": 5
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Run"
+            }
+          ],
+          "id": "user-content-run",
+          "kind": "heading",
+          "level": 2,
+          "line": 8
+        },
+        {
+          "kind": "code",
+          "language": null,
+          "line": 10,
+          "lines": [
+            {
+              "from": 4,
+              "number": 10,
+              "text": "    pnpm dev"
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "shop/docs/architecture/overview.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "overview"
+            }
+          ],
+          "id": "user-content-overview",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "shop/docs/architecture/payments.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "payments"
+            }
+          ],
+          "id": "user-content-payments",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "vault/guide.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Vault guide"
+            }
+          ],
+          "id": "user-content-vault-guide",
+          "kind": "heading",
+          "level": 1,
+          "line": 5
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Notes kept as "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Markdown"
+                }
+              ],
+              "kind": "strong"
+            },
+            {
+              "kind": "text",
+              "text": ", read in "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Sidekyk"
+                }
+              ],
+              "kind": "emphasis"
+            },
+            {
+              "kind": "text",
+              "text": " with "
+            },
+            {
+              "kind": "code",
+              "text": "code"
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "gone"
+                }
+              ],
+              "kind": "strikethrough"
+            },
+            {
+              "kind": "text",
+              "text": " and a line"
+            },
+            {
+              "kind": "break"
+            },
+            {
+              "kind": "text",
+              "text": "broken here.\nSee "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "the index"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "index.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "ideas at their top"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "anchor": "user-content-ideas",
+                "kind": "file",
+                "path": "ideas.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "a missing note"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "missing",
+                "path": "gone.md"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ",\n"
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "the website"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "web",
+                "url": "https://example.com"
+              },
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": ", "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "a script"
+                }
+              ],
+              "kind": "link",
+              "target": null,
+              "title": null
+            },
+            {
+              "kind": "text",
+              "text": " and "
+            },
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Setup"
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "id": "user-content-setup",
+                "kind": "anchor"
+              },
+              "title": null
+            },
+            {
+              "kind": "footnoteRef",
+              "nth": 1,
+              "number": 1
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 7
+        },
+        {
+          "content": [
+            {
+              "content": [
+                {
+                  "alt": "Build status",
+                  "kind": "image",
+                  "target": {
+                    "kind": "web",
+                    "url": "https://img.shields.io/badge/build-passing-green"
+                  },
+                  "title": null
+                }
+              ],
+              "kind": "link",
+              "target": {
+                "kind": "web",
+                "url": "https://example.com/ci"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 11
+        },
+        {
+          "content": [
+            {
+              "alt": "The app beside an agent",
+              "kind": "image",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "images/screenshot.png"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 13
+        },
+        {
+          "content": [
+            {
+              "alt": "Who edits what",
+              "kind": "image",
+              "target": {
+                "anchor": null,
+                "kind": "file",
+                "path": "images/diagram.svg"
+              },
+              "title": null
+            }
+          ],
+          "kind": "paragraph",
+          "line": 15
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Setup"
+            }
+          ],
+          "id": "user-content-setup",
+          "kind": "heading",
+          "level": 2,
+          "line": 17
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Open the folder"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 19
+                }
+              ],
+              "line": 19,
+              "task": null
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read the notes"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 20
+                }
+              ],
+              "line": 20,
+              "task": null
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write more"
+                    },
+                    {
+                      "kind": "footnoteRef",
+                      "nth": 2,
+                      "number": 1
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 21
+                }
+              ],
+              "line": 21,
+              "task": null
+            }
+          ],
+          "kind": "list",
+          "line": 19,
+          "start": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Install the app"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 23
+                }
+              ],
+              "line": 23,
+              "task": true
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Try the preview"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 24
+                }
+              ],
+              "line": 24,
+              "task": false
+            }
+          ],
+          "kind": "list",
+          "line": 23,
+          "start": null
+        },
+        {
+          "kind": "code",
+          "language": "ts",
+          "line": 26,
+          "lines": [
+            {
+              "from": 0,
+              "number": 27,
+              "text": "export function greet(name: string): string {"
+            },
+            {
+              "from": 0,
+              "number": 28,
+              "text": "    return `Hello, ${name}`;"
+            },
+            {
+              "from": 0,
+              "number": 29,
+              "text": "}"
+            }
+          ]
+        },
+        {
+          "alert": null,
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "A quote, as plain as it gets."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 32
+            }
+          ],
+          "kind": "quote",
+          "line": 32
+        },
+        {
+          "alert": "note",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Notes stay on this machine."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 35
+            }
+          ],
+          "kind": "quote",
+          "line": 34
+        },
+        {
+          "alert": "important",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "The preview reads; your editor writes."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 38
+            }
+          ],
+          "kind": "quote",
+          "line": 37
+        },
+        {
+          "alert": "warning",
+          "blocks": [
+            {
+              "content": [
+                {
+                  "kind": "text",
+                  "text": "Nothing here runs: alert(1) stays text."
+                }
+              ],
+              "kind": "paragraph",
+              "line": 41
+            }
+          ],
+          "kind": "quote",
+          "line": 40
+        },
+        {
+          "align": [
+            "left",
+            "right",
+            "center"
+          ],
+          "head": [
+            [
+              {
+                "kind": "text",
+                "text": "Note"
+              }
+            ],
+            [
+              {
+                "kind": "text",
+                "text": "Words"
+              }
+            ],
+            [
+              {
+                "kind": "text",
+                "text": "Kind"
+              }
+            ]
+          ],
+          "kind": "table",
+          "line": 43,
+          "rows": [
+            [
+              [
+                {
+                  "kind": "text",
+                  "text": "ideas"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "120"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "list"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "kind": "text",
+                  "text": "papers"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "3400"
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "reading"
+                }
+              ]
+            ]
+          ]
+        },
+        {
+          "kind": "code",
+          "language": null,
+          "line": 48,
+          "lines": [
+            {
+              "from": 4,
+              "number": 48,
+              "text": "    an indented block, as code"
+            }
+          ]
+        },
+        {
+          "kind": "rule",
+          "line": 50
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Setup"
+            }
+          ],
+          "id": "user-content-setup-1",
+          "kind": "heading",
+          "level": 2,
+          "line": 52
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "The same heading twice gets another id"
+            },
+            {
+              "kind": "footnoteRef",
+              "nth": 1,
+              "number": 2
+            },
+            {
+              "kind": "text",
+              "text": "."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 54
+        },
+        {
+          "kind": "footnotes",
+          "line": 56,
+          "notes": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Because a guide helps."
+                    }
+                  ],
+                  "kind": "paragraph",
+                  "line": 56
+                }
+              ],
+              "line": 56,
+              "number": 1,
+              "references": 2
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "GitHub numbers repeats "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "-1"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", "
+                    },
+                    {
+                      "kind": "code",
+                      "text": "-2"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
+                  ],
+                  "kind": "paragraph",
+                  "line": 57
+                }
+              ],
+              "line": 57,
+              "number": 2,
+              "references": 1
+            }
+          ]
+        }
+      ],
+      "truncated": false
+    },
+    "vault/ideas.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "ideas"
+            }
+          ],
+          "id": "user-content-ideas",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "vault/index.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Vault"
+            }
+          ],
+          "id": "user-content-vault",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "Notes kept in Markdown, without git."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 3
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "[[ideas]]"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 5
+                }
+              ],
+              "line": 5,
+              "task": null
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "[[reading/papers]]"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 6
+                }
+              ],
+              "line": 6,
+              "task": null
+            }
+          ],
+          "kind": "list",
+          "line": 5,
+          "start": null
+        }
+      ],
+      "truncated": false
+    },
+    "vault/journal/2026-10-23.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "2026-10-23"
+            }
+          ],
+          "id": "user-content-2026-10-23",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "vault/journal/2026-10-24.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "2026-10-24"
+            }
+          ],
+          "id": "user-content-2026-10-24",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "vault/reading/books.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "books"
+            }
+          ],
+          "id": "user-content-books",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    },
+    "vault/reading/papers.md": {
+      "blocks": [
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "papers"
+            }
+          ],
+          "id": "user-content-papers",
+          "kind": "heading",
+          "level": 1,
+          "line": 1
+        },
+        {
+          "items": [
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Read it again"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 3
+                }
+              ],
+              "line": 3,
+              "task": false
+            },
+            {
+              "blocks": [
+                {
+                  "content": [
+                    {
+                      "kind": "text",
+                      "text": "Write it down"
+                    }
+                  ],
+                  "kind": "plain",
+                  "line": 4
+                }
+              ],
+              "line": 4,
+              "task": true
+            }
+          ],
+          "kind": "list",
+          "line": 3,
+          "start": null
+        },
+        {
+          "content": [
+            {
+              "kind": "text",
+              "text": "A note, for the fixtures."
+            }
+          ],
+          "kind": "paragraph",
+          "line": 6
+        }
+      ],
+      "truncated": false
+    }
+  },
+  "sizes": {
+    "shop": {
+      "README.md": 127,
+      "docs/architecture/overview.md": 79,
+      "docs/architecture/payments.md": 79
+    },
+    "vault": {
+      ".ignore": 8,
+      "guide.md": 1178,
+      "ideas.md": 76,
+      "images/diagram.svg": 858,
+      "images/screenshot.png": 7874,
+      "index.md": 80,
+      "journal/2026-10-23.md": 81,
+      "journal/2026-10-24.md": 81,
+      "reading/books.md": 76,
+      "reading/papers.md": 77
+    }
+  }
+}

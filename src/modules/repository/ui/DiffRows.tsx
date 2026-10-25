@@ -1,7 +1,6 @@
 import { Fragment, memo } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { DiffHunk, DiffLine } from '../model/diff-parser';
-import type { SyntaxTone } from '../model/repository.types';
 import type { LineBreaks } from '../model/soft-wrap';
 import { type LineSpans, textParts } from '../model/syntax';
 import {
@@ -12,6 +11,7 @@ import {
     TEXT_PADDING_LEFT,
     TEXT_PADDING_RIGHT,
 } from './diff-layout';
+import { TONE_CLASS } from './syntax-tones';
 
 const ROW_TONE: Record<DiffLine['kind'], string> = {
     context: '',
@@ -63,27 +63,6 @@ export interface LineFound {
     /** The one being read, if it is in this line. */
     current: number | null;
 }
-
-/** The class of each tone's color (literal names, for Tailwind). */
-const TONE_CLASS: Record<SyntaxTone, string> = {
-    comment: 'text-ui-syntax-comment',
-    string: 'text-ui-syntax-string',
-    escape: 'text-ui-syntax-escape',
-    literal: 'text-ui-syntax-literal',
-    constant: 'text-ui-syntax-constant',
-    keyword: 'text-ui-syntax-keyword',
-    operator: 'text-ui-syntax-operator',
-    function: 'text-ui-syntax-function',
-    type: 'text-ui-syntax-type',
-    tag: 'text-ui-syntax-tag',
-    attribute: 'text-ui-syntax-attribute',
-    property: 'text-ui-syntax-property',
-    parameter: 'text-ui-syntax-parameter',
-    title: 'text-ui-syntax-title',
-    link: 'text-ui-syntax-link',
-    inserted: 'text-ui-syntax-inserted',
-    deleted: 'text-ui-syntax-deleted',
-};
 
 /** A line's text in its colors, with the text looked for marked over them, on its rows. */
 function LineText({

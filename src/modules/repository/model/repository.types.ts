@@ -181,6 +181,102 @@ export type FileContent =
     /** A folder git lists as one entry: a submodule. */
     | { kind: 'folder' };
 
+/**
+ * A Markdown file as its preview shows it (`src-tauri/crates/core/src/modules/preview/`): its
+ * blocks, the footnotes last. Every block carries the file's line it starts on, from 1.
+ */
+export interface MarkdownDocument {
+    blocks: MarkdownBlock[];
+    /** Larger than 2 MiB: its first part only. */
+    truncated: boolean;
+}
+
+export type MarkdownBlock =
+    | { kind: 'paragraph'; line: number; content: MarkdownInline[] }
+    /** The text of a tight list's item: a paragraph without a paragraph's spacing. */
+    | { kind: 'plain'; line: number; content: MarkdownInline[] }
+    /** `id`: its element's, prefixed so it is never one of the app's own. */
+    | { kind: 'heading'; line: number; level: number; id: string; content: MarkdownInline[] }
+    | { kind: 'quote'; line: number; alert: MarkdownAlert | null; blocks: MarkdownBlock[] }
+    /** `start`: an ordered list's first number; null for bullets. */
+    | { kind: 'list'; line: number; start: number | null; items: MarkdownListItem[] }
+    | { kind: 'code'; line: number; language: string | null; lines: MarkdownCodeLine[] }
+    | {
+          kind: 'table';
+          line: number;
+          align: MarkdownAlign[];
+          head: MarkdownInline[][];
+          rows: MarkdownInline[][][];
+      }
+    | { kind: 'rule'; line: number }
+    | { kind: 'footnotes'; line: number; notes: MarkdownFootnote[] };
+
+interface MarkdownListItem {
+    line: number;
+    /** A task list's item: checked or not. */
+    task: boolean | null;
+    blocks: MarkdownBlock[];
+}
+
+/**
+ * A code block's line as the file has it, so its syntax colors are the file's own: the code starts
+ * after `from` UTF-16 units.
+ */
+export interface MarkdownCodeLine {
+    number: number;
+    text: string;
+    from: number;
+}
+
+interface MarkdownFootnote {
+    number: number;
+    line: number;
+    /** How many times the text refers to it, each with a link back. */
+    references: number;
+    blocks: MarkdownBlock[];
+}
+
+export type MarkdownAlert = 'note' | 'tip' | 'important' | 'warning' | 'caution';
+
+export type MarkdownAlign = 'none' | 'left' | 'center' | 'right';
+
+export type MarkdownInline =
+    | { kind: 'text'; text: string }
+    | { kind: 'code'; text: string }
+    | { kind: 'emphasis'; content: MarkdownInline[] }
+    | { kind: 'strong'; content: MarkdownInline[] }
+    | { kind: 'strikethrough'; content: MarkdownInline[] }
+    /** Without a target (a scheme not allowed), its text alone. */
+    | {
+          kind: 'link';
+          target: MarkdownTarget | null;
+          title: string | null;
+          content: MarkdownInline[];
+      }
+    | { kind: 'image'; target: MarkdownTarget | null; alt: string; title: string | null }
+    | { kind: 'break' }
+    /** The `nth` reference, from 1, to footnote `number`. */
+    | { kind: 'footnoteRef'; number: number; nth: number };
+
+/** Where a link or an image leads, resolved by the backend: the frontend never parses a URL. */
+export type MarkdownTarget =
+    /** An element of the same document, by its id. */
+    | { kind: 'anchor'; id: string }
+    /** A file of the project's tree, with an element of it to scroll to. */
+    | { kind: 'file'; path: string; anchor: string | null }
+    /** A path inside the project that is not a file of its tree. */
+    | { kind: 'missing'; path: string }
+    /** `http`, `https` or `mailto`: opened outside the app; never loaded as an image. */
+    | { kind: 'web'; url: string }
+    /** An image written into the file. */
+    | { kind: 'data'; url: string };
+
+/** A file's size and last change (ms since the epoch): an image's URL carries it. */
+export interface FileStamp {
+    size: number;
+    modified: number;
+}
+
 /** One version of a file: the two sides of a diff, or the file the Files panel shows. */
 export type FileVersion =
     | { kind: 'worktree' }

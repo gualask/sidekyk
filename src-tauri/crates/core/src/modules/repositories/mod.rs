@@ -13,9 +13,10 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
 use crate::modules::folder::{self, FolderKind};
+use crate::modules::preview::{self, MarkdownDocument};
 use crate::modules::repository::{
     self, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileTree, RecentCommits, RepositoryBackend,
+    Directory, FileContent, FileDiffRequest, FileStamp, FileTree, RecentCommits, RepositoryBackend,
     RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
     WatchedFolders,
 };
@@ -189,6 +190,17 @@ impl LocalRepositories {
 
     /// A project's files, read again only when they may have changed, sharing the read in flight:
     /// those git lists in a repository, those the walk lists in a folder without git.
+    /// The project's tree when `path` is one of its files, else `file_missing`: only a file of the
+    /// tree is read, so never one hidden.
+    fn tree_holding(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Arc<FileTree>> {
+        let tree = self.file_tree(info)?;
+        if tree.contains_file(path) {
+            Ok(tree)
+        } else {
+            Err(user_facing(UserFacingErrorCode::FileMissing))
+        }
+    }
+
     fn file_tree(&self, info: &RepositoryInfo) -> anyhow::Result<Arc<FileTree>> {
         let root = info.root.as_str();
         let cached = || lock(&self.trees).get(root).and_then(|c| c.tree.clone());
@@ -303,10 +315,40 @@ impl Repositories for LocalRepositories {
     }
 
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
-        if !self.file_tree(info)?.contains_file(path) {
+        self.tree_holding(info, path)?;
+        repository::load_file_content(&*self.backend, info, path)
+    }
+
+    fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp> {
+        self.tree_holding(info, path)?;
+        repository::load_file_stamp(&*self.backend, info, path)
+    }
+
+    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>> {
+        if preview::image_type(path).is_none() {
             return Err(user_facing(UserFacingErrorCode::FileMissing));
         }
-        repository::load_file_content(&*self.backend, info, path)
+        self.tree_holding(info, path)?;
+        repository::load_image(&*self.backend, info, path)
+    }
+
+    fn markdown_preview(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+    ) -> anyhow::Result<Option<MarkdownDocument>> {
+        let tree = self.tree_holding(info, path)?;
+        Ok(
+            match repository::load_file_content(&*self.backend, info, path)? {
+                FileContent::Text { text, truncated } => Some(preview::parse_markdown(
+                    &text,
+                    path,
+                    &|other| tree.contains_file(other),
+                    truncated,
+                )),
+                FileContent::Binary | FileContent::Link { .. } | FileContent::Folder => None,
+            },
+        )
     }
 
     fn syntax_colors(

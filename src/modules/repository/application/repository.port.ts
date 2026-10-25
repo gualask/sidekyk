@@ -7,7 +7,9 @@ import type {
     Directory,
     FileContent,
     FileDiffRequest,
+    FileStamp,
     FolderKind,
+    MarkdownDocument,
     RecentCommits,
     RepositoryChangedEvent,
     RepositorySnapshot,
@@ -41,6 +43,23 @@ export interface RepositoryPort {
     getDirectory(projectId: string, path: string): Promise<Directory>;
     /** A file of the tree, as the Files panel shows it. */
     getFileContent(projectId: string, path: string): Promise<FileContent>;
+    /** The size and last change of a file of the tree. */
+    getFileStamp(projectId: string, path: string): Promise<FileStamp>;
+    /**
+     * The URL an image of the tree loads from, read by the WebView itself; it names the file's
+     * stamp, so a changed file is another URL.
+     */
+    projectFileUrl(projectId: string, path: string, stamp: FileStamp): string;
+    /**
+     * A Markdown file of the tree as its preview shows it, links and images resolved against the
+     * tree; null when it is not text (binary, a link, a submodule).
+     */
+    getMarkdownPreview(projectId: string, path: string): Promise<MarkdownDocument | null>;
+    /**
+     * A web or mail address a file shown links to, in the system's browser or mail app; the
+     * backend refuses any other scheme.
+     */
+    openUrl(url: string): Promise<void>;
     /** The colors of a block of lines of one version of a file: colored whole once, then kept. */
     getSyntaxColors(projectId: string, request: SyntaxRequest): Promise<SyntaxColors>;
     /** Returns a synchronous disposer. */

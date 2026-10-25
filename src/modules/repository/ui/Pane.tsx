@@ -14,7 +14,7 @@ import { type FindMatch, findMatches, matchFrom } from '../model/find';
 import type { FileSyntax } from '../model/syntax';
 import { useLineWrapper } from './code-wrap';
 import { DiffList, type HunkReader } from './DiffList';
-import { diffLayout, FIND_BAR_SPACE } from './diff-layout';
+import { diffLayout, FIND_BAR_SPACE, rowAt } from './diff-layout';
 import { FindBar } from './FindBar';
 import { ChangeMap, SideScrollbar } from './ScrollMap';
 import { useScrollbars } from './scrollbars';
@@ -37,6 +37,8 @@ export interface PaneHeader {
     currentHunk: () => number;
     /** The file is too large to color: shown in the text's color alone. */
     uncolored: boolean;
+    /** The line of the file at the top of the viewer, for its preview to open on. */
+    topLine: () => number | null;
 }
 
 /**
@@ -78,6 +80,7 @@ export function Pane({
     hunks,
     widest,
     openOn,
+    openOnLine = null,
     linesAbove,
     finder,
     syntax,
@@ -95,6 +98,8 @@ export function Pane({
     widest: number;
     /** The hunk to open on; the first if null. */
     openOn: number | null;
+    /** A file's line to open on instead, its preview's place. */
+    openOnLine?: number | null;
     /** Lines left above that hunk, so it shows where it sits. */
     linesAbove: number;
     finder: FileFinder;
@@ -130,8 +135,28 @@ export function Pane({
             fileCopied: copied?.id === 'file' ? copied : null,
             currentHunk: () => reader.current?.current() ?? 0,
             uncolored,
+            topLine: () => {
+                if (!scrollElement) return null;
+                // the rows start below the find bar's room, when it shows
+                const room = finder.bar ? FIND_BAR_SPACE : 0;
+                const index = rowAt(layout, Math.max(0, scrollElement.scrollTop - room));
+                const row = rows[index];
+                return row?.kind === 'line' ? row.line.newNumber : null;
+            },
         }),
-        [hunks, copy, copyTemplate, source, copied, uncolored, i18n],
+        [
+            hunks,
+            copy,
+            copyTemplate,
+            source,
+            copied,
+            uncolored,
+            i18n,
+            scrollElement,
+            layout,
+            rows,
+            finder.bar,
+        ],
     );
 
     // the matches of the text looked for; a new text, or the file read again, starts from the
@@ -183,6 +208,14 @@ export function Pane({
     );
 
     const topSpace = find ? FIND_BAR_SPACE : 0;
+    // the row of the line asked for: the first at or past it
+    const openOnRow = useMemo(() => {
+        if (openOnLine === null) return null;
+        const index = rows.findIndex(
+            (row) => row.kind === 'line' && (row.line.newNumber ?? 0) >= openOnLine,
+        );
+        return index < 0 ? null : index;
+    }, [rows, openOnLine]);
     return (
         <div className="flex h-full">
             {header ? createPortal(renderHeader(pane), header) : null}
@@ -217,6 +250,7 @@ export function Pane({
                             widest={widest}
                             scrollElement={scrollElement}
                             openOn={openOn}
+                            openOnRow={openOnRow}
                             linesAbove={linesAbove}
                             reader={reader}
                             current={current}

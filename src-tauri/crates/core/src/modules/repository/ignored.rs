@@ -238,6 +238,14 @@ mod tests {
             unreachable!()
         }
 
+        fn file_stamp(
+            &self,
+            _root: &Path,
+            _path: &Path,
+        ) -> Option<crate::modules::repository::FileStamp> {
+            unreachable!()
+        }
+
         fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn std::io::Read + Send>> {
             unreachable!()
         }

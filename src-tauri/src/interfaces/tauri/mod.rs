@@ -6,7 +6,9 @@
 
 mod blocking;
 pub(crate) mod diagnostics;
+pub(crate) mod links;
 pub(crate) mod notes;
+pub(crate) mod project_file;
 pub(crate) mod projects;
 pub(crate) mod repository;
 pub(crate) mod search;

@@ -136,10 +136,11 @@ mod tests {
 
     use super::*;
     use crate::modules::folder::FolderKind;
+    use crate::modules::preview::MarkdownDocument;
     use crate::modules::repository::{
         CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-        FileDiffRequest, RecentCommits, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-        UnifiedDiff,
+        FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo, RepositorySnapshot,
+        RepositorySummary, UnifiedDiff,
     };
     use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
     use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -196,6 +197,19 @@ mod tests {
             unreachable!()
         }
         fn file_content(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileContent> {
+            unreachable!()
+        }
+        fn file_stamp(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileStamp> {
+            unreachable!()
+        }
+        fn image(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<Vec<u8>> {
+            unreachable!()
+        }
+        fn markdown_preview(
+            &self,
+            _: &RepositoryInfo,
+            _: &str,
+        ) -> anyhow::Result<Option<MarkdownDocument>> {
             unreachable!()
         }
         fn syntax_colors(

@@ -1,5 +1,4 @@
 import { type Icon, IconFolder, IconGitCompare } from '@tabler/icons-react';
-import type { DiffView } from '@/shared/git/diff-view';
 import { type MessageKey, useTranslation } from '@/shared/i18n';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import {
@@ -9,11 +8,7 @@ import {
 } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { FileChange } from '../model/repository.types';
 import { LineCounts } from './LineCounts';
-
-const VIEWS: { value: DiffView; label: MessageKey; title: MessageKey }[] = [
-    { value: 'changes', label: 'diffView.changes', title: 'fileHeader.changesTitle' },
-    { value: 'file', label: 'diffView.file', title: 'fileHeader.fileTitle' },
-];
+import type { ViewSwitch } from './view-options';
 
 /** The way to the other panel, with the same file. */
 const SHOW_IN: Record<'files' | 'changes', { label: MessageKey; title: MessageKey; Icon: Icon }> = {
@@ -34,9 +29,10 @@ const ICON_BUTTON = 'btn-icon h-[26px] w-[26px]';
 /**
  * The file open in a panel, in the panel's header: its path, what the panel shows nowhere else
  * about it (in Changes, that it did not change: its list already has a change's area and counts;
- * in Files, its area and counts), the view a diff shows in, the way to the other panel, and a
- * copy: of the diff when there is one, else of the path. Copy is an icon, as
- * everywhere: its tooltip says what it copies, and it turns into a check for a moment once done.
+ * in Files, its area and counts), the way it shows (a diff's view, or its code and preview), the
+ * way to the other panel, and a copy: of the diff when there is one, else of the path. Copy is an
+ * icon, as everywhere: its tooltip says what it copies, and it turns into a check for a moment
+ * once done.
  * A file too large to color says so, quietly.
  */
 export function FileHeader({
@@ -55,8 +51,8 @@ export function FileHeader({
     /** "Unchanged" in Changes; in Files, "Staged", "Not staged" or "New file". */
     badge?: { label: string; title?: string } | null;
     counts?: Pick<FileChange, 'additions' | 'deletions' | 'binary'> | null;
-    /** The view a diff shows in, and its switch. */
-    view?: { value: DiffView; onChange: (view: DiffView) => void } | null;
+    /** The way the file shows, and its switch: a diff's view, or code and preview. */
+    view?: ViewSwitch | null;
     showIn?: { panel: keyof typeof SHOW_IN; onShow: () => void } | null;
     /** The copy of the diff, null while it has no hunks; without it, the path copies. */
     copyDiff?: { copied: CopyState; onCopy: (() => void) | null } | null;
@@ -113,8 +109,8 @@ export function FileHeader({
             </span>
             {view ? (
                 // plain buttons styled as segments: Base UI stays out of the first paint
-                <fieldset className="seg" aria-label={t('fileHeader.diffView')}>
-                    {VIEWS.map((option) => (
+                <fieldset className="seg" aria-label={t('fileHeader.view')}>
+                    {view.options.map((option) => (
                         <button
                             key={option.value}
                             type="button"

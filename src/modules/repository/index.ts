@@ -20,6 +20,7 @@ export {
     type FileContent,
     type FileVersion,
     type FolderKind,
+    type MarkdownDocument,
     REPOSITORY_CHANGED_EVENT,
     type RecentCommits,
     type RepositoryChangedEvent,

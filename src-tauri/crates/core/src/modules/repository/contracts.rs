@@ -301,6 +301,15 @@ pub enum FileVersion {
     Commit { sha: String },
 }
 
+/// A file's size and last change, for the viewer to show an image again once it changed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FileStamp {
+    pub size: u64,
+    /// Milliseconds since the Unix epoch.
+    pub modified: i64,
+}
+
 /// A file as the Files panel shows it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]

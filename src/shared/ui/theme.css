@@ -32,6 +32,9 @@
     --ui-warning-soft: #fffbeb;
     --ui-warning-soft-text: #92400e;
     --ui-warning-on-solid: #1f1300;
+    /* a Markdown preview's IMPORTANT alert, beside the accent (note), success (tip), warning and
+       danger (caution): GitHub's purple */
+    --ui-important: #8250df;
     /* the text found in the viewer (find bar), and the match being read */
     --ui-find-match: rgba(250, 204, 21, 0.35);
     --ui-find-current: rgba(249, 115, 22, 0.55);
@@ -103,6 +106,7 @@
         --ui-warning-soft: rgba(69, 26, 3, 0.6);
         --ui-warning-soft-text: #fde68a;
         --ui-warning-on-solid: #1f1300;
+        --ui-important: #a371f7;
         --ui-find-match: rgba(250, 204, 21, 0.22);
         --ui-find-current: rgba(251, 146, 60, 0.6);
         --ui-diff-add-bg: rgba(16, 185, 129, 0.11);
@@ -170,6 +174,7 @@
     --color-ui-warning-soft: var(--ui-warning-soft);
     --color-ui-warning-soft-text: var(--ui-warning-soft-text);
     --color-ui-warning-on-solid: var(--ui-warning-on-solid);
+    --color-ui-important: var(--ui-important);
     --color-ui-find-match: var(--ui-find-match);
     --color-ui-find-current: var(--ui-find-current);
     --color-ui-diff-add-bg: var(--ui-diff-add-bg);

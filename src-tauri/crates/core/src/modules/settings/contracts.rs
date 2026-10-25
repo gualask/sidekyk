@@ -31,6 +31,15 @@ pub enum DiffView {
     File,
 }
 
+/// How a file that has a preview (Markdown, SVG) opens: as it reads, or its text.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FileView {
+    #[default]
+    Preview,
+    Code,
+}
+
 /// How wide the scrollbar beside a diff is, the map of its changes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,6 +129,7 @@ pub struct Settings {
     pub theme: Theme,
     pub global_shortcut: GlobalShortcut,
     pub diff_view: DiffView,
+    pub file_view: FileView,
     pub diff_scrollbar: DiffScrollbar,
     pub code_lines: CodeLines,
     pub copy_template: CopyTemplate,
@@ -168,6 +178,7 @@ mod tests {
                 keys: "Super+Shift+KeyK".to_string(),
             },
             diff_view: DiffView::File,
+            file_view: FileView::Code,
             diff_scrollbar: DiffScrollbar::Wide,
             code_lines: CodeLines::Wrap,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
@@ -179,6 +190,7 @@ mod tests {
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "diffView": "file",
+            "fileView": "code",
             "diffScrollbar": "wide",
             "codeLines": "wrap",
             "copyTemplate": "Look at {row}:\n{text}",
@@ -201,6 +213,7 @@ mod tests {
                     keys: DEFAULT_GLOBAL_SHORTCUT.to_string(),
                 },
                 diff_view: DiffView::Changes,
+                file_view: FileView::Preview,
                 diff_scrollbar: DiffScrollbar::Narrow,
                 code_lines: CodeLines::Scroll,
                 copy_template: CopyTemplate::default(),

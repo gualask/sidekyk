@@ -32,9 +32,10 @@ has.
 
 `.cflow/plans/previews.md`.
 
-- [ ] Markdown rendered in the file viewer
-- [ ] Images in the file viewer (today the binary notice)
-- [ ] PDF in the file viewer. **After:** images
+Built: `docs/features/previews.md` (Markdown, SVG, images).
+
+- [ ] PDF in the file viewer
+- [ ] Mermaid diagrams in the Markdown preview (nice to have)
 
 ## Capture
 
@@ -83,6 +84,8 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
     log; a new folder's files told, an ignored folder silent); a WSL folder without git through
     the real `wsl.exe` (its card without starting the distro, "Starting …" on opening it)
+  - Linux and Windows: images in the viewer through `project-file:` (WebView2's
+    `http://project-file.localhost`), a preview's link opened in the browser; WebKitGTK and AVIF
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
     follows the window theme

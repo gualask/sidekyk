@@ -7,6 +7,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
+import type { FileView } from '@/shared/git/file-view';
 import { type Locale, type MessageKey, RichText, useTranslation } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { altLabel } from '@/shared/platform/shortcut';
@@ -29,6 +30,11 @@ const THEMES: { value: Theme; label: MessageKey }[] = [
 const DIFF_VIEWS: { value: DiffView; label: MessageKey }[] = [
     { value: 'changes', label: 'diffView.changes' },
     { value: 'file', label: 'diffView.file' },
+];
+
+const FILE_VIEWS: { value: FileView; label: MessageKey }[] = [
+    { value: 'preview', label: 'fileView.preview' },
+    { value: 'code', label: 'fileView.code' },
 ];
 
 const DIFF_SCROLLBARS: { value: DiffScrollbar; label: MessageKey }[] = [
@@ -169,6 +175,23 @@ export function SettingsDialog({
                             )}
                         </Setting>
                         <CopyTemplateSetting />
+                    </Section>
+                    <Section title={t('panel.files')}>
+                        <Setting
+                            label={t('settings.fileView.label')}
+                            description={t('settings.fileView.description')}
+                        >
+                            {(labelId) => (
+                                <Choice
+                                    labelId={labelId}
+                                    options={translated(FILE_VIEWS)}
+                                    value={settings.fileView}
+                                    onChange={(fileView) =>
+                                        update.mutate({ ...settings, fileView })
+                                    }
+                                />
+                            )}
+                        </Setting>
                     </Section>
                     <Section title={t('panel.notes')}>
                         <Setting

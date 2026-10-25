@@ -7,6 +7,23 @@ import { wholeFileDiff } from './whole-file.fixture';
 
 export const FIXTURE_REPOSITORY: ProjectInfo = localProject('/Users/dev/Projects/shop', 'shop');
 
+/** A Markdown file changed: its diff, and its preview from the working tree's text. */
+const README_MD = `diff --git a/README.md b/README.md
+index 5c1d2e3..8a9b0c4 100644
+--- a/README.md
++++ b/README.md
+@@ -2,6 +2,10 @@
+ 
+ A small shop, for the fixtures.
+ 
++> [!TIP]
++> Coupons apply at checkout: see \`src/cart/coupon.ts\`.
++
+ ## Run
+ 
+     pnpm dev
+`;
+
 const TOTAL_TS = `diff --git a/src/cart/total.ts b/src/cart/total.ts
 index 3f2a1c0..9b7e4d2 100644
 --- a/src/cart/total.ts
@@ -115,6 +132,16 @@ const FILES: FixtureFile[] = [
         diff: TOTAL_TS,
     },
     longChange('src/cart/checkout.ts', 'unstaged', CHECKOUT_TS),
+    {
+        path: 'README.md',
+        origPath: null,
+        area: 'unstaged',
+        kind: 'modified',
+        additions: 3,
+        deletions: 0,
+        binary: false,
+        diff: README_MD,
+    },
     {
         path: 'src/legacy/discounts.ts',
         origPath: null,

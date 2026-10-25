@@ -3,6 +3,7 @@
 
 pub mod folder;
 pub mod notes;
+pub mod preview;
 pub mod projects;
 pub mod repositories;
 pub mod repository;

@@ -15,6 +15,7 @@ import { changeTouches } from '../model/changed-paths';
 import { commitRequest } from '../model/commits';
 import type { DiffLine } from '../model/diff-parser';
 import { foldersToRead } from '../model/file-tree';
+import { MAX_IMAGE_BYTES } from '../model/preview';
 import type {
     Commit,
     CommitFileDiffRequest,
@@ -66,6 +67,10 @@ export const repositoryKeys = {
         [...repositoryKeys.of(projectId), 'directory', path] as const,
     file: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'file', path] as const,
+    preview: (projectId: string, path: string) =>
+        [...repositoryKeys.of(projectId), 'preview', path] as const,
+    stamp: (projectId: string, path: string) =>
+        [...repositoryKeys.of(projectId), 'stamp', path] as const,
     /** The working tree's, the index's or HEAD's: `[3]` is the version. */
     colors: (projectId: string, { path, version }: ColorSource, first: number) =>
         [...repositoryKeys.of(projectId), 'colors', version.kind, path, first] as const,
@@ -98,7 +103,10 @@ export function worktreeChangeTouches(
                 area !== 'staged' && (touchesPath(changed, path) || touchesPath(changed, origPath))
             );
         }
+        // a preview's links and images are not read again when only they change: the file is
         case 'file':
+        case 'preview':
+        case 'stamp':
             return touchesPath(changed, rest[0]);
         case 'colors':
             return rest[0] === 'worktree' && touchesPath(changed, rest[1]);
@@ -288,6 +296,33 @@ export function useFileContent(projectId: string, path: string | null) {
             : [...repositoryKeys.of(projectId), 'none'],
         queryFn: () => (path ? port.getFileContent(projectId, path) : null),
         enabled: path !== null,
+    });
+}
+
+/** An image's URL, from its stamp: read again, and so loaded again, once the file changed. */
+export function useImageSource(projectId: string, path: string) {
+    const port = useRepositoryPort();
+    const stamp = useQuery({
+        queryKey: repositoryKeys.stamp(projectId, path),
+        queryFn: () => port.getFileStamp(projectId, path),
+    });
+    const { data, isPending, isError, error } = stamp;
+    return {
+        data,
+        isPending,
+        isError,
+        error,
+        tooLarge: data !== undefined && data.size > MAX_IMAGE_BYTES,
+        url: data ? port.projectFileUrl(projectId, path, data) : null,
+    };
+}
+
+/** A Markdown file of the tree as its preview shows it. */
+export function useMarkdownPreview(projectId: string, path: string) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: repositoryKeys.preview(projectId, path),
+        queryFn: () => port.getMarkdownPreview(projectId, path),
     });
 }
 

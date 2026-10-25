@@ -8,8 +8,9 @@ import { createBrowserRuntime, isScenario, SCENARIOS } from './browser-runtime-p
  * on fixture data, so a UI change can be checked without Tauri or a real repository. `&open=<name>`
  * and `sidekykDev.openFolder(<name>)` stand in for the command line; `sidekykDev.gitInit(<name>)`
  * and `gitRemove(<name>)` for `git init` and `.git` removed in a project's folder;
- * `sidekykDev.stopDistro(<name>)` for `wsl --shutdown` of a WSL project's distro
- * (`docs/testing.md`).
+ * `sidekykDev.stopDistro(<name>)` for `wsl --shutdown` of a WSL project's distro;
+ * `sidekykDev.writeFile(<name>, <path>, <text>?)` for an agent writing a file, its later version
+ * in `fixture-files/edits/` without a text (`docs/testing.md`).
  */
 export function DevModePage() {
     const params = new URLSearchParams(window.location.search);
@@ -22,8 +23,10 @@ export function DevModePage() {
     });
     // in an effect: the runtime kept, not the one of a second call StrictMode makes and drops
     useEffect(() => {
-        const { openFolder, gitInit, gitRemove, stopDistro } = runtime;
-        Object.assign(window, { sidekykDev: { openFolder, gitInit, gitRemove, stopDistro } });
+        const { openFolder, gitInit, gitRemove, stopDistro, writeFile } = runtime;
+        Object.assign(window, {
+            sidekykDev: { openFolder, gitInit, gitRemove, stopDistro, writeFile },
+        });
     }, [runtime]);
 
     if (scenario !== null && !isScenario(scenario)) {

@@ -49,7 +49,8 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
   a `LinuxMachine`, which the container fixture also implements).
 - Protocol (`infrastructure/agent/`): frames of a u32 LE length and a JSON envelope `{ id, … }`,
   several in flight; one request per method of the `Repositories` port; a reply's value is raw
-  JSON, read once as the caller's type; a search in contents streams its files, then its reply;
+  JSON, read once as the caller's type; an image's bytes follow a `Bytes` message as a raw frame,
+  not base64 (2026-10-25); a search in contents streams its files, then its reply;
   changes come unasked; cancel is a message; over 64 MiB is a broken stream; failures keep their
   code. Each request on a thread of its own, except what depends on order: stop, visibility,
   forgetting projects, a content search's turn. Visibility is not waited for: a change missed

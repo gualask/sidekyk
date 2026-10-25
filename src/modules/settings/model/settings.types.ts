@@ -6,6 +6,7 @@
 import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
+import type { FileView } from '@/shared/git/file-view';
 import type { Locale } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 
@@ -29,6 +30,8 @@ export interface Settings {
     globalShortcut: GlobalShortcut;
     /** The view a diff opens in. */
     diffView: DiffView;
+    /** How a file that has a preview opens. */
+    fileView: FileView;
     /** How wide the scrollbar beside a diff, the map of its changes, is. */
     diffScrollbar: DiffScrollbar;
     /** How the viewer shows a line longer than its width: scrolled sideways, or wrapped. */

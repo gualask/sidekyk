@@ -11,7 +11,9 @@ use std::sync::{Arc, Mutex};
 use serde::Serialize;
 use serde_json::value::RawValue;
 
-use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, WireError};
+use super::protocol::{
+    read_frame, write_bytes, write_frame, Message, Request, RequestFrame, WireError,
+};
 use crate::modules::repositories::{LocalRepositories, Repositories};
 use crate::modules::repository::{RepositoryChange, RepositoryInfo};
 use crate::shared::sync::lock;
@@ -110,6 +112,24 @@ pub fn serve(
                     value(r.file_content(&repository, &path)?)
                 }));
             }
+            Request::FileStamp { repository, path } => {
+                on_thread(Box::new(move |r| value(r.file_stamp(&repository, &path)?)));
+            }
+            // bytes as they are, after their message: a failure is a reply as any other
+            Request::Image { repository, path } => {
+                let (repositories, output) = (repositories.clone(), output.clone());
+                std::thread::spawn(move || {
+                    match guarded(|| repositories.image(&repository, &path)) {
+                        Ok(bytes) => reply_bytes(&output, id, &bytes),
+                        Err(error) => reply(&output, id, Err(error)),
+                    }
+                });
+            }
+            Request::MarkdownPreview { repository, path } => {
+                on_thread(Box::new(move |r| {
+                    value(r.markdown_preview(&repository, &path)?)
+                }));
+            }
             Request::SyntaxColors {
                 repository,
                 request,
@@ -157,9 +177,23 @@ fn watch_in_order(
 }
 
 /// `work`'s answer, or a failure if it panicked: the app waits for every reply.
-fn guarded(work: impl FnOnce() -> Reply) -> Reply {
+fn guarded<T>(work: impl FnOnce() -> anyhow::Result<T>) -> anyhow::Result<T> {
     catch_unwind(AssertUnwindSafe(work))
         .unwrap_or_else(|_| Err(anyhow::anyhow!("the helper failed on this request")))
+}
+
+/// Bytes as they are after their message; too long to send, the app gets a failure instead.
+fn reply_bytes(output: &Output, id: u64, bytes: &[u8]) {
+    let written = write_bytes(&mut *lock(output), &Message::Bytes { id }, bytes);
+    match written {
+        Err(error) if error.kind() == io::ErrorKind::InvalidInput => reply(
+            output,
+            id,
+            Err(anyhow::anyhow!("the answer is too long to send")),
+        ),
+        Err(error) => tracing::debug!(%error, "could not write to the app"),
+        Ok(()) => {}
+    }
 }
 
 fn reply(output: &Output, id: u64, result: Reply) {
@@ -204,6 +238,9 @@ fn request_name(request: &Request) -> &'static str {
         Request::CommitFileDiff { .. } => "commitFileDiff",
         Request::Directory { .. } => "directory",
         Request::FileContent { .. } => "fileContent",
+        Request::MarkdownPreview { .. } => "markdownPreview",
+        Request::FileStamp { .. } => "fileStamp",
+        Request::Image { .. } => "image",
         Request::SyntaxColors { .. } => "syntaxColors",
         Request::SearchFiles { .. } => "searchFiles",
         Request::SearchContents { .. } => "searchContents",

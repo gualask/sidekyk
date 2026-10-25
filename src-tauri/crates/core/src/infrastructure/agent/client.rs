@@ -16,14 +16,17 @@ use anyhow::Context;
 use serde::de::DeserializeOwned;
 use serde_json::value::RawValue;
 
-use super::protocol::{read_frame, write_frame, Message, Request, RequestFrame, WireError};
+use super::protocol::{
+    read_bytes, read_frame, write_frame, Message, Request, RequestFrame, WireError,
+};
 use crate::infrastructure::hide_console;
 use crate::modules::folder::FolderKind;
+use crate::modules::preview::MarkdownDocument;
 use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, UnifiedDiff,
+    FileDiffRequest, FileStamp, RecentCommits, RepositoryChange, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -108,6 +111,13 @@ struct Replies {
 enum Incoming {
     Contents(Vec<ContentFile>),
     Reply(Result<Box<RawValue>, WireError>),
+    Bytes(Vec<u8>),
+}
+
+/// What a request is answered with: a value as JSON, or bytes as they are (an image).
+enum Answer {
+    Value(Box<RawValue>),
+    Bytes(Vec<u8>),
 }
 
 impl Connection {
@@ -166,17 +176,32 @@ impl AgentRepositories {
         request: Request,
         contents: &dyn Fn(Vec<ContentFile>),
     ) -> anyhow::Result<T> {
+        match self.answer(request, contents)? {
+            Answer::Value(value) => Ok(serde_json::from_str(value.get())?),
+            Answer::Bytes(_) => anyhow::bail!("the helper answered with bytes"),
+        }
+    }
+
+    /// As `call`, for a request answered with bytes.
+    fn call_bytes(&self, request: Request) -> anyhow::Result<Vec<u8>> {
+        match self.answer(request, &nothing)? {
+            Answer::Bytes(bytes) => Ok(bytes),
+            Answer::Value(_) => anyhow::bail!("the helper answered without bytes"),
+        }
+    }
+
+    fn answer(
+        &self,
+        request: Request,
+        contents: &dyn Fn(Vec<ContentFile>),
+    ) -> anyhow::Result<Answer> {
         lock(&self.idle.state).busy += 1;
         let result = self.ask(request, contents);
         self.idle.touch(|state| state.busy -= 1);
         result
     }
 
-    fn ask<T: DeserializeOwned>(
-        &self,
-        request: Request,
-        contents: &dyn Fn(Vec<ContentFile>),
-    ) -> anyhow::Result<T> {
+    fn ask(&self, request: Request, contents: &dyn Fn(Vec<ContentFile>)) -> anyhow::Result<Answer> {
         let connection = match self.running() {
             Some(connection) => connection,
             None => self.start()?,
@@ -197,7 +222,8 @@ impl AgentRepositories {
         loop {
             match receiver.recv() {
                 Ok(Incoming::Contents(files)) => contents(files),
-                Ok(Incoming::Reply(Ok(value))) => return Ok(serde_json::from_str(value.get())?),
+                Ok(Incoming::Reply(Ok(value))) => return Ok(Answer::Value(value)),
+                Ok(Incoming::Bytes(bytes)) => return Ok(Answer::Bytes(bytes)),
                 Ok(Incoming::Reply(Err(error))) => return Err(error.into()),
                 Err(_) => return Err(helper_failed(anyhow::anyhow!("the helper stopped"))),
             }
@@ -379,6 +405,18 @@ fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child:
                     let _ = sender.send(Incoming::Reply(result));
                 }
             }
+            Ok(Some(Message::Bytes { id })) => match read_bytes(&mut input) {
+                Ok(bytes) => {
+                    if let Some(sender) = lock(&replies.waiting).remove(&id) {
+                        let _ = sender.send(Incoming::Bytes(bytes));
+                    }
+                }
+                Err(error) => {
+                    tracing::warn!(%error, "the helper's output cannot be read: stopping it");
+                    let _ = child.kill();
+                    break;
+                }
+            },
             Ok(Some(Message::Contents { id, files })) => {
                 if let Some(sender) = lock(&replies.waiting).get(&id) {
                     let _ = sender.send(Incoming::Contents(files));
@@ -535,6 +573,25 @@ impl Repositories for AgentRepositories {
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
         let (repository, path) = (info.clone(), path.to_string());
         self.call(Request::FileContent { repository, path }, &nothing)
+    }
+
+    fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp> {
+        let (repository, path) = (info.clone(), path.to_string());
+        self.call(Request::FileStamp { repository, path }, &nothing)
+    }
+
+    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>> {
+        let (repository, path) = (info.clone(), path.to_string());
+        self.call_bytes(Request::Image { repository, path })
+    }
+
+    fn markdown_preview(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+    ) -> anyhow::Result<Option<MarkdownDocument>> {
+        let (repository, path) = (info.clone(), path.to_string());
+        self.call(Request::MarkdownPreview { repository, path }, &nothing)
     }
 
     fn syntax_colors(

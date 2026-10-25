@@ -59,6 +59,10 @@ serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+# Links of a Markdown preview opened in the system's browser or mail app, from our own command,
+# which allows `http`, `https` and `mailto` only (2026-10-25: Tauri's own, over the `open` crate or
+# a child process per OS; it also reveals a file in the file manager).
+tauri-plugin-opener = "2"
 
 [dev-dependencies]
 tempfile.workspace = true

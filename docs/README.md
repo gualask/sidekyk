@@ -12,6 +12,7 @@ reason, numbers, sources. One fact in one file; the others point to it.
   - `changes.md`: snapshot, diffs, commits, the viewer.
   - `syntax-colors.md`
   - `files.md`: tree, file view, folders without git, the shared selection.
+  - `previews.md`: Markdown, SVG and images as they read; links, images loaded from the app.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `background.md`: tray, global shortcut, hidden window.

@@ -11,7 +11,8 @@ The project's tree and the view of any file in it (built 2026-10-17).
 - One selection for both panels, as VS Code's explorer follows the editor (2026-10-17): Changes
   selects the file in its list, Files reveals it. A commit's file leaves the tree alone.
 - File view: files of the tree only, the first 2 MiB, notices for binary, link and submodule,
-  links never followed; the same rows and copy as diffs.
+  links never followed; the same rows and copy as diffs. Markdown, SVG and images show as they
+  read too (`previews.md`).
 - A folder without git (2026-10-24): no change colors. Hidden: what `.gitignore` and `.ignore`
   files say (each for its folder and below, `.ignore` first), git's global excludes, and always
   VCS folders (`.git`, `.hg`, `.svn`, `.jj`, `.sl`, `.repo`, `CVS`) and OS files (`.DS_Store`,

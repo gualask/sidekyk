@@ -1,0 +1,3 @@
+# The fixtures' files are read by the browser and by a Rust test that writes their previews:
+# the same bytes on every system, line ends included.
+src/dev/fixture-files/** -text

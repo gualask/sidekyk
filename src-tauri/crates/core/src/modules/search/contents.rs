@@ -304,6 +304,14 @@ mod tests {
             Some(Box::new(std::io::Cursor::new(bytes)))
         }
 
+        fn file_stamp(
+            &self,
+            _root: &Path,
+            _path: &Path,
+        ) -> Option<crate::modules::repository::FileStamp> {
+            unreachable!()
+        }
+
         fn walk(&self, _root: &Path, _max: usize) -> Walked {
             unreachable!()
         }

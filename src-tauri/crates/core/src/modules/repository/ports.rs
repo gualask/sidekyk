@@ -2,6 +2,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use super::contracts::FileStamp;
 use crate::shared::process::ProcessOutput;
 
 /// What a git call wrote, and how it ended.
@@ -31,6 +32,10 @@ pub trait RepositoryBackend: Send + Sync {
     /// nothing is there or a folder on the way is a link: a file's first `limit` bytes, a link's
     /// target, or a folder (a submodule).
     fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry>;
+
+    /// The size and last change of the file at `path` (relative) under `root`, or `None` when it
+    /// is not a file there: missing, a link (never followed), a folder, or behind a link.
+    fn file_stamp(&self, root: &Path, path: &Path) -> Option<FileStamp>;
 
     /// The file at `path` (relative) under `root`, to read as a stream, or `None` when it is not a
     /// file there: missing, a link (never followed), a folder, or behind a folder that is a link.

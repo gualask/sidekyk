@@ -42,18 +42,27 @@ in-memory ports. UI changes are checked there, light and dark.
 - Scenarios: `review` (changes, commits, notes, long files changed in many places; a WSL clone
   whose helper takes 1.5 s to start), `clean`, `no-repo`, `large`, `problems` (a missing
   repository; WSL projects stopped, gone or without git; `api`'s distro stopped shows its Start
-  panel). `review` and `clean` have `Vault`, a folder without git (Markdown, an `.ignore`). New
+  panel). `review` and `clean` have `Vault`, a folder without git (Markdown, an `.ignore`;
+  `guide.md` holds every construct the preview shows, an image and an SVG beside it); `review`'s
+  `README.md` is changed, for its Preview. The Vault and the shop's Markdown are files
+  (`src/dev/fixture-files/`); their previews are the backend parser's, written to
+  `previews.json` by the Rust test `fixture_previews`, which fails while it is out of date
+  (`SIDEKYK_UPDATE_FIXTURES=1 cargo test --manifest-path src-tauri/Cargo.toml -p sidekyk-core
+  fixture_previews` writes it again; 2026-10-25, over a second parser in TypeScript). New
   project picks the scenario's repository and a folder without git in turn.
 - `&open=<name>` starts as `sidekyk <folder>`. In the console: `sidekykDev.openFolder('<name>')`
   (the project, else one made), `gitInit('<name>')` and `gitRemove('<name>')` (told as the
-  watcher would), `stopDistro('<name>')` (`wsl --shutdown`; the next read starts it).
+  watcher would), `stopDistro('<name>')` (`wsl --shutdown`; the next read starts it),
+  `writeFile('<name>', '<path>', '<text>')` (an agent writing a file, told as the watcher would;
+  without a text, its later version in `fixture-files/edits/`, whose preview is generated too).
 
 ## Timing tests
 
 Ignored by default, run in release with `--ignored --nocapture`:
 
 - `backend_timings` (`SIDEKYK_BENCH_REPO=<repo>`): snapshot, summary, tree and its walk without
-  git, the palette's search over it, recent commits, the diff of the largest changed file.
+  git, the palette's search over it, the largest Markdown file's preview (read, parsed, as JSON),
+  recent commits, the diff of the largest changed file.
 - `syntax_colors_while_written` (`SIDEKYK_BENCH_FILE=<file>`): colors while the file on screen is
   written every 250 ms.
 - `agent_timings` (`-p sidekyk-agent`): the same reads directly and through the helper.

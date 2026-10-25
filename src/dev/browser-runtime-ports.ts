@@ -1,12 +1,13 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
 import type { FolderChoice, ProjectList } from '@/modules/projects';
-import type { FolderKind, RepositoryChangedEvent } from '@/modules/repository';
+import type { FileContent, FolderKind, RepositoryChangedEvent } from '@/modules/repository';
 import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureFolderTree, fixtureTree } from './files.fixture-data';
+import { editedText, fixturePreview, VAULT_IMAGES } from './fixture-files';
 import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
@@ -130,6 +131,12 @@ export interface BrowserRuntime {
     gitRemove: (name: string) => void;
     /** As `wsl --shutdown` of the distro of the project of that name: started again by a read. */
     stopDistro: (name: string) => void;
+    /**
+     * As an agent writing a file of the project of that name, its watcher telling the change:
+     * `text`, or the fixtures' later version of it (`fixture-files/edits/`), whose preview is
+     * the backend's.
+     */
+    writeFile: (name: string, path: string, text?: string) => void;
 }
 
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
@@ -152,6 +159,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         theme: 'dark',
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
         diffView: 'changes',
+        fileView: 'preview',
         diffScrollbar: 'narrow',
         codeLines: 'scroll',
         copyTemplate: DEFAULT_COPY_TEMPLATE,
@@ -338,6 +346,31 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
 
     // as the watcher tells a `.git` come or gone at a folder's root
     const repositoryChanged = new Set<(event: RepositoryChangedEvent) => void>();
+    // files written while the page runs (`writeFile`), by project and path
+    const written = new Map<string, string>();
+    const contentOf = (projectId: string, path: string): FileContent => {
+        if (!tree(projectId).has(path)) throw failure('file_missing');
+        const text = written.get(`${projectId}\0${path}`);
+        return text === undefined
+            ? fixtureFileContent(path)
+            : { kind: 'text', text, truncated: false };
+    };
+    const writeFile = (name: string, path: string, text = editedText(name, path)) => {
+        const found = list.projects.find((p) => p.name === name);
+        if (!found) throw new Error(`No project ${name}`);
+        if (text === undefined)
+            throw new Error(`No later version of ${path} in fixture-files/edits`);
+        written.set(`${found.id}\0${path}`, text);
+        const event: RepositoryChangedEvent = {
+            version: 4,
+            projectId: found.id,
+            gitDir: false,
+            paths: [path],
+            kindChanged: false,
+        };
+        for (const listener of repositoryChanged) listener(event);
+    };
+
     const setKind = (name: string, kind: FolderKind) => {
         const found = list.projects.find((p) => p.name === name);
         const root = found ? projectFolder(found)?.root : undefined;
@@ -484,9 +517,23 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
             getDirectory: async (projectId, path) => tree(projectId).directory(path),
-            getFileContent: async (projectId, path) => {
-                if (!tree(projectId).has(path)) throw failure('file_missing');
-                return fixtureFileContent(path);
+            getFileContent: async (projectId, path) => contentOf(projectId, path),
+            // the fixtures' images, as Vite serves them; any other is missing
+            getFileStamp: async (projectId, path) => {
+                if (!tree(projectId).has(path) || !(path in VAULT_IMAGES)) {
+                    throw failure('file_missing');
+                }
+                return { size: VAULT_IMAGES[path].size, modified: 0 };
+            },
+            projectFileUrl: (_projectId, path) => VAULT_IMAGES[path]?.url ?? '',
+            getMarkdownPreview: async (projectId, path) => {
+                // the backend's own preview of that text (`fixture-files/previews.json`)
+                const content = contentOf(projectId, path);
+                return content.kind === 'text' ? fixturePreview(content.text) : null;
+            },
+            // a browser tab opens it in another, as the system's browser would
+            openUrl: async (url) => {
+                window.open(url, '_blank', 'noopener,noreferrer');
             },
             getSyntaxColors: async (projectId, { path, version, first, count }) => {
                 // as the backend: a file on disk is read without git
@@ -559,6 +606,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         openFolder,
         gitInit: (name) => setKind(name, 'repository'),
         gitRemove: (name) => setKind(name, 'plain'),
+        writeFile,
         stopDistro: (name) => {
             const found = list.projects.find((p) => p.name === name);
             const distro = found ? distroOf(found.id) : null;

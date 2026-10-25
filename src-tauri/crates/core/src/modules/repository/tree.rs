@@ -5,10 +5,10 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
-use super::contracts::{Directory, FileContent, RepositoryInfo, TreeEntry};
+use super::contracts::{Directory, FileContent, FileStamp, RepositoryInfo, TreeEntry};
 use super::diff::{checked_path, cut_at_line};
 use super::ignored::git_path;
-use super::limits::{MAX_FILE_BYTES, MAX_TREE_PATHS};
+use super::limits::{MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS};
 use super::numstat::looks_binary;
 use super::open::existing_root;
 use super::ports::{git_checked, joined, RepositoryBackend, WorktreeEntry};
@@ -286,6 +286,40 @@ pub fn load_file_content(
     })
 }
 
+/// A file's size and last change; links never followed.
+pub fn load_file_stamp(
+    backend: &dyn RepositoryBackend,
+    repository: &RepositoryInfo,
+    path: &str,
+) -> anyhow::Result<FileStamp> {
+    let root = existing_root(backend, repository)?;
+    let path = checked_path(path)?;
+    backend
+        .file_stamp(root, Path::new(path))
+        .ok_or_else(|| user_facing(UserFacingErrorCode::FileMissing))
+}
+
+/// A file's bytes whole, for the viewer to show as an image: at most `MAX_IMAGE_BYTES`, a link
+/// never followed.
+pub fn load_image(
+    backend: &dyn RepositoryBackend,
+    repository: &RepositoryInfo,
+    path: &str,
+) -> anyhow::Result<Vec<u8>> {
+    let root = existing_root(backend, repository)?;
+    let path = checked_path(path)?;
+    match backend.read_entry(root, Path::new(path), MAX_IMAGE_BYTES) {
+        Some(WorktreeEntry::File {
+            head,
+            truncated: false,
+        }) => Ok(head),
+        Some(WorktreeEntry::File { .. }) => anyhow::bail!("larger than {MAX_IMAGE_BYTES} bytes"),
+        Some(WorktreeEntry::Link(_) | WorktreeEntry::Folder) | None => {
+            Err(user_facing(UserFacingErrorCode::FileMissing))
+        }
+    }
+}
+
 /// A link's target as git stores it, with `/` between names.
 fn link_target(target: &Path) -> String {
     let text = target.to_string_lossy();
@@ -394,6 +428,10 @@ mod tests {
         }
 
         fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
+            unreachable!()
+        }
+
+        fn file_stamp(&self, _root: &Path, _path: &Path) -> Option<FileStamp> {
             unreachable!()
         }
 

@@ -14,7 +14,9 @@ import { useCommitFileFind, useFileFind } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
+import { useFileViewChoice, useLinkedAnchor } from '../application/view-choice';
 import { fileKey } from '../model/file-groups';
+import { hasPreview } from '../model/preview';
 import { projectErrorMessage } from '../model/project-error';
 import { selectedFile, selectionOf } from '../model/selection';
 import { fileTarget } from '../model/targets';
@@ -23,8 +25,10 @@ import { ChangeDiffView, CommitDiffView } from './DiffView';
 import { FileHeader } from './FileHeader';
 import { FileList } from './FileList';
 import { fittingRowsWidth } from './list-layout';
+import { PreviewPane } from './PreviewPane';
 import { RecentCommits } from './RecentCommits';
 import { TextFileView } from './TextFileView';
+import { DIFF_VIEWS, PREVIEW_VIEW, type ViewSwitch } from './view-options';
 
 const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
@@ -79,6 +83,21 @@ export function ChangesWorkspace({
           ? fileKey(selected)
           : unchanged;
     const { choice: diffView, openAt } = useDiffViewChoice(shownKey);
+    // a file with a preview: how one that did not change shows, and whether a changed one shows
+    // as it reads instead of its diff, for the panel's files while it is open
+    const fileView = useFileViewChoice();
+    const [previewChanged, setPreviewChanged] = useState(false);
+    const changedPreview =
+        selected !== null &&
+        !viewed &&
+        selected.kind !== 'deleted' &&
+        hasPreview(selected.path) &&
+        previewChanged;
+    const linked = useLinkedAnchor(selectedPath);
+    const openLinked = (path: string, anchor: string | null) => {
+        setSelection((current) => selectionOf(path, current));
+        linked.link(path, anchor);
+    };
     // a commit's file has a find bar of its own, which goes as the commit is left
     const commitFind = useCommitFileFind(viewed ? shownKey : null, findInFiles);
 
@@ -153,11 +172,23 @@ export function ChangesWorkspace({
         panel: 'files' as const,
         onShow: () => show('files', fileTarget(path, hunk())),
     });
-    const viewSwitch = (currentHunk: () => number) =>
+    // a changed file with a preview (`path`, null for none) may show as it reads too, the diff's
+    // view staying as chosen
+    const viewSwitch = (
+        currentHunk: () => number,
+        path: string | null = null,
+    ): ViewSwitch<DiffView | 'preview'> | null =>
         diffView
             ? {
-                  value: diffView.view,
-                  onChange: (next: DiffView) => diffView.onChange(next, currentHunk()),
+                  value: changedPreview ? 'preview' : diffView.view,
+                  options:
+                      path !== null && hasPreview(path)
+                          ? [...DIFF_VIEWS, PREVIEW_VIEW]
+                          : DIFF_VIEWS,
+                  onChange: (next) => {
+                      setPreviewChanged(next === 'preview');
+                      if (next !== 'preview') diffView.onChange(next, currentHunk());
+                  },
               }
             : null;
 
@@ -259,6 +290,27 @@ export function ChangesWorkspace({
                                 )}
                             />
                         ) : null
+                    ) : selected && changedPreview ? (
+                        <PreviewPane
+                            key={`${shownKey}:preview`}
+                            projectId={project.id}
+                            path={selected.path}
+                            header={header}
+                            renderHeader={() => (
+                                <FileHeader
+                                    path={selected.path}
+                                    origPath={selected.origPath}
+                                    view={viewSwitch(() => 0, selected.path)}
+                                    showIn={showInFiles(selected.path, () => null)}
+                                />
+                            )}
+                            openOn={null}
+                            openFile={openLinked}
+                            onFind={(line) => {
+                                setPreviewChanged(false);
+                                find.open(selected.path, { query: '', line: line ?? 1 });
+                            }}
+                        />
                     ) : selected ? (
                         <ChangeDiffView
                             key={`${shownKey}:${diffView.view}`}
@@ -274,7 +326,11 @@ export function ChangesWorkspace({
                                     path={selected.path}
                                     uncolored={pane.uncolored}
                                     origPath={selected.origPath}
-                                    view={viewSwitch(pane.currentHunk)}
+                                    view={viewSwitch(
+                                        pane.currentHunk,
+                                        // a deleted file has nothing to show as it reads
+                                        selected.kind === 'deleted' ? null : selected.path,
+                                    )}
                                     showIn={
                                         // a deleted file is not in the tree
                                         selected.kind === 'deleted'
@@ -292,14 +348,19 @@ export function ChangesWorkspace({
                             path={unchanged}
                             header={header}
                             finder={find.finderFor(unchanged)}
-                            renderHeader={(pane) => (
+                            view={fileView.view}
+                            onView={fileView.choose}
+                            anchor={linked.anchorFor(unchanged)}
+                            openFile={openLinked}
+                            renderHeader={({ uncolored, view }) => (
                                 <FileHeader
                                     path={unchanged}
-                                    uncolored={pane.uncolored}
+                                    uncolored={uncolored}
                                     badge={{
                                         label: i18n.t('changes.unchanged'),
                                         title: i18n.t('changes.unchangedTitle'),
                                     }}
+                                    view={view}
                                     showIn={showInFiles(unchanged, () => null)}
                                 />
                             )}

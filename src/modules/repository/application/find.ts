@@ -22,8 +22,8 @@ interface FindBarState {
 /** What the viewer of a file finds with: its bar while open, and the ways to look further. */
 export interface FileFinder {
     bar: FindBarState | null;
-    /** Opens the bar over the file, empty, to look from its top (`⌘F`). */
-    open: () => void;
+    /** Opens the bar over the file, empty, to look from its top or from `line` (`⌘F`). */
+    open: (line?: number | null) => void;
     /** Looks for a text in all the project's files instead (`⌘F` again, from the bar). */
     findInFiles: (query: string) => void;
 }
@@ -48,7 +48,7 @@ function finderOf(
                       onClose: () => setFind(null),
                   }
                 : null,
-        open: () => setFind({ file, query: '', line: null }),
+        open: (line = null) => setFind({ file, query: '', line }),
         findInFiles,
     };
 }

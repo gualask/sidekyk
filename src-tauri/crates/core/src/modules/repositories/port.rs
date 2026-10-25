@@ -4,10 +4,11 @@
 use std::path::Path;
 
 use crate::modules::folder::FolderKind;
+use crate::modules::preview::MarkdownDocument;
 use crate::modules::repository::{
     CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, RecentCommits, RepositoryChange, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, UnifiedDiff,
+    FileDiffRequest, FileStamp, RecentCommits, RepositoryChange, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -60,6 +61,21 @@ pub trait Repositories: Send + Sync {
 
     /// One file of a project's tree. Only a file of the tree is read, so never one hidden.
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent>;
+
+    /// The size and last change of a file of a project's tree.
+    fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp>;
+
+    /// An image of a project's tree, its bytes whole (at most `MAX_IMAGE_BYTES`), for the viewer
+    /// and the Markdown preview to show.
+    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>>;
+
+    /// A Markdown file of a project's tree as its preview's tree, its links and images resolved
+    /// against the tree; none when it is not text (binary, a link, a submodule).
+    fn markdown_preview(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+    ) -> anyhow::Result<Option<MarkdownDocument>>;
 
     /// The syntax colors of some lines of one version of a file.
     fn syntax_colors(

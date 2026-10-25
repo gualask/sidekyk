@@ -321,6 +321,14 @@ mod tests {
             Some(bytes)
         }
 
+        fn file_stamp(
+            &self,
+            _root: &Path,
+            _path: &Path,
+        ) -> Option<crate::modules::repository::FileStamp> {
+            unreachable!()
+        }
+
         fn walk(&self, _root: &Path, _max: usize) -> Walked {
             unreachable!()
         }
@@ -381,6 +389,14 @@ mod tests {
         }
 
         fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
+            unreachable!()
+        }
+
+        fn file_stamp(
+            &self,
+            _root: &Path,
+            _path: &Path,
+        ) -> Option<crate::modules::repository::FileStamp> {
             unreachable!()
         }
 

@@ -96,6 +96,19 @@ const TONE_SCOPES: &[(&str, Tone)] = &[
     ("markup.deleted", Tone::Deleted),
 ];
 
+/// Scopes in the text's color though a tone's scope holds them: a Markdown file's fenced code is
+/// `markup.raw`, a string's tone, and its plain words keep the text's color, as in the language's
+/// own file (as VS Code shows them; 2026-10-25).
+const PLAIN_SCOPES: &str = "markup.raw.code-fence";
+
+/// The text's own color, which no tone has.
+const TEXT_COLOR: Color = Color {
+    r: 0,
+    g: 0,
+    b: 0,
+    a: 0xFF,
+};
+
 fn tone_color(tone: Tone) -> Color {
     let index = TONES.iter().position(|&t| t == tone).unwrap_or(0);
     Color {
@@ -116,20 +129,17 @@ fn tone_theme() -> Theme {
         name: None,
         author: None,
         settings: ThemeSettings {
-            foreground: Some(Color {
-                r: 0,
-                g: 0,
-                b: 0,
-                a: 0xFF,
-            }),
+            foreground: Some(TEXT_COLOR),
             ..ThemeSettings::default()
         },
         scopes: TONE_SCOPES
             .iter()
-            .map(|&(scopes, tone)| ThemeItem {
+            .map(|&(scopes, tone)| (scopes, tone_color(tone)))
+            .chain(std::iter::once((PLAIN_SCOPES, TEXT_COLOR)))
+            .map(|(scopes, color)| ThemeItem {
                 scope: ScopeSelectors::from_str(scopes).expect("valid scope selectors"),
                 style: StyleModifier {
-                    foreground: Some(tone_color(tone)),
+                    foreground: Some(color),
                     background: None,
                     font_style: None,
                 },
@@ -419,6 +429,26 @@ mod tests {
                 (part, tone)
             })
             .collect()
+    }
+
+    #[test]
+    fn fenced_code_in_markdown_takes_its_language_tones() {
+        let text = "Some `inline`.\n\n```rust\nlet total = count + 1;\n```\n";
+        let lines = colored("README.md", text);
+        let fence = "let total = count + 1;";
+        let parts = toned(fence, &lines[3]);
+        assert!(
+            parts.contains(&("let".to_string(), Tone::Keyword)),
+            "{parts:?}"
+        );
+        // the plain words of the code keep the text's color, as in the language's own file
+        assert!(
+            parts.iter().all(|(part, _)| !part.contains("total")),
+            "{parts:?}"
+        );
+        assert!(
+            toned("Some `inline`.", &lines[0]).contains(&("`inline`".to_string(), Tone::String))
+        );
     }
 
     #[test]
