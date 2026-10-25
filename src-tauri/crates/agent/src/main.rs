@@ -1,5 +1,5 @@
 //! `sidekyk-agent`: runs where the repositories are (a WSL distro) and answers the app over its
-//! stdin and stdout (`docs/plans/remote-projects.md`). `version` prints its version: the app runs
+//! stdin and stdout (`docs/features/wsl.md`). `version` prints its version: the app runs
 //! it to know the helper runs before it starts one; `serve` removes the older ones installed
 //! beside it and answers until the app closes stdin. It logs on stderr, which the app writes to
 //! its own log.

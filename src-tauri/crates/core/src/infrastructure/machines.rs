@@ -1,5 +1,5 @@
 //! The machines a project's repository can be on, this one and WSL distros, and what reads each:
-//! where a project is read, and what every machine is told (`docs/plans/remote-projects.md`).
+//! where a project is read, and what every machine is told (`docs/features/wsl.md`).
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;

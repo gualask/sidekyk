@@ -37,7 +37,7 @@ const STABLE_RUN: Duration = Duration::from_secs(10);
 
 /// How long a helper that watches nothing lives after its last request: a pause, or the projects'
 /// cards read again, never waits for a new one; a WSL distro it keeps running for that long is
-/// fine (`docs/plans/remote-projects.md`, Lifecycle).
+/// fine (`docs/features/wsl.md`, Lifecycle).
 const IDLE_EXIT: Duration = Duration::from_secs(10 * 60);
 
 /// A watch's `OnChange`, shared with the thread reading the helper's messages.

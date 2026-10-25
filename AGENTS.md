@@ -40,7 +40,14 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
   `interfaces/tauri/texts.rs`.
 - A contract change (`contracts.rs`, `repository.types.ts`) also updates the Tauri adapter, the fixtures and the serialization tests; a new error code needs its key in `app-error.ts` and its message in both catalogs.
 - Hot-path logs are `debug`; `info` and above only for rare events and problems.
-- Docs and code comments in English. `ROADMAP.md` holds only what is left to do; a built item leaves it for `docs/features/` in the same commit (`docs/README.md` says where things go).
+- Code comments in English.
+
+## Docs
+
+- In English, for people and coding agents: terse facts, decisions with their date and reason, measures, sources; no narrative, nothing the code already says.
+- One file per area, about 500-1,200 words (`docs/README.md` lists them and says where things go): neither one file that explains a bit of everything nor a tree of small files. One fact in one file; the others point to it.
+- `ROADMAP.md` holds only what is left, by theme, not a timeline; `**After:**` marks a technical dependency. A built item leaves it, and its plan, for `docs/features/` in the same commit.
+- Plans and specs are local, not versioned: `.cflow/plans/`, `.cflow/specs/`. A plan wholly built is deleted.
 
 ## Invariants
 

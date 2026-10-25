@@ -12,13 +12,13 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 ## Notes
 
-- [ ] Optional Google Drive sync/backup (`docs/plans/notes-sync.md`)
-- [ ] Entities recognized while typing a note (`docs/plans/notes-entities.md`)
+- [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)
+- [ ] Entities recognized while typing a note (`.cflow/plans/notes-entities.md`)
 - [ ] Agents read a project's notes and captures over MCP, read-only (design open)
 
 ## Projects with optional folders
 
-`docs/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
+`.cflow/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
 has.
 
 - [ ] Layout without git: what takes Changes' tile (today Files; Notes leaning, decided with
@@ -30,7 +30,7 @@ has.
 
 ## Previews
 
-`docs/plans/previews.md`.
+`.cflow/plans/previews.md`.
 
 - [ ] Markdown rendered in the file viewer
 - [ ] Images in the file viewer (today the binary notice)
@@ -38,7 +38,7 @@ has.
 
 ## Capture
 
-`docs/plans/capture.md`.
+`.cflow/plans/capture.md`.
 
 - [ ] Images in notes: a note holds text and images (pasted, dropped), copied out with its text
 - [ ] Annotate an image: arrows with their text, markers (A, B, C), editable later. **After:**
@@ -50,11 +50,12 @@ has.
 
 ## Remote projects
 
-`docs/plans/remote-projects.md`; the helper tried as a child process on the Mac and, built for
-Linux by `build.yml`, in the container fixture (`docs/testing.md`).
+Built: `docs/features/wsl.md`; what is left: `.cflow/plans/remote-projects.md`. The helper is
+tried as a child process on the Mac and, built for Linux by `build.yml`, in the container fixture
+(`docs/testing.md`).
 
 - [ ] WSL projects tried on Windows 11 x64, from `build.yml`'s build
-      (`docs/plans/remote-projects.md`, Open); later WSL1, ARM64
+      (`.cflow/plans/remote-projects.md`, Open); later WSL1, ARM64
 - [ ] `sidekyk .` from a WSL shell (`$WSL_DISTRO_NAME`). **After:** WSL projects
 - [ ] Nice to have: remove the helper from a distro when its last project goes. **After:** WSL
       projects

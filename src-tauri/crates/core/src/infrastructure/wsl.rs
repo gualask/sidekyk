@@ -1,5 +1,5 @@
 //! WSL distros, through `wsl.exe`: which ones run, and each one's repositories through the helper
-//! started there (`linux_helper`, `docs/plans/remote-projects.md`). Windows only: elsewhere
+//! started there (`linux_helper`, `docs/features/wsl.md`). Windows only: elsewhere
 //! `wsl.exe` is not found, and every call fails.
 
 use std::collections::HashMap;

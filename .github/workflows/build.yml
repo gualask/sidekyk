@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  # the helper a WSL distro runs, shipped in the Windows installer (docs/plans/remote-projects.md);
+  # the helper a WSL distro runs, shipped in the Windows installer (docs/features/wsl.md);
   # arm64 too, for the container fixture on Apple Silicon (docs/testing.md), built on an arm64
   # runner, so musl-gcc builds its C natively
   helper-linux:

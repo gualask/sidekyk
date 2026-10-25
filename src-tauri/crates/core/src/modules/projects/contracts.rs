@@ -24,7 +24,7 @@ pub struct ProjectList {
     pub layouts: BTreeMap<String, TilesLayout>,
 }
 
-/// A project: a name, its notes, and the folders it follows (`docs/plans/project-folders.md`).
+/// A project: a name, its notes, and the folders it follows (`docs/features/projects.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", try_from = "StoredProject")]
 pub struct Project {
@@ -72,7 +72,7 @@ impl Project {
     }
 }
 
-/// Where a project's folder is (`docs/plans/remote-projects.md`).
+/// Where a project's folder is (`docs/features/wsl.md`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum Location {

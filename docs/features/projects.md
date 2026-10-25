@@ -1,167 +1,99 @@
 # Projects
 
-Several projects, one on screen: a project is a name, its notes and none or one folder (a
-repository, or a folder without git).
+A project is a name, its notes and none or one folder: a repository, or a folder without git.
+Several projects, one on screen.
 
 ## Behaviour
 
-- New project (2026-10-23): the "+ New project" card last at level 0 ("Notes on a topic, and a
-  folder if you want") opens one dialog for everyone: Name (focused) and Folder (optional), "None"
-  until Choose… picks one; Cancel and Create (disabled while the name is blank), `↵` creates.
-  Any folder (2026-10-24): one inside a repository resolves to the repository's root, any other is
-  taken as it is; its name fills an empty name. A folder that is another project's is said under
-  the field ("Already the project shop", Open: that project shows). Create adds the project last
-  and opens it at level 1.
-- What a folder is (2026-10-24): a repository when a `.git` (folder, or file for linked worktrees
-  and submodules) is at its root, else a folder without git. Found where it is read, never
-  stored: `git init` in it, or `.git` removed, changes its panels while the app runs (Changes
-  comes and goes, `workspace.md`). A plain folder inside a repository made later stays plain.
-- Rename (2026-10-23): from the card's ⋯, the same dialog with the name only. Two projects may
-  share a name. Removing a project without folder asks about its notes the same way, without the
-  line about the folder.
-- `sidekyk <folder>` (the first CLI argument, inside a repository its root) opens its project,
-  adding one named after the folder when none follows it. Remove (⋯ on the level 0 card; the
-  folder is untouched; asks first about its notes, `notes.md`), switch
-  (`[`/`]`, `Esc` to level 0, `⌘K` there). The app starts at level 0, the project shown last
-  selected; `sidekyk <folder>` opens its project at level 1 (`workspace.md`).
-- A project not on this machine says where it is: `WSL: Ubuntu` before its folder on the level 0
-  card and after its name in the top bar (the same repository cloned in Windows and in WSL shows
-  as two `shop`s otherwise).
-- Level 0 card (2026-10-18), three groups set apart by space:
-  - Name, and under it the branch (cut with "…"; ahead/behind stay) after a WSL project's
-    `WSL: Ubuntu`; for a folder without git the folder itself, cut at its start. The folder is
-    the name's tooltip, which covers the card.
-  - Three boxes across the card, each as wide as what it holds plus a share of what is left:
-    files changed, lines (`+54 −27`), notes waiting; a value at 16 px over its label. Quiet (muted) at 0, so that
-    in the grid the projects at work stand out. Counts kept short (`10k+`, `+999k −999k`): the
-    widest three fill 262 of the card's 266 px.
-  - A well at the bottom, one height whatever it holds: the week of commits, "No commits in 7
-    days", or why the repository cannot be read (moved, distro stopped or gone, no git).
-  A project without folder (2026-10-23), or with a folder without git (2026-10-24, its folder
-  under the name): boxes "waiting" (open notes) and "done"; in the well "Last change yesterday" (calendar days, `Intl.RelativeTimeFormat`: today, yesterday,
-  3 days ago, then weeks, months, years) or "No notes yet". Quiet at 0, as the other boxes.
-  Boxes and well on `surface-subtle`, never in the page's color: page, card, box are three
-  layers; no border, the surface tells them apart (2026-10-18). No chips, no file list (the detail is one
-  zoom away), no least height.
-- Week of commits: across the well, a bar per local day, today and the six before (no weekday
-  letters: "Last 7 days" says it), as tall as the lines the branch's commits changed that day (to
-  the busiest day of that project), green the added at the bottom, red the removed above, a pixel
-  between; a day of a few lines still shows both. Over it `Last 7 days +2.9k −1.3k`; tooltip per
-  day: `Wed 14 Oct: +1234 −340, 5 commits`. Work not committed is left out: it is in the boxes.
-- Facts next to the project's name in the top bar: branch, ahead/behind, changed files and lines
-  added/removed in tracked files against HEAD (`1.2k changed +1.2k −340`, exact lines in the
-  tooltip), or "clean".
-- A moved folder (a repository's or not): problem `repository_missing` ("{name}'s folder was
-  moved or deleted") with Locate… (the project follows its folder
-  there, keeping its id, name, notes and layout) and Remove. A folder that is another project's is
-  not taken: a toast says whose, with Open. Adding a folder a project follows opens that project.
-
-- WSL projects (Windows): a folder of a distro (`\\wsl.localhost\<distro>\…` from the folder
-  picker, Locate… or the command line) is read in that distro by Sidekyk's helper, never through
-  Windows' view of its files. Nothing but its Start button starts a stopped distro (2026-10-24):
-  the card says "Ubuntu is not running."; the project opened (its card, `[`/`]`, the palette)
-  shows Notes, and in place of the folder's panels a Start panel ("Start Ubuntu", then "Starting
-  Ubuntu…"), which gives way to them once the distro runs. A distro that runs already opens at
-  once (its helper started by the first read, "Starting Ubuntu…" meanwhile). The distro gone, no
-  git there, or the helper not starting: a problem in the top bar (Remove, Try again).
+- New project (2026-10-23): the last card at level 0 opens one dialog for everyone: Name and
+  Folder (optional; "None" until Choose…), Create disabled while the name is blank. A folder inside
+  a repository becomes the repository's root, any other is taken as it is (2026-10-24); its name
+  fills an empty name. Another project's folder is said under the field, with Open. Create opens
+  the new project at level 1.
+- Rename from the card's ⋯, the same dialog with the name only; two projects may share a name.
+  Remove from the card's ⋯: the folder is untouched, the notes are exported or deleted first
+  (`notes.md`).
+- `sidekyk <folder>` opens the project of that folder, adding one named after it if none.
+- What a folder is (2026-10-24): a repository when a `.git` (folder, or file for worktrees and
+  submodules) is at its root, else a folder without git. Never stored: `git init` or `.git`
+  removed changes the panels while the app runs (`workspace.md`).
+- Level 0 card, three groups set apart by space, on `surface-subtle` (no border, 2026-10-18):
+  - name and under it the branch (ahead/behind kept), or for a folder without git the folder, cut
+    at its start; WSL's tag first (`wsl.md`); the folder in the tooltip;
+  - three boxes: files changed, lines (`+54 −27`), notes waiting; muted at 0, so projects at work
+    stand out; counts kept short (`10k+`, `+999k −999k`) to fit 266 px;
+  - a well of one height: the week of commits, "No commits in 7 days", or why the folder cannot
+    be read.
+  Without folder or without git: boxes "waiting" and "done", the well "Last change yesterday"
+  (`Intl.RelativeTimeFormat`) or "No notes yet".
+- Week of commits: a bar per local day, today and the six before, as tall as the lines changed that
+  day (scaled to the project's busiest), added green below, removed red above; `Last 7 days +2.9k
+  −1.3k` over it, a tooltip per day. Work not committed is in the boxes.
+- Top bar facts: branch, ahead/behind, changed files and lines against HEAD (`1.2k changed +1.2k
+  −340`), or "clean".
+- A folder moved or deleted: problem `repository_missing` with Locate… (the project follows the
+  folder, keeping id, name, notes and layout) and Remove. Another project's folder is refused with
+  a toast and Open.
 
 ## How it is built
 
-- Identity: a project is `{ id, name, folders }`, a folder local `{ root }` or WSL
-  `{ distro, root }` (`root` a Linux path); none or one repository for now, a list so that
-  several folders change nothing stored (`../plans/project-folders.md`). Everything of a project
-  (queries, layout, notes, session state, avatar color) is keyed by `id`; what reads its
-  repository by its folder (`Project::folder`, `projectFolder`). The id is made once (16 random
-  hex digits, `shared/id.rs`, as notes') and kept; the frontend never reads it. Stored as the
-  frontend gets it. Read too: `{ id, name, location }` (its id kept) and, before ids,
-  `{ name, location }` and `{ root, name }`, whose id is their location's
-  (`Location::id_before_made_ids`: the root, or `wsl:<distro>:<root>`), so notes and layouts
-  stored then stay theirs. One that cannot be read is left out, not the whole list.
-- A folder is one project's: `ProjectList::at` finds a project by folder (`Location::same_place`:
-  roots by component, without case on macOS and Windows; a distro without case). Places are
-  compared in one file, `modules/projects/place.rs`, for this and for an export inside a project
-  (`holds`).
-- WSL (`../plans/remote-projects.md`): `Machines` (the core's `infrastructure/machines.rs`) routes a
-  project to this machine's `LocalRepositories` or its distro's `AgentRepositories`
-  (`WslRepositories`, one helper per distro); every machine is told the window's visibility and the
-  projects it keeps, and the ones not on screen to watch nothing, which never starts a helper. A
-  helper watching nothing closes 10 min after its last request. A summary checks `wsl.exe --list
-  --running --quiet` first when no helper runs there (`distro_stopped`, `distro_missing`; kept 5 s
-  for the other cards of the distro); a helper that cannot start, or a `wsl.exe` that does not
-  answer, is `helper_failed`, never `distro_missing`, which offers Remove. The frontend turns these,
-  `repository_missing` and a WSL project's `git_not_found` into problems (`useProjectFailures`,
-  `app/problems.ts`).
-- Project list: app data next to the settings. Changes run in one mutation scope, in order; the
-  last switch wins.
-- Only the project on screen is watched and runs full snapshots (`changes.md`). The others show a
-  summary (`load_summary`: status + numstat vs HEAD, new files counted not read), the same numbers
-  a snapshot gives; 52 ms on Zed's clone. Read when level 0 shows, and when the window shows again
-  on it, only if older than 30 s. Inactive projects' caches expire (`gcTime`).
-- Card parts: a panel's summary is shown once per part (`SummaryPart`: `lead`, `facts`, `body`)
-  and shows nothing in the parts it has nothing for; Changes fills all three, Notes `facts`, and
-  `facts` and `body` for a project without folder or with a folder without git (a `Stat` box
-  each, the well a `CardWell`, `shared/ui`), Files `lead` for a folder without git
-  (`FilesSummary`). Only the summaries of the project's panels show (`projectTiles`, from the
-  folder's kind), each told `repository` (`PanelSummaryProps`). Each module stays on its own, the
-  card keeps the order.
-- Opening a folder (`resolve_folder`, `modules/folder/open.rs`): the candidate's real path (links
-  resolved on Unix, as the watcher reports paths; on Windows as given); the nearest folder at or
-  above it with a `.git` is a repository, its root from `git rev-parse --show-toplevel`, or that
-  folder when git fails (missing, a broken `.git`); no `.git` found, the folder itself and no git
-  runs (on macOS without the Command Line Tools `/usr/bin/git` asks to install them).
-- Folder kind (`get_folder_kind(projectId, start)`, `folder::folder_kind`): `repository_missing`
-  for a folder gone, else whether `.git` is at the root; no git. The cards and the project opened
-  ask with `start: false` (one query: never starting a distro, `distro_stopped` as the summary),
-  which level 1 shows as the Start panel (`projectTiles('stopped')`, `StartFolder`, no key opens
-  it); only its button asks with `true` (`useStartFolder`), its answer the kind. A kind that
-  cannot be read otherwise counts as a repository, its panels and the problems telling why
-  (`useFolderKind`). The palette's files and `search_contents` check
-  `readable_without_starting` first: no files while the distro is stopped. A change of kind comes from the watcher
-  (`RepositoryChange.kind_changed`): the frontend resets the project's queries.
-- New project and rename (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says
-  what it is (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`),
-  changing nothing; `create_project(name, folder)` checks the path again
-  (`folder_at`) and adds the project (`ProjectList::add`: name trimmed, never blank; a folder
-  another project follows is refused), then shows it; `rename_project` (`ProjectList::rename`,
-  stored only: nothing watched changes). Their failures show in the dialog, still open.
-- A project without folder is never routed to a machine, watched or summarized as a repository:
-  `Project::repository` is `None`, and a repository command given one is an internal error. A
-  folder without git is routed and watched, never summarized: snapshot, summary, diffs and
-  commits on it are an internal error, never asked.
-- Week of commits (`get_commit_activity`, `load_commit_activity`): `git log --since=@<local
-  midnight 6 days ago> --no-merges --shortstat -n 501 HEAD` (`LC_ALL=C`: the line is not
-  translated), at most 500 commits and 256 KiB; the frontend sums them by local day
-  (`activityDays`). Its query key names HEAD (from the summary) and the first day, outside the
-  repository's keys: changes on disk and the window showing leave it alone, another HEAD or
-  another day reads it again; its cache expires as the others (`gcTime`). 80 ms on this repository
-  (68 commits), 0.5 s on Zed's clone over 129 commits.
-- Notes on the card: `notes_summary` (how many wait and are done, the last edit), kept in memory
-  once read, until the notes change.
-- Locate… (`relocate_project`): the folder picked resolves as a new project's; the project's
-  folder becomes it (`relocate`), nothing else changes; the same folder changes nothing. Another
-  project's folder: `Relocation::InProject { id, name }`, the list as it was. The id stays, so
-  what follows the folder is told: `watch_active` compares the id and the folder, and the frontend
-  reads the project's queries again (`useReadProjectAgain`).
+- Identity: `{ id, name, folders }`, a folder local `{ root }` or WSL `{ distro, root }`; one folder
+  for now, a list so several change nothing stored. Everything of a project (queries, layout,
+  notes, session state, avatar color) is keyed by `id`, made once (16 random hex digits,
+  `shared/id.rs`), never read by the frontend. Older stored forms are read: `{ id, name, location
+  }`, and before ids `{ name, location }` and `{ root, name }`, whose id is their location
+  (`Location::id_before_made_ids`), so their notes and layouts stay. One that cannot be read is
+  left out, not the whole list. Stored in app data beside the settings; changes run in one
+  mutation scope, in order.
+- A folder is one project's: `ProjectList::at` finds a project by place (`Location::same_place`:
+  roots by component, case ignored on macOS and Windows, the distro too). Places are compared only
+  in `modules/projects/place.rs`, also for an export inside a project (`holds`).
+- Opening a folder (`resolve_folder`, `modules/folder/open.rs`): its real path (links resolved on
+  Unix, as the watcher reports; as given on Windows); the nearest folder at or above it with a
+  `.git` is a repository, its root from `git rev-parse --show-toplevel`, or that folder when git
+  fails; no `.git`, the folder itself and no git runs (on macOS without the Command Line Tools
+  `/usr/bin/git` asks to install them).
+- Kind (`get_folder_kind`, `folder::folder_kind`, no git): `repository_missing` for a folder gone,
+  else whether `.git` is at the root. One query for cards and level 1 (`useFolderKind`); a kind that
+  cannot be read counts as a repository, its panels and problems telling why. A change of kind
+  comes from the watcher (`kind_changed`) and resets the project's queries.
+- Dialog (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says what it is
+  (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`), changing nothing;
+  `create_project` checks the folder again; `rename_project` stores only. Failures show in the
+  dialog.
+- Locate… (`relocate_project`): the folder resolves as a new project's and replaces the project's;
+  another project's is `Relocation::InProject`. `watch_active` compares id and folder, the
+  frontend reads the project again (`useReadProjectAgain`).
+- Without folder: `Project::repository` is `None`, never routed, watched or summarized; a
+  repository command on it is an internal error. A folder without git is routed and watched, never
+  asked for a snapshot, summary, diff or commits.
+- Only the project on screen is watched (`changes.md`). The others show a summary (`load_summary`:
+  status + numstat vs HEAD, new files counted not read, 52 ms on Zed's clone), read when level 0
+  shows, and on show only if older than 30 s; inactive caches expire (`gcTime`).
+- Card parts: each panel's summary fills `lead`, `facts` or `body` (`SummaryPart`); Changes all
+  three, Notes `facts` (and `body` when `repository` is false, `PanelSummaryProps`), Files `lead`
+  for a folder without git (`FilesSummary`). Only the project's panels' summaries show.
+- Week of commits (`get_commit_activity`): `git log --since=@<local midnight 6 days ago>
+  --no-merges --shortstat -n 501 HEAD`, `LC_ALL=C`, at most 500 commits and 256 KiB, summed by
+  local day in the frontend (`activityDays`). Keyed by HEAD and first day, outside the repository's
+  keys: changes on disk leave it alone. 80 ms here (68 commits), 0.5 s on Zed's clone (129).
 
 ## Decisions
 
-- Id made from the location (2026-10-18), then made once and kept (2026-10-22): a project
-  without folder has no location, one with several no single one. Every new project gets a new
-  id, so a repository added where a moved one was is no collision; one folder is one project's,
-  found by place, not by id. Ids stored before stay: nothing is migrated.
-- Any folder (2026-10-24, `../plans/project-folders.md`): a folder without git has Files and
-  Notes; a folder inside a repository is the repository's root, as before. Kind read by a query of
-  its own, not from the summary: at level 1 a repository's summary comes with its snapshot, so a
-  summary first would run `git status` twice in a row.
-- Locate… onto another project's folder is refused (2026-10-22), not a merge: Locate… changes a
-  folder only; joining two projects would be a command of its own (not needed). It used to join
-  their notes.
-
-- Not watched (2026-10-13): level 0 reads summaries each time it shows (~65 ms, 0.4 s CPU for ten
-  repos). A watcher per project is cheap on FSEvents/Windows but on inotify means one watch per
-  folder git does not ignore (`../architecture.md`, Watching); revisit if real-time cards are
-  missed.
-- On show (2026-10-14) read only what may have changed: the watched project if marked while
-  hidden, anything older than 30 s. 30 s because of the review loop (`⌘Tab` every 5-30 s: reading
-  ten projects each return is ~140 s CPU/hour, 30 s caps it at ~50 s) while another agent's count
-  is at most one turn stale. No debounce on show.
+- One container, the project (2026-10-22): not global notes beside projects (two navigations, two
+  places for a note); lists are topics inside it, the Inbox the one place outside. Panels come
+  from what a project has, never from a template the user picks. One folder first, the model
+  shaped for several (VS Code's multi-root workspace) so stored projects change once.
+- Id made once and kept (2026-10-22; made from the location 2026-10-18): a project without folder
+  has no location, one with several no single one. A folder is one project's, found by place;
+  stored ids stay, nothing migrated.
+- Locate… onto another project's folder refused (2026-10-22), not a merge: it changes a folder
+  only.
+- Kind by its own query, not from the summary (2026-10-24): at level 1 the summary comes with the
+  snapshot, so reading it first would run `git status` twice.
+- Projects not on screen not watched (2026-10-13): level 0 reads summaries when it shows (~65 ms,
+  0.4 s CPU for ten repositories). A watcher per project is cheap on FSEvents and Windows, but on
+  inotify a watch per folder (`../architecture.md`, Watching).
+- On show only what may have changed (2026-10-14): the project marked while hidden, anything older
+  than 30 s. The review loop (`⌘Tab` every 5-30 s) reading ten projects each time is ~140 s CPU an
+  hour; 30 s caps it at ~50 s, another agent's count at most one turn stale.

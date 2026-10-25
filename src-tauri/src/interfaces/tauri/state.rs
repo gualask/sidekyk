@@ -31,7 +31,7 @@ pub(crate) struct ProjectsState {
 
 /// This machine's repositories, read here. A dev build started with `SIDEKYK_AGENT=local` reads
 /// them through the helper instead, a child process beside the app's binary, as it will read a
-/// WSL distro's (`docs/plans/remote-projects.md`).
+/// WSL distro's (`docs/features/wsl.md`).
 fn repositories() -> Arc<dyn Repositories> {
     #[cfg(debug_assertions)]
     if std::env::var_os("SIDEKYK_AGENT").is_some_and(|agent| agent == "local") {

@@ -1,27 +1,25 @@
 # Architecture
 
-Tauri 2 app: React/Vite frontend in `src/`, Rust backend in `src-tauri/`, a modular monolith as
-in Fyler. Each area in `features/`.
+Tauri 2 app: React/Vite frontend in `src/`, Rust backend in `src-tauri/`, a modular monolith as in
+Fyler. Each area in `features/`.
 
 ## Data flow
 
 ```text
 agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet period)
-                       └─▶ Linux: one watch per folder git does not ignore (Watching below)
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory);
-                           without git, those the walk's rules hide (`ignore`, no git)
+                           without git, those the walk's rules hide
                        └─▶ `.git` come or gone at the root: watched again as the other kind
                        └─▶ "repository-changed" { version: 4, projectId, gitDir, paths,
                                                   kindChanged }
                              └─▶ frontend invalidates ['repository', projectId, …]
-                                 (kindChanged: resets them, the folder's kind read again)
-                                 (recent commits and staged diffs only when gitDir: index,
-                                 HEAD, refs; the open file, diff and colors only when paths
-                                 touch them; paths null over 100 or when unknown)
+                                 (kindChanged: reset; commits and staged diffs only when
+                                 gitDir; the open file, diff and colors only when paths touch
+                                 them; paths null over 100 or when unknown)
                                    ├─▶ get_repository_snapshot   status + numstat ×3, with summary
-                                   ├─▶ get_repository_summary    level 0 only (no snapshot there)
+                                   ├─▶ get_repository_summary    level 0 only
                                    ├─▶ get_file_diff             one file, one area
                                    ├─▶ get_recent_commits        only while unfolded
                                    ├─▶ get_directory             each open folder, from memory
@@ -29,193 +27,99 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                    └─▶ get_syntax_colors         blocks of lines on screen
 ```
 
-- A commit's files and diffs (`get_commit_files`, `get_commit_file_diff`) never change: cached
-  under `['commit', …]`, read once.
-- Commands name a project by its id (`features/projects.md`); the backend serves only projects in
-  the list. The core reads a repository by its root on the machine that holds it; the app turns
-  what it reports back into the project's id.
-- Projects not on screen: not watched; their summary is read when level 0 shows, and when the
-  window shows again on it, only if older than 30 s; their week of commits once per HEAD and day
-  (`features/projects.md`).
-- Window hidden, minimized or covered: no git (`features/background.md`).
+- A commit's files and diffs never change: cached under `['commit', …]`, read once.
+- Commands name a project by its id and serve only projects in the list; the core reads a folder
+  by its root on the machine that holds it (`features/wsl.md`).
 
 ## Frontend
 
-### Directory map
-
-- `app/`: composition root: providers, shell (top bar, zoom levels, tiles), keyboard and zoom
-  gestures, panel list (`panels.ts`).
-- `modules/projects/`: project list, level 0 cards (lazy chunk with Base UI's menu), empty
-  screen.
-- `modules/settings/`: settings queries and dialog (lazy chunk).
-- `modules/search/`: palette (lazy chunk), by name (`⌘K`) or in contents (`⌘F`); ranking and
-  reading are the backend's; the app decides what an item opens (`PaletteActions`).
-- `modules/repository/`: the project's folder on screen as two panels (`panel.ts`): Changes
-  (review and the viewer of any file, a repository only) and Files (the tree, with its own viewer
-  where there is no Changes); the folder's kind (`useFolderKind`).
-  - `model/`: wire types, diff parser, whole-file hunks, copy format, file grouping, tree rows and
-    keys (`file-tree.ts`), the shared selection (`selection.ts`), panel targets (`targets.ts`),
-    matches of the find bar (`find.ts`), syntax blocks (`syntax.ts`).
-  - `application/`: `RepositoryPort`, TanStack Query hooks, commit view, session state
-    (`useSelectedFile` for the shared selection), `useShownTarget`, `useFileFind` (the find bar's
-    text, per project), `RepositorySettings` (what the app passes from the settings).
-  - `ui/`: `ChangesWorkspace`, `FilesWorkspace`, `FileTree` (+ `tree-layout.ts`), the viewer
-    `Pane` (rows, copy, current hunk, `FindBar`) under `ChangeDiffView`, `CommitDiffView`,
-    `TextFileView`, one `FileHeader`, recent commits, summary views (breadcrumb facts, level 0
-    card). Lists, tree and diff are virtualized flat lists of fixed-height rows.
-- `modules/notes/`: the Notes panel (`NotesWorkspace`, lazy chunk with Base UI's menu;
-  `features/notes.md`).
-- `infrastructure/platform/`: Tauri adapters implementing the ports.
-- `shared/`: tokens, primitives (`InlineField`, `trackDrag`), session state (`useSessionState`),
-  `relativeTime`, clipboard, errors, shortcut labels and `shortcutKey`, keys (`isKeyTaken`,
-  `isOwnKey`, `useWindowKeys`), toasts port, zoom transition, `preloadable`, project type and its
-  place (`project-place.ts`, `RemoteTag`), change areas, panel contract, sidebar widths
-  (`ui/sidebar-width.ts`), the UI's text (`i18n/`, `features/languages.md`).
-- `dev/`: browser fixtures (`?dev=app&scenario=…`), dev builds only.
-
-### Dependency rules
-
-`pnpm boundaries:check` enforces: `app` composes and owns no workflow state; `modules` never
-import `app`, `infrastructure`, `dev` or another module; outside a module only its `index.ts`;
-`infrastructure` implements module ports; `shared` imports only `shared`; `@tauri-apps/*` only in
-`infrastructure/`.
-
-### Panels
-
-- `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, optional level 0
-  `summary`, optional `tileMinWidth`. `app/panels.ts` lists them in shortcut order and the level 1
-  tiles, preloading their chunks; one lazy chunk per module, no queries off screen. Tile layout in
-  `features/workspace.md`.
-- `PanelProps`: `project`; `header` (element filled through a portal; in a tile after the panel's
-  icon, full screen shown only when filled); `tileFit` (in a tile the app sizes: the panel
-  registers how wide it needs it, for the splitter's double click); `target` (a request in the
-  panel's terms, a new object each time); `place` (`tile`/`full`); `selected` (takes the keys: in
-  a tile letters only, the arrows move among tiles); `show(panel, target)` (show something in
-  another panel: selects its tile, or replaces the full-screen panel); `findInFiles(text)` (the
-  palette's search in contents).
-- A panel is remounted per project and per zoom; what must survive lives in `useSessionState`.
-
-### State
-
-- No client store: projects, snapshots, summaries, diffs, tree folders, notes and settings are
-  TanStack Query caches, repository keys starting with the project's id. A snapshot writes its
-  summary's cache.
-- Settings changed from the app's bridges (sidebar widths, note lines) go through
-  `useChangeSettings`: each change starts from the settings as they are then, so two in a row
-  both stay.
-- UI state: zoom level and selected tile (`AppShell`); the shared selection, the tree's open
-  folders and row (session, per project); the viewed commit (Changes).
-- Theme: the backend sets the window theme, the page follows `prefers-color-scheme`; no script.
+- `app/`: composition root: providers, shell (top bar, levels, tiles), keys and zoom gestures,
+  panels (`panels.ts`), problems.
+- `modules/`: `projects` (list, level 0 cards, dialogs), `repository` (Changes and Files, the
+  folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`),
+  `notes`, `search` (the palette; ranking and reading are the backend's), `settings`. Each panel
+  module one lazy chunk.
+- `infrastructure/platform/`: Tauri adapters implementing the ports. `shared/`: tokens, primitives,
+  session state (`useSessionState`), keys, errors, i18n, the panel contract, the project type. `dev/`:
+  browser fixtures.
+- Rules (`pnpm boundaries:check`): `app` composes and owns no workflow state; `modules` never import
+  `app`, `infrastructure`, `dev` or another module; outside a module only its `index.ts`;
+  `shared` imports only `shared`; `@tauri-apps/*` only in `infrastructure/`.
+- Panels: `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, needs,
+  optional `summary` and `tileMinWidth`. `PanelProps`: `project`, `header` (a portal), `tileFit`,
+  `target` (a request in the panel's terms), `place` (`tile`/`full`), `selected` (takes the keys),
+  `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and zoom; what must
+  survive lives in `useSessionState`.
+- State: no client store; projects, snapshots, summaries, diffs, tree folders, notes and settings
+  are TanStack Query caches, a project's keys starting with its id. Settings changed from the app
+  go through `useChangeSettings`, each change from the settings as they are then. UI state: level
+  and tile in `AppShell`; selection, open folders and row per project (session). Theme: the backend
+  sets the window's, the page follows `prefers-color-scheme`.
 
 ## Backend
 
-A Cargo workspace rooted at `src-tauri/Cargo.toml`, crates versioned together; commands run there
-cover every crate (`default-members`), except `cargo fmt`, which needs `--all`.
+A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands cover every crate
+(`default-members`) except `cargo fmt`, which needs `--all`.
 
-- `src-tauri/` (the app, `sidekyk`): Tauri, `bootstrap/`, `interfaces/`, and the infrastructure
-  only the app needs (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`).
-- `src-tauri/crates/core/` (`sidekyk-core`): `modules/`, `shared/`, and the infrastructure of the
-  machine holding the repository (`git_cli.rs`, `watcher.rs`, the helper's protocol). No Tauri:
-  the compiler keeps it out. The app runs all of it; the helper runs what reads a repository
-  (`plans/remote-projects.md`). Its items are `pub` for the app, so an item the app stops using no
-  longer warns as dead code.
-- `src-tauri/crates/agent/` (`sidekyk-agent`): the helper's binary, `version` and `serve`; its
-  tests drive it as the app does.
-
-In the app:
-
-- `bootstrap/`: plugins (single instance, dialog, store), state, commands; creates the hidden
-  window in the stored theme, tray, restores projects, opens the CLI argument.
-- `interfaces/tauri/`: commands, tray, window, and `state.rs` (the project list, the order of
-  watch calls, and the `Repositories` the projects are read through; the commands check a project
-  is in the list first, and find what reads it from its folder). Blocking work on
-  `spawn_blocking`.
-
-In the core:
-
-- `modules/repositories/`: the `Repositories` port (`port.rs`), one method per read, and
-  `LocalRepositories`, which reads this machine's: per-repository coalesced snapshot/summary/tree
-  reads, the cached tree, the changed files the palette ranks, the last search in contents,
-  syntax colors (`ColorCache`), and the watched folder (`watch.rs`: a batch through `classify`,
-  the filter of its kind (`Filter`: git's ignored paths or the walk's rules) and the tree check;
-  a change of kind watches it again; only a mark while the window is hidden).
-- `modules/folder/`: a folder without git, free of git: its kind (`folder_kind`), the folder a
-  project takes (`resolve_folder`), its tree (`load_folder_tree`), the changes that show
-  (`FolderChanges`), the names always hidden (`always_hidden`).
-- `infrastructure/agent/`: the helper's protocol (`protocol.rs`), its side (`server.rs`, over
-  `LocalRepositories`) and the app's (`client.rs`, `AgentRepositories`: the same port through a
-  child process). The app reads local projects through `LocalRepositories` (in dev builds with
-  `SIDEKYK_AGENT=local`, through the helper) and WSL projects through their distro's helper
-  (`infrastructure/wsl.rs`, `features/projects.md`).
-- `modules/projects/`, `modules/settings/`, `modules/search/` (ranking, pure), `modules/notes/`
-  (`Book` in memory, `NotesStore` over the `NotesStorage` port), `modules/syntax/` (colors, over
-  `modules/repository`): no Tauri.
-- `modules/repository/`: status and numstat parsers, snapshot, diffs, commits, tree and file
-  content (`tree.rs`), a version's whole text (`version.rs`), path checks, ignored-paths filter,
-  which watched changes matter (`watched.rs`), which folders to watch where the system watches one
-  at a time (`folders.rs`), contracts. No Tauri, no disk of its own: it declares the
-  `RepositoryBackend` port (`git`, `read_file`, `read_entry`, `open_file`, `is_dir`, `has_entry`,
-  `folders`, `walk`, `folder_rules`, `real_path`) and the `RepositoryWatcher` port (changed paths after a quiet period; on inotify a
-  `FolderWatcher` to add folders through), so it can run on another machine
-  (`plans/remote-projects.md`).
-- `infrastructure/`: `git_cli.rs` (bounded git), `folder_walk.rs` (the walk and its rules,
-  `ignore`), `process.rs` (a child within an output size and a
-  time, for git and `wsl.exe`), `watcher.rs` (notify; drops reads, which inotify reports: each git
-  command's reads would refresh again, without end; found by CI 2026-10-18; on Linux one
-  non-recursive watch per folder added), `agent/` (above),
-  `linux_helper.rs` (the helper installed and started on a `LinuxMachine`), `wsl.rs` (distros,
-  `WslRepositories`), `machines.rs` (which machine reads a project, and what every machine is
-  told).
-- `shared/`: `AppError` (`{ code, message }`, stable codes; a new code needs its key in
-  `app-error.ts` and its message in both catalogs), `coalesce.rs` (one run in flight, later callers share the next), `process.rs`
-  (what a child wrote, `GitOutput` to the repository module), `sync.rs`.
+- `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, the hidden window, tray, the
+  CLI argument), `interfaces/tauri/` (commands, tray, window, `state.rs`: the project list and the
+  `Repositories` it is read through; blocking work on `spawn_blocking`), and the app's own
+  infrastructure (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`).
+- `src-tauri/crates/core/` (`sidekyk-core`): no Tauri, which the compiler keeps out; the app runs
+  all of it, the helper what reads a folder. Its items are `pub` for the app, so one the app stops
+  using no longer warns.
+  - `modules/repository/`: parsers, snapshot, diffs, commits, tree, file content, path checks,
+    the ignored-paths filter, which changes matter (`watched.rs`) and which folders to watch
+    (`folders.rs`). No disk of its own: the `RepositoryBackend` port (git, reads, `walk`,
+    `folder_rules`, `real_path`) and the `RepositoryWatcher` port.
+  - `modules/repositories/`: the `Repositories` port, one method per read, and `LocalRepositories`
+    (coalesced reads, the cached tree, the last content search, `ColorCache`, the watched folder,
+    `watch.rs`).
+  - `modules/folder/`: a folder without git: kind, `resolve_folder`, tree, `FolderChanges`,
+    `always_hidden`.
+  - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
+    `NotesStorage`), `syntax`.
+  - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
+    output size and a time), `watcher.rs` (notify), `agent/`, `linux_helper.rs`, `wsl.rs`,
+    `machines.rs` (`features/wsl.md`).
+  - `shared/`: `AppError` (`{ code, message }`; a new code needs its key in `app-error.ts` and both
+    catalogs), `coalesce.rs` (one run in flight, later callers share the next), `threads.rs` (8 at
+    most).
+- `src-tauri/crates/agent/` (`sidekyk-agent`): the helper's binary, `version` and `serve`.
 
 ### Git
 
-- The `git` CLI, no libgit2: every answer is what the user's own git would print. Found on the
-  PATH, else in `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `C:\Program Files\Git\cmd`;
-  on Windows without a console window (`CREATE_NO_WINDOW`).
-- Runs with `GIT_OPTIONAL_LOCKS=0` (never takes `index.lock`), `-c core.fsmonitor=false` (a
-  repository's config cannot make Sidekyk run a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
-- Bounded (`limits.rs`): each call passes `max_stdout`: status 8 MiB, numstat 4 MiB, diff 2 MiB,
-  `check-ignore` its input size, ls-files 32 MiB. Pipes are read on threads; past the limit git is
-  killed and output is `truncated` (cut records dropped, diffs cut at a whole line). stderr keeps
-  64 KiB. 30 s timeout → `git_timed_out`.
+- The `git` CLI, no libgit2: every answer is what the user's git prints. Found on the PATH, else in
+  `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `C:\Program Files\Git\cmd`; on Windows
+  without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
+- `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
+  a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+- Bounded (`limits.rs`): status 8 MiB, numstat 4 MiB, diff 2 MiB, ls-files 32 MiB, `check-ignore`
+  its input; past the limit git is killed and the output `truncated` (cut records dropped, diffs cut
+  at a line). stderr 64 KiB. 30 s → `git_timed_out`.
 
 ### Watching
 
-- macOS and Windows: one recursive watch of the root (and of the git dir when outside it):
-  FSEvents and `ReadDirectoryChangesW` cover a whole tree with one stream or handle.
-- Linux (2026-10-21; the app and the WSL helper): inotify watches one folder at a time
-  (`inotify(7)`: "not recursive"), and a recursive watch in notify walks and watches every folder,
-  `node_modules/` and `target/` included, and gave up the whole project at the first failure
-  (`max_user_watches`). fanotify covers a whole filesystem only with `CAP_SYS_ADMIN`. So, as VS
-  Code (`@parcel/watcher`, `src/linux/InotifyBackend.cc`: skips its ignore list) and Zed (a watch
-  per scanned folder, ignored ones not scanned) do: `folders.rs` watches each folder git does not
-  ignore (`check-ignore` once per level; a folder holding tracked files is not ignored), empty
-  ones included, each before reading it; not inside a repository within (a submodule) nor through
-  a link. Git dir: itself, `refs/`, `info/`.
-- A folder without git (2026-10-24): no git dir; `classify` takes every path under the root,
-  `folder::FolderChanges` drops what the walk's rules hide (`RepositoryBackend::folder_rules`:
-  `ignore`'s `IncrementalIgnore` from the walk's own `WalkBuilder`, so both answer alike, global
-  excludes included), and on Linux `folders.rs` keeps out the folders the same rules hide
-  (`Hiding::Rules`; a repository inside is walked as any folder). An ignore file changed: rules
-  read again, every folder looked at again.
-- Kind: a batch holding `<root>/.git` whose presence no longer matches the watch (a `.git` at the
-  root, `folder::folder_kind`) restarts the watch as the other kind on a thread of its own (the
-  watcher's thread stops with its watch), then tells `kind_changed`; told even while hidden (rare,
-  no git).
-- A folder a batch created is watched before the change is told, so the read it brings sees what
-  it holds; one created while hidden when the window shows (no git runs before). A `.gitignore`
-  changed: every folder is looked at again. At the system's limit the folders watched stay, one
-  `warn` is logged, and no more are asked.
-- The limit: `max_user_watches`, per user, 8,192 before Linux 5.11; since then 1% of RAM over a
-  watch's cost, within 8,192-1,048,576 (`fs/notify/inotify/inotify_user.c`).
+- macOS and Windows: one recursive watch of the root (and of the git dir when outside it).
+- Linux (2026-10-21; the app and the helper): inotify watches one folder at a time, and notify's
+  recursive watch took every folder, `node_modules/` included, and gave up the project at the first
+  failure (`max_user_watches`); fanotify needs `CAP_SYS_ADMIN`. So, as VS Code
+  (`@parcel/watcher`) and Zed, `folders.rs` watches each folder git does not ignore
+  (`check-ignore` once per level), each before reading it, not inside a submodule nor through a
+  link; in the git dir itself, `refs/`, `info/`. A folder a batch created is watched before the
+  change is told; one created while hidden when the window shows. A `.gitignore` changed: every
+  folder looked at again. At the system's limit the watches stay, one `warn`, no more asked
+  (8,192 before Linux 5.11, then 1% of RAM within 8,192-1,048,576).
+- A folder without git (2026-10-24): no git dir; `FolderChanges` drops what the walk's rules hide
+  (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
+  global excludes included); on Linux `folders.rs` keeps those folders out too. An ignore file
+  changed: rules read again.
+- Kind: a batch with `<root>/.git` that no longer matches the watch restarts it as the other kind
+  on its own thread and tells `kind_changed`, also while hidden (rare, no git).
 
 ### Logs
 
-`tracing` to the app's log dir (one file per session, previous kept, size cap). Development: every
-git call, watcher batch and command duration, also on stderr. The level set applies to the app, its
-core and the helper's lines (target `helper`, at the level the helper wrote them). Release compiles
-out below `info` (+144 KiB on the binary): startup, project opened, failures, panics, frontend
-errors (max 50 per session). Hot-path events are `debug`.
+`tracing` to the app's log dir (one file per session, the previous kept, a size cap). Dev builds:
+every git call, batch and command duration, also on stderr. The level applies to the app, the core
+and the helper's lines (target `helper`). Release compiles out below `info` (+144 KiB): startup,
+project opened, failures, panics, frontend errors (50 per session). Hot-path events are `debug`.

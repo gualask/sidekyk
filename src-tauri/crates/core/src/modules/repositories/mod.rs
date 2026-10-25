@@ -1,7 +1,7 @@
 //! The repositories this process reads, as the app shows them: each one's reads shared while in
 //! flight, its files kept until they may have changed, the one on screen watched. The app runs it
 //! for its local projects; the helper runs it inside a WSL distro, answering over a pipe
-//! (`docs/plans/remote-projects.md`). The caller checks that a repository is one the user added
+//! (`docs/features/wsl.md`). The caller checks that a repository is one the user added
 //! before naming it.
 
 mod port;

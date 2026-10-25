@@ -1,5 +1,5 @@
 //! The helper (`sidekyk-agent`) that runs `LocalRepositories` on the machine holding the
-//! repositories, and the app's client to it (`docs/plans/remote-projects.md`).
+//! repositories, and the app's client to it (`docs/features/wsl.md`).
 
 mod client;
 mod protocol;

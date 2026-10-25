@@ -1,6 +1,6 @@
 //! The helper installed and started on a Linux machine the app reaches only by starting processes
 //! there: a WSL distro (`wsl.exe`), or a container (`docker exec`), as the container fixture is
-//! (`docs/plans/remote-projects.md`).
+//! (`docs/features/wsl.md`).
 
 use std::hash::{DefaultHasher, Hasher};
 use std::path::{Path, PathBuf};

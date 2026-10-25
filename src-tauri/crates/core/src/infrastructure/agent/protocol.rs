@@ -1,6 +1,6 @@
 //! Frames between the app and the helper: a u32 little-endian length, then a JSON message.
 //! Requests go down the helper's stdin, each with an id; replies, the files a search in contents
-//! finds and the changes the watcher sees come up its stdout (`docs/plans/remote-projects.md`).
+//! finds and the changes the watcher sees come up its stdout (`docs/features/wsl.md`).
 
 use std::io::{self, Read, Write};
 use std::path::PathBuf;
