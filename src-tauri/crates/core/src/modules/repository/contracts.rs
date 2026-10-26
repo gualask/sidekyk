@@ -91,7 +91,7 @@ pub struct BranchStatus {
     pub behind: u32,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ChangeArea {
     Staged,
@@ -190,6 +190,28 @@ pub struct FileDiffRequest {
 pub struct UnifiedDiff {
     pub text: String,
     /// Larger than `MAX_DIFF_BYTES`: cut at its last whole line.
+    pub truncated: bool,
+}
+
+/// The lines one area of a file adds and removes, as `git diff -w` counts them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaLines {
+    pub path: String,
+    /// Staged or unstaged: untracked files are new, nothing in them is formatting.
+    pub area: ChangeArea,
+    pub additions: u32,
+    pub deletions: u32,
+}
+
+/// The staged and unstaged changes with whitespace and line endings ignored: what is left of
+/// each file once its formatting-only lines are taken out. A file whose changes are all
+/// formatting is not in `files`, as git leaves it out; nor is a binary file.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangesIgnoringWhitespace {
+    pub files: Vec<AreaLines>,
+    /// A read was cut: a file missing from `files` may be missing because of it.
     pub truncated: bool,
 }
 
@@ -441,6 +463,26 @@ mod tests {
             ))
             .unwrap()["kindChanged"],
             true
+        );
+    }
+
+    #[test]
+    fn changes_ignoring_whitespace_serialize_with_the_frontend_field_names() {
+        let changes = ChangesIgnoringWhitespace {
+            files: vec![AreaLines {
+                path: "src/a.ts".into(),
+                area: ChangeArea::Staged,
+                additions: 2,
+                deletions: 1,
+            }],
+            truncated: false,
+        };
+        assert_eq!(
+            serde_json::to_value(changes).unwrap(),
+            serde_json::json!({
+                "files": [{ "path": "src/a.ts", "area": "staged", "additions": 2, "deletions": 1 }],
+                "truncated": false
+            })
         );
     }
 

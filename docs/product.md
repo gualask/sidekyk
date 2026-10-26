@@ -47,6 +47,11 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
   entities tinted in the field and a chip under it. For entities in notes
   (`../.cflow/plans/notes-entities.md`). Also: a Markdown vault in sync (`ROADMAP.md`, Later), an
   MCP endpoint for agents (`ROADMAP.md`, Notes).
+- From CodeNomad (2026-10-26, MIT; a cockpit for OpenCode that runs the agent, stages, commits
+  and edits): sessions, Missions, its editor, browser automation, Remote Control, notification
+  badges, wake lock, whitespace-only files hidden from the list. Taken: linked worktrees picked
+  in the top bar (`../.cflow/plans/changes.md`), formatting-only changes told in the viewer
+  (`features/changes.md`), a changed image's two sides (`../.cflow/plans/previews.md`).
 
 ## Out of scope
 

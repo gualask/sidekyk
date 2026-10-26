@@ -15,10 +15,10 @@ use std::sync::{Arc, Mutex, Weak};
 use crate::modules::folder::{self, FolderKind};
 use crate::modules::preview::{self, MarkdownDocument};
 use crate::modules::repository::{
-    self, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, FileTree, RecentCommits, RepositoryBackend,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, RepositoryWatcher, UnifiedDiff,
-    WatchedFolders,
+    self, ChangedFile, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, FileTree,
+    RecentCommits, RepositoryBackend, RepositoryInfo, RepositorySnapshot, RepositorySummary,
+    RepositoryWatcher, UnifiedDiff, WatchedFolders,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -284,6 +284,13 @@ impl Repositories for LocalRepositories {
         request: &FileDiffRequest,
     ) -> anyhow::Result<UnifiedDiff> {
         repository::load_file_diff(&*self.backend, info, request)
+    }
+
+    fn changes_ignoring_whitespace(
+        &self,
+        info: &RepositoryInfo,
+    ) -> anyhow::Result<ChangesIgnoringWhitespace> {
+        repository::load_changes_ignoring_whitespace(&*self.backend, info)
     }
 
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {

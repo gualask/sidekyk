@@ -316,6 +316,7 @@ export function ChangesWorkspace({
                             key={`${shownKey}:${diffView.view}`}
                             projectId={project.id}
                             file={selected}
+                            snapshot={snapshot}
                             view={diffView.view}
                             openOn={diffView.openOn}
                             header={header}

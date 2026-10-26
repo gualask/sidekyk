@@ -227,6 +227,7 @@ export function FilesWorkspace({
             key={`${change.area}:${change.path}`}
             projectId={projectId}
             file={change}
+            snapshot={snapshot}
             view="file"
             openOn={openOn?.file === change.path ? openOn.hunk : null}
             header={header}

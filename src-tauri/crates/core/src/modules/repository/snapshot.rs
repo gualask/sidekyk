@@ -78,13 +78,14 @@ fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Status
 }
 
 /// The line counts of one numstat, by path.
-struct Numstat {
-    counts: CountsByPath,
+pub(super) struct Numstat {
+    pub(super) counts: CountsByPath,
     /// The output was cut: some paths have no counts.
-    truncated: bool,
+    pub(super) truncated: bool,
 }
 
-fn numstat(
+/// `git diff --numstat` with `extra` options, cut at `MAX_NUMSTAT_BYTES`.
+pub(super) fn numstat(
     backend: &dyn RepositoryBackend,
     root: &Path,
     extra: &[&str],

@@ -1,6 +1,6 @@
-import { Fragment, memo } from 'react';
+import { Fragment, memo, type ReactNode } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import type { DiffHunk, DiffLine } from '../model/diff-parser';
+import type { DiffHunk, DiffLine, LineEnd } from '../model/diff-parser';
 import type { LineBreaks } from '../model/soft-wrap';
 import { type LineSpans, textParts } from '../model/syntax';
 import {
@@ -28,6 +28,41 @@ const GUTTER_TONE: Record<DiffLine['kind'], string> = {
 };
 
 const SIGN: Record<DiffLine['kind'], string> = { context: '', add: '+', del: '−', note: '' };
+
+/** A formatting-only line's end, as editors' status bars name it. */
+const LINE_END: Record<LineEnd, string | null> = { crlf: 'CRLF', lf: 'LF', none: null };
+
+/** Runs of spaces, and each tab on its own: a tab's width depends on its column. */
+const WHITESPACE = / +|\t/g;
+
+/**
+ * Text with its spaces and tabs drawn over them (`.shown-space`, `.shown-tab`): the characters
+ * stay, so a copy gets them and the columns do not move.
+ */
+function shownWhitespace(text: string): ReactNode {
+    const parts: ReactNode[] = [];
+    let at = 0;
+    for (const match of text.matchAll(WHITESPACE)) {
+        const start = match.index;
+        if (start > at) parts.push(text.slice(at, start));
+        const run = match[0];
+        parts.push(
+            run === '\t' ? (
+                <span key={start} className="shown-tab">
+                    {run}
+                </span>
+            ) : (
+                <span key={start} className="shown-space" data-glyphs={'•'.repeat(run.length)}>
+                    {run}
+                </span>
+            ),
+        );
+        at = start + run.length;
+    }
+    if (parts.length === 0) return text;
+    if (at < text.length) parts.push(text.slice(at));
+    return parts;
+}
 
 /** A hunk's `@@` header: a click copies the hunk, as a click on its lines' numbers does. */
 export function HunkHeaderRow({
@@ -64,17 +99,22 @@ export interface LineFound {
     current: number | null;
 }
 
-/** A line's text in its colors, with the text looked for marked over them, on its rows. */
+/**
+ * A line's text in its colors, with the text looked for marked over them, on its rows; with
+ * `whitespace`, its spaces and tabs drawn.
+ */
 function LineText({
     text,
     colors,
     found,
     wrap,
+    whitespace,
 }: {
     text: string;
     colors: LineSpans;
     found: LineFound | undefined;
     wrap: LineBreaks | undefined;
+    whitespace: boolean;
 }) {
     const indent = ' '.repeat(wrap?.indent ?? 0);
     let at = 0;
@@ -82,12 +122,13 @@ function LineText({
         const key = at;
         at += part.text.length;
         const tone = part.tone ? TONE_CLASS[part.tone] : undefined;
+        const content = whitespace ? shownWhitespace(part.text) : part.text;
         const shown =
             part.found === null ? (
                 tone ? (
-                    <span className={tone}>{part.text}</span>
+                    <span className={tone}>{content}</span>
                 ) : (
-                    part.text
+                    content
                 )
             ) : (
                 <mark
@@ -95,7 +136,7 @@ function LineText({
                         part.found === found?.current ? 'bg-ui-find-current' : 'bg-ui-find-match'
                     }`}
                 >
-                    {part.text}
+                    {content}
                 </mark>
             );
         return (
@@ -128,6 +169,7 @@ export const DiffLineRow = memo(function DiffLineRow({
 }) {
     const gutter = `shrink-0 select-none ${GUTTER_TONE[line.kind]}`;
     const rows = (wrap?.breaks.length ?? 0) + 1;
+    const lineEnd = line.formatting ? LINE_END[line.formatting] : null;
     return (
         <div
             className={`relative flex cursor-pointer leading-5 ${ROW_TONE[line.kind]}`}
@@ -154,11 +196,23 @@ export const DiffLineRow = memo(function DiffLineRow({
                 }`}
                 style={{ paddingLeft: TEXT_PADDING_LEFT, paddingRight: TEXT_PADDING_RIGHT }}
             >
-                {colors || found || rows > 1 ? (
-                    <LineText text={line.text} colors={colors ?? []} found={found} wrap={wrap} />
+                {colors || found || rows > 1 || line.formatting ? (
+                    <LineText
+                        text={line.text}
+                        colors={colors ?? []}
+                        found={found}
+                        wrap={wrap}
+                        whitespace={line.formatting !== undefined}
+                    />
                 ) : (
                     line.text
                 )}
+                {lineEnd ? (
+                    <span
+                        className="shown-line-end ml-1.5 inline-block rounded-[3px] bg-ui-surface-hover px-1 align-[1px] font-sans text-[9.5px] leading-[14px] font-medium text-ui-text-muted"
+                        data-end={lineEnd}
+                    />
+                ) : null}
             </span>
         </div>
     );

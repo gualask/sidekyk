@@ -24,9 +24,9 @@ use crate::modules::folder::FolderKind;
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
-    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileStamp, RecentCommits, RepositoryChange, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryChange,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -529,6 +529,14 @@ impl Repositories for AgentRepositories {
             },
             &nothing,
         )
+    }
+
+    fn changes_ignoring_whitespace(
+        &self,
+        info: &RepositoryInfo,
+    ) -> anyhow::Result<ChangesIgnoringWhitespace> {
+        let repository = info.clone();
+        self.call(Request::ChangesIgnoringWhitespace { repository }, &nothing)
     }
 
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {

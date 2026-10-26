@@ -85,6 +85,7 @@ export function Pane({
     finder,
     syntax,
     onPastEnd,
+    banner = null,
     children,
 }: {
     /** The panel's header, where the open file goes (see `PanelProps`). */
@@ -110,6 +111,8 @@ export function Pane({
      * previous file); without it, the pane takes no `n`/`p`.
      */
     onPastEnd?: (step: 1 | -1) => void;
+    /** What stays above the rows, across the viewer, while they scroll. */
+    banner?: ReactNode;
     children: ReactNode;
 }) {
     const { copyTemplate, scrollbar, codeLines } = useRepositorySettings();
@@ -217,69 +220,74 @@ export function Pane({
         return index < 0 ? null : index;
     }, [rows, openOnLine]);
     return (
-        <div className="flex h-full">
+        <div className="flex h-full flex-col">
             {header ? createPortal(renderHeader(pane), header) : null}
-            <div className="relative flex min-w-0 flex-1 flex-col">
-                {find ? (
-                    <FindBar
-                        field={field}
-                        query={find.query}
-                        count={matches.length}
-                        current={index}
-                        onQuery={find.onQuery}
-                        onStep={stepMatch}
-                        onClose={find.onClose}
-                        onFindInFiles={() => finder.findInFiles(find.query)}
-                    />
-                ) : null}
-                {/* the list keeps its rows in place itself as the room above it changes: no
-                    browser scroll anchoring (Chromium's) on top of it. Its own scrollbars are the
-                    map beside it and the bar below; wrapped lines never scroll sideways */}
-                <div
-                    ref={setScrollElement}
-                    className={`min-h-0 flex-1 overflow-y-auto [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                        wrapper ? 'overflow-x-hidden' : 'overflow-x-auto'
-                    }`}
-                >
-                    {scrollElement && rows.length > 0 ? (
-                        <DiffList
-                            source={source}
-                            rows={rows}
-                            layout={layout}
-                            hunks={hunks}
-                            widest={widest}
-                            scrollElement={scrollElement}
-                            openOn={openOn}
-                            openOnRow={openOnRow}
-                            linesAbove={linesAbove}
-                            reader={reader}
-                            current={current}
-                            onCurrent={setStepped}
-                            found={find && matches.length > 0 ? { matches, current: index } : null}
-                            topSpace={topSpace}
-                            syntax={syntax}
-                            onTooLarge={setUncolored}
-                            wrapper={wrapper}
+            {banner}
+            <div className="flex min-h-0 flex-1">
+                <div className="relative flex min-w-0 flex-1 flex-col">
+                    {find ? (
+                        <FindBar
+                            field={field}
+                            query={find.query}
+                            count={matches.length}
+                            current={index}
+                            onQuery={find.onQuery}
+                            onStep={stepMatch}
+                            onClose={find.onClose}
+                            onFindInFiles={() => finder.findInFiles(find.query)}
                         />
                     ) : null}
-                    {children}
+                    {/* the list keeps its rows in place itself as the room above it changes: no
+                    browser scroll anchoring (Chromium's) on top of it. Its own scrollbars are the
+                    map beside it and the bar below; wrapped lines never scroll sideways */}
+                    <div
+                        ref={setScrollElement}
+                        className={`min-h-0 flex-1 overflow-y-auto [overflow-anchor:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                            wrapper ? 'overflow-x-hidden' : 'overflow-x-auto'
+                        }`}
+                    >
+                        {scrollElement && rows.length > 0 ? (
+                            <DiffList
+                                source={source}
+                                rows={rows}
+                                layout={layout}
+                                hunks={hunks}
+                                widest={widest}
+                                scrollElement={scrollElement}
+                                openOn={openOn}
+                                openOnRow={openOnRow}
+                                linesAbove={linesAbove}
+                                reader={reader}
+                                current={current}
+                                onCurrent={setStepped}
+                                found={
+                                    find && matches.length > 0 ? { matches, current: index } : null
+                                }
+                                topSpace={topSpace}
+                                syntax={syntax}
+                                onTooLarge={setUncolored}
+                                wrapper={wrapper}
+                            />
+                        ) : null}
+                        {children}
+                    </div>
+                    {scrollElement && bars.wide ? (
+                        <SideScrollbar scrollElement={scrollElement} thumb={bars.horizontal} />
+                    ) : null}
                 </div>
-                {scrollElement && bars.wide ? (
-                    <SideScrollbar scrollElement={scrollElement} thumb={bars.horizontal} />
+                {scrollElement ? (
+                    <ChangeMap
+                        scrollElement={scrollElement}
+                        thumb={bars.vertical}
+                        contentHeight={bars.height}
+                        layout={layout}
+                        rows={rows}
+                        topSpace={topSpace}
+                        width={scrollbar}
+                        onGoTo={(hunk) => reader.current?.goTo(hunk)}
+                    />
                 ) : null}
             </div>
-            {scrollElement ? (
-                <ChangeMap
-                    scrollElement={scrollElement}
-                    thumb={bars.vertical}
-                    contentHeight={bars.height}
-                    layout={layout}
-                    rows={rows}
-                    topSpace={topSpace}
-                    width={scrollbar}
-                    onGoTo={(hunk) => reader.current?.goTo(hunk)}
-                />
-            ) : null}
         </div>
     );
 }

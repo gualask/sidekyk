@@ -262,13 +262,13 @@ mod tests {
     use crate::modules::folder::{folder_kind, load_folder_tree, resolve_folder, FolderKind};
     use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
-        load_commit_activity, load_commit_file_diff, load_commit_files, load_file_content,
-        load_file_diff, load_file_stamp, load_file_tree, load_image, load_recent_commits,
-        load_snapshot, load_summary, load_version_text, repository_name, resolve_repository,
-        ChangeKind, Commit, CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest,
-        FileVersion, FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryInfo,
-        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
-        MAX_IMAGE_BYTES,
+        load_changes_ignoring_whitespace, load_commit_activity, load_commit_file_diff,
+        load_commit_files, load_file_content, load_file_diff, load_file_stamp, load_file_tree,
+        load_image, load_recent_commits, load_snapshot, load_summary, load_version_text,
+        repository_name, resolve_repository, ChangeArea, ChangeKind, Commit, CommitFileDiffRequest,
+        CommitRequest, FileContent, FileDiffRequest, FileVersion, FolderAdded, FolderWatcher,
+        Hiding, IgnoredPaths, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText,
+        Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
@@ -439,6 +439,48 @@ mod tests {
         );
 
         assert!(load_file_diff(&backend, &repo.info, &request("../x", "unstaged")).is_err());
+    }
+
+    #[test]
+    fn changes_ignoring_whitespace_leave_out_formatting_in_both_areas() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        git(root, &["init", "-q", "-b", "main"]);
+        git(root, &["config", "user.email", "test@example.com"]);
+        git(root, &["config", "user.name", "Test"]);
+        git(root, &["config", "commit.gpgsign", "false"]);
+        git(root, &["config", "core.autocrlf", "false"]);
+        write(root, "crlf.ts", "a\nb\n");
+        write(root, "indent.ts", "a\n  b\nc\n");
+        write(root, "real.ts", "a\n");
+        write(root, "logo.png", "PNG\0data");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "First"]);
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, root).unwrap();
+
+        // line endings alone, staged; indentation and a real line, unstaged
+        write(root, "crlf.ts", "a\r\nb\r\n");
+        git(root, &["add", "crlf.ts"]);
+        write(root, "indent.ts", "a\n\tb\nC\n");
+        write(root, "real.ts", "b\n");
+        write(root, "logo.png", "PNG\0more");
+
+        let changes = load_changes_ignoring_whitespace(&backend, &repo.info).unwrap();
+        let lines: Vec<(&str, ChangeArea, u32, u32)> = changes
+            .files
+            .iter()
+            .map(|f| (f.path.as_str(), f.area, f.additions, f.deletions))
+            .collect();
+        // crlf.ts is all formatting and logo.png binary: neither is there
+        assert_eq!(
+            lines,
+            [
+                ("indent.ts", ChangeArea::Unstaged, 1, 1),
+                ("real.ts", ChangeArea::Unstaged, 1, 1),
+            ]
+        );
+        assert!(!changes.truncated);
     }
 
     #[test]

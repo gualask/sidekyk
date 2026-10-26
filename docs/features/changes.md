@@ -31,6 +31,12 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   `Esc`); `⌘F` in the bar or its icon opens the palette's search in contents with its text. Top
   right as VS Code's find widget; the match read is never under it.
 - Syntax colors on both sides: `syntax-colors.md`.
+- Formatting (2026-10-26): when changed lines differ only in whitespace or line endings, a strip
+  pinned above the diff says so: "Only formatting changed" or "6 of 8 changed lines differ only in
+  formatting" (a commit's file too). On those lines spaces (`•`), tabs (`→`, Zed's glyphs) and the
+  line end (`CRLF`, `LF`) are drawn. "Check all changes", working tree only, counts them over every
+  staged and unstaged file ("24 of 110 lines are formatting only, in 2 of 8 files"); the answer
+  holds until the next snapshot. Nothing is hidden: the diff stays what git commits.
 
 ## How it is built
 
@@ -61,6 +67,17 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   one row (WKWebView); the `large` fixture (6.7 MiB) ~28 ms per resize in Chromium.
 - `n`/`p`: `HunkReader` steps from the hunk gone to while on screen, else from the line read; past
   either end Changes opens the next or previous file (`openAt`).
+- Formatting: the parser pairs, in each block of removed then added lines of equal counts, the
+  n-th with the n-th, and compares them skipping git's whitespace (`sameButWhitespace`, no
+  copies); counts are lines added plus removed, as numstat's. 2 MiB diff (the viewer's limit),
+  every line changed: parse 3.1 → 8.3 ms in JavaScriptCore (2026-10-26); a usual diff,
+  microseconds. Glyphs and labels are generated text (`::before`) over the characters: a copy and
+  the columns are unchanged. "Check all changes": `git diff --numstat -z --ignore-all-space`,
+  unstaged and `--cached` together (`get_changes_ignoring_whitespace`), against the snapshot's
+  counts per file and area; git leaves out a file that is all formatting, so a missing one counts
+  whole; a cut read answers "too many". Its query is outside the repository's keys: a change on
+  disk never runs it again. The answer goes with the snapshot read it was asked on, by its time:
+  a read with the same counts keeps the same files, not the same lines.
 - Find bar (`FindBar`, 300 px): works on the target's file until closed; while open the list
   leaves `FIND_BAR_SPACE` above its rows (virtualizer `scrollMargin`, scroll anchoring off) and a
   match under the bar counts as off screen. A commit's file has its own bar.
@@ -73,3 +90,11 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 - Long lines a setting only, no shortcut (2026-10-19): VS Code's `⌥Z` and Zed's `⌘K Z` are per
   editor. Breaks in JS rather than CSS `pre-wrap`: a height known before rendering keeps the list
   virtualized and the map exact.
+- Formatting (2026-10-26): one kind, spaces and line ends together. Told, never hidden: Zed and
+  VS Code normalize line endings before diffing (Zed `crates/project/src/git_store.rs:5669-5683`)
+  and VS Code's `diffEditor.ignoreTrimWhitespace` is on by default
+  (`src/vs/editor/common/config/diffEditor.ts:16`), right for an editor, wrong for a review before
+  a commit. No mark in the list: a `-w` numstat per snapshot is +30% CPU, +47% with 300 files
+  reformatted (`.local/format-cost/`). Paired in TS, not Rust as planned: the diff is parsed there
+  already, the cost is of the order of Rust's 4.6 ms, and there is no second parser. Whitespace
+  drawn whole and a label on every such line: no character diff to pay for.

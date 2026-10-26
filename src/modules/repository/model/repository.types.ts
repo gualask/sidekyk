@@ -88,6 +88,26 @@ export interface UnifiedDiff {
     truncated: boolean;
 }
 
+/** The lines one area of a file adds and removes, as `git diff -w` counts them. */
+interface AreaLines {
+    path: string;
+    /** Staged or unstaged: untracked files are new, nothing in them is formatting. */
+    area: Exclude<ChangeArea, 'untracked'>;
+    additions: number;
+    deletions: number;
+}
+
+/**
+ * The staged and unstaged changes with whitespace and line endings ignored: what is left of each
+ * file once its formatting-only lines are taken out. A file whose changes are all formatting is
+ * not in `files`, as git leaves it out; nor is a binary file.
+ */
+export interface ChangesIgnoringWhitespace {
+    files: AreaLines[];
+    /** A read was cut: a file missing from `files` may be missing because of it. */
+    truncated: boolean;
+}
+
 /** One commit of the branch on screen, as the recent commits list it. */
 export interface Commit {
     /** The full hash. */

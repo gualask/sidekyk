@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseUnifiedDiff } from './diff-parser';
+import { parseUnifiedDiff, sameButWhitespace } from './diff-parser';
 
 describe('parseUnifiedDiff', () => {
     it('numbers context, added and deleted lines on each side', () => {
@@ -72,11 +72,16 @@ describe('parseUnifiedDiff', () => {
     it('flags binary files', () => {
         const diff =
             'diff --git a/logo.png b/logo.png\nBinary files a/logo.png and b/logo.png differ\n';
-        expect(parseUnifiedDiff(diff)).toEqual({ binary: true, hunks: [] });
+        expect(parseUnifiedDiff(diff)).toMatchObject({ binary: true, hunks: [], changedLines: 0 });
     });
 
     it('keeps an empty diff empty', () => {
-        expect(parseUnifiedDiff('')).toEqual({ binary: false, hunks: [] });
+        expect(parseUnifiedDiff('')).toEqual({
+            binary: false,
+            hunks: [],
+            changedLines: 0,
+            formattingLines: 0,
+        });
     });
 
     it('reads a combined conflict diff with one prefix column per parent', () => {
@@ -97,5 +102,57 @@ describe('parseUnifiedDiff', () => {
             ['add', 'ours', null, 3],
             ['add', 'theirs', null, 4],
         ]);
+    });
+
+    it('marks removed and added lines that differ only in whitespace or line ending', () => {
+        const diff = [
+            '@@ -1,6 +1,6 @@',
+            ' fn total() {',
+            '-    let a = 1;',
+            '-    let b = 2;',
+            '-    a + b',
+            '+\tlet a = 1;\r',
+            '+\tlet  b=2;',
+            '+\ta - b',
+            ' }',
+            '-tail',
+            '+tail',
+            '\\ No newline at end of file',
+        ].join('\n');
+
+        const parsed = parseUnifiedDiff(diff);
+
+        expect(parsed.changedLines).toBe(8);
+        expect(parsed.formattingLines).toBe(6);
+        expect(parsed.hunks[0]?.lines.map((l) => [l.kind, l.formatting])).toEqual([
+            ['context', undefined],
+            ['del', 'lf'],
+            ['del', 'lf'],
+            ['del', undefined],
+            ['add', 'crlf'],
+            ['add', 'lf'],
+            ['add', undefined],
+            ['context', undefined],
+            ['del', 'lf'],
+            ['add', 'none'],
+            ['note', undefined],
+        ]);
+    });
+
+    it('leaves blocks of unequal counts and combined diffs unpaired', () => {
+        const moved = ['@@ -1,2 +1,1 @@', '-a', '-b', '+  a'].join('\n');
+        expect(parseUnifiedDiff(moved).formattingLines).toBe(0);
+        const combined = ['@@@ -1,1 -1,1 +1,1 @@@', '- a', '+ a '].join('\n');
+        expect(parseUnifiedDiff(combined).formattingLines).toBe(0);
+    });
+});
+
+describe('sameButWhitespace', () => {
+    it('compares lines with all their whitespace left out, as git diff -w', () => {
+        expect(sameButWhitespace('a b', 'ab')).toBe(true);
+        expect(sameButWhitespace('\tx = 1;\r', '    x=1;')).toBe(true);
+        expect(sameButWhitespace('  ', '')).toBe(true);
+        expect(sameButWhitespace('ab', 'abc')).toBe(false);
+        expect(sameButWhitespace('a b', 'a c')).toBe(false);
     });
 });

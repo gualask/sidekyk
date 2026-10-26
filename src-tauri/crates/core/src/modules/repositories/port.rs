@@ -6,9 +6,9 @@ use std::path::Path;
 use crate::modules::folder::FolderKind;
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::repository::{
-    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileStamp, RecentCommits, RepositoryChange, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryChange,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -39,6 +39,12 @@ pub trait Repositories: Send + Sync {
         info: &RepositoryInfo,
         request: &FileDiffRequest,
     ) -> anyhow::Result<UnifiedDiff>;
+
+    /// The staged and unstaged changes with whitespace ignored, read only when asked.
+    fn changes_ignoring_whitespace(
+        &self,
+        info: &RepositoryInfo,
+    ) -> anyhow::Result<ChangesIgnoringWhitespace>;
 
     fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits>;
 

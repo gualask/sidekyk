@@ -1,4 +1,9 @@
-import type { ChangedFile, RepositorySnapshot, UnifiedDiff } from '@/modules/repository';
+import type {
+    ChangedFile,
+    ChangesIgnoringWhitespace,
+    RepositorySnapshot,
+    UnifiedDiff,
+} from '@/modules/repository';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { fixtureSummary } from './fixture-summary';
 import { CHECKOUT_TS, type LongFile, ORDERS_TS } from './long.fixture-data';
@@ -102,6 +107,50 @@ index 0000000..3f2a9c1
 +INSERT INTO coupons (code, percent) VALUES ('VIP25', 25);
 `;
 
+/** Saved with Windows line endings, nothing else changed: all of it formatting. */
+const CART_TS = `diff --git a/src/cart/cart.ts b/src/cart/cart.ts
+index 2b4c6d8..7e9f1a3 100644
+--- a/src/cart/cart.ts
++++ b/src/cart/cart.ts
+@@ -1,9 +1,9 @@
+-export interface Item {
+-    price: number;
+-    quantity: number;
+-}
+-
+-export interface Cart {
+-    items: Item[];
+-    coupon: { amount: number; expiresAt: number } | null;
+-}
++export interface Item {\r
++    price: number;\r
++    quantity: number;\r
++}\r
++\r
++export interface Cart {\r
++    items: Item[];\r
++    coupon: { amount: number; expiresAt: number } | null;\r
++}\r
+`;
+
+/** Indented with tabs instead of spaces, and one real change among the lines. */
+const SHIPPING_TS = `diff --git a/src/cart/shipping.ts b/src/cart/shipping.ts
+index 4e1f2a3..b8c9d0e 100644
+--- a/src/cart/shipping.ts
++++ b/src/cart/shipping.ts
+@@ -1,6 +1,6 @@
+ export function shippingCost(weight: number, country: string): number {
+-    if (country === 'IT') {
+-        return weight > 2 ? 9.9 : 4.9;
+-    }
+-    return weight > 2 ? 19.9 : 12.9;
++\tif (country === 'IT') {
++\t\treturn weight > 2 ? 9.9 : 4.9;
++\t}
++\treturn weight > 2 ? 24.9 : 12.9;
+ }
+`;
+
 /** A file of the fixture, its diff, and the whole file when the fixture has it. */
 type FixtureFile = ChangedFile & { diff: string; whole?: string };
 
@@ -132,6 +181,26 @@ const FILES: FixtureFile[] = [
         diff: TOTAL_TS,
     },
     longChange('src/cart/checkout.ts', 'unstaged', CHECKOUT_TS),
+    {
+        path: 'src/cart/shipping.ts',
+        origPath: null,
+        area: 'unstaged',
+        kind: 'modified',
+        additions: 4,
+        deletions: 4,
+        binary: false,
+        diff: SHIPPING_TS,
+    },
+    {
+        path: 'src/cart/cart.ts',
+        origPath: null,
+        area: 'unstaged',
+        kind: 'modified',
+        additions: 9,
+        deletions: 9,
+        binary: false,
+        diff: CART_TS,
+    },
     {
         path: 'README.md',
         origPath: null,
@@ -205,6 +274,25 @@ export function reviewSnapshot(clean: boolean): RepositorySnapshot {
         behind: 0,
     };
     return { files, summary: fixtureSummary(branch, files) };
+}
+
+/** What `git diff -w` leaves of the fixture's formatting changes; any other file as it is. */
+const IGNORING_WHITESPACE: Record<string, readonly [number, number] | null> = {
+    'src/cart/shipping.ts': [1, 1],
+    'src/cart/cart.ts': null,
+};
+
+/** The staged and unstaged changes of `files` with whitespace ignored, as the backend answers. */
+export function fixtureIgnoringWhitespace(
+    files: readonly ChangedFile[],
+): ChangesIgnoringWhitespace {
+    const lines = files.flatMap(({ path, area, additions, deletions }) => {
+        if (area === 'untracked' || additions === null || deletions === null) return [];
+        const left =
+            path in IGNORING_WHITESPACE ? IGNORING_WHITESPACE[path] : [additions, deletions];
+        return left ? [{ path, area, additions: left[0], deletions: left[1] }] : [];
+    });
+    return { files: lines, truncated: false };
 }
 
 /** A file's diff, or its whole file with its changes (`wholeFile`), as the backend answers. */

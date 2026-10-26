@@ -10,6 +10,12 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
 - [ ] Copy or reveal the log for bug reports
 
+## Changes
+
+`.cflow/plans/changes.md`.
+
+- [ ] Linked worktrees: the branch in the top bar picks the one shown, read-only
+
 ## Notes
 
 - [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)
@@ -34,6 +40,7 @@ has.
 
 Built: `docs/features/previews.md` (Markdown, SVG, images).
 
+- [ ] A changed image's two sides next to each other, as VS Code
 - [ ] PDF in the file viewer
 - [ ] Mermaid diagrams in the Markdown preview (nice to have)
 
@@ -104,5 +111,10 @@ becomes a problem (decided 2026-10-21).
 
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
 - [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
-      interval? skip `check-ignore` for tracked paths?
+      interval? skip `check-ignore` for tracked paths? CodeNomad (2026-10-26): the first after
+      100 ms, then at most one per 5 s while changes go on, no timer when idle
+      (`ui/src/lib/filesystem-events.ts`); 5 s is too stale to watch an agent, the shape fits
+      (first at once, last always, N measured)
+- [ ] Snapshot: with nothing staged, numstat `HEAD` repeats numstat unstaged, ~30% of its git CPU
+      (`.local/format-cost/`, 2026-10-26)
 - [ ] Prefetch neighbouring diffs, if switching shows a wait

@@ -15,6 +15,7 @@ import { changeTouches } from '../model/changed-paths';
 import { commitRequest } from '../model/commits';
 import type { DiffLine } from '../model/diff-parser';
 import { foldersToRead } from '../model/file-tree';
+import { type FormattingTotals, formattingTotals } from '../model/formatting';
 import { MAX_IMAGE_BYTES } from '../model/preview';
 import type {
     Commit,
@@ -63,6 +64,8 @@ export const repositoryKeys = {
      */
     activity: (projectId: string, head: string, since: number) =>
         ['activity', projectId, head, since] as const,
+    /** Outside `of` too: read only when asked, never again by itself (`useFormattingCheck`). */
+    formatting: (projectId: string) => ['formatting', projectId] as const,
     directory: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'directory', path] as const,
     file: (projectId: string, path: string) =>
@@ -249,6 +252,49 @@ export function useFileDiff(projectId: string, request: FileDiffRequest | null) 
         queryFn: () => (request ? port.getFileDiff(projectId, request) : null),
         enabled: request !== null,
     });
+}
+
+/** How much of a project's changes is formatting only, over every file, once asked. */
+export interface FormattingCheck {
+    /** The answer for the snapshot on screen: null when cut, undefined until asked. */
+    totals: FormattingTotals | null | undefined;
+    checking: boolean;
+    error: Error | null;
+    check: () => void;
+}
+
+/** The snapshot on screen, and when it was read (`useRepositorySnapshot`). */
+export type SnapshotRead = Pick<UseQueryResult<RepositorySnapshot>, 'data' | 'dataUpdatedAt'>;
+
+/**
+ * How much of a project's changes is formatting only: a diff of every changed file, run only by
+ * `check`. The answer, or its failure, holds for the snapshot read it was asked on, by its time:
+ * a read after a change on disk keeps the same files when their counts are the same, though
+ * their lines may not be. The next read hides it in every panel; nothing reads it again unasked.
+ */
+export function useFormattingCheck(projectId: string, snapshot: SnapshotRead): FormattingCheck {
+    const port = useRepositoryPort();
+    const files = snapshot.data?.files;
+    const readAt = snapshot.dataUpdatedAt;
+    const query = useQuery({
+        queryKey: repositoryKeys.formatting(projectId),
+        queryFn: async () => ({
+            files,
+            readAt,
+            ignoring: await port.getChangesIgnoringWhitespace(projectId),
+        }),
+        enabled: false,
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+    const answer = files && query.data?.readAt === readAt ? query.data : null;
+    const totals = useMemo(
+        () => (answer?.files ? formattingTotals(answer.files, answer.ignoring) : undefined),
+        [answer],
+    );
+    const { refetch } = query;
+    const check = useCallback(() => void refetch(), [refetch]);
+    const failed = !answer && query.errorUpdatedAt > readAt;
+    return { totals, checking: query.isFetching, error: failed ? query.error : null, check };
 }
 
 /** The data of each directory query, kept the same while none changed. */

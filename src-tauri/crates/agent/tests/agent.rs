@@ -111,6 +111,10 @@ fn the_helper_answers_as_the_app_reads_directly() {
         json(&local.summary(&info).unwrap())
     );
     assert_eq!(
+        json(&agent.changes_ignoring_whitespace(&info).unwrap()),
+        json(&local.changes_ignoring_whitespace(&info).unwrap())
+    );
+    assert_eq!(
         json(&agent.recent_commits(&info).unwrap()),
         json(&local.recent_commits(&info).unwrap())
     );

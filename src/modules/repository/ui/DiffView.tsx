@@ -5,13 +5,20 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
 import { useTranslation } from '@/shared/i18n';
 import type { FileFinder } from '../application/find';
-import { useCommitFileDiff, useFileDiff } from '../application/repository.queries';
+import {
+    type FormattingCheck,
+    type SnapshotRead,
+    useCommitFileDiff,
+    useFileDiff,
+    useFormattingCheck,
+} from '../application/repository.queries';
 import { commitRequest, shortSha } from '../model/commits';
 import { parseUnifiedDiff } from '../model/diff-parser';
 import { diffRows, wholeFileRows, widestLine } from '../model/diff-rows';
 import type { ChangedFile, Commit, FileChange, UnifiedDiff } from '../model/repository.types';
 import { changeSides, commitSides, type FileSyntax } from '../model/syntax';
 import { wholeFile } from '../model/whole-file';
+import { FormattingNotice } from './FormattingNotice';
 import { Notice, Pane, type PaneHeader } from './Pane';
 
 /** Lines left above the change the whole file opens on, so it shows where it sits. */
@@ -37,6 +44,7 @@ function DiffPane({
     file,
     commit,
     syntax,
+    formattingCheck,
     view,
     openOn,
     header,
@@ -49,6 +57,8 @@ function DiffPane({
     /** The commit shown (its short hash); null for the working tree. */
     commit: string | null;
     syntax: FileSyntax;
+    /** Counts formatting over every change: the working tree's diffs only. */
+    formattingCheck?: FormattingCheck;
 }) {
     const i18n = useTranslation();
     const parsed = useMemo(
@@ -86,6 +96,15 @@ function DiffPane({
             syntax={syntax}
             // until the diff is read there are no changes to go through: the keys wait
             onPastEnd={diff.isPending ? undefined : onPastEnd}
+            banner={
+                parsed && parsed.formattingLines > 0 ? (
+                    <FormattingNotice
+                        lines={parsed.formattingLines}
+                        changed={parsed.changedLines}
+                        check={formattingCheck}
+                    />
+                ) : null
+            }
         >
             {diff.isPending ? <Notice>{i18n.t('view.loadingDiff')}</Notice> : null}
             {diff.isError ? (
@@ -113,8 +132,15 @@ function DiffPane({
 export function ChangeDiffView({
     projectId,
     file,
+    snapshot,
     ...shown
-}: DiffShown & { projectId: string; file: ChangedFile }) {
+}: DiffShown & {
+    projectId: string;
+    file: ChangedFile;
+    /** The snapshot the file is from, which formatting is counted over when asked. */
+    snapshot: SnapshotRead;
+}) {
+    const formattingCheck = useFormattingCheck(projectId, snapshot);
     const diff = useFileDiff(projectId, {
         path: file.path,
         origPath: file.origPath,
@@ -126,7 +152,16 @@ export function ChangeDiffView({
         () => ({ projectId, sides: changeSides({ path, origPath, area }) }),
         [projectId, path, origPath, area],
     );
-    return <DiffPane diff={diff} file={file} commit={null} syntax={syntax} {...shown} />;
+    return (
+        <DiffPane
+            diff={diff}
+            file={file}
+            commit={null}
+            syntax={syntax}
+            formattingCheck={formattingCheck}
+            {...shown}
+        />
+    );
 }
 
 /** A file of a commit, against the commit's parent. */

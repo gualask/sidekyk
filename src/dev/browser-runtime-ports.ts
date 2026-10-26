@@ -12,7 +12,12 @@ import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
 import { localProject, wslProject } from './projects.fixture';
-import { FIXTURE_REPOSITORY, reviewDiff, reviewSnapshot } from './review.fixture-data';
+import {
+    FIXTURE_REPOSITORY,
+    fixtureIgnoringWhitespace,
+    reviewDiff,
+    reviewSnapshot,
+} from './review.fixture-data';
 import { type FixtureTexts, fixtureColors, fixtureVersionText } from './syntax.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
 
@@ -494,6 +499,10 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 readable(projectId);
                 if (!large(projectId)) return reviewDiff(request);
                 return request.wholeFile ? wholeFileDiff(largeDiff()) : largeDiff();
+            },
+            getChangesIgnoringWhitespace: async (projectId) => {
+                readable(projectId);
+                return fixtureIgnoringWhitespace(snapshot(projectId).files);
             },
             // every project has the same history, even with a clean working tree
             getRecentCommits: async (projectId) => {

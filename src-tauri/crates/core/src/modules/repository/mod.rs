@@ -16,17 +16,18 @@ mod status;
 mod tree;
 mod version;
 mod watched;
+mod whitespace;
 
 pub use activity::load_commit_activity;
 pub use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
+pub use contracts::{
+    AreaLines, ChangeKind, ChangedFile, ChangesIgnoringWhitespace, CommitActivity,
+    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
+    FileStamp, FileVersion, RecentCommits, RepositoryChange, RepositoryChangedEvent,
+    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
+};
 #[cfg(test)]
 pub use contracts::{ChangeArea, Commit};
-pub use contracts::{
-    ChangeKind, ChangedFile, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, FileVersion, RecentCommits,
-    RepositoryChange, RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
-};
 pub use diff::load_file_diff;
 pub use folders::{Hiding, WatchedFolders};
 pub use ignored::{IgnoredPaths, Visible};
@@ -40,3 +41,4 @@ pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_stamp, load_file_tree, load_image, FileTree};
 pub use version::{load_version_text, VersionText};
 pub use watched::classify;
+pub use whitespace::load_changes_ignoring_whitespace;

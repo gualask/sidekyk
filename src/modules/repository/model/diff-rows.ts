@@ -25,12 +25,18 @@ export function wholeFileRows({ lines, hunkOf }: WholeFile): DiffRow[] {
     return lines.map((line, index) => ({ kind: 'line', line, hunkIndex: hunkOf[index] ?? -1 }));
 }
 
+/** The columns the label after a formatting-only line's text takes (`DiffLineRow`). */
+const LINE_END_COLUMNS = 6;
+
 /** The widest of these lines, or `widest` if none is wider, in monospace columns. */
 function widestOf(lines: readonly DiffLine[], widest = 0): number {
     let found = widest;
     for (const line of lines) {
+        const label = line.formatting ? LINE_END_COLUMNS : 0;
         // most lines are short: skip the tab-aware count when it cannot win
-        if (line.text.length * TAB_SIZE > found) found = Math.max(found, lineWidth(line.text));
+        if (line.text.length * TAB_SIZE + label > found) {
+            found = Math.max(found, lineWidth(line.text) + label);
+        }
     }
     return found;
 }

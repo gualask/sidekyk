@@ -47,6 +47,9 @@ pub enum Request {
         repository: RepositoryInfo,
         request: FileDiffRequest,
     },
+    ChangesIgnoringWhitespace {
+        repository: RepositoryInfo,
+    },
     RecentCommits {
         repository: RepositoryInfo,
     },

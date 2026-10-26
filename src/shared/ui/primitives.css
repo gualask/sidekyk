@@ -83,6 +83,28 @@
         content: "\A" attr(data-indent);
     }
 
+    /* A formatting-only line's spaces, tabs and line end, drawn as generated text over the
+       characters, which stay for a copy and keep the columns (`DiffRows.tsx`). */
+    .shown-space,
+    .shown-tab {
+        position: relative;
+    }
+    .shown-space::before,
+    .shown-tab::before {
+        position: absolute;
+        left: 0;
+        color: var(--ui-diff-invisible);
+    }
+    .shown-space::before {
+        content: attr(data-glyphs);
+    }
+    .shown-tab::before {
+        content: "→";
+    }
+    .shown-line-end::before {
+        content: attr(data-end);
+    }
+
     /* A copy's confirmation: what was copied lights up, then fades. Kept, without the fade, while
        motion is reduced. */
     .copy-flash,

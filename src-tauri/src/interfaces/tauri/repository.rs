@@ -10,9 +10,9 @@ use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
-    CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-    FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, UnifiedDiff,
+    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo,
+    RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
@@ -111,6 +111,19 @@ pub(crate) async fn get_file_diff(
 ) -> Result<UnifiedDiff, AppError> {
     on_project("get_file_diff", app, project_id, move |on| {
         on.repositories.file_diff(on.info, &request)
+    })
+    .await
+}
+
+#[tauri::command]
+/// A project's staged and unstaged changes with whitespace ignored, when the user asks how much
+/// of them is formatting.
+pub(crate) async fn get_changes_ignoring_whitespace(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<ChangesIgnoringWhitespace, AppError> {
+    on_project("get_changes_ignoring_whitespace", app, project_id, |on| {
+        on.repositories.changes_ignoring_whitespace(on.info)
     })
     .await
 }

@@ -138,9 +138,9 @@ mod tests {
     use crate::modules::folder::FolderKind;
     use crate::modules::preview::MarkdownDocument;
     use crate::modules::repository::{
-        CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent,
-        FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo, RepositorySnapshot,
-        RepositorySummary, UnifiedDiff,
+        ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles,
+        CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits,
+        RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
     };
     use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
     use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -171,6 +171,12 @@ mod tests {
             _: &RepositoryInfo,
             _: &FileDiffRequest,
         ) -> anyhow::Result<UnifiedDiff> {
+            unreachable!()
+        }
+        fn changes_ignoring_whitespace(
+            &self,
+            _: &RepositoryInfo,
+        ) -> anyhow::Result<ChangesIgnoringWhitespace> {
             unreachable!()
         }
         fn recent_commits(&self, _: &RepositoryInfo) -> anyhow::Result<RecentCommits> {

@@ -1,5 +1,6 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
+    ChangesIgnoringWhitespace,
     CommitActivity,
     CommitFileDiffRequest,
     CommitFiles,
@@ -33,6 +34,8 @@ export interface RepositoryPort {
     /** Branch, changed paths and line totals, cheap enough for every project on screen. */
     getSummary(projectId: string): Promise<RepositorySummary>;
     getFileDiff(projectId: string, request: FileDiffRequest): Promise<UnifiedDiff>;
+    /** The staged and unstaged changes with whitespace ignored: a diff of each, only when asked. */
+    getChangesIgnoringWhitespace(projectId: string): Promise<ChangesIgnoringWhitespace>;
     /** The last commits of the branch on screen; none before the first commit. */
     getRecentCommits(projectId: string): Promise<RecentCommits>;
     /** The lines each commit of the branch on screen changed since `since` (Unix seconds). */

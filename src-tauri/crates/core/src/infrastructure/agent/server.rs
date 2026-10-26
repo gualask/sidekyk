@@ -85,6 +85,11 @@ pub fn serve(
             } => on_thread(Box::new(move |r| {
                 value(r.file_diff(&repository, &request)?)
             })),
+            Request::ChangesIgnoringWhitespace { repository } => {
+                on_thread(Box::new(move |r| {
+                    value(r.changes_ignoring_whitespace(&repository)?)
+                }));
+            }
             Request::RecentCommits { repository } => {
                 on_thread(Box::new(move |r| value(r.recent_commits(&repository)?)));
             }
@@ -232,6 +237,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::Snapshot { .. } => "snapshot",
         Request::Summary { .. } => "summary",
         Request::FileDiff { .. } => "fileDiff",
+        Request::ChangesIgnoringWhitespace { .. } => "changesIgnoringWhitespace",
         Request::RecentCommits { .. } => "recentCommits",
         Request::CommitActivity { .. } => "commitActivity",
         Request::CommitFiles { .. } => "commitFiles",

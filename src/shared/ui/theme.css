@@ -46,6 +46,8 @@
     --ui-diff-del-mark: #b42318;
     --ui-diff-hunk-bg: #f1f5ff;
     --ui-diff-hunk-text: #4f5b93;
+    /* spaces, tabs and line ends drawn on a formatting-only line (Zed's `editor.invisible`) */
+    --ui-diff-invisible: color-mix(in srgb, var(--ui-text-muted) 55%, transparent);
     /* syntax colors: One Light (Zed's `one.json`, from Atom's One theme, MIT, GitHub Inc.) */
     --ui-syntax-text: #242529;
     --ui-syntax-comment: #a2a3a7;
@@ -117,6 +119,7 @@
         --ui-diff-del-mark: #fda4af;
         --ui-diff-hunk-bg: rgba(99, 102, 241, 0.12);
         --ui-diff-hunk-text: #b4bdf5;
+        --ui-diff-invisible: color-mix(in srgb, var(--ui-text-muted) 50%, transparent);
         /* One Dark, from the same file */
         --ui-syntax-text: #acb2be;
         --ui-syntax-comment: #5d636f;

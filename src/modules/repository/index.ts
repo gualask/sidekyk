@@ -10,6 +10,7 @@ export { RepositorySettingsProvider } from './application/repository-settings';
 export { useShownFile } from './application/selection';
 export {
     type ChangedFile,
+    type ChangesIgnoringWhitespace,
     type Commit,
     type CommitActivity,
     type CommitFileDiffRequest,
