@@ -52,6 +52,24 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
   badges, wake lock, whitespace-only files hidden from the list. Taken: linked worktrees picked
   in the top bar (`../.cflow/plans/changes.md`), formatting-only changes told in the viewer
   (`features/changes.md`), a changed image's two sides (`../.cflow/plans/previews.md`).
+- From Cliptray (2026-10-29, no license; a tray clipboard manager): pasting into the app used
+  before (hide, then a synthetic `⌘V`: the Accessibility permission on macOS; `enigo` 0.2 defaults
+  to X11 through `xdo`, Wayland and libei are opt-in features; UIPI against elevated terminals on
+  Windows; a fixed 70 ms wait), a panel anchored to the tray. Taken: one universal macOS `.dmg`
+  (`ROADMAP.md`, Platforms and release).
+- From Kensaku (2026-10-29, MIT; a local search launcher: names, text in documents, OCR, meaning,
+  MCP): OCR, semantic search, its query language, dates in natural language, a local LLM, a
+  launcher window. Taken: events the system dropped read the project again (`architecture.md`,
+  Watching). For agents over MCP (`ROADMAP.md`, Notes; its `docs/AGENTS.md`): a stdio server from
+  the same binary, read-only; pages with a cursor, snippets capped at 100 characters, a size
+  budget in each answer; a file's text returned as data, never as instructions; a `health_check`
+  tool; roots checked after resolving `..` and links. Not its one-click connect: it writes each
+  client's config, an adapter per client. For text in documents (`ROADMAP.md`, Projects):
+  `lopdf` inside `catch_unwind` (it panics on malformed PDFs); `zip` and `quick-xml` reading
+  Office's XML as a stream up to a byte cap; a time and a size cap per file; Tantivy, after SQLite
+  FTS5 trigram measured at 1M documents (918 MB, 258 ms; our projects are far smaller). Its
+  background priority on macOS is `PRIO_DARWIN_PROCESS`, the whole process with its UI
+  (`man setpriority`); an indexing thread alone is `PRIO_DARWIN_THREAD`.
 
 ## Out of scope
 

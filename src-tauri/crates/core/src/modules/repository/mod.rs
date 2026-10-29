@@ -34,11 +34,11 @@ pub use ignored::{IgnoredPaths, Visible};
 pub use limits::{MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS};
 pub use open::{existing_folder, repository_name, resolve_repository};
 pub use ports::{
-    FolderAdded, FolderRules, FolderWatcher, GitOutput, RepositoryBackend, RepositoryWatcher,
-    Walked, Watch, WorktreeEntry,
+    Changed, FolderAdded, FolderRules, FolderWatcher, GitOutput, RepositoryBackend,
+    RepositoryWatcher, Walked, Watch, WorktreeEntry,
 };
 pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_stamp, load_file_tree, load_image, FileTree};
 pub use version::{load_version_text, VersionText};
-pub use watched::classify;
+pub use watched::{classify, WatchedChanges};
 pub use whitespace::load_changes_ignoring_whitespace;

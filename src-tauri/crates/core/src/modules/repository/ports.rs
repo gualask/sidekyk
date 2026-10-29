@@ -85,16 +85,24 @@ pub struct Walked {
     pub truncated: bool,
 }
 
+/// What a watcher saw.
+#[derive(Debug, PartialEq)]
+pub enum Changed {
+    /// These paths (absolute) changed during a quiet period.
+    Paths(Vec<PathBuf>),
+    /// The system dropped events, its queue full: any path may have changed.
+    Unknown,
+}
+
 /// Watches a project's folder, and a repository's git dir.
 pub trait RepositoryWatcher: Send + Sync {
-    /// Calls `on_change` with the paths (absolute) that changed during each quiet period, until
-    /// the returned watch is dropped. `classify` says which of them matter. `git_dir` is `None`
-    /// for a folder without git.
+    /// Calls `on_change` with what changed, until the returned watch is dropped. `classify` says
+    /// which paths matter. `git_dir` is `None` for a folder without git.
     fn watch(
         &self,
         root: &Path,
         git_dir: Option<&Path>,
-        on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
+        on_change: Box<dyn FnMut(Changed) + Send>,
     ) -> anyhow::Result<Watch>;
 }
 

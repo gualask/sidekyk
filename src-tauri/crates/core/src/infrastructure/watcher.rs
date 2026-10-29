@@ -1,7 +1,9 @@
 //! Watches a project's folder and a repository's git dir, and reports what changed after a quiet
 //! period.
 
-use std::path::{Path, PathBuf};
+use std::fmt;
+use std::io;
+use std::path::Path;
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
 
@@ -11,7 +13,7 @@ use notify_debouncer_mini::notify::{
 };
 use notify_debouncer_mini::{new_debouncer_opt, DebounceEventResult, Debouncer};
 
-use crate::modules::repository::{FolderAdded, FolderWatcher, RepositoryWatcher, Watch};
+use crate::modules::repository::{Changed, FolderAdded, FolderWatcher, RepositoryWatcher, Watch};
 use crate::shared::sync::lock;
 
 /// Long enough to fold an agent's burst of writes into one refresh.
@@ -49,20 +51,13 @@ impl RepositoryWatcher for LocalRepositoryWatcher {
         &self,
         root: &Path,
         git_dir: Option<&Path>,
-        mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
+        mut on_change: Box<dyn FnMut(Changed) + Send>,
     ) -> anyhow::Result<Watch> {
         let config = notify_debouncer_mini::Config::default().with_timeout(QUIET_PERIOD);
         let mut debouncer =
             new_debouncer_opt::<_, ChangesOnly>(config, move |result: DebounceEventResult| {
-                let events = match result {
-                    Ok(events) => events,
-                    Err(error) => {
-                        tracing::warn!(%error, "watcher error");
-                        return;
-                    }
-                };
-                if !events.is_empty() {
-                    on_change(events.into_iter().map(|e| e.path).collect());
+                if let Some(changed) = changed(result) {
+                    on_change(changed);
                 }
             })?;
         if self.per_folder {
@@ -111,6 +106,57 @@ impl FolderWatcher for OneFolderEach {
     }
 }
 
+/// What a batch of the debouncer tells, if anything.
+fn changed(result: DebounceEventResult) -> Option<Changed> {
+    match result {
+        Ok(events) if events.is_empty() => None,
+        Ok(events) => Some(Changed::Paths(events.into_iter().map(|e| e.path).collect())),
+        Err(error) if is_events_lost(&error) => {
+            tracing::info!("the system dropped the watcher's events");
+            Some(Changed::Unknown)
+        }
+        Err(error) => {
+            tracing::warn!(%error, "watcher error");
+            None
+        }
+    }
+}
+
+/// The system dropped events, its queue full (inotify's `IN_Q_OVERFLOW`, FSEvents'
+/// `MustScanSubDirs`; Windows from notify 9: `docs/architecture.md`, Watching). notify sends an
+/// event without paths, which the debouncer drops: it goes as this error, which the debouncer hands
+/// on at once.
+#[derive(Debug)]
+struct EventsLost;
+
+impl fmt::Display for EventsLost {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("the system dropped events")
+    }
+}
+
+impl std::error::Error for EventsLost {}
+
+fn is_events_lost(error: &notify::Error) -> bool {
+    matches!(&error.kind, notify::ErrorKind::Io(error)
+        if error.get_ref().is_some_and(|inner| inner.is::<EventsLost>()))
+}
+
+/// An event of the system as the debouncer gets it: a read dropped, events the system dropped
+/// as `EventsLost`.
+fn sift(event: notify::Result<Event>) -> Option<notify::Result<Event>> {
+    match event {
+        Ok(Event {
+            kind: EventKind::Access(_),
+            ..
+        }) => None,
+        Ok(event) if event.need_rescan() => {
+            Some(Err(notify::Error::io(io::Error::other(EventsLost))))
+        }
+        event => Some(event),
+    }
+}
+
 /// The system's watcher without the reads. inotify reports a file opened, or closed unwritten
 /// (`IN_OPEN`, `IN_CLOSE_NOWRITE`): every git command run on the repository would report its own
 /// reads and refresh the app again, without end. The debouncer drops an event's kind, so they are
@@ -120,13 +166,7 @@ struct ChangesOnly(RecommendedWatcher);
 impl Watcher for ChangesOnly {
     fn new<F: EventHandler>(mut event_handler: F, config: Config) -> notify::Result<Self> {
         let changes = move |event: notify::Result<Event>| {
-            if !matches!(
-                &event,
-                Ok(Event {
-                    kind: EventKind::Access(_),
-                    ..
-                })
-            ) {
+            if let Some(event) = sift(event) {
                 event_handler.handle_event(event);
             }
         };
@@ -157,6 +197,37 @@ impl Watcher for ChangesOnly {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use notify::event::{AccessKind, CreateKind, Flag};
+    use std::path::PathBuf;
+
+    /// The paths a watcher reported; these tests drop no event.
+    fn paths_of(changed: Changed) -> Vec<PathBuf> {
+        match changed {
+            Changed::Paths(paths) => paths,
+            Changed::Unknown => panic!("the system dropped events"),
+        }
+    }
+
+    #[test]
+    fn events_the_system_dropped_reach_the_caller_as_unknown() {
+        // how notify tells an overflow: no path, a flag
+        let overflow = Event::new(EventKind::Other).set_flag(Flag::Rescan);
+        let Some(Err(error)) = sift(Ok(overflow)) else {
+            panic!("an overflow goes on as an error");
+        };
+        assert!(is_events_lost(&error));
+        assert_eq!(changed(Err(error)), Some(Changed::Unknown));
+
+        // a read stops here, a write goes on as it came, another error is no overflow
+        assert!(sift(Ok(Event::new(EventKind::Access(AccessKind::Any)))).is_none());
+        let created =
+            Event::new(EventKind::Create(CreateKind::File)).add_path(PathBuf::from("/r/a.ts"));
+        assert!(matches!(
+            sift(Ok(created)),
+            Some(Ok(event)) if event.paths == [PathBuf::from("/r/a.ts")]
+        ));
+        assert_eq!(changed(Err(notify::Error::generic("gone"))), None);
+    }
 
     /// Where the system watches one folder at a time, the folders the tests write in.
     fn add_folders(watch: &Watch, folders: &[PathBuf]) {
@@ -178,8 +249,8 @@ mod tests {
             .watch(
                 &root,
                 Some(&root.join(".git")),
-                Box::new(move |paths| {
-                    let _ = sent.send(paths);
+                Box::new(move |changed| {
+                    let _ = sent.send(paths_of(changed));
                 }),
             )
             .unwrap();
@@ -215,8 +286,8 @@ mod tests {
             .watch(
                 &root,
                 Some(&root.join(".git")),
-                Box::new(move |paths| {
-                    let _ = sent.send(paths);
+                Box::new(move |changed| {
+                    let _ = sent.send(paths_of(changed));
                 }),
             )
             .unwrap();

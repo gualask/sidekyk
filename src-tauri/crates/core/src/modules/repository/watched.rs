@@ -25,12 +25,24 @@ pub struct WatchedChanges {
     pub git_dir: bool,
     /// Changed paths in the working tree, absolute. Some of them may be ignored by git.
     pub worktree: Vec<PathBuf>,
+    /// The system dropped events: any path of the working tree may have changed.
+    pub lost: bool,
 }
 
 impl WatchedChanges {
+    /// After the system dropped events: the git dir's entries may have changed too, if there is
+    /// one.
+    pub fn lost(has_git_dir: bool) -> Self {
+        Self {
+            git_dir: has_git_dir,
+            worktree: Vec::new(),
+            lost: true,
+        }
+    }
+
     /// Whether nothing in the batch matters.
     pub fn is_empty(&self) -> bool {
-        !self.git_dir && self.worktree.is_empty()
+        !self.git_dir && !self.lost && self.worktree.is_empty()
     }
 }
 
@@ -106,6 +118,7 @@ mod tests {
             WatchedChanges {
                 git_dir: false,
                 worktree: vec!["/r/src/a.ts".into(), "/r/target/x.o".into()],
+                lost: false,
             }
         );
     }

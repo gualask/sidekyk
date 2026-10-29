@@ -118,6 +118,15 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   changed: rules read again.
 - Kind: a batch with `<root>/.git` that no longer matches the watch restarts it as the other kind
   on its own thread and tells `kind_changed`, also while hidden (rare, no git).
+- A repository inside the root (2026-10-29: a submodule, a clone, Claude Code's
+  `.claude/worktrees/` unless ignored): `git status` shows its folder, never its files, yet
+  `check-ignore` calls them visible. `ignored.rs` drops paths under a folder holding a `.git` (the
+  disk asked once per folder of a batch, +1 ms on 5,000 paths), as Linux by not watching them.
+- Events the system dropped (2026-10-29: `IN_Q_OVERFLOW`, `MustScanSubDirs`): notify's pathless
+  event, which the debouncer drops, goes as `Changed::Unknown`: git dir and any path may have
+  changed, folders rescanned on Linux, the project marked if hidden. Windows: notify 8.2.1 loses
+  both forms (a 0-byte completion; `ERROR_NOTIFY_ENUM_DIR`, which also ends the watch), 9.0.0-rc.5
+  rescans (notify-rs#964).
 
 ### Logs
 

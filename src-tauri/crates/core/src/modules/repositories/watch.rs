@@ -8,8 +8,8 @@ use std::sync::Arc;
 use super::{LocalRepositories, OnChange};
 use crate::modules::folder::{folder_kind, FolderChanges, FolderKind};
 use crate::modules::repository::{
-    classify, resolve_repository, Hiding, IgnoredPaths, RepositoryBackend, RepositoryChange,
-    RepositoryInfo, Visible, Watch, WatchedFolders,
+    classify, resolve_repository, Changed, Hiding, IgnoredPaths, RepositoryBackend,
+    RepositoryChange, RepositoryInfo, Visible, Watch, WatchedChanges, WatchedFolders,
 };
 use crate::shared::sync::lock;
 
@@ -44,14 +44,18 @@ struct Watching {
 impl Watching {
     /// Whether a batch brought or took the `.git` at the root, so the folder is now the other
     /// kind. No git runs.
-    fn kind_changed(&self, backend: &dyn RepositoryBackend, paths: &[PathBuf]) -> bool {
+    fn kind_changed(&self, backend: &dyn RepositoryBackend, changed: &Changed) -> bool {
         let watched_as = if self.git_dir.is_some() {
             FolderKind::Repository
         } else {
             FolderKind::Plain
         };
-        paths.contains(&self.folder.join(".git"))
-            && folder_kind(backend, &self.folder).is_ok_and(|kind| kind != watched_as)
+        let git_touched = match changed {
+            Changed::Paths(paths) => paths.contains(&self.folder.join(".git")),
+            // the `.git` may have come or gone among the events dropped
+            Changed::Unknown => true,
+        };
+        git_touched && folder_kind(backend, &self.folder).is_ok_and(|kind| kind != watched_as)
     }
 }
 
@@ -76,7 +80,7 @@ impl Filter {
     /// Whether any of these changes may show, while the window is hidden: no git runs.
     fn any_maybe_visible(&mut self, backend: &dyn RepositoryBackend, changed: &[PathBuf]) -> bool {
         match self {
-            Self::Git(ignored) => ignored.any_maybe_visible(changed),
+            Self::Git(ignored) => ignored.any_maybe_visible(backend, changed),
             Self::Rules(changes) => changes.visible(backend, changed).any(),
         }
     }
@@ -85,6 +89,15 @@ impl Filter {
     fn forget(&mut self) {
         if let Self::Git(ignored) = self {
             ignored.forget();
+        }
+    }
+
+    /// The system dropped events: nothing learned holds, and the rules of a folder without git
+    /// are read again.
+    fn start_over(&mut self, backend: &dyn RepositoryBackend, folder: &Path) {
+        match self {
+            Self::Git(ignored) => ignored.forget(),
+            Self::Rules(changes) => *changes = FolderChanges::new(backend, folder.to_path_buf()),
         }
     }
 }
@@ -103,16 +116,17 @@ pub(super) struct Visibility {
 
 enum MissedPaths {
     Paths(Vec<PathBuf>),
-    /// Too many to keep: every folder is looked at again.
+    /// Too many to keep, or events dropped: every folder is looked at again.
     TooMany,
 }
 
 impl MissedPaths {
     const NONE: Self = Self::Paths(Vec::new());
 
-    fn keep(&mut self, paths: &[PathBuf]) {
+    fn keep(&mut self, changes: &WatchedChanges) {
+        let paths = &changes.worktree;
         match self {
-            Self::Paths(kept) if kept.len() + paths.len() <= MAX_MISSED_PATHS => {
+            Self::Paths(kept) if !changes.lost && kept.len() + paths.len() <= MAX_MISSED_PATHS => {
                 kept.extend_from_slice(paths);
             }
             Self::Paths(_) => *self = Self::TooMany,
@@ -281,14 +295,14 @@ impl LocalRepositories {
             folder: folder.clone(),
             git_dir: git_dir.clone(),
         };
-        let on_paths = move |paths: Vec<PathBuf>| {
+        let on_changed = move |changed: Changed| {
             if let Some(repositories) = repositories.upgrade() {
-                repositories.batch(generation, &watched, &mut filter, &paths, &*on_change);
+                repositories.batch(generation, &watched, &mut filter, &changed, &*on_change);
             }
         };
         let watch = self
             .watcher
-            .watch(&folder, git_dir.as_deref(), Box::new(on_paths))?;
+            .watch(&folder, git_dir.as_deref(), Box::new(on_changed))?;
         lock(&self.visibility).missed_paths = watch.folders.is_some().then_some(MissedPaths::NONE);
         if let Some(watcher) = watch.folders.clone() {
             let hiding = match git_dir {
@@ -308,24 +322,29 @@ impl LocalRepositories {
         generation: u64,
         watched: &Watching,
         filter: &mut Filter,
-        paths: &[PathBuf],
+        changed: &Changed,
         on_change: &dyn Fn(RepositoryChange),
     ) {
         let root = watched.root.as_str();
-        if watched.kind_changed(&*self.backend, paths) {
+        if watched.kind_changed(&*self.backend, changed) {
             self.watch_other_kind(generation, root);
             return;
         }
-        let changes = classify(
-            paths.iter().map(PathBuf::as_path),
-            &watched.folder,
-            watched.git_dir.as_deref(),
-        );
+        let changes = match changed {
+            Changed::Paths(paths) => classify(
+                paths.iter().map(PathBuf::as_path),
+                &watched.folder,
+                watched.git_dir.as_deref(),
+            ),
+            Changed::Unknown => WatchedChanges::lost(watched.git_dir.is_some()),
+        };
         if changes.is_empty() {
             return;
         }
-        // The index may now track a file in an ignored directory, or the excludes changed.
-        if changes.git_dir {
+        if changes.lost {
+            filter.start_over(&*self.backend, &watched.folder);
+        } else if changes.git_dir {
+            // The index may now track a file in an ignored directory, or the excludes changed.
             filter.forget();
         }
         // held until the batch is settled, so the window cannot show in between and miss it
@@ -336,12 +355,13 @@ impl LocalRepositories {
         }
         // nobody looks: no `check-ignore`, no refresh, only a mark for when the window shows
         if visibility.hidden {
-            let marked =
-                changes.git_dir || filter.any_maybe_visible(&*self.backend, &changes.worktree);
+            let marked = changes.git_dir
+                || changes.lost
+                || filter.any_maybe_visible(&*self.backend, &changes.worktree);
             if marked {
                 visibility.missed = Some(root.to_string());
                 if let Some(paths) = visibility.missed_paths.as_mut() {
-                    paths.keep(&changes.worktree);
+                    paths.keep(&changes);
                 }
                 self.forget_tree(root);
                 self.forget_contents();
@@ -349,13 +369,18 @@ impl LocalRepositories {
             tracing::debug!(
                 git_dir = changes.git_dir,
                 worktree_paths = changes.worktree.len(),
+                lost = changes.lost,
                 marked,
                 "watcher batch while hidden"
             );
             return;
         }
         drop(visibility);
-        let worktree = filter.visible(&*self.backend, &changes.worktree);
+        let worktree = if changes.lost {
+            Visible::Unknown
+        } else {
+            filter.visible(&*self.backend, &changes.worktree)
+        };
         self.watch_created_folders(&worktree);
         let visible = changes.git_dir || worktree.any();
         let files = self.batch_changes_tree(watched, changes.git_dir, &worktree);
@@ -365,6 +390,7 @@ impl LocalRepositories {
         tracing::debug!(
             git_dir = changes.git_dir,
             worktree_paths = changes.worktree.len(),
+            lost = changes.lost,
             visible,
             files,
             "watcher batch"
@@ -381,7 +407,8 @@ impl LocalRepositories {
     }
 
     /// Where each folder is watched on its own, watches the folders a batch created, before the
-    /// change is told; every folder is looked at again when what git ignores may have changed.
+    /// change is told; every folder is looked at again when what git ignores may have changed, or
+    /// the system dropped events.
     fn watch_created_folders(&self, worktree: &Visible) {
         let mut folders = lock(&self.folders);
         let Some(folders) = folders.as_mut() else {

@@ -7,6 +7,9 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 ## App
 
+- [ ] First: watch for notify 9 stable, with its `notify-debouncer-mini` (0.8), and install it as
+      soon as it is out: on Windows the system's dropped events become a rescan
+      (notify-rs#964; `docs/architecture.md`, Watching)
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
 - [ ] Copy or reveal the log for bug reports
 
@@ -20,7 +23,8 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 - [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)
 - [ ] Entities recognized while typing a note (`.cflow/plans/notes-entities.md`)
-- [ ] Agents read a project's notes and captures over MCP, read-only (design open)
+- [ ] Agents read a project's notes and captures over MCP, read-only (design open; Kensaku's
+      shape in `docs/product.md`)
 
 ## Projects with optional folders
 
@@ -33,6 +37,7 @@ has.
 - [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
       section per repository in Changes
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
+      (Kensaku's stack in `docs/product.md`)
 
 ## Previews
 
@@ -73,7 +78,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 ## Platforms and release
 
 - [ ] Signed builds and self-update (as in Fyler), built by a release workflow on a `v*` tag that
-      runs `ci.yml` first; update check at startup or on demand only
+      runs `ci.yml` first; update check at startup or on demand only. macOS: one universal `.dmg`
+      (`--target universal-apple-darwin`; 2026-10-29: Intel Macs too, which stop at macOS 26, at
+      no runtime cost, since only the native slice loads)
 - [ ] Verify on the packaged app and other systems:
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
     icon shows the window, `⌘W` hides and `⌘Q` quits, no blank frame at startup; without the

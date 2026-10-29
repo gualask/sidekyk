@@ -7,7 +7,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use super::ignored::{changes_rules, check_ignore};
+use super::ignored::{changes_rules, check_ignore, is_inner_repository};
 use super::ports::{FolderAdded, FolderRules, FolderWatcher, RepositoryBackend};
 use super::watched::GIT_DIR_FOLDERS;
 
@@ -138,11 +138,9 @@ impl WatchedFolders {
                 if !self.add(&self.root.join(&folder)) {
                     return;
                 }
-                // a repository inside (a submodule, a clone) is not this one's files: git refuses
-                // to answer about paths in a submodule
+                // not this one's files; git also refuses to answer about paths in a submodule
                 let inner = matches!(self.hiding, Hiding::Git { .. })
-                    && !folder.as_os_str().is_empty()
-                    && backend.has_entry(&self.root, &folder.join(".git"));
+                    && is_inner_repository(backend, &self.root, &folder);
                 if inner {
                     continue;
                 }

@@ -265,14 +265,17 @@ mod tests {
         load_changes_ignoring_whitespace, load_commit_activity, load_commit_file_diff,
         load_commit_files, load_file_content, load_file_diff, load_file_stamp, load_file_tree,
         load_image, load_recent_commits, load_snapshot, load_summary, load_version_text,
-        repository_name, resolve_repository, ChangeArea, ChangeKind, Commit, CommitFileDiffRequest,
-        CommitRequest, FileContent, FileDiffRequest, FileVersion, FolderAdded, FolderWatcher,
-        Hiding, IgnoredPaths, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText,
-        Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
+        repository_name, resolve_repository, ChangeArea, ChangeKind, Changed, Commit,
+        CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
+        FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryChange, RepositoryInfo,
+        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
+        MAX_IMAGE_BYTES,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
     };
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::mpsc::Receiver;
     use std::sync::{Arc, Mutex};
 
     use crate::infrastructure::watcher::LocalRepositoryWatcher;
@@ -1030,25 +1033,182 @@ mod tests {
             &self,
             root: &Path,
             git_dir: Option<&Path>,
-            mut on_change: Box<dyn FnMut(Vec<PathBuf>) + Send>,
+            mut on_change: Box<dyn FnMut(Changed) + Send>,
         ) -> anyhow::Result<Watch> {
             let seen = self.0.clone();
             LocalRepositoryWatcher::default().watch(
                 root,
                 git_dir,
-                Box::new(move |paths| {
-                    seen.lock().unwrap().extend(paths.iter().cloned());
-                    on_change(paths);
+                Box::new(move |changed| {
+                    if let Changed::Paths(paths) = &changed {
+                        seen.lock().unwrap().extend(paths.iter().cloned());
+                    }
+                    on_change(changed);
+                }),
+            )
+        }
+    }
+
+    /// Past the watcher's quiet period (250 ms) and the system's own delay.
+    const QUIET: Duration = Duration::from_secs(1);
+    const DEADLINE: Duration = Duration::from_secs(10);
+
+    /// Puts the project on screen; what it tells arrives here, as the frontend gets it.
+    fn watch_on_screen(
+        repositories: &LocalRepositories,
+        info: &RepositoryInfo,
+    ) -> Receiver<RepositoryChange> {
+        let (sent, received) = std::sync::mpsc::channel();
+        repositories.watch(
+            Some(info),
+            Box::new(move |event| {
+                let _ = sent.send(event);
+            }),
+        );
+        received
+    }
+
+    /// Waits until nothing more is told: events still on their way, such as FSEvents reporting
+    /// what happened before the watch.
+    fn settle(received: &Receiver<RepositoryChange>) {
+        let started = Instant::now();
+        while received.recv_timeout(QUIET).is_ok() {
+            assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
+        }
+    }
+
+    /// Writes `rel` again until a change naming it is told: a watch added on another thread may
+    /// still be on its way.
+    fn written_and_told(received: &Receiver<RepositoryChange>, root: &Path, rel: &str) {
+        let started = Instant::now();
+        loop {
+            write(root, rel, "x\n");
+            if let Ok(event) = received.recv_timeout(QUIET) {
+                if event
+                    .paths
+                    .unwrap_or_default()
+                    .iter()
+                    .any(|path| path == rel)
+                {
+                    return;
+                }
+            }
+            assert!(started.elapsed() < DEADLINE, "{rel} was never told");
+        }
+    }
+
+    type OnChanged = Arc<Mutex<Box<dyn FnMut(Changed) + Send>>>;
+
+    /// The local watcher, one folder at a time, deaf while asked; told to, it says events were
+    /// dropped, as the system does when its queue is full.
+    #[derive(Default)]
+    struct DeafWatcher {
+        deaf: Arc<AtomicBool>,
+        on_changed: Mutex<Option<OnChanged>>,
+    }
+
+    impl DeafWatcher {
+        fn set_deaf(&self, deaf: bool) {
+            self.deaf.store(deaf, Ordering::SeqCst);
+        }
+
+        fn drop_events(&self) {
+            let on_changed = self.on_changed.lock().unwrap().clone().unwrap();
+            (on_changed.lock().unwrap())(Changed::Unknown);
+        }
+    }
+
+    impl RepositoryWatcher for DeafWatcher {
+        fn watch(
+            &self,
+            root: &Path,
+            git_dir: Option<&Path>,
+            on_change: Box<dyn FnMut(Changed) + Send>,
+        ) -> anyhow::Result<Watch> {
+            let on_changed: OnChanged = Arc::new(Mutex::new(on_change));
+            *self.on_changed.lock().unwrap() = Some(on_changed.clone());
+            let deaf = self.deaf.clone();
+            LocalRepositoryWatcher::per_folder().watch(
+                root,
+                git_dir,
+                Box::new(move |changed| {
+                    if !deaf.load(Ordering::SeqCst) {
+                        (on_changed.lock().unwrap())(changed);
+                    }
                 }),
             )
         }
     }
 
     #[test]
+    fn a_worktree_inside_the_repository_is_not_its_files() {
+        let dir = scratch_repo();
+        // where Claude Code puts its worktrees, not ignored
+        git(
+            dir.path(),
+            &[
+                "worktree",
+                "add",
+                "-q",
+                ".claude/worktrees/feat",
+                "-b",
+                "feat",
+            ],
+        );
+        let repositories = LocalRepositories::new(
+            Arc::new(LocalRepositoryBackend::default()),
+            Arc::new(LocalRepositoryWatcher::default()),
+        );
+        let info = repositories.resolve(dir.path()).unwrap();
+        let root = Path::new(&info.root);
+        let received = watch_on_screen(&repositories, &info);
+        settle(&received);
+
+        write(root, ".claude/worktrees/feat/src/agent.ts", "x\n");
+        if let Ok(event) = received.recv_timeout(QUIET) {
+            panic!("an agent writing in its worktree shows nothing here: {event:?}");
+        }
+        written_and_told(&received, root, "src/cart.ts");
+        repositories.watch(None, Box::new(|_| {}));
+    }
+
+    #[test]
+    fn events_the_system_dropped_read_the_project_again() {
+        let dir = scratch_repo();
+        let watcher = Arc::new(DeafWatcher::default());
+        let repositories =
+            LocalRepositories::new(Arc::new(LocalRepositoryBackend::default()), watcher.clone());
+        let info = repositories.resolve(dir.path()).unwrap();
+        let root = Path::new(&info.root);
+        let received = watch_on_screen(&repositories, &info);
+        settle(&received);
+
+        // a burst the system could not keep up with: a folder created, nothing told
+        watcher.set_deaf(true);
+        write(root, "src/burst/a.ts", "");
+        settle(&received);
+        watcher.drop_events();
+        let event = received.recv_timeout(DEADLINE).unwrap();
+        assert_eq!(event.root, info.root);
+        assert!(event.git_dir, "HEAD and the index may have changed too");
+        assert_eq!(event.paths, None, "any path may have changed");
+
+        // the folder created meanwhile is watched now
+        watcher.set_deaf(false);
+        written_and_told(&received, root, "src/burst/b.ts");
+        settle(&received);
+
+        // while hidden, the project is marked and nothing is told
+        repositories.set_visible(false);
+        watcher.drop_events();
+        assert_eq!(repositories.set_visible(true), Some(info.root.clone()));
+        assert!(received.try_recv().is_err(), "nothing is told while hidden");
+        repositories.watch(None, Box::new(|_| {}));
+    }
+
+    #[test]
     fn the_watched_repository_tells_what_shows_and_marks_it_while_hidden() {
         // past the watcher's quiet period (250 ms) and the system's own delay
-        const QUIET: Duration = Duration::from_secs(1);
-        const DEADLINE: Duration = Duration::from_secs(10);
         let dir = scratch_repo();
         write(dir.path(), ".gitignore", "build/\n");
         let watcher = Arc::new(RecordingWatcher::default());
@@ -1057,21 +1217,8 @@ mod tests {
             LocalRepositories::new(Arc::new(LocalRepositoryBackend::default()), watcher);
         let info = repositories.resolve(dir.path()).unwrap();
         let root = Path::new(&info.root);
-        let (sent, received) = std::sync::mpsc::channel();
-        repositories.watch(
-            Some(&info),
-            Box::new(move |event| {
-                let _ = sent.send(event);
-            }),
-        );
-        // events still on their way, such as FSEvents reporting what happened before the watch
-        let settle = || {
-            let started = Instant::now();
-            while received.recv_timeout(QUIET).is_ok() {
-                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
-            }
-        };
-        settle();
+        let received = watch_on_screen(&repositories, &info);
+        settle(&received);
 
         seen.lock().unwrap().clear();
         write(root, "build/out.o", "");
@@ -1088,7 +1235,7 @@ mod tests {
         assert!(!event.git_dir);
         let paths = event.paths.unwrap_or_default();
         assert!(paths.iter().any(|path| path == "src/cart.ts"), "{paths:?}");
-        settle();
+        settle(&received);
 
         assert_eq!(repositories.set_visible(false), None);
         write(root, "src/cart.ts", "again\n");
@@ -1119,8 +1266,6 @@ mod tests {
     }
 
     fn folder_without_git_watched(watcher: LocalRepositoryWatcher) {
-        const QUIET: Duration = Duration::from_secs(1);
-        const DEADLINE: Duration = Duration::from_secs(10);
         let dir = tempfile::tempdir().unwrap();
         write(dir.path(), ".gitignore", "build/\n");
         write(dir.path(), "notes/a.md", "a\n");
@@ -1137,19 +1282,7 @@ mod tests {
         };
         assert_eq!(paths(""), ["notes", ".gitignore"]);
 
-        let (sent, received) = std::sync::mpsc::channel();
-        repositories.watch(
-            Some(&info),
-            Box::new(move |event| {
-                let _ = sent.send(event);
-            }),
-        );
-        let settle = || {
-            let started = Instant::now();
-            while received.recv_timeout(QUIET).is_ok() {
-                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
-            }
-        };
+        let received = watch_on_screen(&repositories, &info);
         let kind_changed = || {
             let started = Instant::now();
             while started.elapsed() < DEADLINE {
@@ -1162,7 +1295,7 @@ mod tests {
             }
             panic!("the change of kind was never told");
         };
-        settle();
+        settle(&received);
 
         write(root, "build/more.o", "");
         if let Ok(event) = received.recv_timeout(QUIET) {
@@ -1177,7 +1310,7 @@ mod tests {
             "{changed:?}"
         );
         assert_eq!(paths("notes"), ["notes/a.md", "notes/b.md"]);
-        settle();
+        settle(&received);
 
         git(root, &["init", "-q"]);
         kind_changed();
@@ -1185,11 +1318,11 @@ mod tests {
             repositories.folder_kind(&info).unwrap(),
             FolderKind::Repository
         );
-        settle();
+        settle(&received);
         write(root, "notes/c.md", "c\n");
         let event = received.recv_timeout(DEADLINE).unwrap();
         assert!(!event.kind_changed, "watched as a repository now");
-        settle();
+        settle(&received);
 
         std::fs::remove_dir_all(root.join(".git")).unwrap();
         kind_changed();
@@ -1329,8 +1462,6 @@ mod tests {
 
     #[test]
     fn folder_by_folder_a_new_folder_is_watched_and_ignored_ones_never_are() {
-        const QUIET: Duration = Duration::from_secs(1);
-        const DEADLINE: Duration = Duration::from_secs(10);
         let dir = scratch_repo();
         write(dir.path(), ".gitignore", "build/\n");
         std::fs::create_dir(dir.path().join("build")).unwrap();
@@ -1340,39 +1471,8 @@ mod tests {
         );
         let info = repositories.resolve(dir.path()).unwrap();
         let root = Path::new(&info.root);
-        let (sent, received) = std::sync::mpsc::channel();
-        repositories.watch(
-            Some(&info),
-            Box::new(move |event| {
-                let _ = sent.send(event);
-            }),
-        );
-        let settle = || {
-            let started = Instant::now();
-            while received.recv_timeout(QUIET).is_ok() {
-                assert!(started.elapsed() < DEADLINE, "the watcher never went quiet");
-            }
-        };
-        // waits for an event naming `path`, writing `rel` again until it comes: a watch added on
-        // another thread may still be on its way
-        let told = |rel: &str| {
-            let started = Instant::now();
-            loop {
-                write(root, rel, "x\n");
-                if let Ok(event) = received.recv_timeout(QUIET) {
-                    if event
-                        .paths
-                        .unwrap_or_default()
-                        .iter()
-                        .any(|path| path == rel)
-                    {
-                        return;
-                    }
-                }
-                assert!(started.elapsed() < DEADLINE, "{rel} was never told");
-            }
-        };
-        settle();
+        let received = watch_on_screen(&repositories, &info);
+        settle(&received);
 
         write(root, "build/out.o", "");
         assert!(
@@ -1381,8 +1481,8 @@ mod tests {
         );
 
         std::fs::create_dir_all(root.join("src/new/deep")).unwrap();
-        told("src/new/deep/x.ts");
-        settle();
+        written_and_told(&received, root, "src/new/deep/x.ts");
+        settle(&received);
 
         repositories.set_visible(false);
         std::fs::create_dir_all(root.join("later/inner")).unwrap();
@@ -1395,7 +1495,7 @@ mod tests {
             );
             std::thread::sleep(Duration::from_millis(100));
         }
-        told("later/inner/y.ts");
+        written_and_told(&received, root, "later/inner/y.ts");
         repositories.watch(None, Box::new(|_| {}));
     }
 

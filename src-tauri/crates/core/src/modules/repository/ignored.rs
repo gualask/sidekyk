@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use super::ports::RepositoryBackend;
@@ -6,8 +6,8 @@ use super::ports::RepositoryBackend;
 /// The changes of a batch that show: git does not ignore them, or, in a folder without git, the
 /// walk's rules do not hide them.
 pub enum Visible<'a> {
-    /// Every change counts: git could not answer, or a change may alter what is hidden (an
-    /// ignore file, the root itself).
+    /// Every change counts: git could not answer, a change may alter what is hidden (an ignore
+    /// file, the root itself), or the system dropped events.
     Unknown,
     /// These paths, relative to the root.
     Paths(Vec<&'a Path>),
@@ -34,7 +34,8 @@ impl Visible<'_> {
 }
 
 /// Tells changes that can alter what Sidekyk shows from changes git ignores, such as a build
-/// writing to `target/` or an install filling `node_modules/`.
+/// writing to `target/` or an install filling `node_modules/`, and from changes inside a
+/// repository within this one (`is_inner_repository`).
 ///
 /// Git answers (`git check-ignore`), so every rule applies exactly as in `git status`: nested
 /// `.gitignore` files, `.git/info/exclude`, `core.excludesFile`, and tracked files inside an
@@ -66,7 +67,7 @@ impl IgnoredPaths {
         backend: &dyn RepositoryBackend,
         changed: &'a [PathBuf],
     ) -> Visible<'a> {
-        let Some(candidates) = self.unsettled(changed) else {
+        let Some(candidates) = self.unsettled(backend, changed) else {
             return Visible::Unknown;
         };
         if candidates.is_empty() {
@@ -101,26 +102,36 @@ impl IgnoredPaths {
 
     /// Whether any of these changed paths may be one git does not ignore, from what was already
     /// learned: no git runs, so a path never asked about counts.
-    pub fn any_maybe_visible(&mut self, changed: &[PathBuf]) -> bool {
-        self.unsettled(changed)
+    pub fn any_maybe_visible(
+        &mut self,
+        backend: &dyn RepositoryBackend,
+        changed: &[PathBuf],
+    ) -> bool {
+        self.unsettled(backend, changed)
             .is_none_or(|candidates| !candidates.is_empty())
     }
 
-    /// The changed paths, relative to the root, that are not inside a directory known to be
-    /// ignored; `None` when one of them is visible for sure (outside the root, the root itself,
-    /// a `.gitignore`).
-    fn unsettled<'a>(&mut self, changed: &'a [PathBuf]) -> Option<Vec<&'a Path>> {
+    /// The changed paths, relative to the root, that are neither inside a directory known to be
+    /// ignored nor inside another repository; `None` when one of them is visible for sure (outside
+    /// the root, the root itself, a `.gitignore`).
+    fn unsettled<'a>(
+        &mut self,
+        backend: &dyn RepositoryBackend,
+        changed: &'a [PathBuf],
+    ) -> Option<Vec<&'a Path>> {
+        let mut inner = InnerRepositories::new(backend);
         let mut candidates = Vec::new();
         for path in changed {
             let rel = path.strip_prefix(&self.root).ok()?;
             if rel.as_os_str().is_empty() {
                 return None;
             }
-            if changes_rules(rel) {
+            if changes_rules(rel) && !inner.holds(&self.root, rel) {
                 self.forget();
                 return None;
             }
-            if !self.is_in_ignored_dir(rel) {
+            // what is known first: a burst under `node_modules/` asks nothing of the disk
+            if !self.is_in_ignored_dir(rel) && !inner.holds(&self.root, rel) {
                 candidates.push(rel);
             }
         }
@@ -129,6 +140,55 @@ impl IgnoredPaths {
 
     fn is_in_ignored_dir(&self, rel: &Path) -> bool {
         rel.ancestors().any(|path| self.ignored_dirs.contains(path))
+    }
+}
+
+/// Whether `folder` (relative to `root`) holds a repository inside this one: a submodule, a clone,
+/// a linked worktree such as an agent's under `.claude/worktrees/`. Its files are not this
+/// repository's: `git status` shows the folder at most, never what changes inside. The root
+/// itself is this repository.
+pub(super) fn is_inner_repository(
+    backend: &dyn RepositoryBackend,
+    root: &Path,
+    folder: &Path,
+) -> bool {
+    !folder.as_os_str().is_empty() && backend.has_entry(root, &folder.join(".git"))
+}
+
+/// The repositories inside the root met by a batch: a change inside one shows nothing, as on
+/// Linux, where `folders.rs` does not watch them; the folder itself coming or going does.
+struct InnerRepositories<'b, 'a> {
+    backend: &'b dyn RepositoryBackend,
+    /// Each folder met during one batch, whether it is or is inside another repository: the paths
+    /// of a burst share their folders, so each is looked up once and asked of the disk once.
+    known: HashMap<&'a Path, bool>,
+}
+
+impl<'b, 'a> InnerRepositories<'b, 'a> {
+    fn new(backend: &'b dyn RepositoryBackend) -> Self {
+        Self {
+            backend,
+            known: HashMap::new(),
+        }
+    }
+
+    /// Whether `rel` (relative to `root`) is inside another repository.
+    fn holds(&mut self, root: &Path, rel: &'a Path) -> bool {
+        rel.parent()
+            .is_some_and(|dir| self.in_repository(root, dir))
+    }
+
+    /// Whether `dir` is an inner repository, or inside one.
+    fn in_repository(&mut self, root: &Path, dir: &'a Path) -> bool {
+        if let Some(&known) = self.known.get(dir) {
+            return known;
+        }
+        let inside = dir
+            .parent()
+            .is_some_and(|parent| self.in_repository(root, parent))
+            || is_inner_repository(self.backend, root, dir);
+        self.known.insert(dir, inside);
+        inside
     }
 }
 
@@ -184,11 +244,12 @@ mod tests {
     use super::*;
     use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
 
-    /// Ignores `target/` and `*.log` and records every question.
+    /// Ignores `target/` and `*.log` and records every question; `repositories` hold a `.git`.
     #[derive(Default)]
     struct FakeGit {
         asked: Mutex<Vec<Vec<String>>>,
         fail: bool,
+        repositories: Vec<&'static str>,
     }
 
     impl RepositoryBackend for FakeGit {
@@ -196,8 +257,12 @@ mod tests {
             unreachable!()
         }
 
-        fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
-            unreachable!()
+        fn has_entry(&self, _root: &Path, path: &Path) -> bool {
+            path.file_name().is_some_and(|name| name == ".git")
+                && self
+                    .repositories
+                    .iter()
+                    .any(|repository| path.parent() == Some(Path::new(repository)))
         }
 
         fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<PathBuf>> {
@@ -314,17 +379,47 @@ mod tests {
     fn without_git_only_directories_already_learned_are_settled() {
         let git = FakeGit::default();
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(ignored.any_maybe_visible(&paths(&["target/a.o"])));
+        assert!(ignored.any_maybe_visible(&git, &paths(&["target/a.o"])));
 
         assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
-        assert!(!ignored.any_maybe_visible(&paths(&["target/debug/b.o"])));
-        assert!(ignored.any_maybe_visible(&paths(&["target/c.o", "dist/app.js"])));
-        assert!(ignored.any_maybe_visible(&paths(&[".gitignore"])));
+        assert!(!ignored.any_maybe_visible(&git, &paths(&["target/debug/b.o"])));
+        assert!(ignored.any_maybe_visible(&git, &paths(&["target/c.o", "dist/app.js"])));
+        assert!(ignored.any_maybe_visible(&git, &paths(&[".gitignore"])));
         assert!(
-            ignored.any_maybe_visible(&paths(&["target/a.o"])),
+            ignored.any_maybe_visible(&git, &paths(&["target/a.o"])),
             "forgotten"
         );
         assert_eq!(git.asked.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn changes_inside_another_repository_show_nothing_and_ask_nothing() {
+        // an agent's worktree under the root, not ignored
+        let git = FakeGit {
+            repositories: vec![".claude/worktrees/feat"],
+            ..FakeGit::default()
+        };
+        let mut ignored = IgnoredPaths::new("/r".into());
+        let inside = paths(&[
+            ".claude/worktrees/feat/src/a.ts",
+            ".claude/worktrees/feat/.gitignore",
+        ]);
+        assert!(!ignored.visible(&git, &inside).any());
+        assert!(!ignored.any_maybe_visible(&git, &inside));
+        assert!(git.asked.lock().unwrap().is_empty());
+
+        // the worktree coming or going changes the status; so does the repository's own file
+        let outside = paths(&[".claude/worktrees/feat", "src/main.rs"]);
+        let Visible::Paths(shown) = ignored.visible(&git, &outside) else {
+            panic!("git answered");
+        };
+        assert_eq!(
+            shown,
+            [
+                Path::new(".claude/worktrees/feat"),
+                Path::new("src/main.rs")
+            ]
+        );
     }
 
     #[test]
