@@ -41,6 +41,11 @@ platform before a release. Actions pinned to a commit, the version in a comment.
 What the Mac cannot show (ROADMAP, Verify on the packaged app), tried by hand; the log comes back
 for reading.
 
+- Builds: Windows from `build.yml` (its `debug` input for the development log, CI above); Linux
+  has none in CI, so on the Linux machine from a clone, with Tauri's prerequisites
+  (WebKitGTK 4.1 and the rest, Tauri's docs, Prerequisites): `pnpm install`, then `pnpm tauri
+  build --debug` (the same development log, installer under `src-tauri/target/debug/bundle/`) or
+  `pnpm tauri:dev`.
 - Logs: Settings, Show log; by hand `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's
