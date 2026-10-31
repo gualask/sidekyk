@@ -41,8 +41,10 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 ## How it is built
 
 - Snapshot, in parallel: `git status --porcelain=v2 -z --branch --untracked-files=all`, `git diff
-  --numstat -z` (unstaged and `--cached`), `git diff HEAD --numstat` for the summary. One in flight
-  per project. Untracked files read to count lines (binary: NUL in the first 8 KiB): 4 MiB per
+  --numstat -z` unstaged, and the staged area: `--cached --name-status` names it, then, if not
+  empty, `--cached --numstat` beside `HEAD --numstat -- <its paths, literal>` (the whole diff past
+  16 KiB of paths). The summary is against HEAD: unstaged counts but for staged paths. One in
+  flight per project. Untracked files read to count lines (binary: NUL in the first 8 KiB): 4 MiB per
   file, 32 MiB and 2,000 files per snapshot. At most 10,000 changed paths (`truncated`, `10k+`).
 - Diff: `git diff [--cached] --no-color --no-ext-diff -U3 -- <path>` (both paths for a staged
   rename, `--no-index /dev/null <path>` for untracked); full file with `-U` at git's maximum. Parsed
@@ -85,6 +87,12 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 ## Decisions
 
 - Against HEAD, not the default branch or merge base (2026-10-14), as VS Code and Zed.
+- Summary counts without a numstat against HEAD of every path (2026-10-31): a path not staged
+  counts against HEAD as unstaged, so only staged paths are diffed against HEAD. Zed's clone, M4,
+  CPU per snapshot: 20 files edited 225 → 152 ms, 300 edited 422 → 254 ms, 10 of 20 staged and
+  edited again 222 → 200 ms; 300 staged and edited again 543 → 558 ms, wall time even (168 →
+  170 ms) since `--name-status` (14 ms) lets both staged diffs run at once (`.local/snapshot-cost/`).
+  The summary alone (level 0) keeps status plus one numstat against HEAD, its cheapest.
 - Map: marks under a translucent thumb, not strong colors (2026-10-17: too loud); nothing marks the
   change gone to, no tooltip (too much).
 - Long lines a setting only, no shortcut (2026-10-19): VS Code's `⌥Z` and Zed's `⌘K Z` are per

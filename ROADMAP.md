@@ -116,6 +116,4 @@ becomes a problem (decided 2026-10-21).
       100 ms, then at most one per 5 s while changes go on, no timer when idle
       (`ui/src/lib/filesystem-events.ts`); 5 s is too stale to watch an agent, the shape fits
       (first at once, last always, N measured)
-- [ ] Snapshot: with nothing staged, numstat `HEAD` repeats numstat unstaged, ~30% of its git CPU
-      (`.local/format-cost/`, 2026-10-26)
 - [ ] Prefetch neighbouring diffs, if switching shows a wait

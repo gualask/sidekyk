@@ -18,7 +18,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                  (kindChanged: reset; commits and staged diffs only when
                                  gitDir; the open file, diff and colors only when paths touch
                                  them; paths null over 100 or when unknown)
-                                   ├─▶ get_repository_snapshot   status + numstat ×3, with summary
+                                   ├─▶ get_repository_snapshot   status + numstats, with summary
                                    ├─▶ get_repository_summary    level 0 only
                                    ├─▶ get_file_diff             one file, one area
                                    ├─▶ get_recent_commits        only while unfolded

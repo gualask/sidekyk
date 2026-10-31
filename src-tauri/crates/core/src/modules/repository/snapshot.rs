@@ -6,7 +6,7 @@ use super::contracts::{
     RepositorySummary,
 };
 use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
-use super::numstat::{count_text_lines, parse_numstat_z, Counts, LineCounts};
+use super::numstat::{count_text_lines, parse_name_status_z, parse_numstat_z, Counts, LineCounts};
 use super::open::existing_root;
 use super::ports::{git_checked, joined, RepositoryBackend};
 use super::status::{parse_porcelain_v2, StatusEntry, StatusReport};
@@ -21,6 +21,10 @@ const MAX_UNTRACKED_FILES_READ: usize = 2_000;
 /// Output read from `git status`, well past what `MAX_CHANGED_PATHS` paths take (about 150 bytes
 /// each), so that git is killed rather than read to the end when the paths are many more.
 const MAX_STATUS_BYTES: usize = 8 * 1024 * 1024;
+
+/// The staged paths are named to git, against HEAD, while they fit in this many bytes; past it
+/// the whole diff runs. Well inside Windows' 32,767-character command line.
+const MAX_PATHSPEC_BYTES: usize = 16 * 1024;
 
 type CountsByPath = HashMap<String, Counts>;
 
@@ -78,6 +82,7 @@ fn status(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Status
 }
 
 /// The line counts of one numstat, by path.
+#[derive(Default)]
 pub(super) struct Numstat {
     pub(super) counts: CountsByPath,
     /// The output was cut: some paths have no counts.
@@ -158,6 +163,123 @@ fn sum(counts: impl Iterator<Item = Counts>) -> (u32, u32) {
     })
 }
 
+/// The paths `git diff --cached` names, both sides of a rename: what is staged, without reading
+/// a file's content.
+struct StagedPaths {
+    paths: Vec<String>,
+    /// The output was cut: some staged paths are not named.
+    truncated: bool,
+}
+
+fn staged_paths(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<StagedPaths> {
+    let out = git_checked(
+        backend,
+        root,
+        &["diff", "--cached", "--name-status", "-z", "--no-ext-diff"],
+        &[0],
+        MAX_NUMSTAT_BYTES,
+    )?;
+    Ok(StagedPaths {
+        paths: parse_name_status_z(&out.stdout),
+        truncated: out.truncated,
+    })
+}
+
+/// `staged` as literal pathspecs; `None` when some are not named or past `MAX_PATHSPEC_BYTES`.
+fn literal_pathspecs(staged: &StagedPaths) -> Option<Vec<String>> {
+    if staged.truncated {
+        return None;
+    }
+    let mut pathspecs = Vec::new();
+    let mut bytes = 0;
+    for path in &staged.paths {
+        // a name is never read as a pattern (`[id].tsx`) or magic
+        let pathspec = format!(":(literal){path}");
+        bytes += pathspec.len() + 1;
+        if bytes > MAX_PATHSPEC_BYTES {
+            return None;
+        }
+        pathspecs.push(pathspec);
+    }
+    Some(pathspecs)
+}
+
+/// The counts against HEAD that what is staged needs. Each fails before the first commit, when it
+/// is not used.
+enum StagedAgainstHead {
+    /// The staged paths' own, replacing their unstaged counts.
+    Paths {
+        paths: Vec<String>,
+        counts: anyhow::Result<Numstat>,
+    },
+    /// Every path's, when the staged ones cannot all be named.
+    Every(anyhow::Result<Numstat>),
+}
+
+/// The staged area: its counts and, when anything is staged, what it needs against HEAD. Both
+/// diffs run together once `--name-status` has named the paths, which costs about as much as an
+/// empty `--cached` numstat; with nothing staged neither runs.
+fn staged_area(
+    backend: &dyn RepositoryBackend,
+    root: &Path,
+) -> anyhow::Result<(Numstat, Option<StagedAgainstHead>)> {
+    let staged = staged_paths(backend, root)?;
+    if staged.paths.is_empty() && !staged.truncated {
+        return Ok((Numstat::default(), None));
+    }
+    let pathspecs = literal_pathspecs(&staged);
+    let (counts, head) = std::thread::scope(|scope| {
+        let head = scope.spawn(|| match &pathspecs {
+            Some(pathspecs) => {
+                let mut args = vec!["HEAD", "--"];
+                args.extend(pathspecs.iter().map(String::as_str));
+                numstat(backend, root, &args)
+            }
+            None => numstat(backend, root, &["HEAD"]),
+        });
+        let counts = numstat(backend, root, &["--cached"]);
+        (counts, joined(head))
+    });
+    let head = match pathspecs {
+        Some(_) => StagedAgainstHead::Paths {
+            paths: staged.paths,
+            counts: head,
+        },
+        None => StagedAgainstHead::Every(head),
+    };
+    Ok((counts?, Some(head)))
+}
+
+/// The line counts of tracked paths against HEAD. A path not staged has the same counts against
+/// HEAD as unstaged, the index holding HEAD's version; a staged one takes its own diff against
+/// HEAD, where a line edited, staged and edited again counts once. Before the first commit there
+/// is no HEAD, and the areas add up.
+fn against_head(
+    status: &StatusReport,
+    staged: Numstat,
+    unstaged: Numstat,
+    of_staged: Option<StagedAgainstHead>,
+) -> anyhow::Result<Numstat> {
+    if status.branch.commit.is_none() {
+        return Ok(added_up(staged, unstaged));
+    }
+    match of_staged {
+        None => Ok(unstaged),
+        Some(StagedAgainstHead::Every(counts)) => counts,
+        Some(StagedAgainstHead::Paths { paths, counts }) => {
+            let counts = counts?;
+            let mut tracked = unstaged;
+            for path in &paths {
+                tracked.counts.remove(path);
+            }
+            // a staged path back to HEAD's content is not in `counts`, and counts nothing
+            tracked.counts.extend(counts.counts);
+            tracked.truncated |= counts.truncated;
+            Ok(tracked)
+        }
+    }
+}
+
 /// The summary of `status`, where `tracked` holds the line counts of tracked paths against HEAD.
 /// New files are counted as files, their lines unread.
 fn summarize(status: &StatusReport, tracked: &Numstat) -> RepositorySummary {
@@ -180,24 +302,19 @@ pub fn load_snapshot(
     repository: &RepositoryInfo,
 ) -> anyhow::Result<RepositorySnapshot> {
     let root = existing_root(backend, repository)?;
-    // The four commands are independent, so they run together and the snapshot costs about as
-    // much as the slowest one. The diff against HEAD fails before the first commit; its result
-    // is only used when status reports a commit.
-    let (status, unstaged, staged, against_head) = std::thread::scope(|scope| {
+    // The reads are independent, so they run together and the snapshot costs about as much as
+    // the slowest one. The counts against HEAD are the unstaged ones but for the staged paths,
+    // diffed against HEAD on their own (`against_head`): a numstat against HEAD of every path
+    // would repeat the unstaged one, its whole cost, while nothing is staged.
+    let (status, unstaged, staged) = std::thread::scope(|scope| {
         let unstaged = scope.spawn(|| numstat(backend, root, &[]));
-        let staged = scope.spawn(|| numstat(backend, root, &["--cached"]));
-        let against_head = scope.spawn(|| numstat(backend, root, &["HEAD"]));
+        let staged = scope.spawn(|| staged_area(backend, root));
         let status = status(backend, root);
-        (
-            status,
-            joined(unstaged),
-            joined(staged),
-            joined(against_head),
-        )
+        (status, joined(unstaged), joined(staged))
     });
     let status = status?;
     let unstaged = unstaged?;
-    let staged = staged?;
+    let (staged, of_staged) = staged?;
 
     let mut files = Vec::new();
     let mut budget = UntrackedBudget::new();
@@ -228,14 +345,7 @@ pub fn load_snapshot(
         }
     }
 
-    // Against HEAD a line edited, staged, then edited again counts once. Before the first commit
-    // there is no HEAD, and the staged and unstaged counts are added up instead.
-    let tracked = if status.branch.commit.is_some() {
-        against_head?
-    } else {
-        added_up(staged, unstaged)
-    };
-
+    let tracked = against_head(&status, staged, unstaged, of_staged)?;
     Ok(RepositorySnapshot {
         files,
         summary: summarize(&status, &tracked),
@@ -479,6 +589,30 @@ mod tests {
         assert_eq!(sum.counts["b.ts"], Counts::lines(0, 1));
         assert_eq!(sum.counts["logo.png"], Counts::BINARY);
         assert!(sum.truncated);
+    }
+
+    #[test]
+    fn staged_paths_are_named_literally_while_they_fit() {
+        let staged = |paths: Vec<String>, truncated| StagedPaths { paths, truncated };
+        assert_eq!(
+            literal_pathspecs(&staged(vec!["src/[id].ts".into(), "old.md".into()], false)).unwrap(),
+            [":(literal)src/[id].ts", ":(literal)old.md"]
+        );
+
+        let name = "a".repeat(100);
+        let many = (0..MAX_PATHSPEC_BYTES / 100)
+            .map(|i| format!("{name}{i}"))
+            .collect();
+        assert_eq!(
+            literal_pathspecs(&staged(many, false)),
+            None,
+            "past the limit, the whole diff"
+        );
+        assert_eq!(
+            literal_pathspecs(&staged(vec!["a.ts".into()], true)),
+            None,
+            "a cut list does not name every staged path"
+        );
     }
 
     #[test]

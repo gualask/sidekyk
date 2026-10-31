@@ -358,6 +358,55 @@ mod tests {
     }
 
     #[test]
+    fn snapshot_counts_paths_changed_twice_against_head() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        for (path, body) in [
+            ("src/[id].ts", "1\n"),
+            ("src/i.ts", "1\n"),
+            ("src/back.ts", "x\n"),
+            ("src/staged.ts", "s\n"),
+        ] {
+            write(root, path, body);
+        }
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "more"]);
+
+        let twice = |path: &str, staged: &str, again: &str| {
+            write(root, path, staged);
+            git(root, &["add", "--", path]);
+            write(root, path, again);
+        };
+        // one line changed twice counts once against HEAD, where the areas would add up to two
+        twice("src/cart.ts", "a\nB\nc\n", "a\nBB\nc\n");
+        // a name with glob characters, beside one its glob matches
+        twice("src/[id].ts", "2\n", "3\n");
+        write(root, "src/i.ts", "9\n");
+        // staged, then put back as HEAD has it: nothing against HEAD
+        twice("src/back.ts", "y\n", "x\n");
+        // a staged rename edited again, paired with its old side
+        std::fs::create_dir(root.join("docs")).unwrap();
+        git(root, &["mv", "README.md", "docs/README.md"]);
+        write(root, "docs/README.md", "hello\nworld\n");
+        // staged only
+        twice("src/staged.ts", "s\nt\n", "s\nt\n");
+
+        let snapshot = load_snapshot(&backend, &repo.info).unwrap();
+        // cart +1 -1, [id] +1 -1, i +1 -1, docs/README +1, staged +1; back counts as a file
+        assert_eq!(
+            snapshot_json(&snapshot)["summary"]["totals"],
+            json!({ "files": 6, "additions": 5, "deletions": 3 })
+        );
+        assert_eq!(
+            load_summary(&backend, &repo.info).unwrap(),
+            snapshot.summary,
+            "the same as one numstat against HEAD"
+        );
+    }
+
+    #[test]
     fn snapshot_before_the_first_commit_adds_up_staged_and_unstaged() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();

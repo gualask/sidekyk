@@ -1,4 +1,5 @@
-//! Parser for `git diff --numstat -z`, plus line counting for untracked files.
+//! Parsers for `git diff --numstat -z` and `--name-status -z`, plus line counting for untracked
+//! files.
 
 /// Lines added and removed in one file. Both are `None` for a binary file, and for a file that
 /// was not counted.
@@ -68,6 +69,23 @@ pub(super) fn parse_numstat_z(bytes: &[u8]) -> Vec<LineCounts> {
     counts
 }
 
+/// Every path `git diff --name-status -z` names: a status, then the path, or for a rename or a
+/// copy (`R100`, `C75`) the old path and the new one.
+pub(super) fn parse_name_status_z(bytes: &[u8]) -> Vec<String> {
+    let text = String::from_utf8_lossy(bytes);
+    let mut fields = text.split('\0');
+    let mut paths = Vec::new();
+    while let Some(status) = fields.next() {
+        let sides = match status.chars().next() {
+            None => continue,
+            Some('R' | 'C') => 2,
+            Some(_) => 1,
+        };
+        paths.extend(fields.by_ref().take(sides).map(str::to_string));
+    }
+    paths
+}
+
 /// A NUL in the first 8 KiB: the heuristic git uses to call a file binary.
 pub(super) fn looks_binary(bytes: &[u8]) -> bool {
     bytes[..bytes.len().min(8000)].contains(&0)
@@ -108,6 +126,16 @@ mod tests {
             ]
         );
         assert!(parse_numstat_z(b"").is_empty());
+    }
+
+    #[test]
+    fn names_every_path_with_both_sides_of_a_rename() {
+        let out = b"M\0src/a b.ts\0R100\0old.ts\0new.ts\0D\0gone.ts\0";
+        assert_eq!(
+            parse_name_status_z(out),
+            ["src/a b.ts", "old.ts", "new.ts", "gone.ts"]
+        );
+        assert!(parse_name_status_z(b"").is_empty());
     }
 
     #[test]
