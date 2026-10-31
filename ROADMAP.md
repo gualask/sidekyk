@@ -1,15 +1,16 @@
 # Roadmap
 
-What is left to build, by theme; not a timeline. **After:** marks an item that builds on another.
+What is left to build, by theme; not a timeline. **After:** marks an item that builds on another;
+**Next:** the one to build next, nothing left to decide.
 A built item leaves this file for `docs/features/` (`docs/README.md`). Every item keeps
 repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `docs/product.md`.
 
 ## App
 
-- [ ] First: watch for notify 9 stable, with its `notify-debouncer-mini` (0.8), and install it as
-      soon as it is out: on Windows the system's dropped events become a rescan
-      (notify-rs#964; `docs/architecture.md`, Watching)
+- [ ] Waiting for notify 9 stable (9.0.0-rc.7 on 2026-10-31), with its `notify-debouncer-mini`
+      (0.8): installed as soon as it is out, before anything else; on Windows the system's
+      dropped events become a rescan (notify-rs#964; `docs/architecture.md`, Watching)
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
 
 ## Notes
@@ -38,7 +39,8 @@ has.
 
 Built: `docs/features/previews.md` (Markdown, SVG, images).
 
-- [ ] A changed image's two sides next to each other, as VS Code
+- [ ] **Next:** a changed image's two sides next to each other, as VS Code (design agreed
+      2026-10-26 in the plan; nothing open)
 - [ ] PDF in the file viewer
 - [ ] Mermaid diagrams in the Markdown preview (nice to have)
 
