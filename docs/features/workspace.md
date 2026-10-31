@@ -52,8 +52,10 @@ problems. Why semantic zoom: `../product.md`.
   level change goes through `zoom` in a view transition. The level shown is as deep as the project
   goes; another project opens at the level seen. A target (`⌘N`, a file from the palette) names its
   project, so a switch leaves it behind. Level 0 composes `InboxColumn` and `ProjectsOverview`,
-  both in the first chunk. `preloadable` parts render at once once loaded, so a transition never
-  captures an empty frame.
+  both in the first chunk. Panel chunks start loading in `main.tsx`, before the first render. A
+  `preloadable` part, shown by `Preloaded`, renders at once once loaded, so a transition never
+  captures an empty frame. `Preloaded` is one component at module level (2026-10-31): a factory
+  defining one fails Biome's `noComponentHookFactories` (React's `component-hook-factories`).
 - Start at level 1: the backend keeps the project the folder argument opened
   (`ProjectsState::opened`) and says the list changed; the frontend takes it once
   (`take_opened_project`). `onProjectsChanged` also runs once as listening starts, so a change made

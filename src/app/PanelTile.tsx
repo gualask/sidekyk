@@ -3,6 +3,7 @@ import { type CSSProperties, Suspense, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { Preloaded } from '@/shared/ui/Preloaded';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
 
@@ -119,16 +120,19 @@ export function PanelTile({
             )}
             <div className="relative min-h-0 flex-1">
                 <Suspense fallback={null}>
-                    <panel.Component
+                    <Preloaded
                         key={project.id}
-                        project={project}
-                        header={header}
-                        tileFit={tileFit}
-                        target={target}
-                        place={onZoomIn ? 'tile' : 'full'}
-                        selected={selected}
-                        show={show}
-                        findInFiles={findInFiles}
+                        of={panel.view}
+                        props={{
+                            project,
+                            header,
+                            tileFit,
+                            target,
+                            place: onZoomIn ? 'tile' : 'full',
+                            selected,
+                            show,
+                            findInFiles,
+                        }}
                     />
                 </Suspense>
             </div>

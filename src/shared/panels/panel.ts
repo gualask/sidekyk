@@ -1,7 +1,7 @@
 import type { ComponentType } from 'react';
 import type { MessageKey } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
-import { preloadable } from '@/shared/ui/preloadable';
+import { type Preloadable, preloadable } from '@/shared/ui/preloadable';
 
 /**
  * Something the app asks a panel to show, such as a file picked in the command palette. Each
@@ -85,17 +85,12 @@ export interface PanelDefinition {
      * it, so a panel that is not on screen runs none. It is mounted again for another project, so
      * its state (a selection, a scroll position) always belongs to the project it shows.
      */
-    Component: ComponentType<PanelProps>;
-    /** Starts loading the chunk ahead of the first show, for the panel the app opens on. */
-    preload: () => Promise<unknown>;
+    view: Preloadable<PanelProps>;
     /**
      * What the panel tells about a project on its card at all projects (level 0), if anything.
      * A chunk of its own, loaded with level 0; it fetches only what the card shows.
      */
-    summary?: {
-        Component: ComponentType<PanelSummaryProps>;
-        preload: () => Promise<unknown>;
-    };
+    summary?: Preloadable<PanelSummaryProps>;
 }
 
 /** A component of a module's UI, loaded by `load`, a dynamic `import()`. */
@@ -116,7 +111,7 @@ export function definePanel<M, S = never>({
     }): PanelDefinition {
     return {
         ...panel,
-        ...preloadable(load, pick),
+        view: preloadable(load, pick),
         summary: summary ? preloadable(summary.load, summary.pick) : undefined,
     };
 }

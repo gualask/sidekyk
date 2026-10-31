@@ -54,10 +54,13 @@ export interface ProjectTiles {
 }
 
 /** A panel's summary, by the panel's id. */
-type PanelSummary = NonNullable<PanelDefinition['summary']> & { id: string };
+interface PanelSummary {
+    id: string;
+    summary: NonNullable<PanelDefinition['summary']>;
+}
 
 function summariesOf(panels: readonly PanelDefinition[]): PanelSummary[] {
-    return panels.flatMap((panel) => (panel.summary ? [{ id: panel.id, ...panel.summary }] : []));
+    return panels.flatMap(({ id, summary }) => (summary ? [{ id, summary }] : []));
 }
 
 function tilesOf(panels: readonly PanelDefinition[]): ProjectTiles {
@@ -97,9 +100,13 @@ export function deepestLevel(tiles: ProjectTiles): 1 | 2 {
     return tiles.side.length > 0 ? 2 : 1;
 }
 
-/** The panel selected at startup. Every chunk starts loading with the app, not after a render. */
+/** The panel selected at startup. */
 export const INITIAL_PANEL = PANELS[0];
-for (const panel of PANELS) void panel.preload();
+
+/** Starts loading every panel's chunk: as the app starts, not after a render. */
+export function preloadPanels() {
+    for (const panel of PANELS) void panel.view.preload();
+}
 
 /**
  * The tile shown next to a panel's, before (-1) or after (1) it, if any, among a project's tiles

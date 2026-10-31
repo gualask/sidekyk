@@ -39,6 +39,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget, SummaryPart } from '@/shared/panels/panel';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import { Preloaded } from '@/shared/ui/Preloaded';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
@@ -373,7 +374,7 @@ export function AppShell() {
             whenIdle(() => {
                 void SettingsDialog.preload();
                 void CommandPalette.preload();
-                for (const summary of SUMMARIES) void summary.preload();
+                for (const { summary } of SUMMARIES) void summary.preload();
             }),
         [],
     );
@@ -428,11 +429,14 @@ export function AppShell() {
             </main>
             {removing ? (
                 <Suspense fallback={null}>
-                    <RemoveProjectDialog.Component
+                    <Preloaded
                         key={removing.id}
-                        project={removing}
-                        onRemove={() => removeProject(removing.id)}
-                        onClose={() => setRemoving(null)}
+                        of={RemoveProjectDialog}
+                        props={{
+                            project: removing,
+                            onRemove: () => removeProject(removing.id),
+                            onClose: () => setRemoving(null),
+                        }}
                     />
                 </Suspense>
             ) : null}
@@ -443,25 +447,31 @@ export function AppShell() {
             ) : null}
             {settingsOpen === null ? null : (
                 <Suspense fallback={null}>
-                    <SettingsDialog.Component open={settingsOpen} onOpenChange={setSettingsOpen} />
+                    <Preloaded
+                        of={SettingsDialog}
+                        props={{ open: settingsOpen, onOpenChange: setSettingsOpen }}
+                    />
                 </Suspense>
             )}
             {palette.open === null ? null : (
                 <Suspense fallback={null}>
-                    <CommandPalette.Component
-                        open={palette.open}
-                        onOpenChange={(open) => setPalette((current) => ({ ...current, open }))}
-                        mode={palette.mode}
-                        onModeChange={(mode) => setPalette((current) => ({ ...current, mode }))}
-                        initialText={palette.text}
-                        projectName={project?.name ?? null}
-                        projectId={level > 0 ? (project?.id ?? null) : null}
-                        hasFiles={tiles?.panels.includes(filesPanel) ?? false}
-                        stoppedDistro={stoppedDistro}
-                        currentFile={palette.open ? shownFile() : null}
-                        panels={palettePanels}
-                        books={paletteBook}
-                        actions={paletteActions}
+                    <Preloaded
+                        of={CommandPalette}
+                        props={{
+                            open: palette.open,
+                            onOpenChange: (open) => setPalette((current) => ({ ...current, open })),
+                            mode: palette.mode,
+                            onModeChange: (mode) => setPalette((current) => ({ ...current, mode })),
+                            initialText: palette.text,
+                            projectName: project?.name ?? null,
+                            projectId: level > 0 ? (project?.id ?? null) : null,
+                            hasFiles: tiles?.panels.includes(filesPanel) ?? false,
+                            stoppedDistro,
+                            currentFile: palette.open ? shownFile() : null,
+                            panels: palettePanels,
+                            books: paletteBook,
+                            actions: paletteActions,
+                        }}
                     />
                 </Suspense>
             )}
@@ -607,9 +617,9 @@ function CardSummaries({ project, part }: { project: ProjectInfo; part: SummaryP
     const folderKind = useFolderKind(project, { freshOnShow: true });
     if (folderKind.waiting) return null;
     const repository = folderKind.kind === 'repository';
-    return projectTiles(folderKind.kind).summaries.map(({ id, Component }) => (
+    return projectTiles(folderKind.kind).summaries.map(({ id, summary }) => (
         <Suspense key={id} fallback={null}>
-            <Component project={project} part={part} repository={repository} />
+            <Preloaded of={summary} props={{ project, part, repository }} />
         </Suspense>
     ));
 }

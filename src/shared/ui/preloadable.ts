@@ -1,27 +1,33 @@
-import { type ComponentType, createElement, lazy, useState } from 'react';
+import { type ComponentType, lazy } from 'react';
 
 /**
- * A component loaded by a dynamic `import()` on its first show, or ahead of it with `preload`.
- * Once loaded it renders at once: `lazy` alone suspends on its first render even when the chunk
- * is already there, which shows an empty frame first (and a zoom transition would capture it).
+ * A component loaded by a dynamic `import()` on its first show, or ahead of it with `preload`;
+ * `Preloaded` shows it.
  */
+export interface Preloadable<P> {
+    /** Starts loading the chunk ahead of the first show. */
+    preload: () => Promise<ComponentType<P>>;
+    /** The component once its chunk is loaded, else null. */
+    readonly loaded: ComponentType<P> | null;
+    /** The same component, suspending until its chunk is loaded: for a show before that. */
+    readonly lazy: ComponentType<P>;
+}
+
 export function preloadable<M, P extends object>(
     load: () => Promise<M>,
     pick: (module: M) => ComponentType<P>,
-) {
+): Preloadable<P> {
     let loaded: ComponentType<P> | null = null;
     const preload = () =>
         load().then((module) => {
             loaded = pick(module);
             return loaded;
         });
-    const Lazy = lazy(() => preload().then((component) => ({ default: component })));
-
-    function Preloadable(props: P) {
-        // kept for the component's life: going from the lazy one to the loaded one would mount it
-        // again
-        const [component] = useState<ComponentType<P>>(() => loaded ?? Lazy);
-        return createElement(component, props);
-    }
-    return { Component: Preloadable, preload };
+    return {
+        preload,
+        get loaded() {
+            return loaded;
+        },
+        lazy: lazy(() => preload().then((component) => ({ default: component }))),
+    };
 }
