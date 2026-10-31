@@ -9,6 +9,7 @@
         "includes": [
             "src/**",
             "!src/dev/fixture-files/previews.json",
+            "!src/dev/fixture-files/**/*.md",
             "*.json",
             "*.js",
             "*.ts",

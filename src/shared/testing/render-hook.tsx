@@ -1,5 +1,6 @@
 import { act, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { Probe } from './probe';
 
 // React then expects the updates of a test inside `act`, and warns of those outside it
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -18,16 +19,12 @@ export function renderHook<P, R>(
     }: { props?: NoInfer<P>; wrapper?: (props: { children: ReactNode }) => ReactNode } = {},
 ) {
     const result = { current: undefined as R };
-    function Probe({ props }: { props: P }) {
-        result.current = hook(props);
-        return null;
-    }
     const root = createRoot(document.createElement('div'));
     const rerender = (next: NoInfer<P>) =>
         act(() =>
             root.render(
                 <Wrapper>
-                    <Probe props={next} />
+                    <Probe hook={hook} props={next} result={result} />
                 </Wrapper>,
             ),
         );

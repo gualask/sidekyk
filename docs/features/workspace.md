@@ -84,9 +84,9 @@ problems. Why semantic zoom: `../product.md`.
 
 ## Decisions
 
-- Base UI (`@base-ui/react`, pinned 1.8.0, 2026-10-12) for palette, menus, selects, tooltips,
-  toasts: maintained, headless, virtualizes with `@tanstack/react-virtual`. Compared (kB gzip,
-  palette/tooltip): Base UI 42/34, Radix+cmdk 19.5/21 (Radix slowing, cmdk not virtualized),
-  Headless UI 54/none, Ariakit 38/35 (0.x), Ark 48/25, React Aria 56/22. CSS-only tooltips cannot
-  flip. Never in the first paint chunk.
+- Base UI (`@base-ui/react`, pinned to an exact version, 2026-10-12) for palette, menus,
+  selects, tooltips, toasts: maintained, headless, virtualizes with `@tanstack/react-virtual`.
+  Compared (kB gzip, palette/tooltip): Base UI 42/34, Radix+cmdk 19.5/21 (Radix slowing, cmdk
+  not virtualized), Headless UI 54/none, Ariakit 38/35 (0.x), Ark 48/25, React Aria 56/22.
+  CSS-only tooltips cannot flip. Never in the first paint chunk.
 - Panel icon in a tile, not its title (2026-10-17): the title repeated what the panel shows.
