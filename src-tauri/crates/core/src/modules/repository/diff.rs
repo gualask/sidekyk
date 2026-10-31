@@ -3,7 +3,7 @@ use std::path::{Component, Path};
 use super::contracts::{ChangeArea, FileDiffRequest, RepositoryInfo, UnifiedDiff};
 use super::limits::MAX_DIFF_BYTES;
 use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend};
+use super::ports::{git_checked, RepositoryBackend, LITERAL_PATHSPECS};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// Only a plain relative path may reach git: no `..`, no absolute path, nothing that names a
@@ -52,7 +52,7 @@ pub fn load_file_diff(
         context_option(request.whole_file),
     ];
 
-    let mut args = vec!["diff"];
+    let mut args = vec![LITERAL_PATHSPECS, "diff"];
     let mut ok_codes = vec![0];
     match request.area {
         ChangeArea::Unstaged => {

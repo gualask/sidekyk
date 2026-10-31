@@ -11,7 +11,7 @@ use super::diff::{checked_path, context_option, cut_at_line};
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
 use super::numstat::{parse_numstat_z, Counts};
 use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend};
+use super::ports::{git_checked, RepositoryBackend, LITERAL_PATHSPECS};
 use super::status::kind_of;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
@@ -105,7 +105,7 @@ fn diff_tree_args<'a>(
 ) -> anyhow::Result<Vec<&'a str>> {
     let sha = checked_commit(&commit.sha)?;
     let parent = commit.parent.as_deref().map(checked_commit).transpose()?;
-    let mut args = vec!["diff-tree", "--no-commit-id", "-M"];
+    let mut args = vec![LITERAL_PATHSPECS, "diff-tree", "--no-commit-id", "-M"];
     args.extend_from_slice(options);
     match parent {
         Some(parent) => args.extend([parent, sha]),
@@ -337,6 +337,7 @@ mod tests {
         assert_eq!(
             diff_tree_args(&["-p"], &root, &["a.ts"]).unwrap(),
             [
+                "--literal-pathspecs",
                 "diff-tree",
                 "--no-commit-id",
                 "-M",
@@ -354,6 +355,7 @@ mod tests {
         assert_eq!(
             diff_tree_args(&[], &child, &[]).unwrap(),
             [
+                "--literal-pathspecs",
                 "diff-tree",
                 "--no-commit-id",
                 "-M",

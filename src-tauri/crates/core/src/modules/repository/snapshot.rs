@@ -8,7 +8,7 @@ use super::contracts::{
 use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
 use super::numstat::{count_text_lines, parse_name_status_z, parse_numstat_z, Counts, LineCounts};
 use super::open::existing_root;
-use super::ports::{git_checked, joined, RepositoryBackend};
+use super::ports::{git_checked, joined, RepositoryBackend, LITERAL_PATHSPECS};
 use super::status::{parse_porcelain_v2, StatusEntry, StatusReport};
 
 /// Untracked files are read to count their lines, within these limits per snapshot. Past them a
@@ -95,7 +95,13 @@ pub(super) fn numstat(
     root: &Path,
     extra: &[&str],
 ) -> anyhow::Result<Numstat> {
-    let mut args = vec!["diff", "--numstat", "-z", "--no-ext-diff"];
+    let mut args = vec![
+        LITERAL_PATHSPECS,
+        "diff",
+        "--numstat",
+        "-z",
+        "--no-ext-diff",
+    ];
     args.extend_from_slice(extra);
     let out = git_checked(backend, root, &args, &[0], MAX_NUMSTAT_BYTES)?;
     let mut counts = parse_numstat_z(&out.stdout);
@@ -185,23 +191,16 @@ fn staged_paths(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<
     })
 }
 
-/// `staged` as literal pathspecs; `None` when some are not named or past `MAX_PATHSPEC_BYTES`.
-fn literal_pathspecs(staged: &StagedPaths) -> Option<Vec<String>> {
-    if staged.truncated {
-        return None;
-    }
-    let mut pathspecs = Vec::new();
-    let mut bytes = 0;
-    for path in &staged.paths {
-        // a name is never read as a pattern (`[id].tsx`) or magic
-        let pathspec = format!(":(literal){path}");
-        bytes += pathspec.len() + 1;
-        if bytes > MAX_PATHSPEC_BYTES {
-            return None;
-        }
-        pathspecs.push(pathspec);
-    }
-    Some(pathspecs)
+/// Whether the staged paths can all be named to git: the list is whole, and fits in
+/// `MAX_PATHSPEC_BYTES`.
+fn all_nameable(staged: &StagedPaths) -> bool {
+    !staged.truncated
+        && staged
+            .paths
+            .iter()
+            .map(|path| path.len() + 1)
+            .sum::<usize>()
+            <= MAX_PATHSPEC_BYTES
 }
 
 /// The counts against HEAD that what is staged needs. Each fails before the first commit, when it
@@ -227,25 +226,27 @@ fn staged_area(
     if staged.paths.is_empty() && !staged.truncated {
         return Ok((Numstat::default(), None));
     }
-    let pathspecs = literal_pathspecs(&staged);
+    let named = all_nameable(&staged);
     let (counts, head) = std::thread::scope(|scope| {
-        let head = scope.spawn(|| match &pathspecs {
-            Some(pathspecs) => {
+        let head = scope.spawn(|| {
+            if named {
                 let mut args = vec!["HEAD", "--"];
-                args.extend(pathspecs.iter().map(String::as_str));
+                args.extend(staged.paths.iter().map(String::as_str));
                 numstat(backend, root, &args)
+            } else {
+                numstat(backend, root, &["HEAD"])
             }
-            None => numstat(backend, root, &["HEAD"]),
         });
         let counts = numstat(backend, root, &["--cached"]);
         (counts, joined(head))
     });
-    let head = match pathspecs {
-        Some(_) => StagedAgainstHead::Paths {
+    let head = if named {
+        StagedAgainstHead::Paths {
             paths: staged.paths,
             counts: head,
-        },
-        None => StagedAgainstHead::Every(head),
+        }
+    } else {
+        StagedAgainstHead::Every(head)
     };
     Ok((counts?, Some(head)))
 }
@@ -592,25 +593,20 @@ mod tests {
     }
 
     #[test]
-    fn staged_paths_are_named_literally_while_they_fit() {
+    fn staged_paths_are_named_while_they_fit() {
         let staged = |paths: Vec<String>, truncated| StagedPaths { paths, truncated };
-        assert_eq!(
-            literal_pathspecs(&staged(vec!["src/[id].ts".into(), "old.md".into()], false)).unwrap(),
-            [":(literal)src/[id].ts", ":(literal)old.md"]
-        );
+        assert!(all_nameable(&staged(vec!["src/[id].ts".into()], false)));
 
         let name = "a".repeat(100);
         let many = (0..MAX_PATHSPEC_BYTES / 100)
             .map(|i| format!("{name}{i}"))
             .collect();
-        assert_eq!(
-            literal_pathspecs(&staged(many, false)),
-            None,
+        assert!(
+            !all_nameable(&staged(many, false)),
             "past the limit, the whole diff"
         );
-        assert_eq!(
-            literal_pathspecs(&staged(vec!["a.ts".into()], true)),
-            None,
+        assert!(
+            !all_nameable(&staged(vec!["a.ts".into()], true)),
             "a cut list does not name every staged path"
         );
     }

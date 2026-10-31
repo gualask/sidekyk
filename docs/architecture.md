@@ -96,6 +96,9 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
 - `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
   a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+- Paths after `--` are literal (2026-10-31): `--literal-pathspecs` on diff, diff-tree and the
+  snapshot's numstats, else `[id].tsx` also matched `i.tsx` and a file's diff held both. Not
+  `GIT_LITERAL_PATHSPECS` for every command: `check-ignore` refuses it.
 - Bounded (`limits.rs`): status 8 MiB, numstat 4 MiB, diff 2 MiB, ls-files 32 MiB, `check-ignore`
   its input; past the limit git is killed and the output `truncated` (cut records dropped, diffs cut
   at a line). stderr 64 KiB. 30 s → `git_timed_out`.

@@ -141,6 +141,11 @@ pub enum WorktreeEntry {
     Folder,
 }
 
+/// Before a git command whose paths after `--` are paths: git reads them as patterns, and
+/// `[id].tsx` would also match `i.tsx` and `d.tsx`. Not for every command
+/// (`GIT_LITERAL_PATHSPECS`): `check-ignore` refuses it.
+pub(super) const LITERAL_PATHSPECS: &str = "--literal-pathspecs";
+
 /// Runs `git` and fails unless it exits with one of `ok_codes`. Output cut at `max_stdout` comes
 /// back as it is, `truncated`: git was killed, so its exit code says nothing.
 pub(super) fn git_checked(
@@ -157,7 +162,8 @@ pub(super) fn git_checked(
     let detail = out.stderr.trim();
     anyhow::bail!(
         "git {} exited with code {}{}{}",
-        args.first().unwrap_or(&""),
+        // the command, after any option of git's own
+        args.iter().find(|arg| !arg.starts_with('-')).unwrap_or(&""),
         out.code,
         if detail.is_empty() { "" } else { ": " },
         detail

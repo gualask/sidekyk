@@ -407,6 +407,52 @@ mod tests {
     }
 
     #[test]
+    fn a_name_with_glob_characters_is_diffed_alone() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        // `[id].ts` as a pattern matches `i.ts` too
+        write(root, "src/[id].ts", "1\n");
+        write(root, "src/i.ts", "1\n");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "Routes"]);
+        let alone = |text: &str| text.contains("+2\n") && !text.contains("src/i.ts");
+
+        write(root, "src/[id].ts", "2\n");
+        write(root, "src/i.ts", "2\n");
+        let request = |area: &str| -> FileDiffRequest {
+            serde_json::from_value(json!({ "path": "src/[id].ts", "origPath": null, "area": area }))
+                .unwrap()
+        };
+        let unstaged = load_file_diff(&backend, &repo.info, &request("unstaged")).unwrap();
+        assert!(alone(&unstaged.text), "{}", unstaged.text);
+
+        git(root, &["add", "."]);
+        let staged = load_file_diff(&backend, &repo.info, &request("staged")).unwrap();
+        assert!(alone(&staged.text), "{}", staged.text);
+
+        git(root, &["commit", "-q", "-m", "Both"]);
+        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let both = &recent.commits[0];
+        let committed = load_commit_file_diff(
+            &backend,
+            &repo.info,
+            &CommitFileDiffRequest {
+                commit: CommitRequest {
+                    sha: both.sha.clone(),
+                    parent: both.parent.clone(),
+                },
+                path: "src/[id].ts".into(),
+                orig_path: None,
+                whole_file: false,
+            },
+        )
+        .unwrap();
+        assert!(alone(&committed.text), "{}", committed.text);
+    }
+
+    #[test]
     fn snapshot_before_the_first_commit_adds_up_staged_and_unstaged() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
