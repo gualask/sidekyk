@@ -6,7 +6,8 @@ Fyler. Each area in `features/`.
 ## Data flow
 
 ```text
-agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet period)
+agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet period,
+                       at most one report per second while changes go on)
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
                        └─▶ paths git ignores skipped (check-ignore, cached per directory);
@@ -115,6 +116,15 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   change is told; one created while hidden when the window shows. A `.gitignore` changed: every
   folder looked at again. At the system's limit the watches stay, one `warn`, no more asked
   (8,192 before Linux 5.11, then 1% of RAM within 8,192-1,048,576).
+- Reports (2026-10-31): while an agent writes, the debouncer gives ~8 batches a second (its next
+  deadline is the oldest pending path's last event + 250 ms), each a `check-ignore` and a snapshot
+  (~165 ms CPU). `REPORT_INTERVAL` (1 s, `watcher.rs`, a thread per watch): the first batch after a
+  quiet second at once, the next ones joined and told when the second ends; no timer while idle;
+  before `check-ignore`, so in the helper too. `.local/snapshot-churn/` (M4, CPU with git): 200
+  writes in 3.7 s 5.8 → 1.4 s, one every 0.5 s for 20 s 8.4 → 4.4 s, one every 1.5 s even; first
+  change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last 1.7 s late), not
+  the debouncer's timeout at 1 s (the first in 1.4 s), not CodeNomad's 5 s
+  (`packages/ui/src/lib/filesystem-events.ts`, too stale to watch an agent).
 - A folder without git (2026-10-24): no git dir; `FolderChanges` drops what the walk's rules hide
   (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
   global excludes included); on Linux `folders.rs` keeps those folders out too. An ignore file

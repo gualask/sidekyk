@@ -10,14 +10,15 @@ use std::time::{Duration, Instant};
 
 use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
-use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
 use sidekyk_core::modules::folder::FolderKind;
 use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{FileContent, FileDiffRequest, RepositoryInfo};
 use sidekyk_core::shared::error::{user_facing_code, UserFacingErrorCode};
 
-/// Past the watcher's quiet period (250 ms) and the system's own delay.
-const QUIET: Duration = Duration::from_secs(1);
+/// Past a batch held by the watcher's report interval, its quiet period (250 ms) and the system's
+/// own delay.
+const QUIET: Duration = REPORT_INTERVAL.saturating_add(Duration::from_secs(1));
 const DEADLINE: Duration = Duration::from_secs(10);
 
 fn agent() -> AgentRepositories {

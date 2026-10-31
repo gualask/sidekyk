@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 
 use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::linux_helper::{LinuxHelper, LinuxMachine, SERVER_DIR};
+use sidekyk_core::infrastructure::watcher::REPORT_INTERVAL;
 use sidekyk_core::modules::folder::FolderKind;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{RepositoryChange, RepositoryInfo};
@@ -19,8 +20,9 @@ const PROJECT: &str = "/home/ubuntu/project";
 /// A folder without git, made by the test and removed after.
 const VAULT: &str = "/home/ubuntu/vault";
 const HOME: &str = "/home/ubuntu";
-/// Past the watcher's quiet period (250 ms) and the trip out of the container.
-const QUIET: Duration = Duration::from_secs(1);
+/// Past a batch held by the watcher's report interval, its quiet period (250 ms) and the trip out
+/// of the container.
+const QUIET: Duration = REPORT_INTERVAL.saturating_add(Duration::from_secs(1));
 const DEADLINE: Duration = Duration::from_secs(10);
 const IDLE: Duration = Duration::from_secs(2);
 

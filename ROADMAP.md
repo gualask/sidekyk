@@ -111,9 +111,4 @@ No measuring code in the app: a question below is measured with a temporary setu
 becomes a problem (decided 2026-10-21).
 
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
-- [ ] Sustained churn: 250 ms batches mean 4 snapshots/s (200 writes in 3 s gave 14); minimum
-      interval? skip `check-ignore` for tracked paths? CodeNomad (2026-10-26): the first after
-      100 ms, then at most one per 5 s while changes go on, no timer when idle
-      (`ui/src/lib/filesystem-events.ts`); 5 s is too stale to watch an agent, the shape fits
-      (first at once, last always, N measured)
 - [ ] Prefetch neighbouring diffs, if switching shows a wait

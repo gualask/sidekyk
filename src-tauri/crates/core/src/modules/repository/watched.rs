@@ -18,7 +18,7 @@ const GIT_DIR_ENTRIES: [&str; 7] = [
 /// The entries of `GIT_DIR_ENTRIES` that are folders, watched with all they hold.
 pub(super) const GIT_DIR_FOLDERS: [&str; 2] = ["refs", "info"];
 
-/// What changed during one quiet period.
+/// What changed since the last report.
 #[derive(Debug, Default, PartialEq)]
 pub struct WatchedChanges {
     /// The index, HEAD, refs or the exclude file changed.

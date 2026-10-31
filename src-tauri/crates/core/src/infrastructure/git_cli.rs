@@ -278,7 +278,7 @@ mod tests {
     use std::sync::mpsc::Receiver;
     use std::sync::{Arc, Mutex};
 
-    use crate::infrastructure::watcher::LocalRepositoryWatcher;
+    use crate::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
     use crate::modules::projects::{Location, Project};
     use crate::modules::repositories::{LocalRepositories, Repositories};
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
@@ -1144,8 +1144,9 @@ mod tests {
         }
     }
 
-    /// Past the watcher's quiet period (250 ms) and the system's own delay.
-    const QUIET: Duration = Duration::from_secs(1);
+    /// Past a batch held by the watcher's report interval, its quiet period (250 ms) and the
+    /// system's own delay.
+    const QUIET: Duration = REPORT_INTERVAL.saturating_add(Duration::from_secs(1));
     const DEADLINE: Duration = Duration::from_secs(10);
 
     /// Puts the project on screen; what it tells arrives here, as the frontend gets it.
@@ -1303,7 +1304,6 @@ mod tests {
 
     #[test]
     fn the_watched_repository_tells_what_shows_and_marks_it_while_hidden() {
-        // past the watcher's quiet period (250 ms) and the system's own delay
         let dir = scratch_repo();
         write(dir.path(), ".gitignore", "build/\n");
         let watcher = Arc::new(RecordingWatcher::default());
@@ -1864,7 +1864,7 @@ mod tests {
     }
 
     /// Syntax colors while an agent writes the file on screen: written every 250 ms (the
-    /// watcher's batches during a burst), and after each write the block on screen, at the end of
+    /// debouncer's batches during a burst, more often than the watcher reports), and after each write the block on screen, at the end of
     /// the file, asked for as the viewer does when a change invalidates it, without waiting for
     /// the last answer. An answer shows only if it comes before the next write (the viewer drops
     /// the others). Two edits: a line changed in the middle, a line added near the top.

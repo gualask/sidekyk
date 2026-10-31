@@ -88,7 +88,7 @@ pub struct Walked {
 /// What a watcher saw.
 #[derive(Debug, PartialEq)]
 pub enum Changed {
-    /// These paths (absolute) changed during a quiet period.
+    /// These paths (absolute) changed since the last report.
     Paths(Vec<PathBuf>),
     /// The system dropped events, its queue full: any path may have changed.
     Unknown,
