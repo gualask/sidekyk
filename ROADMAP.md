@@ -13,12 +13,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
 - [ ] Copy or reveal the log for bug reports
 
-## Changes
-
-`.cflow/plans/changes.md`.
-
-- [ ] Linked worktrees: the branch in the top bar picks the one shown, read-only
-
 ## Notes
 
 - [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)

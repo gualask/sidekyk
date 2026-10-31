@@ -49,9 +49,11 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
   MCP endpoint for agents (`ROADMAP.md`, Notes).
 - From CodeNomad (2026-10-26, MIT; a cockpit for OpenCode that runs the agent, stages, commits
   and edits): sessions, Missions, its editor, browser automation, Remote Control, notification
-  badges, wake lock, whitespace-only files hidden from the list. Taken: linked worktrees picked
-  in the top bar (`../.cflow/plans/changes.md`), formatting-only changes told in the viewer
-  (`features/changes.md`), a changed image's two sides (`../.cflow/plans/previews.md`).
+  badges, wake lock, whitespace-only files hidden from the list, linked worktrees picked in the
+  top bar (2026-10-31: the repository is what is reviewed; an agent's worktree shows once merged,
+  a merge commit diffed against its first parent; a worktree can still be a project of its own).
+  Taken: formatting-only changes told in the viewer (`features/changes.md`), a changed image's
+  two sides (`../.cflow/plans/previews.md`).
 - From Cliptray (2026-10-29, no license; a tray clipboard manager): pasting into the app used
   before (hide, then a synthetic `⌘V`: the Accessibility permission on macOS; `enigo` 0.2 defaults
   to X11 through `xdo`, Wayland and libei are opt-in features; UIPI against elevated terminals on
