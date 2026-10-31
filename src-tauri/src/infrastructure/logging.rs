@@ -7,7 +7,7 @@
 
 use std::fs::File;
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Mutex;
 
@@ -131,9 +131,14 @@ pub(crate) fn init(dir: &Path) {
     );
 }
 
+/// This session's log in `dir`; the previous session's is beside it.
+pub(crate) fn session_file(dir: &Path) -> PathBuf {
+    dir.join(PROFILE.file)
+}
+
 fn open_session_file(dir: &Path) -> io::Result<File> {
     std::fs::create_dir_all(dir)?;
-    let current = dir.join(PROFILE.file);
+    let current = session_file(dir);
     if current.exists() {
         let _ = std::fs::rename(&current, dir.join(PROFILE.previous_file));
     }

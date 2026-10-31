@@ -33,7 +33,11 @@ problems. Why semantic zoom: `../product.md`.
   top bar, each with its fix.
 - Settings: a modal (`⌘,`), applied at once: theme (dark by default, no system following),
   language (`languages.md`), diff view and scrollbar width, long lines in code and in notes, copy
-  template, how Markdown and SVG open (`previews.md`), global shortcut.
+  template, how Markdown and SVG open (`previews.md`), global shortcut; at the end the version and
+  Show log, which selects this session's log in the system's file manager, the previous one beside
+  it (`tauri-plugin-opener`'s reveal). Not in the tray (2026-10-31): a page broken once still
+  shows it after a restart, the previous session kept; one broken at every start leaves the
+  folder (`../testing.md`).
 
 ## Keys
 

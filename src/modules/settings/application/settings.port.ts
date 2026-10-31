@@ -16,6 +16,10 @@ export interface SettingsPort {
      * window nor reaches the field.
      */
     setShortcutRecording(recording: boolean): Promise<void>;
+    /** The app's version, as its bundle has it. */
+    getVersion(): Promise<string>;
+    /** This session's log selected in the system's file manager, the previous one beside it. */
+    revealLog(): Promise<void>;
 }
 
 const SettingsPortContext = createContext<SettingsPort | null>(null);

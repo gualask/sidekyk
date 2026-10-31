@@ -202,6 +202,8 @@ pub(crate) fn run() {
             tauri_commands::window::set_window_visible,
             tauri_commands::window::show_window,
             tauri_commands::diagnostics::log_frontend_error,
+            tauri_commands::diagnostics::get_version,
+            tauri_commands::diagnostics::reveal_log,
         ])
         .build(::tauri::generate_context!())
         .expect("error while building tauri application")

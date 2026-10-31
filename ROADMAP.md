@@ -11,7 +11,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
       soon as it is out: on Windows the system's dropped events become a rescan
       (notify-rs#964; `docs/architecture.md`, Watching)
 - [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
-- [ ] Copy or reveal the log for bug reports
 
 ## Notes
 

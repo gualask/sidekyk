@@ -13,6 +13,7 @@ import type { NoteLines } from '@/shared/notes/note-lines';
 import { altLabel } from '@/shared/platform/shortcut';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 import type { Theme } from '../model/settings.types';
+import { AboutSetting } from './AboutSetting';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
 
@@ -214,6 +215,9 @@ export function SettingsDialog({
                     </Section>
                     <Section title={t('common.shortcuts')}>
                         <GlobalShortcutSetting />
+                    </Section>
+                    <Section title={t('settings.about')}>
+                        <AboutSetting />
                     </Section>
                     <div className="dialog-foot">
                         <span>{t('settings.applyAtOnce')}</span>

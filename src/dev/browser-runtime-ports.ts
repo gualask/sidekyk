@@ -603,6 +603,9 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             },
             getGlobalShortcutStatus: async () => shortcutStatus,
             setShortcutRecording: async () => undefined,
+            getVersion: async () => '0.1.0',
+            // a browser tab has no file manager to show it in
+            revealLog: async () => undefined,
         },
         // a browser tab draws no window controls over the page
         titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },

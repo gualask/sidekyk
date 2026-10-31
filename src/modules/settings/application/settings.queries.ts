@@ -66,6 +66,16 @@ export function useUpdateSettings() {
     });
 }
 
+/** The app's version: read once, when the settings first show it. */
+export function useAppVersion() {
+    const port = useSettingsPort();
+    return useQuery({
+        queryKey: ['settings', 'version'],
+        queryFn: () => port.getVersion(),
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+}
+
 /** Tells the backend a new shortcut is being typed, or no longer is. */
 export function useShortcutRecording() {
     const port = useSettingsPort();

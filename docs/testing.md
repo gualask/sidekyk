@@ -41,7 +41,7 @@ platform before a release. Actions pinned to a commit, the version in a comment.
 What the Mac cannot show (ROADMAP, Verify on the packaged app), tried by hand; the log comes back
 for reading.
 
-- Logs: `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
+- Logs: Settings, Show log; by hand `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's
   beside it.
