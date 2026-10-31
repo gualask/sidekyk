@@ -57,6 +57,8 @@ pub(crate) fn show_by_deadline(app: &AppHandle) {
 /// every platform's webview keeps. Showing again answers with the id of the project on screen
 /// when its files or refs changed meanwhile.
 pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option<String> {
+    // rare, and what tells whether a platform's webview reports it (docs/testing.md)
+    tracing::info!(visible, "window visibility");
     app.state::<ProjectsState>().set_visible(visible)
 }
 

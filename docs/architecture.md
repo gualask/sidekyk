@@ -146,4 +146,6 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 `tracing` to the app's log dir (one file per session, the previous kept, a size cap). Dev builds:
 every git call, batch and command duration, also on stderr. The level applies to the app, the core
 and the helper's lines (target `helper`). Release compiles out below `info` (+144 KiB): startup,
-project opened, failures, panics, frontend errors (50 per session). Hot-path events are `debug`.
+project opened, the window's visibility, failures, panics, frontend errors (50 per session).
+Hot-path events are `debug`. A command's failure is logged once until that command succeeds
+(`blocking.rs`): a read failing on every refresh writes one line, not one a second.

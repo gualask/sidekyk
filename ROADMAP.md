@@ -95,8 +95,8 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - Linux and Windows: images in the viewer through `project-file:` (WebView2's
     `http://project-file.localhost`), a preview's link opened in the browser; WebKitGTK and AVIF
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
-    `visibilitychange` on minimize (WebView2 may need its controller told); `prefers-color-scheme`
-    follows the window theme
+    the window's visibility (`docs/testing.md`, Trying it on Windows and Linux; WebView2 may
+    need its controller told); `prefers-color-scheme` follows the window theme
 
 ## Later
 
