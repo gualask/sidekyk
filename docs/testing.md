@@ -45,10 +45,8 @@ for reading.
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's
   beside it.
-- Release log: startup, the window shown, each project opened, each change of the window's
-  visibility, failures (each once until its command succeeds), panics, frontend errors (50).
-  Debug build: also every git call, watcher batch (`watcher batch while hidden` while hidden)
-  and command with its duration.
+- What each build writes: `architecture.md`, Logs; a debug build also tells `watcher batch while
+  hidden`.
 - Visibility (the webview must report it, or the watcher runs git while nobody looks):
   minimize, close to the tray, move the window to another desktop, cover it whole with another
   window, then bring it back each time; each gesture writes `window visibility visible=false`,

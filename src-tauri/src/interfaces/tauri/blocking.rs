@@ -32,7 +32,7 @@ pub(super) async fn blocking<T: Send + 'static>(
         }
         Err(error) => {
             let error_text = format!("{error:#}");
-            if !lock(&LOGGED).first(command, &error_text) {
+            if !lock(&LOGGED).is_new(command, &error_text) {
                 tracing::debug!(command, ms, error = error_text, "command failed again");
             } else if let Some(code) = user_facing_code(error) {
                 // Expected states such as a folder outside any repository: the UI shows them,
@@ -57,7 +57,7 @@ struct Failures(BTreeSet<(&'static str, String)>);
 
 impl Failures {
     /// Whether this failure is new: not logged since its command last succeeded.
-    fn first(&mut self, command: &'static str, error: &str) -> bool {
+    fn is_new(&mut self, command: &'static str, error: &str) -> bool {
         if self.0.len() >= MAX_KEPT {
             self.0.clear();
         }
@@ -79,17 +79,17 @@ mod tests {
     #[test]
     fn a_failure_is_logged_once_until_its_command_succeeds() {
         let mut logged = Failures(BTreeSet::new());
-        assert!(logged.first("get_repository_snapshot", "git: not a repository"));
-        assert!(!logged.first("get_repository_snapshot", "git: not a repository"));
+        assert!(logged.is_new("get_repository_snapshot", "git: not a repository"));
+        assert!(!logged.is_new("get_repository_snapshot", "git: not a repository"));
         // another message, or the same from another command, is new
-        assert!(logged.first("get_repository_snapshot", "git timed out"));
-        assert!(logged.first("get_file_diff", "git timed out"));
+        assert!(logged.is_new("get_repository_snapshot", "git timed out"));
+        assert!(logged.is_new("get_file_diff", "git timed out"));
 
         // another command succeeding forgets nothing of this one
         logged.succeeded("get_file_diff");
-        assert!(!logged.first("get_repository_snapshot", "git timed out"));
+        assert!(!logged.is_new("get_repository_snapshot", "git timed out"));
         logged.succeeded("get_repository_snapshot");
-        assert!(logged.first("get_repository_snapshot", "git: not a repository"));
-        assert!(logged.first("get_file_diff", "git timed out"));
+        assert!(logged.is_new("get_repository_snapshot", "git: not a repository"));
+        assert!(logged.is_new("get_file_diff", "git timed out"));
     }
 }

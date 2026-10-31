@@ -5,6 +5,7 @@ import { type SettingsPort, useSettingsPort } from './settings.port';
 
 const settingsKey = ['settings'] as const;
 const shortcutStatusKey = ['settings', 'global-shortcut'] as const;
+const versionKey = ['settings', 'version'] as const;
 
 /** The settings, read once per session: the backend answers from memory. */
 function settingsQuery(port: SettingsPort) {
@@ -66,11 +67,11 @@ export function useUpdateSettings() {
     });
 }
 
-/** The app's version: read once, when the settings first show it. */
+/** The app's version, read once; the settings wait for it (`Suspense`), as for themselves. */
 export function useAppVersion() {
     const port = useSettingsPort();
-    return useQuery({
-        queryKey: ['settings', 'version'],
+    return useSuspenseQuery({
+        queryKey: versionKey,
         queryFn: () => port.getVersion(),
         staleTime: Number.POSITIVE_INFINITY,
     });

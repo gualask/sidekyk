@@ -16,6 +16,7 @@ import type { Theme } from '../model/settings.types';
 import { AboutSetting } from './AboutSetting';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
+import { Setting } from './Setting';
 
 /** Each language by its own name, as anyone looking for theirs reads it. */
 const LANGUAGES: { value: Locale; label: string }[] = [
@@ -246,30 +247,6 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
             </h3>
             {children}
         </section>
-    );
-}
-
-/** A setting's row: what it is, and its control, named by the label's id. */
-function Setting({
-    label,
-    description,
-    children,
-}: {
-    label: string;
-    description: string;
-    children: (labelId: string) => ReactNode;
-}) {
-    const id = useId();
-    return (
-        <div className="flex items-center gap-4 py-2">
-            <div className="min-w-0 flex-1">
-                <div id={id} className="font-semibold">
-                    {label}
-                </div>
-                <div className="mt-0.5 text-xs text-ui-text-muted">{description}</div>
-            </div>
-            {children(id)}
-        </div>
     );
 }
 
