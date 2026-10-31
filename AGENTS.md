@@ -10,7 +10,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Measure hot paths before and after a change; do not merge a regression without a reason.
 - Run independent git commands in parallel, bound every read, never block the main thread. Lazy-load what the first paint does not need, virtualize long lists.
 - Prefer a battle-tested crate or library to our own code, but never add a dependency yourself: present the candidates with pros and cons and wait for the maintainer's decision.
-- Zed (`.local/zed`, a full clone; reclone if missing) is the reference for driving git and watching files. Its crates are GPL: read for ideas, never copy code (only GPUI is Apache-2.0).
+- How other tools drive git and watch files: `.local/references/README.md` (local). Read for ideas, never copy code.
 
 ## Commands
 
@@ -48,6 +48,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - One file per area, about 500-1,200 words (`docs/README.md` lists them and says where things go): neither one file that explains a bit of everything nor a tree of small files. One fact in one file; the others point to it.
 - `ROADMAP.md` holds only what is left, by theme, not a timeline; `**After:**` marks a technical dependency. A built item leaves it, and its plan, for `docs/features/` in the same commit.
 - Plans and specs are local, not versioned: `.cflow/plans/`, `.cflow/specs/`. A plan wholly built is deleted.
+- Tracked files never cite another app's source nor name an app studied for ideas: those notes live in `.local/references/` (local, one file per app), a decision they led to stated on its own. A familiar editor's behavior may be named ("as VS Code's explorer").
 
 ## Invariants
 

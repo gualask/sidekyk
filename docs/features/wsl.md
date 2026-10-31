@@ -93,13 +93,7 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 
 ## Sources
 
-- Zed (`.local/zed`, 93d7456): `crates/remote/src/transport/wsl.rs`, `crates/remote_server`;
-  identity `crates/remote/src/remote_client.rs:1346`, `crates/workspace/src/persistence.rs:885`,
-  `:2189` (WSL paths dropped from history); frames `crates/remote/src/protocol.rs:8`; 10 min
-  `crates/remote_server/src/server.rs:521`.
-- VS Code (`microsoft/vscode`, 00ab0906): `src/vs/base/parts/ipc/common/ipc.ts` (cancel `:40`),
-  `src/vs/server/node/serverLifetimeService.ts:13` (5 min, opt-in); its WSL stdio relay seen in a
-  user's log (https://qna.habr.com/q/1399122).
+- VS Code's WSL stdio relay seen in a user's log (https://qna.habr.com/q/1399122).
 - `wsl.exe` output UTF-16LE ([WSL#4607](https://github.com/microsoft/WSL/issues/4607)),
   `WSL_UTF8=1` since [0.64.0](https://github.com/microsoft/WSL/releases/tag/0.64.0).
 - [WSL: working across file systems](https://learn.microsoft.com/en-us/windows/wsl/filesystems);

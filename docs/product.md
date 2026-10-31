@@ -29,49 +29,28 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
 - Comparing against the default branch or merge base (2026-10-14).
 - Following the terminal (2026-10-16): no automatic switch to the project of the terminal used
   last. Every signal breaks on some axis: terminal APIs (an adapter per terminal, blind under tmux;
-  built for kitty, dropped), agent hooks (not every agent), shell hooks (silent while the agent
+  built for one, dropped), agent hooks (not every agent), shell hooks (silent while the agent
   runs), tty access time (unchanged on macOS, none on Windows), window titles (permissions,
   overwritten by agents). Kept in mind: follow the project whose files changed last.
 - In the viewer (2026-10-18): several commented hunks copied as a batch; side by side; unchanged
   regions expanded on demand; opening the editor at a line; a setting for context lines.
 - From tazly: glass blur (GPU), rich-text editors. Taken: one command bar, `Esc` cancels before
   navigating, notes with copy, `⌥` shortcuts on `e.code`. Open: a `PRODUCT.md`.
-- From Carbon (2026-10-22): selected text captured in any app (Windows accessibility, not
-  terminals), double-tap modifiers (a global keyboard hook), link previews, backgrounds. For
-  Capture: images pasted or dropped into notes; a small window confirming a capture while hidden,
-  destroyed 1.5 s after the last.
-- From Shotoshot (2026-10-22, GPL-3.0): its overlay, drawing tools, Board, presentation mode. For
-  Capture (`../.cflow/plans/capture.md`): editable annotations, one process per capture.
-- From OpenTodo (2026-10-22, AGPL-3.0, ideas only): quick add recognizing dates, `#project`,
-  `@label`, priority while typing, its own grammar (6-8 kB gzip against 30-90 kB date libraries);
-  entities tinted in the field and a chip under it. For entities in notes
-  (`../.cflow/plans/notes-entities.md`). Also: a Markdown vault in sync (`ROADMAP.md`, Later), an
-  MCP endpoint for agents (`ROADMAP.md`, Notes).
-- From CodeNomad (2026-10-26, MIT; a cockpit for OpenCode that runs the agent, stages, commits
-  and edits): sessions, Missions, its editor, browser automation, Remote Control, notification
-  badges, wake lock, whitespace-only files hidden from the list, linked worktrees picked in the
-  top bar (2026-10-31: the repository is what is reviewed; an agent's worktree shows once merged,
-  a merge commit diffed against its first parent; a worktree can still be a project of its own).
-  Taken: formatting-only changes told in the viewer (`features/changes.md`), a changed image's
-  two sides (`../.cflow/plans/previews.md`).
-- From Cliptray (2026-10-29, no license; a tray clipboard manager): pasting into the app used
-  before (hide, then a synthetic `⌘V`: the Accessibility permission on macOS; `enigo` 0.2 defaults
-  to X11 through `xdo`, Wayland and libei are opt-in features; UIPI against elevated terminals on
-  Windows; a fixed 70 ms wait), a panel anchored to the tray. Taken: one universal macOS `.dmg`
-  (`ROADMAP.md`, Platforms and release).
-- From Kensaku (2026-10-29, MIT; a local search launcher: names, text in documents, OCR, meaning,
-  MCP): OCR, semantic search, its query language, dates in natural language, a local LLM, a
-  launcher window. Taken: events the system dropped read the project again (`architecture.md`,
-  Watching). For agents over MCP (`ROADMAP.md`, Notes; its `docs/AGENTS.md`): a stdio server from
-  the same binary, read-only; pages with a cursor, snippets capped at 100 characters, a size
-  budget in each answer; a file's text returned as data, never as instructions; a `health_check`
-  tool; roots checked after resolving `..` and links. Not its one-click connect: it writes each
-  client's config, an adapter per client. For text in documents (`ROADMAP.md`, Projects):
-  `lopdf` inside `catch_unwind` (it panics on malformed PDFs); `zip` and `quick-xml` reading
-  Office's XML as a stream up to a byte cap; a time and a size cap per file; Tantivy, after SQLite
-  FTS5 trigram measured at 1M documents (918 MB, 258 ms; our projects are far smaller). Its
-  background priority on macOS is `PRIO_DARWIN_PROCESS`, the whole process with its UI
-  (`man setpriority`); an indexing thread alone is `PRIO_DARWIN_THREAD`.
+- Input from anywhere (2026-10-22): selected text captured in any app (Windows accessibility,
+  not terminals), double-tap modifiers (a global keyboard hook), link previews, backgrounds.
+- For captures (2026-10-22): an overlay of our own, drawing tools beyond annotations, a board,
+  presentation mode.
+- An agent's cockpit (2026-10-26): sessions, an editor, browser automation, remote control,
+  notification badges, wake lock; whitespace-only files hidden from the list; linked worktrees
+  picked in the top bar (2026-10-31: the repository is what is reviewed; an agent's worktree shows
+  once merged, a merge commit diffed against its first parent; a worktree can still be a project
+  of its own).
+- Pasting into the app used before (2026-10-29): a synthetic `⌘V` after hiding needs the
+  Accessibility permission on macOS, X11 or opt-in Wayland support on Linux, and fails against
+  elevated terminals on Windows (UIPI); a panel anchored to the tray.
+- A search launcher (2026-10-29): OCR, semantic search, a query language, dates in natural
+  language, a local LLM, a launcher window. MCP clients connected by writing their config: an
+  adapter per client.
 
 ## Out of scope
 

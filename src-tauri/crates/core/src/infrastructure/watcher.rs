@@ -252,7 +252,7 @@ fn sift(event: notify::Result<Event>) -> Option<notify::Result<Event>> {
 /// The system's watcher without the reads. inotify reports a file opened, or closed unwritten
 /// (`IN_OPEN`, `IN_CLOSE_NOWRITE`): every git command run on the repository would report its own
 /// reads and refresh the app again, without end. The debouncer drops an event's kind, so they are
-/// dropped before it, as Zed does (`crates/fs/src/fs_watcher.rs`, `enqueue`).
+/// dropped before it.
 struct ChangesOnly(RecommendedWatcher);
 
 impl Watcher for ChangesOnly {

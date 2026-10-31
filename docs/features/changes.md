@@ -99,10 +99,8 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   editor. Breaks in JS rather than CSS `pre-wrap`: a height known before rendering keeps the list
   virtualized and the map exact.
 - Formatting (2026-10-26): one kind, spaces and line ends together. Told, never hidden: Zed and
-  VS Code normalize line endings before diffing (Zed `crates/project/src/git_store.rs:5669-5683`)
-  and VS Code's `diffEditor.ignoreTrimWhitespace` is on by default
-  (`src/vs/editor/common/config/diffEditor.ts:16`), right for an editor, wrong for a review before
-  a commit. No mark in the list: a `-w` numstat per snapshot is +30% CPU, +47% with 300 files
+  VS Code normalize line endings before diffing and VS Code's `diffEditor.ignoreTrimWhitespace` is
+  on by default, right for an editor, wrong for a review before a commit. No mark in the list: a `-w` numstat per snapshot is +30% CPU, +47% with 300 files
   reformatted (`.local/format-cost/`). Paired in TS, not Rust as planned: the diff is parsed there
   already, the cost is of the order of Rust's 4.6 ms, and there is no second parser. Whitespace
   drawn whole and a label on every such line: no character diff to pay for.

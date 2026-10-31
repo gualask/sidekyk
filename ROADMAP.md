@@ -17,8 +17,8 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 
 - [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)
 - [ ] Entities recognized while typing a note (`.cflow/plans/notes-entities.md`)
-- [ ] Agents read a project's notes and captures over MCP, read-only (design open; Kensaku's
-      shape in `docs/product.md`)
+- [ ] Agents read a project's notes and captures over MCP, read-only (design open;
+      `.cflow/plans/agents-mcp.md`)
 
 ## Projects with optional folders
 
@@ -31,7 +31,7 @@ has.
 - [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
       section per repository in Changes
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
-      (Kensaku's stack in `docs/product.md`)
+      (`.cflow/plans/project-folders.md`)
 
 ## Previews
 
@@ -72,14 +72,15 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 
 ## Platforms and release
 
-- [ ] Signed builds and self-update (as in Fyler), built by a release workflow on a `v*` tag that
-      runs `ci.yml` first; update check at startup or on demand only. macOS: one universal `.dmg`
-      (`--target universal-apple-darwin`; 2026-10-29: Intel Macs too, which stop at macOS 26, at
-      no runtime cost, since only the native slice loads)
+- [ ] Signed builds and self-update (as in Fyler; `.cflow/plans/release.md`), built by a release
+      workflow on a `v*` tag that runs `ci.yml` first; update check at startup or on demand only.
+      macOS: one universal `.dmg` (`--target universal-apple-darwin`; 2026-10-29: Intel Macs too,
+      which stop at macOS 26, at no runtime cost, since only the native slice loads)
 - [ ] Verify on the packaged app and other systems:
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
-    icon shows the window, `⌘W` hides and `⌘Q` quits, no blank frame at startup; without the
-    Command Line Tools, a folder without git picked asks nothing to install
+    icon shows the window, `⌘W` hides and `⌘Q` quits, hidden while full screen (closed or by
+    the shortcut) no black Space left, no blank frame at startup; without the Command Line
+    Tools, a folder without git picked asks nothing to install
   - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
     git-dir check, case included; a folder without git (`real_path` as given, its walk and
     rules, `git init` and `.git` removed while on screen); snapshot timings (process start, Defender); a repo on `C:\`
@@ -103,8 +104,8 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 
 To evaluate once the app is complete, when its evolution is discussed.
 
-- [ ] Notes as a folder of Markdown files in two-way sync (OpenTodo's vault, `docs/product.md`),
-      outside repositories: an alternative to Drive sync
+- [ ] Notes as a folder of Markdown files in two-way sync, outside repositories: an alternative
+      to Drive sync (`.cflow/plans/notes-sync.md`)
 
 ## Performance review
 

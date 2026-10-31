@@ -83,5 +83,4 @@ holds runs, nothing leaves the machine.
   `scanners.re`); crates.io (`crates/crates_io_markdown`, comrak with ammonia).
 - [react-markdown](https://github.com/remarkjs/react-markdown) (`defaultUrlTransform`),
   `mdast-util-to-hast` (`clobberPrefix`, footnotes), `hast-util-to-jsx-runtime`.
-- VS Code: [Markdown preview security](https://code.visualstudio.com/docs/languages/markdown);
-  Zed: `assets/settings/default.json:127`.
+- VS Code: [Markdown preview security](https://code.visualstudio.com/docs/languages/markdown).

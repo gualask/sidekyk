@@ -123,8 +123,7 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   before `check-ignore`, so in the helper too. `.local/snapshot-churn/` (M4, CPU with git): 200
   writes in 3.7 s 5.8 → 1.4 s, one every 0.5 s for 20 s 8.4 → 4.4 s, one every 1.5 s even; first
   change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last 1.7 s late), not
-  the debouncer's timeout at 1 s (the first in 1.4 s), not CodeNomad's 5 s
-  (`packages/ui/src/lib/filesystem-events.ts`, too stale to watch an agent).
+  the debouncer's timeout at 1 s (the first in 1.4 s), not 5 s (too stale to watch an agent).
 - A folder without git (2026-10-24): no git dir; `FolderChanges` drops what the walk's rules hide
   (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
   global excludes included); on Linux `folders.rs` keeps those folders out too. An ignore file
