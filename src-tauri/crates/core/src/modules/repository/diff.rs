@@ -3,7 +3,7 @@ use std::path::{Component, Path};
 use super::contracts::{ChangeArea, FileDiffRequest, RepositoryInfo, UnifiedDiff};
 use super::limits::MAX_DIFF_BYTES;
 use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend, LITERAL_PATHSPECS};
+use super::ports::{git_checked, GitOutput, RepositoryBackend, LITERAL_PATHSPECS};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// Only a plain relative path may reach git: no `..`, no absolute path, nothing that names a
@@ -77,16 +77,20 @@ pub fn load_file_diff(
     }
 
     let out = git_checked(backend, root, &args, &ok_codes, MAX_DIFF_BYTES)?;
+    Ok(unified_diff(out))
+}
+
+/// A diff git printed, cut back to its last whole line when its output was cut.
+pub(super) fn unified_diff(out: GitOutput) -> UnifiedDiff {
     let bytes = if out.truncated {
         cut_at_line(out.stdout)
     } else {
         out.stdout
     };
-
-    Ok(UnifiedDiff {
+    UnifiedDiff {
         text: String::from_utf8_lossy(&bytes).into_owned(),
         truncated: out.truncated,
-    })
+    }
 }
 
 #[cfg(test)]

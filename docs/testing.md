@@ -11,7 +11,9 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
   give only the port methods the hook calls. Components with layout (virtualized lists, view
   transitions) are checked on the browser fixtures.
 - Backend: `cargo test`, clippy, rustfmt. End-to-end tests run a real git on scratch repositories,
-  the watched ones a real watcher too.
+  the watched ones a real watcher too. Unit tests fake the machine through `FakeBackend`
+  (`modules/repository/fake.rs`): a fake writes only the `RepositoryBackend` methods it uses, the
+  others panic.
 - Helper (`crates/agent/tests`): the `sidekyk-agent` binary started as the app starts it, its
   answers compared with direct reads; failures keep their code; changes, and one missed while
   hidden, come through.

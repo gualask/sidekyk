@@ -332,11 +332,10 @@ fn link_target(target: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::{FolderRules, GitOutput, Walked};
+    use crate::modules::repository::FakeBackend;
 
     fn names(directory: &Directory) -> Vec<(&str, &str, bool)> {
         directory
@@ -396,59 +395,9 @@ mod tests {
     /// What is on disk under the root, as relative paths.
     struct OnDisk(Mutex<HashSet<&'static str>>);
 
-    impl RepositoryBackend for OnDisk {
-        fn is_dir(&self, _path: &Path) -> bool {
-            unreachable!()
-        }
-
+    impl FakeBackend for OnDisk {
         fn has_entry(&self, _root: &Path, path: &Path) -> bool {
             self.0.lock().unwrap().contains(path.to_str().unwrap())
-        }
-
-        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<std::path::PathBuf>> {
-            unreachable!()
-        }
-
-        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
-            unreachable!()
-        }
-
-        fn git_with_input(
-            &self,
-            _cwd: &Path,
-            _args: &[&str],
-            _input: &[u8],
-            _max: usize,
-        ) -> anyhow::Result<GitOutput> {
-            unreachable!()
-        }
-
-        fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
-            unreachable!()
-        }
-
-        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
-            unreachable!()
-        }
-
-        fn file_stamp(&self, _root: &Path, _path: &Path) -> Option<FileStamp> {
-            unreachable!()
-        }
-
-        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn Read + Send>> {
-            unreachable!()
-        }
-
-        fn walk(&self, _root: &Path, _max: usize) -> Walked {
-            unreachable!()
-        }
-
-        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
-            unreachable!()
-        }
-
-        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
-            unreachable!()
         }
     }
 

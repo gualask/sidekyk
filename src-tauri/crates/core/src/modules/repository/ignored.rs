@@ -242,7 +242,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
+    use crate::modules::repository::{FakeBackend, GitOutput};
 
     /// Ignores `target/` and `*.log` and records every question; `repositories` hold a `.git`.
     #[derive(Default)]
@@ -252,25 +252,13 @@ mod tests {
         repositories: Vec<&'static str>,
     }
 
-    impl RepositoryBackend for FakeGit {
-        fn is_dir(&self, _path: &Path) -> bool {
-            unreachable!()
-        }
-
+    impl FakeBackend for FakeGit {
         fn has_entry(&self, _root: &Path, path: &Path) -> bool {
             path.file_name().is_some_and(|name| name == ".git")
                 && self
                     .repositories
                     .iter()
                     .any(|repository| path.parent() == Some(Path::new(repository)))
-        }
-
-        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<PathBuf>> {
-            unreachable!()
-        }
-
-        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
-            unreachable!()
         }
 
         fn git_with_input(
@@ -297,38 +285,6 @@ mod tests {
                 stderr: String::new(),
                 truncated: false,
             })
-        }
-
-        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
-            unreachable!()
-        }
-
-        fn file_stamp(
-            &self,
-            _root: &Path,
-            _path: &Path,
-        ) -> Option<crate::modules::repository::FileStamp> {
-            unreachable!()
-        }
-
-        fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn std::io::Read + Send>> {
-            unreachable!()
-        }
-
-        fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
-            unreachable!()
-        }
-
-        fn walk(&self, _root: &Path, _max: usize) -> Walked {
-            unreachable!()
-        }
-
-        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
-            unreachable!()
-        }
-
-        fn real_path(&self, _path: &Path) -> Option<PathBuf> {
-            unreachable!()
         }
     }
 

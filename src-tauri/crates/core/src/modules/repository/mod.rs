@@ -5,6 +5,8 @@ mod activity;
 mod commits;
 mod contracts;
 mod diff;
+#[cfg(test)]
+mod fake;
 mod folders;
 mod ignored;
 mod limits;
@@ -29,6 +31,8 @@ pub use contracts::{
 #[cfg(test)]
 pub use contracts::{ChangeArea, Commit};
 pub use diff::load_file_diff;
+#[cfg(test)]
+pub(crate) use fake::FakeBackend;
 pub use folders::{Hiding, WatchedFolders};
 pub use ignored::{IgnoredPaths, Visible};
 pub use limits::{MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS};

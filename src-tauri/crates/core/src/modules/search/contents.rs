@@ -258,70 +258,16 @@ pub fn narrows(previous: &str, next: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::{FolderRules, GitOutput, Walked, WorktreeEntry};
+    use crate::modules::repository::FakeBackend;
     use std::collections::HashMap;
 
     /// Files by path, read from memory.
     struct FakeFiles(HashMap<&'static str, Vec<u8>>);
 
-    impl RepositoryBackend for FakeFiles {
-        fn is_dir(&self, _path: &Path) -> bool {
-            unreachable!()
-        }
-
-        fn has_entry(&self, _root: &Path, _path: &Path) -> bool {
-            unreachable!()
-        }
-
-        fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<std::path::PathBuf>> {
-            unreachable!()
-        }
-
-        fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
-            unreachable!()
-        }
-
-        fn git_with_input(
-            &self,
-            _cwd: &Path,
-            _args: &[&str],
-            _input: &[u8],
-            _max: usize,
-        ) -> anyhow::Result<GitOutput> {
-            unreachable!()
-        }
-
-        fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
-            unreachable!()
-        }
-
-        fn read_entry(&self, _root: &Path, _path: &Path, _limit: usize) -> Option<WorktreeEntry> {
-            unreachable!()
-        }
-
+    impl FakeBackend for FakeFiles {
         fn open_file(&self, _root: &Path, path: &Path) -> Option<Box<dyn Read + Send>> {
             let bytes = self.0.get(path.to_str()?)?.clone();
             Some(Box::new(std::io::Cursor::new(bytes)))
-        }
-
-        fn file_stamp(
-            &self,
-            _root: &Path,
-            _path: &Path,
-        ) -> Option<crate::modules::repository::FileStamp> {
-            unreachable!()
-        }
-
-        fn walk(&self, _root: &Path, _max: usize) -> Walked {
-            unreachable!()
-        }
-
-        fn folder_rules(&self, _root: &Path) -> Box<dyn FolderRules> {
-            unreachable!()
-        }
-
-        fn real_path(&self, _path: &Path) -> Option<std::path::PathBuf> {
-            unreachable!()
         }
     }
 

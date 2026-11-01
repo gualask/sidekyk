@@ -7,7 +7,7 @@ use super::contracts::{
     ChangeKind, Commit, CommitFileDiffRequest, CommitFiles, CommitRequest, FileChange,
     RecentCommits, RepositoryInfo, UnifiedDiff,
 };
-use super::diff::{checked_path, context_option, cut_at_line};
+use super::diff::{checked_path, context_option, unified_diff};
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
 use super::numstat::{parse_numstat_z, Counts};
 use super::open::existing_root;
@@ -208,15 +208,7 @@ pub fn load_commit_file_diff(
         &paths,
     )?;
     let out = git_checked(backend, root, &args, &[0], MAX_DIFF_BYTES)?;
-    let bytes = if out.truncated {
-        cut_at_line(out.stdout)
-    } else {
-        out.stdout
-    };
-    Ok(UnifiedDiff {
-        text: String::from_utf8_lossy(&bytes).into_owned(),
-        truncated: out.truncated,
-    })
+    Ok(unified_diff(out))
 }
 
 #[cfg(test)]
