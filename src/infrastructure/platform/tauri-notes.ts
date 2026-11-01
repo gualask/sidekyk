@@ -1,6 +1,41 @@
-import { invoke } from '@tauri-apps/api/core';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { getCurrentWebview } from '@tauri-apps/api/webview';
 
-import type { NotesPort } from '@/modules/notes';
+import { type ImageDrop, imageFile, type NotesPort } from '@/modules/notes';
+import { attachListener } from './events';
+
+/** The last part of a path, whichever separator it uses. */
+function fileName(path: string): string {
+    return path.split(/[\\/]/).pop() ?? path;
+}
+
+/**
+ * Follows the system's file drags over the webview (Tauri takes them all: the page never sees
+ * them), positions in CSS pixels. A drop's files are read by the backend, from their paths.
+ */
+function onImageDrop(listener: (drop: ImageDrop) => void): () => void {
+    const css = (position: { x: number; y: number }) => ({
+        x: position.x / window.devicePixelRatio,
+        y: position.y / window.devicePixelRatio,
+    });
+    return attachListener(() =>
+        getCurrentWebview().onDragDropEvent(({ payload }) => {
+            if (payload.type === 'leave') {
+                listener({ kind: 'leave' });
+            } else if (payload.type === 'drop') {
+                const { paths } = payload;
+                listener({
+                    kind: 'drop',
+                    ...css(payload.position),
+                    names: paths.map(fileName),
+                    add: (book, target) => invoke('add_note_image_files', { book, target, paths }),
+                });
+            } else {
+                listener({ kind: 'over', ...css(payload.position) });
+            }
+        }),
+    );
+}
 
 /** Native notes adapter: the commands in `src-tauri/src/interfaces/tauri/notes.rs`. */
 export const tauriNotes: NotesPort = {
@@ -23,4 +58,23 @@ export const tauriNotes: NotesPort = {
     notesSummary: (book) => invoke('notes_summary', { book }),
     countNotes: (book) => invoke('count_notes', { book }),
     exportNotes: (projectId) => invoke('export_notes', { projectId }),
+    // the bytes cross raw, as the body; the book and the target as headers (`notes.rs`, `pasted`)
+    addImage: (book, target, bytes) =>
+        invoke('add_note_image', bytes, {
+            headers: { 'x-book': encodeURIComponent(book), 'x-target': JSON.stringify(target) },
+        }),
+    removeImage: (book, id, image) => invoke('remove_note_image', { book, id, image }),
+    copyNote: (book, id) => invoke('copy_note', { book, id }),
+    imagePng: async (book, image) =>
+        new Blob(
+            [await invoke<ArrayBuffer>('note_image_png', { book, file: imageFile(image, false) })],
+            {
+                type: 'image/png',
+            },
+        ),
+    // `note_image.rs`: the book and the file encoded whole, the book once before (an older id is
+    // a path)
+    imageUrl: (book, image, thumb) =>
+        convertFileSrc(`${encodeURIComponent(book)}/${imageFile(image, thumb)}`, 'note-image'),
+    onImageDrop,
 };

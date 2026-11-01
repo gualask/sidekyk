@@ -10,22 +10,6 @@ const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico']);
 /** Larger images are not shown (`MAX_IMAGE_BYTES` in the backend's `repository/limits.rs`). */
 export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
-/** A file's size as people read it: bytes, kB or MB (decimal, as file managers show them). */
-export function fileSize(bytes: number, locale: string): string {
-    const [value, unit] =
-        bytes < 1000
-            ? [bytes, 'byte']
-            : bytes < 1_000_000
-              ? [bytes / 1000, 'kilobyte']
-              : [bytes / 1_000_000, 'megabyte'];
-    return new Intl.NumberFormat(locale, {
-        style: 'unit',
-        unit,
-        unitDisplay: 'short',
-        maximumFractionDigits: unit === 'byte' ? 0 : 1,
-    }).format(value);
-}
-
 /** The preview a file has, if any. */
 export function previewKind(path: string): PreviewKind | null {
     const name = path.slice(path.lastIndexOf('/') + 1);

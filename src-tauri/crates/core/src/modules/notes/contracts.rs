@@ -51,7 +51,62 @@ pub enum ListTarget {
     },
 }
 
-/// One note: a card of plain text in a list of a book.
+/// The formats a note takes: those every webview shows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ImageKind {
+    Png,
+    Jpeg,
+    Gif,
+    Webp,
+}
+
+impl ImageKind {
+    pub const ALL: [Self; 4] = [Self::Png, Self::Jpeg, Self::Gif, Self::Webp];
+
+    /// The extension of its file.
+    pub fn extension(self) -> &'static str {
+        match self {
+            Self::Png => "png",
+            Self::Jpeg => "jpg",
+            Self::Gif => "gif",
+            Self::Webp => "webp",
+        }
+    }
+
+    pub fn mime(self) -> &'static str {
+        match self {
+            Self::Png => "image/png",
+            Self::Jpeg => "image/jpeg",
+            Self::Gif => "image/gif",
+            Self::Webp => "image/webp",
+        }
+    }
+}
+
+/// An image of a note, kept beside its notes as given, with a thumbnail for the cards.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteImage {
+    /// Names its files: `<id>.<extension>`, and the thumbnail's `<id>.thumb.png`.
+    pub id: String,
+    pub kind: ImageKind,
+    /// In pixels.
+    pub width: u32,
+    pub height: u32,
+    /// The size of its file.
+    pub bytes: u64,
+}
+
+/// The note images go to, as the frontend names it: one there, or a new one on top of a list.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum ImageTarget {
+    Note { id: String },
+    New { list: String },
+}
+
+/// One note: a card of plain text in a list of a book, and its images below the text.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
@@ -68,6 +123,9 @@ pub struct Note {
     pub edited: u64,
     /// When it was marked done, or `None` while open.
     pub done: Option<u64>,
+    /// In the order they came in; none in a note stored before images.
+    #[serde(default)]
+    pub images: Vec<NoteImage>,
 }
 
 /// A list of notes, by topic.
@@ -181,6 +239,7 @@ mod tests {
             created: 1,
             edited: 2,
             done: None,
+            images: Vec::new(),
         }
     }
 
@@ -205,7 +264,8 @@ mod tests {
                     "text": "Try the rail",
                     "created": 1,
                     "edited": 2,
-                    "done": null
+                    "done": null,
+                    "images": []
                 }],
                 "openList": "fedcba9876543210"
             })
@@ -282,6 +342,23 @@ mod tests {
     }
 
     #[test]
+    fn an_image_target_reads_as_the_frontend_sends_it() {
+        let target = |json| serde_json::from_value::<ImageTarget>(json).unwrap();
+        assert_eq!(
+            target(serde_json::json!({ "kind": "note", "id": "0123456789abcdef" })),
+            ImageTarget::Note {
+                id: "0123456789abcdef".into()
+            }
+        );
+        assert_eq!(
+            target(serde_json::json!({ "kind": "new", "list": "fedcba9876543210" })),
+            ImageTarget::New {
+                list: "fedcba9876543210".into()
+            }
+        );
+    }
+
+    #[test]
     fn a_move_tells_where_it_went_and_comes_back_to_be_undone() {
         assert_eq!(
             serde_json::to_value(MovedNote {
@@ -309,6 +386,38 @@ mod tests {
         assert_eq!(json["left"]["index"], 1);
         assert_eq!(json["joined"], false);
         assert_eq!(serde_json::from_value::<MovedList>(json).unwrap(), moved);
+    }
+
+    #[test]
+    fn an_image_uses_the_frontend_field_names_and_a_note_before_images_has_none() {
+        let image = NoteImage {
+            id: "00112233445566ff".into(),
+            kind: ImageKind::Jpeg,
+            width: 4032,
+            height: 3024,
+            bytes: 1_008_550,
+        };
+        assert_eq!(
+            serde_json::to_value(&image).unwrap(),
+            serde_json::json!({
+                "id": "00112233445566ff",
+                "kind": "jpeg",
+                "width": 4032,
+                "height": 3024,
+                "bytes": 1_008_550
+            })
+        );
+        let mut json = serde_json::to_value(StoredNote {
+            version: STORED_VERSION,
+            note: note(),
+        })
+        .unwrap();
+        json.as_object_mut().unwrap().remove("images");
+        assert!(serde_json::from_value::<StoredNote>(json)
+            .unwrap()
+            .note
+            .images
+            .is_empty());
     }
 
     #[test]

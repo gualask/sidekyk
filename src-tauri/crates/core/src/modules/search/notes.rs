@@ -204,6 +204,7 @@ mod tests {
             created: 0,
             edited: 0,
             done,
+            images: Vec::new(),
         }
     }
 

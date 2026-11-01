@@ -5,13 +5,18 @@
 //! <folder>/project.json   { version, id }      the project's id (`root` before ids)
 //! <folder>/lists.json     { version, lists: [{ id, name }] }   the user's order
 //! <folder>/state.json     { version, openList }                this machine only
-//! <folder>/<id>.json      { version, id, list, position, text, created, edited, done }
+//! <folder>/<id>.json      { version, id, list, position, text, created, edited, done, images }
+//! <folder>/<image>.<ext>   an image of a note, as given (png, jpg, gif, webp)
+//! <folder>/<image>.thumb.png   its thumbnail
 //! ```
 //!
 //! A project's folder is named after it; the Inbox's is `inbox`, without `project.json`.
 //!
 //! Every book read stays in memory until the app quits or the book is deleted: every change goes
 //! to it, then at once to its files, which are read again only after a write failed.
+//!
+//! An image's files outlive its note until the book is first read in the next session, so an undo
+//! finds them; a note moved to another book takes copies of them.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
@@ -19,9 +24,11 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use super::book::{NoteBook, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
-    Book, DeletedList, ListTarget, MovedList, MovedNote, Note, NoteList, NotesSummary,
-    ProjectNotes, StoredLists, StoredNote, StoredProject, StoredState, STORED_VERSION,
+    Book, DeletedList, ImageKind, ImageTarget, ListTarget, MovedList, MovedNote, Note, NoteImage,
+    NoteList, NotesSummary, ProjectNotes, StoredLists, StoredNote, StoredProject, StoredState,
+    STORED_VERSION,
 };
+use super::images::{image_file, image_of_file, thumb_file, PreparedImage, MAX_IMAGE_BYTES};
 use super::ports::NotesStorage;
 use crate::shared::id::{is_id, new_id};
 use crate::shared::sync::lock;
@@ -88,6 +95,41 @@ fn new_note_id(book: &NoteBook) -> String {
     id
 }
 
+/// A new id no image of `book` has, nor one of `taken`.
+fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
+    let used = |id: &str| {
+        taken.iter().any(|i| i.id == id)
+            || book
+                .notes
+                .iter()
+                .any(|n| n.images.iter().any(|i| i.id == id))
+    };
+    let mut id = new_id();
+    while used(&id) {
+        id = new_id();
+    }
+    id
+}
+
+/// Removes the files of images no note of a folder has: left by a note deleted, an image taken
+/// out or a note moved, in the session before.
+fn sweep(storage: &dyn NotesStorage, folder: &str, notes: &[Note], files: &[String]) {
+    let kept: HashSet<&str> = notes
+        .iter()
+        .flat_map(|n| n.images.iter().map(|i| i.id.as_str()))
+        .collect();
+    for file in files {
+        if image_of_file(file).is_some_and(|id| !kept.contains(id)) {
+            match storage.remove(folder, file) {
+                Ok(()) => tracing::debug!(folder, file, "image of no note removed"),
+                Err(error) => {
+                    tracing::warn!(folder, file, error = %format!("{error:#}"), "image of no note stays");
+                }
+            }
+        }
+    }
+}
+
 /// A new id no list of `book` has.
 fn new_list_id(book: &NoteBook) -> String {
     let mut id = new_id();
@@ -149,6 +191,9 @@ pub struct NotesStore {
     books: Mutex<HashMap<String, KeptBook>>,
     /// The name of a book's first list, `FIRST_LIST_NAME` until named.
     first_list_name: Mutex<Option<&'static str>>,
+    /// The books whose images of no note were removed this session, by key: once, at the first
+    /// read, so an undo of this session finds its files.
+    swept: Mutex<HashSet<String>>,
 }
 
 impl NotesStore {
@@ -203,6 +248,9 @@ impl NotesStore {
         let mut lists = Vec::new();
         let mut notes = Vec::new();
         let mut open_list = None;
+        // a note that cannot be read may have images: none is removed then
+        let mut broken = false;
+        let mut images = Vec::new();
         if let Some(folder) = folder.as_deref() {
             for file in storage.files(folder)? {
                 if file == LISTS_FILE {
@@ -215,15 +263,16 @@ impl NotesStore {
                     open_list = parse::<StoredState>(storage, folder, &file, OTHER_FILE_LIMIT)
                         .and_then(|s| s.open_list);
                 } else if let Some(id) = file.strip_suffix(".json").filter(|id| is_id(id)) {
-                    if let Some(stored) =
-                        parse::<StoredNote>(storage, folder, &file, NOTE_FILE_LIMIT)
-                    {
+                    match parse::<StoredNote>(storage, folder, &file, NOTE_FILE_LIMIT) {
                         // the file's name is the note's id
-                        notes.push(Note {
+                        Some(stored) => notes.push(Note {
                             id: id.into(),
                             ..stored.note
-                        });
+                        }),
+                        None => broken = true,
                     }
+                } else if image_of_file(&file).is_some() {
+                    images.push(file);
                 }
             }
         }
@@ -233,6 +282,11 @@ impl NotesStore {
             name: name.into(),
         };
         let (notes, pending) = NoteBook::mended(lists, notes, open_list, first_list);
+        if let Some(folder) = folder.as_deref() {
+            if lock(&self.swept).insert(book.key().into()) && !broken {
+                sweep(storage, folder, &notes.notes, &images);
+            }
+        }
         tracing::debug!(
             notes = notes.notes.len(),
             ms = started.elapsed().as_millis() as u64,
@@ -277,9 +331,20 @@ impl NotesStore {
         book: &Book,
         change: impl FnOnce(&mut NoteBook) -> anyhow::Result<(T, Vec<Touched>)>,
     ) -> anyhow::Result<T> {
+        self.change_kept(storage, book, |kept| change(&mut kept.notes))
+    }
+
+    /// `change`, given the book as kept (its folder too): a change that writes files of its own
+    /// before the notes, which fails with the notes in memory as they were.
+    fn change_kept<T>(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        change: impl FnOnce(&mut KeptBook) -> anyhow::Result<(T, Vec<Touched>)>,
+    ) -> anyhow::Result<T> {
         let mut books = lock(&self.books);
         let kept = self.kept_book(&mut books, storage, book)?;
-        let (value, touched) = change(&mut kept.notes)?;
+        let (value, touched) = change(kept)?;
         if let Err(error) = self.write(storage, book, kept, touched) {
             books.remove(book.key());
             return Err(error);
@@ -328,25 +393,57 @@ impl NotesStore {
             unreachable!("both just read");
         };
         let (value, gave, took) = change(&mut giving.notes, &mut taking.notes)?;
+        self.carry_images(storage, taker, taking, giving.folder.as_deref(), &took)?;
         self.write(storage, taker, taking, took)?;
         self.write(storage, giver, giving, gave)?;
         Ok(value)
     }
 
-    /// Writes what a change touched, if anything, with what reading mended.
-    fn write(
+    /// Copies the image files of the notes a book took in (`took`) from the folder of the book
+    /// they came from: written before the notes that name them.
+    fn carry_images(
+        &self,
+        storage: &dyn NotesStorage,
+        taker: &Book,
+        taking: &mut KeptBook,
+        from: Option<&str>,
+        took: &[Touched],
+    ) -> anyhow::Result<()> {
+        let Some(from) = from else {
+            return Ok(());
+        };
+        let images: Vec<NoteImage> = took
+            .iter()
+            .filter_map(|touched| match touched {
+                Touched::Note(id) => taking.notes.note(id),
+                _ => None,
+            })
+            .flat_map(|note| note.images.iter().cloned())
+            .collect();
+        if images.is_empty() {
+            return Ok(());
+        }
+        let to = self.folder(storage, taker, taking)?;
+        for image in &images {
+            for file in [image_file(image), thumb_file(&image.id)] {
+                if let Some(bytes) = storage.read(from, &file, MAX_IMAGE_BYTES)? {
+                    storage.write(&to, &file, &bytes)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The folder of a book, made with its `project.json` when nothing of it is written yet: the
+    /// first list, made in memory, is then written with the next change.
+    fn folder(
         &self,
         storage: &dyn NotesStorage,
         book: &Book,
         kept: &mut KeptBook,
-        mut touched: Vec<Touched>,
-    ) -> anyhow::Result<()> {
-        if touched.is_empty() {
-            return Ok(());
-        }
-        touched.append(&mut kept.pending);
-        let folder = match (&kept.folder, book) {
-            (Some(folder), _) => folder.clone(),
+    ) -> anyhow::Result<String> {
+        match (&kept.folder, book) {
+            (Some(folder), _) => Ok(folder.clone()),
             (None, Book::Inbox) => unreachable!("the Inbox's folder is known"),
             (None, Book::Project { id, name }) => {
                 let folder = self.free_folder(storage, name)?;
@@ -363,11 +460,25 @@ impl NotesStore {
                     .get_or_insert_with(HashMap::new)
                     .insert(id.clone(), folder.clone());
                 kept.folder = Some(folder.clone());
-                // the first list was made in memory
-                touched.push(Touched::Lists);
-                folder
+                kept.pending.push(Touched::Lists);
+                Ok(folder)
             }
-        };
+        }
+    }
+
+    /// Writes what a change touched, if anything, with what reading mended.
+    fn write(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        kept: &mut KeptBook,
+        mut touched: Vec<Touched>,
+    ) -> anyhow::Result<()> {
+        if touched.is_empty() {
+            return Ok(());
+        }
+        let folder = self.folder(storage, book, kept)?;
+        touched.append(&mut kept.pending);
         let mut seen = HashSet::new();
         touched.retain(|t| seen.insert(t.clone()));
         let notes = &kept.notes;
@@ -497,6 +608,108 @@ impl NotesStore {
         text: String,
     ) -> anyhow::Result<Note> {
         self.change(storage, book, |notes| notes.set_text(id, text, now()))
+    }
+
+    /// Adds images to a note, or to a new one on top of a list: their files first, then the note
+    /// that names them. Files written for a change that fails are removed at the next session.
+    pub fn add_images(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        target: ImageTarget,
+        images: Vec<PreparedImage>,
+    ) -> anyhow::Result<Note> {
+        anyhow::ensure!(!images.is_empty(), "no image to add");
+        self.change_kept(storage, book, |kept| {
+            let folder = self.folder(storage, book, kept)?;
+            let mut added: Vec<NoteImage> = Vec::with_capacity(images.len());
+            for image in &images {
+                let note_image = image.note_image(new_image_id(&kept.notes, &added));
+                storage.write(&folder, &image_file(&note_image), &image.original)?;
+                storage.write(&folder, &thumb_file(&note_image.id), &image.thumb)?;
+                added.push(note_image);
+            }
+            let notes = &mut kept.notes;
+            let now = now();
+            match target {
+                ImageTarget::Note { id } => notes.add_images(&id, added, now),
+                ImageTarget::New { list } => {
+                    let id = new_note_id(notes);
+                    let (_, mut touched) = notes.add(id.clone(), &list, String::new(), now)?;
+                    let (note, more) = notes.add_images(&id, added, now)?;
+                    touched.extend(more);
+                    Ok((note, touched))
+                }
+            }
+        })
+    }
+
+    /// Takes an image out of a note; `restore_note` with the note as it was puts it back.
+    pub fn remove_image(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        id: &str,
+        image: &str,
+    ) -> anyhow::Result<Note> {
+        self.change(storage, book, |notes| notes.remove_image(id, image, now()))
+    }
+
+    /// The bytes of an image of a note, or of its thumbnail (PNG), by the name of its file, and
+    /// their kind; `None` for a file no note of the book has. Read outside the lock.
+    pub fn image(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        file: &str,
+    ) -> anyhow::Result<Option<(ImageKind, Vec<u8>)>> {
+        let Some(id) = image_of_file(file) else {
+            return Ok(None);
+        };
+        let found = {
+            let mut books = lock(&self.books);
+            let kept = self.kept_book(&mut books, storage, book)?;
+            let image = kept
+                .notes
+                .notes
+                .iter()
+                .flat_map(|n| &n.images)
+                .find(|i| i.id == id);
+            match (image, &kept.folder) {
+                (Some(_), Some(folder)) if file == thumb_file(id) => {
+                    Some((folder.clone(), ImageKind::Png))
+                }
+                (Some(image), Some(folder)) if file == image_file(image) => {
+                    Some((folder.clone(), image.kind))
+                }
+                _ => None,
+            }
+        };
+        let Some((folder, kind)) = found else {
+            return Ok(None);
+        };
+        Ok(storage
+            .read(&folder, file, MAX_IMAGE_BYTES)?
+            .map(|bytes| (kind, bytes)))
+    }
+
+    /// A note's text and where its images are, in their order: what its copy is made of.
+    pub fn note_copy(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        id: &str,
+    ) -> anyhow::Result<(String, Vec<String>)> {
+        let mut books = lock(&self.books);
+        let kept = self.kept_book(&mut books, storage, book)?;
+        let note = kept.notes.find(id)?;
+        let mut images = Vec::with_capacity(note.images.len());
+        if let Some(folder) = &kept.folder {
+            for image in &note.images {
+                images.push(storage.location(folder, &image_file(image))?);
+            }
+        }
+        Ok((note.text.clone(), images))
     }
 
     pub fn set_note_done(
@@ -752,6 +965,10 @@ pub mod tests {
         fn remove_folder(&self, folder: &str) -> anyhow::Result<()> {
             lock(&self.files).retain(|(f, _), _| f != folder);
             Ok(())
+        }
+
+        fn location(&self, folder: &str, file: &str) -> anyhow::Result<String> {
+            Ok(format!("/data/notes/{folder}/{file}"))
         }
     }
 
@@ -1442,5 +1659,242 @@ pub mod tests {
         assert!(store
             .move_list(&storage, &shop(), &general, &docs())
             .is_err());
+    }
+
+    fn screenshot() -> PreparedImage {
+        let png = super::super::images::tests::encoded(64, 32, image::ImageFormat::Png);
+        super::super::images::prepare(png).unwrap()
+    }
+
+    fn files_of(storage: &MemoryStorage, image: &NoteImage) -> Vec<String> {
+        storage
+            .names()
+            .into_iter()
+            .map(|(_, file)| file)
+            .filter(|file| file.starts_with(&image.id))
+            .collect()
+    }
+
+    #[test]
+    fn images_make_a_new_note_their_files_written_first() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot(), screenshot()],
+            )
+            .unwrap();
+        assert_eq!(note.text, "");
+        assert_eq!(note.images.len(), 2);
+        assert_ne!(note.images[0].id, note.images[1].id);
+        assert_eq!((note.images[0].width, note.images[0].height), (64, 32));
+        let image = &note.images[0];
+        let mut files = files_of(&storage, image);
+        files.sort();
+        assert_eq!(files, [image_file(image), thumb_file(&image.id)]);
+        // the project's folder and lists came with them
+        assert!(storage.names().iter().any(|(_, f)| f == PROJECT_FILE));
+        assert!(storage.names().iter().any(|(_, f)| f == LISTS_FILE));
+
+        let (kind, bytes) = store
+            .image(&storage, &shop(), &image_file(image))
+            .unwrap()
+            .unwrap();
+        assert_eq!(kind, ImageKind::Png);
+        assert_eq!(bytes.len() as u64, image.bytes);
+        let (kind, _) = store
+            .image(&storage, &shop(), &thumb_file(&image.id))
+            .unwrap()
+            .unwrap();
+        assert_eq!(kind, ImageKind::Png);
+        assert!(store
+            .image(&storage, &shop(), "0000000000000000.png")
+            .unwrap()
+            .is_none());
+        assert!(store
+            .image(&storage, &shop(), &note_file(&note.id))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn images_join_a_note_below_its_own() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_note(&storage, &shop(), &general, "the rail".into())
+            .unwrap();
+        let first = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::Note {
+                    id: note.id.clone(),
+                },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let second = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::Note { id: note.id },
+                vec![screenshot()],
+            )
+            .unwrap();
+        assert_eq!(second.text, "the rail");
+        assert_eq!(second.images.len(), 2);
+        assert_eq!(second.images[0], first.images[0]);
+        let read = NotesStore::default().notes(&storage, &shop()).unwrap();
+        assert_eq!(read.notes[0].images, second.images);
+    }
+
+    #[test]
+    fn an_image_taken_out_keeps_its_files_until_the_next_session() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let image = note.images[0].clone();
+        store
+            .remove_image(&storage, &shop(), &note.id, &image.id)
+            .unwrap();
+        assert_eq!(files_of(&storage, &image).len(), 2);
+        // undone: the note as it was finds its files
+        store.restore_note(&storage, &shop(), note.clone()).unwrap();
+        assert!(store
+            .image(&storage, &shop(), &image_file(&image))
+            .unwrap()
+            .is_some());
+
+        store.delete_note(&storage, &shop(), &note.id).unwrap();
+        // the next session's first read removes them
+        NotesStore::default().notes(&storage, &shop()).unwrap();
+        assert!(files_of(&storage, &image).is_empty());
+    }
+
+    #[test]
+    fn a_session_reading_a_book_twice_removes_its_stray_images_once() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let image = note.images[0].clone();
+
+        let next = NotesStore::default();
+        next.notes(&storage, &shop()).unwrap();
+        next.delete_note(&storage, &shop(), &note.id).unwrap();
+        // a failed write drops the book; read again, it keeps the files for an undo
+        storage.fail_writes.store(true, Ordering::Relaxed);
+        let general = next.notes(&storage, &shop()).unwrap().open_list;
+        assert!(next
+            .add_note(&storage, &shop(), &general, "x".into())
+            .is_err());
+        storage.fail_writes.store(false, Ordering::Relaxed);
+        next.notes(&storage, &shop()).unwrap();
+        assert_eq!(files_of(&storage, &image).len(), 2);
+    }
+
+    #[test]
+    fn a_note_that_cannot_be_read_keeps_every_image() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let folder = storage.names()[0].0.clone();
+        storage
+            .write(&folder, &note_file(&note.id), b"{ broken")
+            .unwrap();
+        NotesStore::default().notes(&storage, &shop()).unwrap();
+        assert_eq!(files_of(&storage, &note.images[0]).len(), 2);
+    }
+
+    #[test]
+    fn a_note_moved_takes_copies_of_its_images() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let image = note.images[0].clone();
+        let moved = store
+            .move_note(&storage, &shop(), &note.id, &docs(), ListTarget::Open)
+            .unwrap();
+        assert_eq!(moved.note.images, note.images);
+        assert!(store
+            .image(&storage, &docs(), &image_file(&image))
+            .unwrap()
+            .is_some());
+        // both folders hold them until the next session, so an undo finds them
+        assert_eq!(files_of(&storage, &image).len(), 4);
+
+        let next = NotesStore::default();
+        next.notes(&storage, &shop()).unwrap();
+        next.notes(&storage, &docs()).unwrap();
+        assert_eq!(files_of(&storage, &image).len(), 2);
+        assert!(next
+            .image(&storage, &docs(), &thumb_file(&image.id))
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn a_copy_names_where_the_images_are() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                &storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let note = store
+            .set_note_text(&storage, &shop(), &note.id, "look".into())
+            .unwrap();
+        let folder = storage.names()[0].0.clone();
+        let (text, images) = store.note_copy(&storage, &shop(), &note.id).unwrap();
+        assert_eq!(text, "look");
+        assert_eq!(
+            images,
+            [format!(
+                "/data/notes/{folder}/{}",
+                image_file(&note.images[0])
+            )]
+        );
     }
 }

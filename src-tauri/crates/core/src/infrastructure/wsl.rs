@@ -161,6 +161,22 @@ impl LinuxMachine for Distro {
     }
 }
 
+/// How a distro names a Windows path (`wslpath -u`): `/mnt/c/…` for `C:\…` unless the distro
+/// mounts drives elsewhere. Starts the distro when it is stopped: run it off the main thread.
+pub fn linux_path(distro: &str, path: &Path) -> anyhow::Result<String> {
+    let mut command = Distro(distro.into()).command("wslpath");
+    command.args(["-u", &plain_windows_path(path)]);
+    let output = process::run(&mut command, None, MAX_OUTPUT, LIST_TIMEOUT)
+        .with_context(|| format!("could not ask {distro} for a path"))?;
+    anyhow::ensure!(
+        output.code == 0,
+        "wslpath failed in {distro}: {}",
+        output.stderr.trim()
+    );
+    let linux = String::from_utf8(output.stdout).context("wslpath wrote no UTF-8")?;
+    Ok(linux.trim_end_matches(['\n', '\r']).to_string())
+}
+
 /// A Windows path as `wslpath` reads it: without the `\\?\` prefix Windows' own APIs give, which
 /// it does not know.
 fn plain_windows_path(path: &Path) -> String {

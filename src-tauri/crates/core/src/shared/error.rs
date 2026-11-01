@@ -24,6 +24,10 @@ pub enum UserFacingErrorCode {
     GitTimedOut,
     /// The helper that reads a WSL project could not start, or stopped.
     HelperFailed,
+    /// An image for a note is bigger than a note takes, in bytes or in pixels.
+    ImageTooLarge,
+    /// A file given to a note is not an image a note takes (PNG, JPEG, GIF, WebP), or is broken.
+    ImageUnsupported,
     InvalidCommit,
     #[cfg(any(target_os = "macos", windows))]
     InvalidShortcut,
@@ -47,6 +51,8 @@ impl UserFacingErrorCode {
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
             Self::HelperFailed => "helper_failed",
+            Self::ImageTooLarge => "image_too_large",
+            Self::ImageUnsupported => "image_unsupported",
             Self::InvalidCommit => "invalid_commit",
             #[cfg(any(target_os = "macos", windows))]
             Self::InvalidShortcut => "invalid_shortcut",
@@ -74,6 +80,8 @@ impl UserFacingErrorCode {
         Self::GitNotFound,
         Self::GitTimedOut,
         Self::HelperFailed,
+        Self::ImageTooLarge,
+        Self::ImageUnsupported,
         Self::InvalidCommit,
         #[cfg(any(target_os = "macos", windows))]
         Self::InvalidShortcut,

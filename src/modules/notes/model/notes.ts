@@ -1,6 +1,6 @@
 import type { Translator } from '@/shared/i18n';
 import { timeAgo } from '@/shared/time/relative-time';
-import type { Note, NoteList, ProjectNotes } from './notes.types';
+import type { Note, NoteImage, NoteList, ProjectNotes } from './notes.types';
 
 /** A card shows this many lines until it is opened. */
 const SHOWN_LINES = 4;
@@ -91,4 +91,29 @@ export function positionAt(open: readonly Note[], id: string, index: number): nu
     if (before === undefined) return after === undefined ? 0 : after - 1;
     if (after === undefined) return before + 1;
     return (before + after) / 2;
+}
+
+/**
+ * The file of a note's image, or of its thumbnail, as the backend names it
+ * (`src-tauri/crates/core/src/modules/notes/images.rs`).
+ */
+export function imageFile(image: NoteImage, thumb: boolean): string {
+    if (thumb) return `${image.id}.thumb.png`;
+    return `${image.id}.${image.kind === 'jpeg' ? 'jpg' : image.kind}`;
+}
+
+/** How tall a card's thumbnails are, in CSS pixels; their width follows, within bounds. */
+const THUMB_HEIGHT = 72;
+const THUMB_WIDTH = { min: 40, max: 200 };
+
+/**
+ * The box a card gives an image's thumbnail: known before it loads, so the card's height never
+ * moves. A very wide or tall image is cropped to its middle.
+ */
+export function thumbBox(image: NoteImage): { width: number; height: number } {
+    const width = Math.round((THUMB_HEIGHT * image.width) / Math.max(1, image.height));
+    return {
+        width: Math.min(THUMB_WIDTH.max, Math.max(THUMB_WIDTH.min, width)),
+        height: THUMB_HEIGHT,
+    };
 }

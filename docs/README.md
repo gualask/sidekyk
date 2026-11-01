@@ -15,6 +15,7 @@ reason, numbers, sources. One fact in one file; the others point to it.
   - `previews.md`: Markdown, SVG and images as they read; links, images loaded from the app.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
+  - `note-images.md`: images in notes: in, thumbnails, copy, export, files.
   - `background.md`: tray, global shortcut, hidden window.
   - `languages.md`: English and Italian, catalogs, `i18n:check`.
 - `testing.md`: what the checks, fixtures and timing tests cover; the container fixture.

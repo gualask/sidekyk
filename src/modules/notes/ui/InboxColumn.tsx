@@ -13,6 +13,7 @@ import { MoveHost } from './MoveHost';
 import { NoteCard } from './NoteCard';
 import { useCardRows } from './use-card-rows';
 import { useCardStates } from './use-card-states';
+import { useColumnImages } from './use-image-drops';
 import { useRevealedNote } from './use-revealed-note';
 
 /**
@@ -42,7 +43,7 @@ export function InboxColumn({
 }) {
     const { data: notes, error } = useNotes(INBOX_BOOK);
     const actions = useNoteActions(INBOX_BOOK);
-    const cardState = useCardStates();
+    const { cardState, edit } = useCardStates(INBOX_BOOK);
     const [moving, setMoving] = useState<MoveSubject | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
@@ -56,6 +57,17 @@ export function InboxColumn({
         [notes, list],
     );
     const rows = useCardRows(shown.length, (index) => shown[index].id);
+    const images = useColumnImages({
+        root: box,
+        book: INBOX_BOOK,
+        actions,
+        list: list?.id ?? '',
+        onAdded: (note) => {
+            rows.virtualizer.scrollToOffset(0);
+            // a note of images alone opens, for its text
+            if (note.text === '') edit(note.id);
+        },
+    });
     // once the notes are read: before, the note asked for has no row yet
     const flash = useRevealedNote({
         reveal: notes ? reveal : null,
@@ -87,23 +99,21 @@ export function InboxColumn({
                             placeholder={t('inbox.composer')}
                             label={t('inbox.newNote')}
                             hint={shown.length === 0 ? t('inbox.empty') : null}
-                            onAdd={async (text) => {
-                                const added = await actions.add(list.id, text);
-                                if (added) rows.virtualizer.scrollToOffset(0);
-                                return added !== undefined;
-                            }}
+                            {...images.composer}
                         />
                         <CardRows rows={rows}>
                             {(index) => {
                                 const note = shown[index];
                                 return (
                                     <NoteCard
+                                        book={INBOX_BOOK}
                                         note={note}
                                         flash={flash === note.id}
                                         actions={actions}
                                         {...cardState(note)}
                                         onDone={null}
                                         order={null}
+                                        dropping={images.overCard === note.id}
                                         onMove={() =>
                                             setMoving({ kind: 'note', book: INBOX_BOOK, note })
                                         }

@@ -10,8 +10,8 @@ export function copyLabel(copied: CopyState, idle: string, i18n: Translator): st
 }
 
 /**
- * Copies text and remembers, for a moment, which item was copied and whether it worked, so the
- * item can show its own confirmation.
+ * Copies text, or what a promise gives (asked of the backend on the click), and remembers, for a
+ * moment, which item was copied and whether it worked, so the item can show its own confirmation.
  */
 export function useCopyToClipboard(resetMs = 1400) {
     const [state, setState] = useState<CopyState>(null);
@@ -19,11 +19,12 @@ export function useCopyToClipboard(resetMs = 1400) {
 
     useEffect(() => () => window.clearTimeout(timer.current), []);
 
-    const copy = useCallback(
-        async (id: string, text: string) => {
+    /** Runs a write to the clipboard and says how it went. */
+    const run = useCallback(
+        async (id: string, write: () => Promise<void>) => {
             let ok = true;
             try {
-                await navigator.clipboard.writeText(text);
+                await write();
             } catch {
                 ok = false;
             }
@@ -33,6 +34,17 @@ export function useCopyToClipboard(resetMs = 1400) {
         },
         [resetMs],
     );
+    const copy = useCallback(
+        (id: string, text: string | Promise<string>) =>
+            run(id, async () => navigator.clipboard.writeText(await text)),
+        [run],
+    );
+    /** Copies a PNG image; the promise lets the click's handler write while it is made. */
+    const copyImage = useCallback(
+        (id: string, png: Promise<Blob>) =>
+            run(id, () => navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])),
+        [run],
+    );
 
-    return { copied: state, copy };
+    return { copied: state, copy, copyImage };
 }

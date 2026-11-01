@@ -28,6 +28,7 @@ const note: Note = {
     created: 0,
     edited: 0,
     done: null,
+    images: [],
 };
 
 const casaNotes: ProjectNotes = {

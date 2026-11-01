@@ -1,6 +1,8 @@
 //! Tauri adapters for notes. Every command names a book: the Inbox, or a project of the list.
 
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use tauri::{Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
@@ -8,14 +10,21 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::texts;
-use crate::infrastructure::notes_files::{resolved_path, write_chosen_file, NotesFiles};
-use sidekyk_core::infrastructure::wsl::wsl_path;
-use sidekyk_core::modules::notes::{
-    to_markdown, Book, BookTarget, DeletedList, ListTarget, MovedList, MovedNote, Note, NoteList,
-    NotesStore, NotesSummary, ProjectNotes, INBOX_BOOK,
+use crate::infrastructure::notes_files::{
+    create_chosen_folder, read_image_file, resolved_path, write_chosen_file, NotesFiles,
 };
-use sidekyk_core::modules::projects::{Project, ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
+use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
+use sidekyk_core::modules::notes::{
+    as_png, image_file, prepare, to_markdown, Book, BookTarget, DeletedList, ImageTarget,
+    ListTarget, MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
+    EXPORT_IMAGES, INBOX_BOOK, MAX_IMAGE_BYTES,
+};
+use sidekyk_core::modules::projects::{
+    Location, Project, ProjectsChangedEvent, PROJECTS_CHANGED_EVENT,
+};
 use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
+use sidekyk_core::shared::sync::lock;
+use sidekyk_core::shared::url::percent_decoded;
 
 /// A project's book.
 pub(crate) fn project_book(project: &Project) -> Book {
@@ -26,7 +35,7 @@ pub(crate) fn project_book(project: &Project) -> Book {
 }
 
 /// The book the frontend names: the Inbox, or a project of the list. Any other id is refused.
-fn book_of(app: &tauri::AppHandle, book: &str) -> anyhow::Result<Book> {
+pub(super) fn book_of(app: &tauri::AppHandle, book: &str) -> anyhow::Result<Book> {
     if book == INBOX_BOOK {
         return Ok(Book::Inbox);
     }
@@ -140,6 +149,175 @@ pub(crate) async fn set_note_text(
         store.set_note_text(files, book, &id, text)
     })
     .await
+}
+
+#[tauri::command]
+/// Adds the image files dropped on a note, or on the field that writes a new one: all of them, or
+/// none when one is refused.
+pub(crate) async fn add_note_image_files(
+    app: tauri::AppHandle,
+    book: String,
+    target: ImageTarget,
+    paths: Vec<String>,
+) -> Result<Note, AppError> {
+    with_notes(
+        "add_note_image_files",
+        app,
+        book,
+        move |store, files, book| {
+            let images = paths
+                .iter()
+                .map(|path| prepare(read_image_file(Path::new(path), MAX_IMAGE_BYTES)?))
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            store.add_images(files, book, target, images)
+        },
+    )
+    .await
+}
+
+#[tauri::command]
+/// Adds an image pasted: its bytes are the request's body, so they cross as they are; the book
+/// (percent-encoded) and the target are its headers.
+pub(crate) async fn add_note_image(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> Result<Note, AppError> {
+    let (book, target, bytes) = pasted(&request).map_err(AppError::from)?;
+    with_notes("add_note_image", app, book, move |store, files, book| {
+        store.add_images(files, book, target, vec![prepare(bytes)?])
+    })
+    .await
+}
+
+/// A pasted image's book, target and bytes, from its request.
+fn pasted(request: &tauri::ipc::Request<'_>) -> anyhow::Result<(String, ImageTarget, Vec<u8>)> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        anyhow::bail!("an image's bytes come raw");
+    };
+    let header = |name: &str| {
+        request
+            .headers()
+            .get(name)
+            .and_then(|value| value.to_str().ok())
+            .ok_or_else(|| anyhow::anyhow!("no {name} header"))
+    };
+    let book = percent_decoded(header("x-book")?);
+    let target = serde_json::from_str(header("x-target")?)?;
+    Ok((book, target, bytes.clone()))
+}
+
+#[tauri::command]
+/// Takes an image out of a note; its files stay for an undo (`restore_note`).
+pub(crate) async fn remove_note_image(
+    app: tauri::AppHandle,
+    book: String,
+    id: String,
+    image: String,
+) -> Result<Note, AppError> {
+    with_notes("remove_note_image", app, book, move |store, files, book| {
+        store.remove_image(files, book, &id, &image)
+    })
+    .await
+}
+
+#[tauri::command]
+/// An image of a note as PNG, by its file's name: what "Copy image" puts on the clipboard, which
+/// takes PNG everywhere. Raw bytes, not a JSON array.
+pub(crate) async fn note_image_png(
+    app: tauri::AppHandle,
+    book: String,
+    file: String,
+) -> Result<tauri::ipc::Response, AppError> {
+    with_notes("note_image_png", app, book, move |store, files, book| {
+        let (kind, bytes) = store
+            .image(files, book, &file)?
+            .ok_or_else(|| anyhow::anyhow!("no image {file} in this book"))?;
+        Ok(tauri::ipc::Response::new(as_png(kind, bytes)?))
+    })
+    .await
+}
+
+#[tauri::command]
+/// What a note's copy puts on the clipboard: its text, then where each image is, a line each, as
+/// the project's agents name it (in a WSL distro, its own path).
+pub(crate) async fn copy_note(
+    app: tauri::AppHandle,
+    book: String,
+    id: String,
+) -> Result<String, AppError> {
+    with_store("copy_note", app, move |app, store, files| {
+        let book = book_of(app, &book)?;
+        let (text, images) = store.note_copy(files, &book, &id)?;
+        let images = match wsl_distro(app, &book)? {
+            Some(distro) => in_distro(&distro, files.root(), images)?,
+            None => images,
+        };
+        Ok(copy_text(&text, &images))
+    })
+    .await
+}
+
+/// A note's text, then its images' paths, a line each; without images, the text as it is.
+fn copy_text(text: &str, images: &[String]) -> String {
+    if images.is_empty() {
+        return text.to_string();
+    }
+    let paths = images.join("\n");
+    match text.trim_end() {
+        "" => paths,
+        text => format!("{text}\n\n{paths}"),
+    }
+}
+
+/// The distro a book's project is in, if it is a WSL project's.
+fn wsl_distro(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<String>> {
+    let Book::Project { id, .. } = book else {
+        return Ok(None);
+    };
+    let project = app.state::<ProjectsState>().project(id)?;
+    Ok(project.folders.into_iter().find_map(|folder| match folder {
+        Location::Wsl { distro, .. } => Some(distro),
+        Location::Local { .. } => None,
+    }))
+}
+
+/// How a distro names the notes' folder, asked once (`wslpath`) and kept: one `wsl.exe` per
+/// distro and session, not one per copy.
+static NOTES_IN_DISTRO: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+
+/// Paths under the notes' folder (`root`) as `distro` names them.
+fn in_distro(distro: &str, root: &Path, paths: Vec<String>) -> anyhow::Result<Vec<String>> {
+    let known = lock(&NOTES_IN_DISTRO)
+        .as_ref()
+        .and_then(|roots| roots.get(distro).cloned());
+    let linux_root = match known {
+        Some(linux_root) => linux_root,
+        None => {
+            let linux_root = linux_path(distro, root)?;
+            lock(&NOTES_IN_DISTRO)
+                .get_or_insert_with(HashMap::new)
+                .insert(distro.into(), linux_root.clone());
+            linux_root
+        }
+    };
+    paths
+        .iter()
+        .map(|path| under_linux_root(&linux_root, root, Path::new(path)))
+        .collect()
+}
+
+/// `path`, under `root`, as under `linux_root`: its parts joined by `/`.
+fn under_linux_root(linux_root: &str, root: &Path, path: &Path) -> anyhow::Result<String> {
+    let inside = path.strip_prefix(root)?;
+    let parts: Vec<String> = inside
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect();
+    Ok(format!(
+        "{}/{}",
+        linux_root.trim_end_matches('/'),
+        parts.join("/")
+    ))
 }
 
 #[tauri::command]
@@ -345,7 +523,8 @@ pub(crate) async fn count_notes(app: tauri::AppHandle, book: String) -> Result<u
 
 #[tauri::command]
 /// Asks where to save a project's notes as Markdown and writes them there; the path written, or
-/// `None` when cancelled. Never inside a project's folder: Sidekyk writes in none.
+/// `None` when cancelled. With images, a folder: the Markdown file named after it, the images in
+/// `images/` inside it. Never inside a project's folder: Sidekyk writes in none.
 pub(crate) async fn export_notes(
     app: tauri::AppHandle,
     project_id: String,
@@ -353,15 +532,24 @@ pub(crate) async fn export_notes(
     with_store("export_notes", app, move |app, store, files| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
+        let book = project_book(&project);
         let texts = texts::current(app);
-        let Some(path) = app
-            .dialog()
-            .file()
-            .set_title(texts.export_notes)
-            .set_file_name(texts.export_file.replace("{name}", &project.name))
-            .add_filter("Markdown", &["md"])
-            .blocking_save_file()
-        else {
+        let images: Vec<String> = store.with_notes(files, &book, |_, notes| {
+            notes
+                .iter()
+                .flat_map(|note| note.images.iter().map(image_file))
+                .collect()
+        })?;
+        let file_name = texts.export_file.replace("{name}", &project.name);
+        let dialog = app.dialog().file().set_title(texts.export_notes);
+        let dialog = if images.is_empty() {
+            dialog
+                .set_file_name(&file_name)
+                .add_filter("Markdown", &["md"])
+        } else {
+            dialog.set_file_name(file_name.trim_end_matches(".md"))
+        };
+        let Some(path) = dialog.blocking_save_file() else {
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
@@ -373,10 +561,27 @@ pub(crate) async fn export_notes(
         if inside {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
         }
-        let markdown = store.with_notes(files, &project_book(&project), |lists, notes| {
+        let markdown = store.with_notes(files, &book, |lists, notes| {
             to_markdown(&project.name, lists, notes, &texts.export)
         })?;
-        write_chosen_file(&path, markdown.as_bytes())?;
+        if images.is_empty() {
+            write_chosen_file(&path, markdown.as_bytes())?;
+            return Ok(Some(path.to_string_lossy().into_owned()));
+        }
+        // a folder: the name chosen names the Markdown file in it too
+        let name = path.file_name().map_or_else(
+            || file_name.trim_end_matches(".md").to_string(),
+            |name| name.to_string_lossy().into_owned(),
+        );
+        let folder = path.join(EXPORT_IMAGES);
+        create_chosen_folder(&folder)?;
+        write_chosen_file(&path.join(format!("{name}.md")), markdown.as_bytes())?;
+        for image in &images {
+            // one at a time: an export holds one image in memory at most
+            if let Some((_, bytes)) = store.image(files, &book, image)? {
+                write_chosen_file(&folder.join(image), &bytes)?;
+            }
+        }
         Ok(Some(path.to_string_lossy().into_owned()))
     })
     .await
@@ -409,6 +614,29 @@ mod tests {
         );
         assert!(failed.is_err());
         assert!(unmade.get());
+    }
+
+    #[test]
+    fn a_copy_is_the_text_then_a_line_per_image() {
+        let images = ["/n/a.png".to_string(), "/n/b.jpg".to_string()];
+        assert_eq!(copy_text("look\n", &images), "look\n\n/n/a.png\n/n/b.jpg");
+        assert_eq!(copy_text("  \n", &images[..1]), "/n/a.png");
+        assert_eq!(copy_text("only text\n", &[]), "only text\n");
+    }
+
+    #[test]
+    fn a_path_under_the_notes_is_named_as_a_distro_names_the_notes() {
+        let root = Path::new("/data/notes");
+        assert_eq!(
+            under_linux_root(
+                "/mnt/c/Users/me/AppData/notes/",
+                root,
+                &root.join("shop-3f9a2c").join("00112233445566ff.png")
+            )
+            .unwrap(),
+            "/mnt/c/Users/me/AppData/notes/shop-3f9a2c/00112233445566ff.png"
+        );
+        assert!(under_linux_root("/mnt/c", root, Path::new("/elsewhere/a.png")).is_err());
     }
 
     #[test]

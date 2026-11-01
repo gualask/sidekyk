@@ -102,6 +102,16 @@ pub(crate) fn run() {
                 )
             },
         )
+        .register_asynchronous_uri_scheme_protocol(
+            tauri_commands::note_image::SCHEME,
+            |context, request, responder| {
+                tauri_commands::note_image::respond(
+                    context.app_handle(),
+                    request.uri().path(),
+                    responder,
+                )
+            },
+        )
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
@@ -178,6 +188,11 @@ pub(crate) fn run() {
             tauri_commands::notes::add_note,
             tauri_commands::notes::set_note_text,
             tauri_commands::notes::set_note_done,
+            tauri_commands::notes::add_note_image_files,
+            tauri_commands::notes::add_note_image,
+            tauri_commands::notes::remove_note_image,
+            tauri_commands::notes::copy_note,
+            tauri_commands::notes::note_image_png,
             tauri_commands::notes::place_note,
             tauri_commands::notes::restore_note,
             tauri_commands::notes::delete_note,

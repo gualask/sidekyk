@@ -15,6 +15,8 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     git_not_found: 'error.gitNotFound',
     git_timed_out: 'error.gitTimedOut',
     helper_failed: 'error.helperFailed',
+    image_too_large: 'error.imageTooLarge',
+    image_unsupported: 'error.imageUnsupported',
     invalid_commit: 'error.invalidCommit',
     invalid_shortcut: 'error.invalidShortcut',
     note_list_missing: 'error.noteListMissing',

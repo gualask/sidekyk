@@ -7,6 +7,7 @@
 mod blocking;
 pub(crate) mod diagnostics;
 pub(crate) mod links;
+pub(crate) mod note_image;
 pub(crate) mod notes;
 pub(crate) mod project_file;
 pub(crate) mod projects;

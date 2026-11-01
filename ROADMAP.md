@@ -39,16 +39,15 @@ has.
 
 Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two sides).
 
-- [ ] PDF in the file viewer
 - [ ] Mermaid diagrams in the Markdown preview (nice to have)
 
 ## Capture
 
 `.cflow/plans/capture.md`.
 
-- [ ] Images in notes: a note holds text and images (pasted, dropped), copied out with its text
-- [ ] Annotate an image: arrows with their text, markers (A, B, C), editable later. **After:**
-      images in notes
+Built: `docs/features/note-images.md` (images in notes).
+
+- [ ] Annotate an image: arrows with their text, markers (A, B, C), editable later
 - [ ] Capture from a global shortcut: the system's tool picks the region, the image opens to
       annotate in a new note of the project on screen. **After:** annotate
 - [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`,
@@ -94,6 +93,10 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
     the real `wsl.exe` (its card without starting the distro, "Starting …" on opening it)
   - Linux and Windows: images in the viewer through `project-file:` (WebView2's
     `http://project-file.localhost`), a preview's link opened in the browser; WebKitGTK and AVIF
+  - Linux and Windows, images in notes (`docs/features/note-images.md`): a screenshot and a file
+    copied in the file manager pasted (a `File` with its bytes?); a file drop's position on the
+    right card (physical pixels over `devicePixelRatio`); a note's copy written after the backend
+    answers; "Copy image" (`ClipboardItem`, WebKitGTK?); a WSL note's copy gives `/mnt/c/…` paths
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     the window's visibility (`docs/testing.md`, Trying it on Windows and Linux; WebView2 may
     need its controller told); `prefers-color-scheme` follows the window theme
@@ -104,6 +107,9 @@ To evaluate once the app is complete, when its evolution is discussed.
 
 - [ ] Notes as a folder of Markdown files in two-way sync, outside repositories: an alternative
       to Drive sync (`.cflow/plans/notes-sync.md`)
+- [ ] PDF in the file viewer, decided with projects without git, where documents live: VS Code
+      and Zed have none, and in a repository an agent edits a PDF rarely changes. Candidate:
+      `pdfium-render` rendering in Rust (2026-11-01; `.cflow/plans/previews.md`, PDF)
 
 ## Performance review
 

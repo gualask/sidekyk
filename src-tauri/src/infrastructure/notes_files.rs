@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 
 use sidekyk_core::modules::notes::NotesStorage;
+use sidekyk_core::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A path as the file system names it, links resolved; a file not written yet, by its folder; as
 /// given when neither exists.
@@ -20,6 +21,31 @@ pub(crate) fn resolved_path(path: &Path) -> PathBuf {
             .unwrap_or_else(|_| path.to_path_buf()),
         _ => path.to_path_buf(),
     }
+}
+
+/// The bytes of an image file the user gave a note (dropped): a regular file, at most `limit`
+/// bytes, else refused as the user is told.
+pub(crate) fn read_image_file(path: &Path, limit: u64) -> anyhow::Result<Vec<u8>> {
+    let metadata = fs::metadata(path).with_context(|| format!("reading {}", path.display()))?;
+    if !metadata.is_file() {
+        return Err(user_facing(UserFacingErrorCode::ImageUnsupported));
+    }
+    if metadata.len() > limit {
+        return Err(user_facing(UserFacingErrorCode::ImageTooLarge));
+    }
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    fs::File::open(path)
+        .and_then(|file| file.take(limit + 1).read_to_end(&mut bytes))
+        .with_context(|| format!("reading {}", path.display()))?;
+    if bytes.len() as u64 > limit {
+        return Err(user_facing(UserFacingErrorCode::ImageTooLarge));
+    }
+    Ok(bytes)
+}
+
+/// Makes a folder the user chose, with the folders above it, such as notes exported with images.
+pub(crate) fn create_chosen_folder(path: &Path) -> anyhow::Result<()> {
+    fs::create_dir_all(path).with_context(|| format!("creating {}", path.display()))
 }
 
 /// Writes a file the user chose, such as notes exported, whole.
@@ -39,6 +65,11 @@ impl NotesFiles {
         Self {
             dir: app_data.join("notes"),
         }
+    }
+
+    /// The folder every book's folder is in.
+    pub(crate) fn root(&self) -> &Path {
+        &self.dir
     }
 
     /// The path of a folder, or of a file in it: a name with a separator or `..` is refused, so
@@ -140,6 +171,13 @@ impl NotesStorage for NotesFiles {
         }
     }
 
+    fn location(&self, folder: &str, file: &str) -> anyhow::Result<String> {
+        Ok(self
+            .path(folder, Some(file))?
+            .to_string_lossy()
+            .into_owned())
+    }
+
     fn remove(&self, folder: &str, file: &str) -> anyhow::Result<()> {
         let path = self.path(folder, Some(file))?;
         match fs::remove_file(&path) {
@@ -180,6 +218,30 @@ mod tests {
         notes.remove_folder("shop-123456").unwrap();
         notes.remove_folder("shop-123456").unwrap();
         assert!(notes.folders().unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_image_file_is_read_within_its_limit() {
+        use sidekyk_core::shared::error::user_facing_code;
+        let data = tempfile::tempdir().unwrap();
+        let file = data.path().join("shot.png");
+        fs::write(&file, b"12345").unwrap();
+        assert_eq!(read_image_file(&file, 5).unwrap(), b"12345");
+        let code = |result: anyhow::Result<Vec<u8>>| user_facing_code(&result.unwrap_err());
+        assert_eq!(
+            code(read_image_file(&file, 4)),
+            Some(UserFacingErrorCode::ImageTooLarge)
+        );
+        assert_eq!(
+            code(read_image_file(data.path(), 5)),
+            Some(UserFacingErrorCode::ImageUnsupported)
+        );
+        assert!(read_image_file(&data.path().join("gone.png"), 5).is_err());
+        let notes = NotesFiles::new(data.path());
+        assert_eq!(
+            PathBuf::from(notes.location("inbox", "a.png").unwrap()),
+            data.path().join("notes").join("inbox").join("a.png")
+        );
     }
 
     #[test]

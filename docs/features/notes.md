@@ -1,13 +1,14 @@
 # Notes
 
-Cards in lists, per project and in the Inbox, stored in the app's data (built 2026-10-17). Sync:
-`../../.cflow/plans/notes-sync.md`.
+Cards in lists, per project and in the Inbox, stored in the app's data (built 2026-10-17). Images
+in notes: `note-images.md`. Sync: `../../.cflow/plans/notes-sync.md`.
 
 ## Behaviour
 
-- Cards, not documents: plain text, the user's order (new on top), marked done when used; done
-  cards fold into "Done (n)". Actions on the card, never in its text: done circle left, copy and ⋯
-  right (move to top, reorder, Move…, delete; move and delete undoable).
+- Cards, not documents: plain text and images below it (`note-images.md`), the user's order (new
+  on top), marked done when used; done cards fold into "Done (n)". Actions on the card, never in
+  its text: done circle left, copy and ⋯ right (move to top, reorder, Move…, delete; move and
+  delete undoable).
 - Edit in place: four lines shown, all when clicked; `Esc`, `⌘↵` or a click outside closes; an
   empty card goes (Undo). Long lines wrap or scroll (setting `noteLines`, `⌥Z` in a note).
 - The field on top adds to the open list: `↵` adds, `⇧↵` a new line, a paste into the empty field
@@ -42,8 +43,9 @@ Cards in lists, per project and in the Inbox, stored in the app's data (built 20
 - Storage: `<app data>/notes/<name>-<6 hex>/` per project (named when first written) and
   `notes/inbox/`, never in repositories: `project.json` (the project's id), `lists.json` (order),
   `state.json` (open list, this machine only), one `<id>.json` per note (text, list, position,
-  edited, done). A move takes the middle of its neighbours' positions, renumbering only when no
-  room is left. Ids are 16 hex digits, the only names let through to files.
+  edited, done, images), and its images' files. A move takes the middle of its neighbours'
+  positions, renumbering only when no room is left. Ids are 16 hex digits, the only names let
+  through to files.
 - Every book read stays in memory (`NotesStore::books`, one lock) until quit or removal: the cards
   read every book at start, so files are read once per session. A change writes at once only the
   files it touched (written beside, `sync_all`, renamed over); a failed write drops that book,

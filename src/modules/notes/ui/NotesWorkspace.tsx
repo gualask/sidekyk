@@ -89,6 +89,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
             <NoteCards
                 // a list opens with its done notes folded and no card open
                 key={list.id}
+                book={book}
                 notes={notes}
                 list={list}
                 actions={actions}

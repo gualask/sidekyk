@@ -1,9 +1,10 @@
 import { IconFileOff, IconPhotoOff } from '@tabler/icons-react';
 import { type ReactNode, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
+import { fileSize } from '@/shared/format/file-size';
 import { useTranslation } from '@/shared/i18n';
 import { useImageSource } from '../application/repository.queries';
-import { fileSize, MAX_IMAGE_BYTES } from '../model/preview';
+import { MAX_IMAGE_BYTES } from '../model/preview';
 import { Notice } from './Pane';
 
 /**

@@ -1,7 +1,9 @@
 //! A book's notes in memory, and every change to them. Pure: each change says which files it
 //! touched, and `NotesStore` writes them.
 
-use super::contracts::{DeletedList, ListTarget, Note, NoteList, NotesSummary, ProjectNotes};
+use super::contracts::{
+    DeletedList, ListTarget, Note, NoteImage, NoteList, NotesSummary, ProjectNotes,
+};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 use crate::shared::id::is_id;
 
@@ -75,11 +77,17 @@ fn checked_id(id: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
-/// A note handed back by the frontend or another book, before it is stored.
+/// A note handed back by the frontend or another book, before it is stored: its images' ids
+/// name files too.
 fn checked_note(note: &Note) -> anyhow::Result<()> {
     checked_id(&note.id)?;
     checked_text(&note.text)?;
     anyhow::ensure!(note.position.is_finite(), "a position must be a number");
+    let mut seen = std::collections::HashSet::new();
+    for image in &note.images {
+        checked_id(&image.id)?;
+        anyhow::ensure!(seen.insert(&image.id), "an image twice in a note");
+    }
     Ok(())
 }
 
@@ -211,6 +219,7 @@ impl NoteBook {
             created: now,
             edited: now,
             done: None,
+            images: Vec::new(),
         };
         self.notes.push(note.clone());
         let touched = vec![Touched::Note(note.id.clone())];
@@ -229,6 +238,40 @@ impl NoteBook {
             return Ok((note.clone(), Vec::new()));
         }
         note.text = text;
+        note.edited = now;
+        Ok((note.clone(), vec![Touched::Note(id.into())]))
+    }
+
+    /// Images added below a note's, in the order given.
+    pub(super) fn add_images(
+        &mut self,
+        id: &str,
+        images: Vec<NoteImage>,
+        now: u64,
+    ) -> anyhow::Result<(Note, Vec<Touched>)> {
+        let note = self.note_mut(id)?;
+        if images.is_empty() {
+            return Ok((note.clone(), Vec::new()));
+        }
+        note.images.extend(images);
+        note.edited = now;
+        Ok((note.clone(), vec![Touched::Note(id.into())]))
+    }
+
+    /// Takes an image out of a note; its files stay until the book is next read, so an undo
+    /// (`restore`) finds them.
+    pub(super) fn remove_image(
+        &mut self,
+        id: &str,
+        image: &str,
+        now: u64,
+    ) -> anyhow::Result<(Note, Vec<Touched>)> {
+        let note = self.note_mut(id)?;
+        let before = note.images.len();
+        note.images.retain(|i| i.id != image);
+        if note.images.len() == before {
+            return Ok((note.clone(), Vec::new()));
+        }
         note.edited = now;
         Ok((note.clone(), vec![Touched::Note(id.into())]))
     }
@@ -573,6 +616,7 @@ mod tests {
             created: 1,
             edited: 1,
             done: None,
+            images: Vec::new(),
         };
         let first = || NoteList {
             id: GENERAL.into(),

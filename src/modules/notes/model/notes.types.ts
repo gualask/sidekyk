@@ -18,7 +18,27 @@ export type ListTarget =
     | { kind: 'list'; id: string }
     | { kind: 'new'; name: string };
 
-/** One note: a card of plain text in a list of a book. Times are milliseconds since the epoch. */
+/** The formats a note takes: those every webview shows. */
+type ImageKind = 'png' | 'jpeg' | 'gif' | 'webp';
+
+/** An image of a note, kept beside its notes as given, with a thumbnail for the cards. */
+export interface NoteImage {
+    id: string;
+    kind: ImageKind;
+    /** In pixels, as shown. */
+    width: number;
+    height: number;
+    /** The size of its file. */
+    bytes: number;
+}
+
+/** The note images go to: one there, or a new one on top of a list. */
+export type ImageTarget = { kind: 'note'; id: string } | { kind: 'new'; list: string };
+
+/**
+ * One note: a card of plain text in a list of a book, its images below the text. Times are
+ * milliseconds since the epoch.
+ */
 export interface Note {
     id: string;
     /** The list it is in. */
@@ -31,6 +51,8 @@ export interface Note {
     edited: number;
     /** When it was marked done, or null while open. */
     done: number | null;
+    /** In the order they came in. */
+    images: NoteImage[];
 }
 
 /** A list of notes, by topic. */

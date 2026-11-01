@@ -35,6 +35,11 @@ ignore = "0.4"
 # renders, so no HTML writer (2026-10-25, over comrak: 3x faster, half the memory on 2 MiB;
 # `.local/markdown-renderers/`, docs/features/previews.md).
 pulldown-cmark = { version = "0.13", default-features = false }
+# Images in notes: the formats every webview shows, decoded within a pixel limit, and a thumbnail
+# for the cards (2026-11-01, over a canvas in the webview: a 5K screenshot peaks at 84 MB against
+# ~450 MB over two WebKit processes, and the same code on every system;
+# `.local/note-thumbnails/`, docs/features/notes.md).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 [dev-dependencies]
 tempfile.workspace = true

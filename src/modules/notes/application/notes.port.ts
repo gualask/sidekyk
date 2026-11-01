@@ -2,14 +2,33 @@ import { createContext, createElement, type ReactNode, useContext } from 'react'
 import type {
     BookTarget,
     DeletedList,
+    ImageTarget,
     ListTarget,
     MovedList,
     MovedNote,
     Note,
+    NoteImage,
     NoteList,
     NotesSummary,
     ProjectNotes,
 } from '../model/notes.types';
+
+/**
+ * Files dragged over the window, in CSS pixels of the page: where they are, then dropped (`add`
+ * gives them to a note, all or none) or taken away. Only the system's file drags: the webview
+ * sees none of them itself.
+ */
+export type ImageDrop =
+    | { kind: 'over'; x: number; y: number }
+    | { kind: 'leave' }
+    | {
+          kind: 'drop';
+          x: number;
+          y: number;
+          /** The files' names, for a draft to show. */
+          names: string[];
+          add: (book: string, target: ImageTarget) => Promise<Note>;
+      };
 
 /**
  * The notes' runtime boundary: the native backend, or a fixture in browser dev mode. `book` is
@@ -51,6 +70,18 @@ export interface NotesPort {
     countNotes(book: string): Promise<number>;
     /** Asks where to save a project's notes as Markdown and saves them; the path, or null. */
     exportNotes(projectId: string): Promise<string | null>;
+    /** Adds an image pasted (its bytes) to a note, or to a new one on top of a list. */
+    addImage(book: string, target: ImageTarget, bytes: Uint8Array<ArrayBuffer>): Promise<Note>;
+    /** Takes an image out of a note; `restoreNote` with the note as it was puts it back. */
+    removeImage(book: string, id: string, image: string): Promise<Note>;
+    /** What a note's copy puts on the clipboard: its text, then where its images are. */
+    copyNote(book: string, id: string): Promise<string>;
+    /** An image of a note as PNG, whatever its format: what "Copy image" puts on the clipboard. */
+    imagePng(book: string, image: NoteImage): Promise<Blob>;
+    /** Where the webview loads an image of a note, or its thumbnail. */
+    imageUrl(book: string, image: NoteImage, thumb: boolean): string;
+    /** Follows files dragged over the window; gives back what stops following. */
+    onImageDrop(listener: (drop: ImageDrop) => void): () => void;
 }
 
 const NotesPortContext = createContext<NotesPort | null>(null);

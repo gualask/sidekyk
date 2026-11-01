@@ -4,9 +4,9 @@ import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { Move } from '../model/move-dialog';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
-import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
+import type { ImageTarget, Note, NoteImage, NoteList, ProjectNotes } from '../model/notes.types';
 import { changeQueue } from './change-queue';
-import { useNotesPort } from './notes.port';
+import { type NotesPort, useNotesPort } from './notes.port';
 
 /**
  * Where a book's notes are cached, and below the same key what is told of them (a project card's
@@ -16,6 +16,48 @@ import { useNotesPort } from './notes.port';
 export const notesKey = (book: string) => ['notes', book] as const;
 const summaryKey = (book: string) => [...notesKey(book), 'summary'] as const;
 const countKey = (book: string) => [...notesKey(book), 'count'] as const;
+
+/**
+ * Images on their way to a note: pasted (`previews` shows them) or dropped (their `names`). `add`
+ * gives them to a note, or to a new one, all or none. Whoever holds them revokes the previews.
+ */
+export interface PendingImages {
+    names: string[];
+    /** Object URLs of pasted images, revoked once added or dropped. */
+    previews: string[];
+    add: (target: ImageTarget) => Promise<Note>;
+}
+
+/**
+ * Adds image files to a note in turn, the first to `target`, the rest to the note it gave: one
+ * note, as a drop of several files makes. `add` gives one file's bytes to the backend.
+ */
+export async function addFiles(
+    files: readonly File[],
+    target: ImageTarget,
+    add: (target: ImageTarget, bytes: Uint8Array<ArrayBuffer>) => Promise<Note>,
+): Promise<Note> {
+    let note: Note | undefined;
+    for (const file of files) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        note = await add(note ? { kind: 'note', id: note.id } : target, bytes);
+    }
+    if (!note) throw new Error('no file to add');
+    return note;
+}
+
+/** Images pasted into a book (`files`), with their previews, to be added through the port. */
+export function pastedImages(
+    port: Pick<NotesPort, 'addImage'>,
+    book: string,
+    files: readonly File[],
+): PendingImages {
+    return {
+        names: files.map((file) => file.name),
+        previews: files.map((file) => URL.createObjectURL(file)),
+        add: (target) => addFiles(files, target, (to, bytes) => port.addImage(book, to, bytes)),
+    };
+}
 
 /**
  * A book's notes, read once: only the app writes them, and every change goes through the cache
@@ -139,7 +181,59 @@ export function useNoteActions(book: string) {
             }
         };
 
+        /** Adds images to a note, or to a new one; the note as stored, or undefined. */
+        const addImages = (pending: PendingImages, target: ImageTarget) =>
+            send(
+                t('notes.addImageFailed'),
+                () => pending.add(target),
+                (note) => update((notes) => withNotes(notes, [note])),
+            );
+
         return {
+            /**
+             * A note on top of a list with its text and the images waiting for it, in order. The
+             * note as stored, if any was made, and the images left out by a step that failed (a
+             * toast says why): the field keeps those, never the text of a note made.
+             */
+            addWithImages: async (
+                list: string,
+                text: string,
+                pending: readonly PendingImages[],
+            ): Promise<{ note: Note | undefined; left: PendingImages[] }> => {
+                let note: Note | undefined;
+                if (text.trim() !== '') {
+                    note = await send(
+                        t('notes.addFailed'),
+                        () => port.addNote(book, list, text),
+                        (added) => update((notes) => withNotes(notes, [added])),
+                    );
+                    if (!note) return { note, left: [...pending] };
+                }
+                for (const [index, images] of pending.entries()) {
+                    const target: ImageTarget = note
+                        ? { kind: 'note', id: note.id }
+                        : { kind: 'new', list };
+                    const added = await addImages(images, target);
+                    if (!added) return { note, left: pending.slice(index) };
+                    note = added;
+                }
+                return { note, left: [] };
+            },
+            addImages,
+            /** Takes an image out of a note; the toast puts it back. */
+            removeImage: async (note: Note, image: NoteImage) => {
+                patch(note.id, { images: note.images.filter((i) => i.id !== image.id) });
+                const changed = await send(
+                    t('notes.removeImageFailed'),
+                    () => port.removeImage(book, note.id, image.id),
+                    (removed) => updated([removed]),
+                );
+                if (!changed) return;
+                showToast({
+                    title: t('notes.imageRemoved'),
+                    action: { label: t('notes.undo'), run: () => void restore(note) },
+                });
+            },
             /** A note on top of a list; the note as stored, or undefined when it failed. */
             add: (list: string, text: string) =>
                 send(

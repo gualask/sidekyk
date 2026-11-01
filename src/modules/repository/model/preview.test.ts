@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
     blockAtLine,
     blocksById,
-    fileSize,
     footnoteId,
     footnoteRefId,
     hasCodeAndPreview,
@@ -96,11 +95,5 @@ describe('previews', () => {
         ]);
         expect(table.rows[0].key).toBe('row:0');
         expect(table.rows[0].cells[1].content).toEqual([]);
-    });
-
-    it('size files as file managers do', () => {
-        expect(fileSize(858, 'en-GB')).toBe('858 byte');
-        expect(fileSize(7874, 'en-GB')).toBe('7.9 kB');
-        expect(fileSize(16_777_216, 'it-IT')).toBe('16,8 MB');
     });
 });

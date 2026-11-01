@@ -8,6 +8,7 @@ import {
     openCounts,
     openNotes,
     positionAt,
+    thumbBox,
     withNotes,
     withoutNote,
     withUpdated,
@@ -25,6 +26,7 @@ function note(id: string, position: number, extra: Partial<Note> = {}): Note {
         created: 0,
         edited: 0,
         done: null,
+        images: [],
         ...extra,
     };
 }
@@ -99,5 +101,25 @@ describe('notes', () => {
         expect(positionAt(open, 'c', 1)).toBe(0.5);
         expect(positionAt(open, 'a', 9)).toBe(3);
         expect(positionAt([], 'z', 0)).toBe(0);
+    });
+});
+
+describe('thumbBox', () => {
+    const image = (width: number, height: number) => ({
+        id: 'i',
+        kind: 'png' as const,
+        width,
+        height,
+        bytes: 1,
+    });
+
+    it('keeps the image shape at the card height', () => {
+        expect(thumbBox(image(1600, 900))).toEqual({ width: 128, height: 72 });
+    });
+
+    it('crops a very wide or tall image to bounds', () => {
+        expect(thumbBox(image(5120, 300))).toEqual({ width: 200, height: 72 });
+        expect(thumbBox(image(100, 4000))).toEqual({ width: 40, height: 72 });
+        expect(thumbBox(image(0, 0))).toEqual({ width: 40, height: 72 });
     });
 });

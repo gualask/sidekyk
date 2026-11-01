@@ -1,22 +1,21 @@
 import { listen } from '@tauri-apps/api/event';
 
 /**
- * Attaches a Tauri event listener.
+ * Attaches a listener whose registration resolves later (Tauri's `listen`, a webview's drags).
  *
  * - Returns a synchronous disposer.
- * - Handles late `listen()` resolution by disposing immediately when already disposed.
+ * - Handles late resolution by disposing immediately when already disposed.
  * - `onListening` runs once the listener is attached: what happened before it is not missed.
  * - Swallows registration failures to keep UI flows resilient in dev mode.
  */
-export function onTauriEvent<T>(
-    eventName: string,
-    listener: (payload: T) => void,
+export function attachListener(
+    register: () => Promise<() => void>,
     onListening?: () => void,
 ): () => void {
     let disposed = false;
     let unlisten: (() => void) | undefined;
 
-    void listen<T>(eventName, (event) => listener(event.payload))
+    void register()
         .then((fn) => {
             if (disposed) {
                 fn();
@@ -33,4 +32,16 @@ export function onTauriEvent<T>(
         disposed = true;
         unlisten?.();
     };
+}
+
+/** Attaches a Tauri event listener (`attachListener`). */
+export function onTauriEvent<T>(
+    eventName: string,
+    listener: (payload: T) => void,
+    onListening?: () => void,
+): () => void {
+    return attachListener(
+        () => listen<T>(eventName, (event) => listener(event.payload)),
+        onListening,
+    );
 }

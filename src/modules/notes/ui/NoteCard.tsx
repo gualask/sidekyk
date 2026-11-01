@@ -8,17 +8,21 @@ import type { NoteActions } from '../application/notes.queries';
 import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { noteMeta } from '../model/notes';
 import type { Note } from '../model/notes.types';
+import { NoteImages } from './NoteImages';
 import { autosize, fitLines, linesClass } from './notes-layout';
+import { DROP_ATTRIBUTE } from './use-image-drops';
 
 /** How long typing pauses before the text is saved; closing the card saves at once. */
 const SAVE_DELAY_MS = 500;
 
 /**
  * One note: done on the left (where notes can be done), copy and ⋯ on the right, the text in
- * between, four lines until clicked. Clicked, the text is edited in place: saved as typing pauses,
- * closed by `Esc`, `⌘↵` or a click outside; emptied, the note goes (with Undo).
+ * between, four lines until clicked, its images below. Clicked, the text is edited in place: saved
+ * as typing pauses, closed by `Esc`, `⌘↵` or a click outside; emptied, a note without images goes
+ * (with Undo). Files dropped on it join its images.
  */
 export function NoteCard({
+    book,
     note,
     flash,
     editing,
@@ -29,7 +33,10 @@ export function NoteCard({
     onDone,
     order,
     onMove,
+    dropping,
 }: {
+    /** The book the note is in. */
+    book: string;
     note: Note;
     /** Lit up for a moment: brought into view from the palette. */
     flash: boolean;
@@ -44,6 +51,8 @@ export function NoteCard({
     order: { top: boolean; moveToTop: () => void; reorder: () => void } | null;
     /** Opens the Move dialog for the note. */
     onMove: () => void;
+    /** Files are dragged over it. */
+    dropping: boolean;
 }) {
     const done = note.done !== null;
     const i18n = useTranslation();
@@ -53,9 +62,12 @@ export function NoteCard({
     return (
         <article
             className={`group/card relative flex items-start gap-2.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
-                editing ? 'border-ui-accent' : 'border-ui-border hover:border-ui-border-hover'
+                editing || dropping
+                    ? 'border-ui-accent'
+                    : 'border-ui-border hover:border-ui-border-hover'
             } ${flash ? 'note-flash' : ''}`}
             aria-label={t('notes.note')}
+            {...{ [DROP_ATTRIBUTE]: note.id }}
         >
             {onDone ? (
                 <button
@@ -84,9 +96,14 @@ export function NoteCard({
                         title={t('notes.clickToEdit')}
                         onClick={() => onEdit(true)}
                     >
-                        {note.text}
+                        {note.text === '' ? (
+                            <span className="text-ui-text-muted">{t('notes.addText')}</span>
+                        ) : (
+                            note.text
+                        )}
                     </button>
                 )}
+                <NoteImages book={book} note={note} actions={actions} />
                 <div className="text-[11.5px] text-ui-text-muted">
                     {noteMeta(note, Date.now(), i18n)}
                 </div>
@@ -148,11 +165,14 @@ export function NoteCard({
     );
 }
 
-/** Saves a note's text unless it is saved already, or empty (closing deletes it then). */
-function persist(actions: NoteActions, id: string, saved: { current: string }, text: string) {
-    if (text === saved.current || text.trim() === '') return;
+/**
+ * Saves a note's text unless it is saved already, or empty without images (closing deletes the
+ * note then).
+ */
+function persist(actions: NoteActions, note: Note, saved: { current: string }, text: string) {
+    if (text === saved.current || (text.trim() === '' && note.images.length === 0)) return;
     saved.current = text;
-    void actions.setText(id, text);
+    void actions.setText(note.id, text);
 }
 
 /** A note's text being edited: saved as typing pauses and on close, which an empty text deletes. */
@@ -178,22 +198,25 @@ function NoteEditor({
 
     const save = () => {
         window.clearTimeout(timer.current);
-        persist(actions, note.id, saved, latest.current);
+        persist(actions, note, saved, latest.current);
     };
     const close = () => {
         window.clearTimeout(timer.current);
-        // emptied, it goes; the toast brings it back with the text last saved
-        if (latest.current.trim() === '') void actions.remove(note);
+        // emptied, it goes, unless images are left; the toast brings it back with the text last
+        // saved
+        if (latest.current.trim() === '' && note.images.length === 0) void actions.remove(note);
         else save();
         onClose();
     };
     // a card scrolled out of the list unmounts: what was typed is kept
+    const current = useRef(note);
+    current.current = note;
     useEffect(
         () => () => {
             window.clearTimeout(timer.current);
-            persist(actions, note.id, saved, latest.current);
+            persist(actions, current.current, saved, latest.current);
         },
-        [actions, note.id],
+        [actions],
     );
 
     useEffect(() => {

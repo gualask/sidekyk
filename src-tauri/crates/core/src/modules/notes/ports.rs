@@ -19,4 +19,7 @@ pub trait NotesStorage: Send + Sync {
 
     /// Removes a folder and what is in it; one already gone is not an error.
     fn remove_folder(&self, folder: &str) -> anyhow::Result<()>;
+
+    /// Where a file is, as this system names it: what a note's copy gives an agent to read.
+    fn location(&self, folder: &str, file: &str) -> anyhow::Result<String>;
 }
