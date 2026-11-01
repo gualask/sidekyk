@@ -6,6 +6,7 @@ import {
     newNoteTarget,
     notesPanel,
     notesTarget,
+    useCaptures,
 } from '@/modules/notes';
 import {
     activeProject,
@@ -278,6 +279,16 @@ export function AppShell() {
         [relocate, readAgain],
     );
     const problems = useProblems(projects.data, openSettings, fixProject);
+
+    // a capture becomes a note of the project whose panels show, else of the Inbox; it comes into
+    // view, where its card opens its marks
+    useCaptures(
+        () => (level > 0 && project ? project.id : INBOX_BOOK),
+        (book, note) => {
+            if (book === INBOX_BOOK) setInboxNote(note.id);
+            else show(notesPanel.id, notesTarget(note.list, note.id));
+        },
+    );
 
     const paletteActions: PaletteActions = {
         openProject,

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { ProjectList } from '@/modules/projects';
 import { type ProjectFailure, useProjectFailures } from '@/modules/repository';
-import { shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
+import { SHORTCUT_ACTIONS, shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
@@ -36,7 +36,7 @@ export function useProblems(
     fixProject: ProjectFixes,
 ): Problem[] {
     const failures = useProjectFailures();
-    const shortcut = useGlobalShortcutStatus().data;
+    const shortcuts = useGlobalShortcutStatus().data;
     const i18n = useTranslation();
 
     return useMemo(() => {
@@ -45,16 +45,18 @@ export function useProblems(
             const problem = failure ? projectProblem(project, failure, fixProject, i18n) : null;
             return problem ? [problem] : [];
         });
-        const shortcutIssue = shortcutProblem(shortcut, MACOS, i18n);
-        if (shortcutIssue) {
-            problems.push({
-                id: 'global-shortcut',
-                ...shortcutIssue,
-                fixes: [{ label: i18n.t('problem.changeShortcut'), run: openSettings }],
-            });
+        for (const action of SHORTCUT_ACTIONS) {
+            const shortcutIssue = shortcutProblem(action, shortcuts?.[action], MACOS, i18n);
+            if (shortcutIssue) {
+                problems.push({
+                    id: `${action}-shortcut`,
+                    ...shortcutIssue,
+                    fixes: [{ label: i18n.t('problem.changeShortcut'), run: openSettings }],
+                });
+            }
         }
         return problems;
-    }, [list, failures, fixProject, shortcut, openSettings, i18n]);
+    }, [list, failures, fixProject, shortcuts, openSettings, i18n]);
 }
 
 /** A project's failure as a problem; none for one that tells nothing more than its panels do. */

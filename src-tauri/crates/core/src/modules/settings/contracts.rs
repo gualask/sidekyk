@@ -100,7 +100,12 @@ impl<'de> Deserialize<'de> for CopyTemplate {
 /// provisional: the maintainer picks them once the conflict warnings have been tried.
 pub const DEFAULT_GLOBAL_SHORTCUT: &str = "Control+Alt+Space";
 
-/// The shortcut that shows and hides the window from any app. `keys` is its combination:
+/// The shortcut that captures an area of the screen from any app, on by default; provisional
+/// keys too.
+pub const DEFAULT_CAPTURE_SHORTCUT: &str = "Control+Alt+KeyC";
+
+/// A global shortcut, from any app: the one that shows and hides the window (its default, below),
+/// or the one that captures an area of the screen. `keys` is its combination:
 /// modifiers (`Control`, `Alt`, `Shift`, `Super`, in this order), then a `KeyboardEvent.code`,
 /// joined by `+`, as `global-hotkey` parses it. Kept on Linux, which registers none of its own.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -121,13 +126,15 @@ impl Default for GlobalShortcut {
 
 /// Every setting. Also the form they are stored in: a setting missing from the stored ones, such
 /// as one added since they were stored, takes its default.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
     /// `None` until the frontend stores the system's language, at the first start.
     pub language: Option<Language>,
     pub theme: Theme,
+    /// The shortcut that shows and hides the window.
     pub global_shortcut: GlobalShortcut,
+    pub capture_shortcut: GlobalShortcut,
     pub diff_view: DiffView,
     pub file_view: FileView,
     pub diff_scrollbar: DiffScrollbar,
@@ -139,7 +146,35 @@ pub struct Settings {
     pub note_lines: NoteLines,
 }
 
-/// Where the global shortcut stands, as registered. The frontend knows every platform's kinds;
+impl Default for Settings {
+    fn default() -> Self {
+        Self {
+            language: None,
+            theme: Theme::default(),
+            global_shortcut: GlobalShortcut::default(),
+            capture_shortcut: GlobalShortcut {
+                enabled: true,
+                keys: DEFAULT_CAPTURE_SHORTCUT.to_string(),
+            },
+            diff_view: DiffView::default(),
+            file_view: FileView::default(),
+            diff_scrollbar: DiffScrollbar::default(),
+            code_lines: CodeLines::default(),
+            copy_template: CopyTemplate::default(),
+            sidebar_widths: BTreeMap::new(),
+            note_lines: NoteLines::default(),
+        }
+    }
+}
+
+/// Where each global shortcut stands. `capture` is `None` where capture is not built yet.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct GlobalShortcutStatuses {
+    pub toggle: GlobalShortcutStatus,
+    pub capture: Option<GlobalShortcutStatus>,
+}
+
+/// Where a global shortcut stands, as registered. The frontend knows every platform's kinds;
 /// each platform builds only its own.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[cfg_attr(any(target_os = "macos", windows), derive(Default))]
@@ -153,13 +188,16 @@ pub enum GlobalShortcutStatus {
     #[cfg(any(target_os = "macos", windows))]
     Active { keys: String, conflict: bool },
     /// The stored shortcut could not be registered at startup, as another app or the system
-    /// holds it: none works.
+    /// holds it: it does not work.
     #[cfg(any(target_os = "macos", windows))]
     Refused { keys: String },
+    /// The stored shortcut has the other's keys, which that one took first: it does not work.
+    #[cfg(any(target_os = "macos", windows))]
+    InUse { keys: String },
     /// No global shortcut on this system: the plugin could not start.
     #[cfg(any(target_os = "macos", windows))]
     Unavailable,
-    /// Linux: the desktop's own shortcut runs this command, which shows or hides the window.
+    /// Linux: the desktop's own shortcut runs this command, which does what the shortcut would.
     #[cfg(not(any(target_os = "macos", windows)))]
     Command { command: String },
 }
@@ -177,6 +215,10 @@ mod tests {
                 enabled: false,
                 keys: "Super+Shift+KeyK".to_string(),
             },
+            capture_shortcut: GlobalShortcut {
+                enabled: true,
+                keys: "Super+Shift+KeyX".to_string(),
+            },
             diff_view: DiffView::File,
             file_view: FileView::Code,
             diff_scrollbar: DiffScrollbar::Wide,
@@ -189,6 +231,7 @@ mod tests {
             "language": "it",
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
+            "captureShortcut": { "enabled": true, "keys": "Super+Shift+KeyX" },
             "diffView": "file",
             "fileView": "code",
             "diffScrollbar": "wide",
@@ -211,6 +254,10 @@ mod tests {
                 global_shortcut: GlobalShortcut {
                     enabled: true,
                     keys: DEFAULT_GLOBAL_SHORTCUT.to_string(),
+                },
+                capture_shortcut: GlobalShortcut {
+                    enabled: true,
+                    keys: DEFAULT_CAPTURE_SHORTCUT.to_string(),
                 },
                 diff_view: DiffView::Changes,
                 file_view: FileView::Preview,
@@ -261,6 +308,12 @@ mod tests {
                 serde_json::json!({ "kind": "refused", "keys": "Super+Space" }),
             ),
             (
+                GlobalShortcutStatus::InUse {
+                    keys: "Super+Space".to_string(),
+                },
+                serde_json::json!({ "kind": "inUse", "keys": "Super+Space" }),
+            ),
+            (
                 GlobalShortcutStatus::Unavailable,
                 serde_json::json!({ "kind": "unavailable" }),
             ),
@@ -268,6 +321,19 @@ mod tests {
         for (status, json) in cases {
             assert_eq!(serde_json::to_value(status).unwrap(), json);
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn shortcut_statuses_go_by_shortcut() {
+        let statuses = GlobalShortcutStatuses {
+            toggle: GlobalShortcutStatus::Off,
+            capture: None,
+        };
+        assert_eq!(
+            serde_json::to_value(statuses).unwrap(),
+            serde_json::json!({ "toggle": { "kind": "off" }, "capture": null })
+        );
     }
 
     #[cfg(not(any(target_os = "macos", windows)))]

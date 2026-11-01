@@ -25,6 +25,7 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     path_outside_repository: 'error.pathOutsideRepository',
     project_not_found: 'error.projectNotFound',
     repository_missing: 'error.repositoryMissing',
+    shortcut_in_use: 'error.shortcutInUse',
     shortcut_taken: 'error.shortcutTaken',
 };
 

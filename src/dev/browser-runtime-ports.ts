@@ -2,7 +2,7 @@ import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
 import type { FolderChoice, ProjectList } from '@/modules/projects';
 import type { FileContent, FolderKind, RepositoryChangedEvent } from '@/modules/repository';
-import type { GlobalShortcutStatus, Settings } from '@/modules/settings';
+import type { GlobalShortcutStatuses, Settings, ShortcutAction } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
@@ -115,6 +115,7 @@ const MACOS_SHORTCUTS = ['Super+Space', 'Alt+Super+Space', 'Control+Super+Space'
 const TAKEN_SHORTCUTS = ['Shift+Super+Space'];
 
 const STORED_SHORTCUT = 'Control+Alt+Space';
+const STORED_CAPTURE_SHORTCUT = 'Control+Alt+KeyC';
 
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
@@ -169,6 +170,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         language: null,
         theme: 'dark',
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
+        captureShortcut: { enabled: true, keys: STORED_CAPTURE_SHORTCUT },
         diffView: 'changes',
         fileView: 'preview',
         diffScrollbar: 'narrow',
@@ -179,9 +181,12 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     };
     // in `problems`, another app holds the stored shortcut since startup
     const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;
-    let shortcutStatus: GlobalShortcutStatus = taken.includes(STORED_SHORTCUT)
-        ? { kind: 'refused', keys: STORED_SHORTCUT }
-        : { kind: 'active', keys: STORED_SHORTCUT, conflict: false };
+    const shortcutStatus: GlobalShortcutStatuses = {
+        toggle: taken.includes(STORED_SHORTCUT)
+            ? { kind: 'refused', keys: STORED_SHORTCUT }
+            : { kind: 'active', keys: STORED_SHORTCUT, conflict: false },
+        capture: { kind: 'active', keys: STORED_CAPTURE_SHORTCUT, conflict: false },
+    };
     // the scenario's data belongs to its first project; any other is clean
     const scenarioData = (projectId: string) =>
         projectId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
@@ -603,22 +608,26 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         },
         settings: {
             getSettings: async () => settings,
-            // as the backend: the shortcut's settings unchanged change nothing, even refused
+            // as the backend: a shortcut's settings unchanged change nothing, even refused
             setSettings: async (next) => {
-                const { enabled, keys } = next.globalShortcut;
-                const changed =
-                    enabled !== settings.globalShortcut.enabled ||
-                    keys !== settings.globalShortcut.keys;
-                if (changed) {
+                const fields = { toggle: 'globalShortcut', capture: 'captureShortcut' } as const;
+                const other = { toggle: 'capture', capture: 'toggle' } as const;
+                for (const action of ['toggle', 'capture'] satisfies ShortcutAction[]) {
+                    const { enabled, keys } = next[fields[action]];
+                    const current = settings[fields[action]];
+                    if (enabled === current.enabled && keys === current.keys) continue;
+                    const otherStatus = shortcutStatus[other[action]];
+                    const inUse = otherStatus?.kind === 'active' && otherStatus.keys === keys;
+                    if (enabled && inUse) throw failure('shortcut_in_use');
                     if (enabled && taken.includes(keys)) throw failure('shortcut_taken');
-                    shortcutStatus = enabled
+                    shortcutStatus[action] = enabled
                         ? { kind: 'active', keys, conflict: MACOS_SHORTCUTS.includes(keys) }
                         : { kind: 'off' };
                 }
                 settings = next;
                 return settings;
             },
-            getGlobalShortcutStatus: async () => shortcutStatus,
+            getGlobalShortcutStatus: async () => ({ ...shortcutStatus }),
             setShortcutRecording: async () => undefined,
             getVersion: async () => '0.1.0',
             // a browser tab has no file manager to show it in

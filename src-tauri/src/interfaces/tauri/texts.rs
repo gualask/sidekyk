@@ -3,14 +3,15 @@
 //! `src/shared/i18n/messages`; both languages have every field, as the struct asks. Statics, so
 //! that a language's texts live as long as the app.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use sidekyk_core::modules::notes::ExportWords;
 use sidekyk_core::modules::settings::Language;
-use tauri::Manager;
-
-use super::settings::AppliedSettings;
 
 pub(crate) struct Texts {
     pub(crate) show: &'static str,
+    /// The tray's item that starts a capture, and the overlay's button that takes the area.
+    pub(crate) capture: &'static str,
     pub(crate) quit: &'static str,
     /// The folder picker's title for a new project.
     pub(crate) choose_folder: &'static str,
@@ -25,6 +26,7 @@ pub(crate) struct Texts {
 
 static ENGLISH: Texts = Texts {
     show: "Show Sidekyk",
+    capture: "Capture",
     quit: "Quit Sidekyk",
     choose_folder: "Choose the project's folder",
     locate: "Locate {name}",
@@ -40,6 +42,7 @@ static ENGLISH: Texts = Texts {
 
 static ITALIAN: Texts = Texts {
     show: "Mostra Sidekyk",
+    capture: "Cattura",
     quit: "Esci da Sidekyk",
     choose_folder: "Scegli la cartella del progetto",
     locate: "Individua {name}",
@@ -53,15 +56,23 @@ static ITALIAN: Texts = Texts {
     first_list: "Generale",
 };
 
-/// English until the frontend stores the system's language, at the first start.
-pub(crate) fn texts(language: Option<Language>) -> &'static Texts {
-    match language {
-        Some(Language::It) => &ITALIAN,
-        Some(Language::En) | None => &ENGLISH,
-    }
+/// The texts in effect, by `ALL`'s index: read apart from the settings' lock, which a change holds
+/// while it waits on the main thread, where the tray and the global shortcuts read them.
+static CURRENT: AtomicUsize = AtomicUsize::new(0);
+static ALL: [&Texts; 2] = [&ENGLISH, &ITALIAN];
+
+/// Puts a language's texts in effect; English until the frontend stores the system's language,
+/// at the first start.
+pub(crate) fn set(language: Option<Language>) -> &'static Texts {
+    let index = match language {
+        Some(Language::It) => 1,
+        Some(Language::En) | None => 0,
+    };
+    CURRENT.store(index, Ordering::Relaxed);
+    ALL[index]
 }
 
-/// In the language of the settings in effect.
-pub(crate) fn current(app: &tauri::AppHandle) -> &'static Texts {
-    texts(app.state::<AppliedSettings>().current().language)
+/// The texts in effect.
+pub(crate) fn current() -> &'static Texts {
+    ALL[CURRENT.load(Ordering::Relaxed)]
 }

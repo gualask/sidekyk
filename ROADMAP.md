@@ -45,12 +45,14 @@ Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two
 
 `.cflow/plans/capture.md`.
 
-Built: `docs/features/note-images.md` (images in notes, marks).
+Built: `docs/features/note-images.md` (images in notes, marks), `docs/features/capture.md`
+(capture on macOS).
 
-- [ ] Capture from a global shortcut: the system's tool picks the region, the image opens to
-      annotate in a new note of the project last on screen
-- [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`,
-      tazly)
+- [ ] Capture on Windows: Windows.Graphics.Capture (GDI as fallback) and a Win32 overlay, tried
+      on a machine
+- [ ] Capture on Linux: X11 and wlroots with the overlay, `sidekyk --capture` from the
+      desktop's shortcut; GNOME and KDE after trying ScreenCast's one frame
+- [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`)
 
 ## Remote projects
 
@@ -73,6 +75,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
       macOS: one universal `.dmg` (`--target universal-apple-darwin`; 2026-10-29: Intel Macs too,
       which stop at macOS 26, at no runtime cost, since only the native slice loads)
 - [ ] Verify on the packaged app and other systems:
+  - macOS, capture (`docs/features/capture.md`): over a full screen app and on another Space,
+    two displays (the one under the pointer), the monthly "bypass the system private window
+    picker" prompt, the permission kept across an update of a signed build
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
     icon shows the window, `⌘W` hides and `⌘Q` quits, hidden while full screen (closed or by
     the shortcut) no black Space left, no blank frame at startup; without the Command Line
@@ -96,6 +101,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
     copied in the file manager pasted (a `File` with its bytes?); a file drop's position on the
     right card (physical pixels over `devicePixelRatio`); a note's copy written after the backend
     answers; "Copy image" (`ClipboardItem`, WebKitGTK?); a WSL note's copy gives `/mnt/c/…` paths
+  - Linux and Windows, marks on images: how long Done takes on a 5K screenshot (WebView2 encodes
+    `toBlob` in idle time; `.local/note-thumbnails/`, `mode=flatten`), the labels in the app's
+    font, a label's field over its label
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     the window's visibility (`docs/testing.md`, Trying it on Windows and Linux; WebView2 may
     need its controller told); `prefers-color-scheme` follows the window theme

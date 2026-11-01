@@ -1,6 +1,7 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
     BookTarget,
+    CaptureEvent,
     DeletedList,
     ImageTarget,
     ListTarget,
@@ -94,6 +95,18 @@ export interface NotesPort {
     imageUrl(book: string, image: NoteImage, thumb: boolean): string;
     /** Follows files dragged over the window; gives back what stops following. */
     onImageDrop(listener: (drop: ImageDrop) => void): () => void;
+    /** Whether this system captures an area of the screen, as the backend has it. */
+    canCapture(): Promise<boolean>;
+    /** Starts a capture of the display under the pointer, as the global shortcut does. */
+    startCapture(): Promise<void>;
+    /** Follows how captures end; gives back what stops following. */
+    onCapture(listener: (event: CaptureEvent) => void): () => void;
+    /** Makes the area last captured a new note, on top of the book's open list. */
+    addCapture(book: string): Promise<Note>;
+    /** An image's marks are edited, or no longer are: meanwhile a capture only shows Sidekyk. */
+    setMarking(marking: boolean): Promise<void>;
+    /** Opens the system's settings that let Sidekyk read the screen. */
+    openCaptureSettings(): Promise<void>;
 }
 
 const NotesPortContext = createContext<NotesPort | null>(null);

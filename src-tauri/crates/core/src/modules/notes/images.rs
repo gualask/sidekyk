@@ -5,7 +5,7 @@
 use std::io::Cursor;
 
 use image::imageops::FilterType;
-use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits, RgbaImage};
 
 use super::contracts::{ImageKind, Mark, NoteImage};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
@@ -127,6 +127,27 @@ fn thumbnail(image: &DynamicImage) -> anyhow::Result<Vec<u8>> {
     Ok(png.into_inner())
 }
 
+/// A screen capture kept as a note's image: its pixels, opaque RGBA rows of `width`, encoded once
+/// as PNG beside its thumbnail, never decoded again. A display's frame is within the pixel limit,
+/// and a capture is not held to the file limit a note's other images are: a 5K photo-like screen
+/// may pass it.
+pub fn prepare_capture(width: u32, height: u32, rgba: Vec<u8>) -> anyhow::Result<PreparedImage> {
+    let image = RgbaImage::from_raw(width, height, rgba)
+        .ok_or_else(|| anyhow::anyhow!("a {width}x{height} capture's pixels do not fill it"))?;
+    // a screen is opaque: no alpha channel to keep
+    let image = DynamicImage::ImageRgb8(DynamicImage::ImageRgba8(image).into_rgb8());
+    let thumb = thumbnail(&image)?;
+    let mut original = Cursor::new(Vec::new());
+    image.write_to(&mut original, ImageFormat::Png)?;
+    Ok(PreparedImage {
+        kind: ImageKind::Png,
+        width,
+        height,
+        original: original.into_inner(),
+        thumb,
+    })
+}
+
 /// An image's bytes as PNG, what a clipboard takes everywhere: as they are when they are PNG.
 pub fn as_png(kind: ImageKind, bytes: Vec<u8>) -> anyhow::Result<Vec<u8>> {
     if kind == ImageKind::Png {
@@ -202,6 +223,23 @@ pub(super) fn image_of_file(file: &str) -> Option<&str> {
 pub(super) mod tests {
     use super::*;
     use crate::shared::error::user_facing_code;
+
+    #[test]
+    fn a_capture_becomes_a_png_of_its_size_with_a_thumbnail() {
+        let prepared = prepare_capture(600, 2, vec![255; 600 * 2 * 4]).unwrap();
+        assert_eq!(prepared.kind, ImageKind::Png);
+        assert_eq!((prepared.width, prepared.height), (600, 2));
+        let original = image::load_from_memory(&prepared.original).unwrap();
+        assert_eq!((original.width(), original.height()), (600, 2));
+        assert!(!original.color().has_alpha());
+        let thumb = image::load_from_memory(&prepared.thumb).unwrap();
+        assert_eq!(thumb.width(), THUMB_SIDE);
+    }
+
+    #[test]
+    fn capture_pixels_short_of_the_size_are_refused() {
+        assert!(prepare_capture(3, 2, vec![255; 5]).is_err());
+    }
 
     /// An image of `width` x `height` encoded as `format`, its pixels a gradient.
     pub(crate) fn encoded(width: u32, height: u32, format: ImageFormat) -> Vec<u8> {

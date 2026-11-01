@@ -19,20 +19,43 @@ import { MarkEditor } from './MarkEditor';
 
 /**
  * A note's images below its text: thumbnails of a fixed height, so the card's never moves while
- * they load. A click opens the image large; on hover a × takes it out (with Undo).
+ * they load. A click opens the image large; on hover a × takes it out (with Undo). A capture's
+ * opens large with its marks at once; when they end the viewer closes (`onAnnotated`): Done keeps
+ * the note, Cancel discards the capture, the note deleted (with Undo).
  */
 export function NoteImages({
     book,
     note,
     actions,
+    annotate = null,
+    place = '',
+    onAnnotated = () => undefined,
 }: {
     book: string;
     note: Note;
     actions: NoteActions;
+    /** A capture's image, just made a note, whose marks open at once. */
+    annotate?: string | null;
+    /** Where the note went, as the capture's marks name it. */
+    place?: string;
+    onAnnotated?: (kept: boolean) => void;
 }) {
     const port = useNotesPort();
     const [open, setOpen] = useState<number | null>(null);
+    // where a capture's note went, while its marks are open
+    const [captured, setCaptured] = useState<string | null>(null);
     const { t } = useTranslation();
+    const index = annotate ? note.images.findIndex((image) => image.id === annotate) : -1;
+    useEffect(() => {
+        if (index < 0) return;
+        setOpen(index);
+        setCaptured(place);
+    }, [index, place]);
+    const endCapture = (kept: boolean) => {
+        setOpen(null);
+        setCaptured(null);
+        onAnnotated(kept);
+    };
     if (note.images.length === 0) return null;
     return (
         <>
@@ -73,12 +96,19 @@ export function NoteImages({
             </ul>
             {open !== null && note.images[open] ? (
                 <ImageViewer
+                    // a capture's marks start a viewer of their own
+                    key={captured === null ? 'viewer' : 'capture'}
                     book={book}
                     note={note}
                     actions={actions}
                     index={open}
+                    captured={captured}
                     onIndex={setOpen}
-                    onClose={() => setOpen(null)}
+                    onClose={() => (captured === null ? setOpen(null) : endCapture(true))}
+                    onDiscard={() => {
+                        void actions.remove(note);
+                        endCapture(false);
+                    }}
                 />
             ) : null}
         </>
@@ -88,28 +118,34 @@ export function NoteImages({
 /**
  * A note's image large, over the app: fitted, never scaled up; `←`/`→` go through the note's
  * images, `Esc` or a click outside closes. "Copy image" puts it on the clipboard as PNG;
- * "Annotate" opens its marks (`MarkEditor`), which keep the viewer open until they end.
+ * "Annotate" opens its marks (`MarkEditor`), which keep the viewer open until they end. A capture's
+ * (`captured`, where its note went) opens on its marks, and closes when they end: Done keeps it,
+ * Cancel discards it (`onDiscard`).
  */
 function ImageViewer({
     book,
     note,
     actions,
     index,
+    captured,
     onIndex,
     onClose,
+    onDiscard,
 }: {
     book: string;
     note: Note;
     actions: NoteActions;
     index: number;
+    captured: string | null;
     onIndex: (index: number) => void;
     onClose: () => void;
+    onDiscard: () => void;
 }) {
     const port = useNotesPort();
     const i18n = useTranslation();
     const { t } = i18n;
     const { copied, copyImage } = useCopyToClipboard();
-    const [marking, setMarking] = useState(false);
+    const [marking, setMarking] = useState(captured !== null);
     // the marks ended, the focus goes back to what opened them, so `Esc` closes the viewer next
     const annotate = useRef<HTMLButtonElement>(null);
     const marked = useRef(false);
@@ -135,9 +171,18 @@ function ImageViewer({
             );
             if (!kept) return false;
         }
+        if (captured !== null) {
+            onClose();
+            return true;
+        }
+        endMarks();
+        return true;
+    };
+
+    /** Back to the image, the focus on what opened the marks. */
+    const endMarks = () => {
         marked.current = true;
         setMarking(false);
-        return true;
     };
 
     return (
@@ -161,7 +206,14 @@ function ImageViewer({
                     }}
                 >
                     {marking ? (
-                        <MarkEditor key={image.id} book={book} image={image} onDone={keepMarks} />
+                        <MarkEditor
+                            key={image.id}
+                            book={book}
+                            image={image}
+                            place={captured}
+                            onDone={keepMarks}
+                            onCancel={captured === null ? endMarks : onDiscard}
+                        />
                     ) : (
                         <>
                             <header className="flex items-center gap-1 pb-2 pl-1.5">

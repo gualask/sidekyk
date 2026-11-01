@@ -97,6 +97,7 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
                 onComposerFocused={() => setWriteIn(null)}
                 reveal={reveal}
                 onRevealed={revealed}
+                place={project.name}
                 onReorder={setReorder}
                 onMove={askMoveNote}
             />

@@ -1,7 +1,7 @@
 export { type MoveTargets, MoveTargetsProvider } from './application/move-targets';
 export { type ImageDrop, type NotesPort, NotesProvider } from './application/notes.port';
 // for the browser fixtures, which add a drop's files as the app does
-export { addFiles } from './application/notes.queries';
+export { addFiles, useCaptures } from './application/notes.queries';
 export { NotesSettingsProvider } from './application/notes-settings';
 // for the browser fixtures, which keep notes as the backend does
 export {
@@ -14,6 +14,7 @@ export {
 } from './model/notes';
 export {
     type BookTarget,
+    type CaptureEvent,
     type DeletedList,
     type ImageTarget,
     INBOX_BOOK,

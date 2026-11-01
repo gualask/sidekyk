@@ -1,19 +1,20 @@
-//! Tauri adapter for the global shortcut that shows and hides the window from any app. macOS and
-//! Windows register it through `tauri-plugin-global-shortcut`, which costs nothing until it is
-//! pressed (`modules/settings` decides which one and where it stands). Linux registers none: the
+//! Tauri adapter for the global shortcuts, from any app: the one that shows and hides the window
+//! and, where capture is built, the one that captures an area of the screen. macOS and Windows
+//! register them through `tauri-plugin-global-shortcut`, which costs nothing until one is pressed
+//! (`modules/settings` decides which keys and where each stands). Linux registers none: the
 //! desktop's own shortcut runs `sidekyk --toggle`.
 
 use tauri::AppHandle;
 
-use sidekyk_core::modules::settings::GlobalShortcutStatus;
+use sidekyk_core::modules::settings::GlobalShortcutStatuses;
 
 /// `sidekyk --toggle`, run while Sidekyk runs, shows or hides its window like the shortcut.
 pub(crate) const TOGGLE_FLAG: &str = "--toggle";
 
 #[tauri::command]
-/// Where the global shortcut stands, from memory. Async, so off the main thread: a change of
+/// Where each global shortcut stands, from memory. Async, so off the main thread: a change of
 /// the settings holds the state while the main thread registers its shortcut.
-pub(crate) async fn get_global_shortcut_status(app: AppHandle) -> GlobalShortcutStatus {
+pub(crate) async fn get_global_shortcut_status(app: AppHandle) -> GlobalShortcutStatuses {
     platform::status(&app)
 }
 
@@ -27,20 +28,35 @@ pub(crate) use platform::{apply, set_recording, start};
 
 #[cfg(any(target_os = "macos", windows))]
 mod platform {
+    use std::sync::atomic::{AtomicU64, Ordering};
+
     use tauri::{AppHandle, Manager};
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+    use crate::infrastructure::capture as system_capture;
+    use crate::interfaces::tauri::capture::capture;
     use crate::interfaces::tauri::window::toggle_main_window;
     use sidekyk_core::modules::settings::{
-        GlobalShortcut, GlobalShortcutStatus, GlobalShortcuts, RegisterError, ShortcutKeys,
-        ShortcutRegistrar,
+        GlobalShortcutStatuses, GlobalShortcuts, RegisterError, Settings, ShortcutAction,
+        ShortcutKeys, ShortcutRegistrar,
     };
+
+    /// The plugin's id of the capture shortcut registered, `NONE` without one: a press of any
+    /// other is the window's. Apart from `GlobalShortcuts`' state, which a press must not wait
+    /// for.
+    struct CaptureId(AtomicU64);
+
+    const NONE: u64 = u64::MAX;
 
     /// The system's global shortcuts, through the plugin.
     struct PluginRegistrar<'a>(&'a AppHandle);
 
     impl ShortcutRegistrar for PluginRegistrar<'_> {
-        fn register(&self, keys: &ShortcutKeys) -> Result<(), RegisterError> {
+        fn register(
+            &self,
+            action: ShortcutAction,
+            keys: &ShortcutKeys,
+        ) -> Result<(), RegisterError> {
             let shortcut = plugin_shortcut(keys)?;
             self.0
                 .global_shortcut()
@@ -48,15 +64,30 @@ mod platform {
                 .map_err(|error| {
                     tracing::debug!(%error, keys = keys.as_str(), "global shortcut refused");
                     RegisterError::Taken
-                })
+                })?;
+            if action == ShortcutAction::Capture {
+                let id = self.0.state::<CaptureId>();
+                id.0.store(u64::from(shortcut.id()), Ordering::Relaxed);
+            }
+            Ok(())
         }
 
-        fn unregister(&self, keys: &ShortcutKeys) {
-            let released = plugin_shortcut(keys)
-                .ok()
-                .map(|shortcut| self.0.global_shortcut().unregister(shortcut));
-            if let Some(Err(error)) = released {
-                tracing::warn!(%error, "could not release the global shortcut");
+        fn unregister(&self, action: ShortcutAction, keys: &ShortcutKeys) {
+            let Ok(shortcut) = plugin_shortcut(keys) else {
+                return;
+            };
+            if action == ShortcutAction::Capture {
+                let id = self.0.state::<CaptureId>();
+                // a new capture shortcut registers before the old one goes
+                let _ = id.0.compare_exchange(
+                    u64::from(shortcut.id()),
+                    NONE,
+                    Ordering::Relaxed,
+                    Ordering::Relaxed,
+                );
+            }
+            if let Err(error) = self.0.global_shortcut().unregister(shortcut) {
+                tracing::warn!(%error, "could not release a global shortcut");
             }
         }
 
@@ -78,14 +109,21 @@ mod platform {
             .map_err(|_| RegisterError::Unsupported)
     }
 
-    /// Starts the plugin and registers the stored shortcut.
-    pub(crate) fn start(app: &AppHandle, settings: &GlobalShortcut) {
-        app.manage(GlobalShortcuts::default());
+    /// Starts the plugin and registers the stored shortcuts.
+    pub(crate) fn start(app: &AppHandle, settings: &Settings) {
+        app.manage(GlobalShortcuts::new(system_capture::BUILT));
+        app.manage(CaptureId(AtomicU64::new(NONE)));
         let plugin = tauri_plugin_global_shortcut::Builder::new()
-            .with_handler(|app, _shortcut, event| {
-                if event.state == ShortcutState::Pressed
-                    && app.state::<GlobalShortcuts>().takes_press()
+            .with_handler(|app, shortcut, event| {
+                if event.state != ShortcutState::Pressed
+                    || !app.state::<GlobalShortcuts>().takes_press()
                 {
+                    return;
+                }
+                let capture_id = app.state::<CaptureId>().0.load(Ordering::Relaxed);
+                if u64::from(shortcut.id()) == capture_id {
+                    capture(app);
+                } else {
                     toggle_main_window(app);
                 }
             })
@@ -100,13 +138,13 @@ mod platform {
         }
     }
 
-    /// Registers the shortcut of new settings, before they are stored.
-    pub(crate) fn apply(app: &AppHandle, settings: &GlobalShortcut) -> anyhow::Result<()> {
+    /// Registers the shortcuts of new settings, before they are stored.
+    pub(crate) fn apply(app: &AppHandle, settings: &Settings) -> anyhow::Result<()> {
         app.state::<GlobalShortcuts>()
             .apply(&PluginRegistrar(app), settings)
     }
 
-    pub(super) fn status(app: &AppHandle) -> GlobalShortcutStatus {
+    pub(super) fn status(app: &AppHandle) -> GlobalShortcutStatuses {
         app.state::<GlobalShortcuts>().status()
     }
 
@@ -137,20 +175,23 @@ mod platform {
     use tauri::AppHandle;
 
     use super::TOGGLE_FLAG;
-    use sidekyk_core::modules::settings::{GlobalShortcut, GlobalShortcutStatus};
+    use sidekyk_core::modules::settings::{GlobalShortcutStatus, GlobalShortcutStatuses, Settings};
 
     /// Linux registers no shortcut: there is nothing to start.
-    pub(crate) fn start(_app: &AppHandle, _settings: &GlobalShortcut) {}
+    pub(crate) fn start(_app: &AppHandle, _settings: &Settings) {}
 
     /// Linux registers no shortcut: new settings only need storing.
-    pub(crate) fn apply(_app: &AppHandle, _settings: &GlobalShortcut) -> anyhow::Result<()> {
+    pub(crate) fn apply(_app: &AppHandle, _settings: &Settings) -> anyhow::Result<()> {
         Ok(())
     }
 
-    /// The command to give the desktop's shortcut.
-    pub(super) fn status(_app: &AppHandle) -> GlobalShortcutStatus {
-        GlobalShortcutStatus::Command {
-            command: toggle_command(),
+    /// The command to give the desktop's shortcut; capture is not built here yet.
+    pub(super) fn status(_app: &AppHandle) -> GlobalShortcutStatuses {
+        GlobalShortcutStatuses {
+            toggle: GlobalShortcutStatus::Command {
+                command: toggle_command(),
+            },
+            capture: None,
         }
     }
 

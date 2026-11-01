@@ -1,6 +1,7 @@
 //! Workflow-owned behavior. Modules know nothing about Tauri; they reach the outside world only
 //! through the ports they declare.
 
+pub mod capture;
 pub mod folder;
 pub mod notes;
 pub mod preview;

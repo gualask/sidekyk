@@ -3,7 +3,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useNoteActions, useNotes } from '../application/notes.queries';
+import { useCaptureMarks, useNoteActions, useNotes } from '../application/notes.queries';
 import type { MoveSubject } from '../model/move-dialog';
 import { openNotes } from '../model/notes';
 import { INBOX_BOOK } from '../model/notes.types';
@@ -44,6 +44,7 @@ export function InboxColumn({
     const { data: notes, error } = useNotes(INBOX_BOOK);
     const actions = useNoteActions(INBOX_BOOK);
     const { cardState, edit } = useCardStates(INBOX_BOOK);
+    const { marks, end: endMarks } = useCaptureMarks();
     const [moving, setMoving] = useState<MoveSubject | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
@@ -114,6 +115,9 @@ export function InboxColumn({
                                         onDone={null}
                                         order={null}
                                         dropping={images.overCard === note.id}
+                                        marks={marks}
+                                        place={t('inbox.title')}
+                                        onMarked={endMarks}
                                         onMove={() =>
                                             setMoving({ kind: 'note', book: INBOX_BOOK, note })
                                         }

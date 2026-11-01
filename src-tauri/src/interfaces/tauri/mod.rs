@@ -5,6 +5,7 @@
 //! module.
 
 mod blocking;
+pub(crate) mod capture;
 pub(crate) mod diagnostics;
 pub(crate) mod links;
 pub(crate) mod note_image;

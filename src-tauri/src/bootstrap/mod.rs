@@ -115,6 +115,7 @@ pub(crate) fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
+        .manage(tauri_commands::capture::CaptureState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
@@ -134,7 +135,7 @@ pub(crate) fn run() {
             // before the windows, whose pages may change the settings as they load; applied below
             app.manage(AppliedSettings::new(settings.clone()));
             // before the windows: their pages reach the shortcut's state as they load
-            shortcut::start(app.handle(), &settings.global_shortcut);
+            shortcut::start(app.handle(), &settings);
             create_windows(app.handle(), settings.theme)?;
             show_by_deadline(app.handle());
             // before the tray, which starts in the language returned
@@ -193,6 +194,11 @@ pub(crate) fn run() {
             tauri_commands::notes::mark_note_image,
             tauri_commands::notes::remove_note_image,
             tauri_commands::notes::copy_note,
+            tauri_commands::capture::can_capture,
+            tauri_commands::capture::start_capture,
+            tauri_commands::capture::add_capture,
+            tauri_commands::capture::set_marking,
+            tauri_commands::capture::open_capture_settings,
             tauri_commands::notes::note_image_png,
             tauri_commands::notes::place_note,
             tauri_commands::notes::restore_note,

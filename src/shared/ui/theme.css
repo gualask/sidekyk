@@ -10,6 +10,7 @@
     --ui-text-secondary: #334155;
     --ui-text-dim: #475569;
     --ui-text-muted: #5b677a;
+    /* also the capture overlay's button, drawn natively (`infrastructure/capture/macos.rs`) */
     --ui-accent: #6366f1;
     --ui-accent-hover: #4f46e5;
     --ui-accent-text: #4f46e5;

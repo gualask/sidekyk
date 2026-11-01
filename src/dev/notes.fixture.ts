@@ -1,6 +1,7 @@
 import {
     addFiles,
     type BookTarget,
+    type CaptureEvent,
     type DeletedList,
     type ImageDrop,
     type ImageTarget,
@@ -603,5 +604,26 @@ export function fixtureNotes({
         imagePng: async (_key, image) => (await fetch(IMAGE_URLS.get(image.id) ?? '')).blob(),
         imageUrl: (_key, image) => IMAGE_URLS.get(image.id) ?? '',
         onImageDrop: (listener) => onBrowserImageDrop(addImage, listener),
+        // a capture picks the hero image a moment later, as if an area had been dragged
+        canCapture: async () => true,
+        startCapture: async () => {
+            setTimeout(() => {
+                for (const listener of captureListeners) listener({ kind: 'taken' });
+            }, 300);
+        },
+        onCapture: (listener) => {
+            captureListeners.add(listener);
+            return () => captureListeners.delete(listener);
+        },
+        addCapture: async (key) => {
+            const area = await fetch(REPOSITORY_IMAGES['public/hero.png'].url);
+            const bytes = new Uint8Array(await area.arrayBuffer());
+            return addImage(key, { kind: 'new', list: book(key).openList }, bytes);
+        },
+        setMarking: async () => undefined,
+        openCaptureSettings: async () => undefined,
     };
 }
+
+/** Who follows the fixture's captures. */
+const captureListeners = new Set<(event: CaptureEvent) => void>();

@@ -37,6 +37,9 @@ pub enum UserFacingErrorCode {
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
+    /// Sidekyk's other global shortcut has these keys.
+    #[cfg(any(target_os = "macos", windows))]
+    ShortcutInUse,
     #[cfg(any(target_os = "macos", windows))]
     ShortcutTaken,
 }
@@ -62,6 +65,8 @@ impl UserFacingErrorCode {
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
+            #[cfg(any(target_os = "macos", windows))]
+            Self::ShortcutInUse => "shortcut_in_use",
             #[cfg(any(target_os = "macos", windows))]
             Self::ShortcutTaken => "shortcut_taken",
         }
@@ -91,6 +96,8 @@ impl UserFacingErrorCode {
         Self::PathOutsideRepository,
         Self::ProjectNotFound,
         Self::RepositoryMissing,
+        #[cfg(any(target_os = "macos", windows))]
+        Self::ShortcutInUse,
         #[cfg(any(target_os = "macos", windows))]
         Self::ShortcutTaken,
     ];
@@ -258,6 +265,7 @@ mod tests {
     fn shortcut_error_codes_keep_the_wire_contract() {
         let cases = [
             (UserFacingErrorCode::InvalidShortcut, "invalid_shortcut"),
+            (UserFacingErrorCode::ShortcutInUse, "shortcut_in_use"),
             (UserFacingErrorCode::ShortcutTaken, "shortcut_taken"),
         ];
         for (code, wire) in cases {

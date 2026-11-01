@@ -1,8 +1,9 @@
-import { IconPhoto, IconX } from '@tabler/icons-react';
+import { IconPhoto, IconScreenshot, IconX } from '@tabler/icons-react';
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
-import type { PendingImages } from '../application/notes.queries';
+import { useNotesPort } from '../application/notes.port';
+import { type PendingImages, useCanCapture } from '../application/notes.queries';
 import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
 import { autosize, fitLines, linesClass } from './notes-layout';
 
@@ -17,7 +18,8 @@ function release(pending: readonly PendingImages[]) {
  * The field on top of notes: `↵` adds the note, `⇧↵` breaks the line, a paste into the empty field
  * adds it at once. Images pasted or dropped into the empty field add a note of them at once; with
  * text there, they wait below it for `↵`. `⌘N` (the app's key) brings the focus here, as its
- * placeholder says.
+ * placeholder says. Where the system captures, an icon at its right starts a capture, which
+ * becomes a note of its own.
  */
 export function Composer({
     focus,
@@ -53,6 +55,8 @@ export function Composer({
     dropping: boolean;
 }) {
     const { t } = useTranslation();
+    const port = useNotesPort();
+    const canCapture = useCanCapture();
     const [text, setText] = useState('');
     const [pending, setPending] = useState<PendingImages[]>([]);
     const field = useRef<HTMLTextAreaElement>(null);
@@ -96,7 +100,7 @@ export function Composer({
     dropInto.current = take;
 
     return (
-        <div className="px-3 pt-2.5 pb-1">
+        <div className="relative px-3 pt-2.5 pb-1">
             <textarea
                 ref={field}
                 rows={1}
@@ -104,9 +108,9 @@ export function Composer({
                 spellCheck={false}
                 placeholder={`${placeholder}  ${shortcutLabel('N')}`}
                 aria-label={label}
-                className={`block max-h-[132px] w-full resize-none rounded-lg border bg-ui-surface-subtle px-2.5 py-[7px] text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${
-                    dropping ? 'border-ui-accent' : 'border-ui-border'
-                } ${linesClass(settings.lines)}`}
+                className={`block max-h-[132px] w-full resize-none rounded-lg border bg-ui-surface-subtle py-[7px] pl-2.5 text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${
+                    canCapture ? 'pr-9' : 'pr-2.5'
+                } ${dropping ? 'border-ui-accent' : 'border-ui-border'} ${linesClass(settings.lines)}`}
                 onChange={(event) => {
                     setText(event.target.value);
                     autosize(event.target);
@@ -135,6 +139,17 @@ export function Composer({
                     void add(typed, []);
                 }}
             />
+            {canCapture ? (
+                <button
+                    type="button"
+                    className="btn-icon absolute top-[13px] right-4 h-7 w-7"
+                    title={t('notes.capture')}
+                    aria-label={t('notes.capture')}
+                    onClick={() => void port.startCapture()}
+                >
+                    <IconScreenshot size={16} />
+                </button>
+            ) : null}
             {pending.length > 0 ? (
                 <ul className="flex flex-wrap gap-1.5 pt-1.5" aria-label={t('notes.pending')}>
                     {pending.map((images) => (

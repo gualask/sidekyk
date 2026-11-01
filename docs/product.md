@@ -34,12 +34,11 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
   overwritten by agents). Kept in mind: follow the project whose files changed last.
 - In the viewer (2026-10-18): several commented hunks copied as a batch; side by side; unchanged
   regions expanded on demand; opening the editor at a line; a setting for context lines.
-- From tazly: glass blur (GPU), rich-text editors. Taken: one command bar, `Esc` cancels before
-  navigating, notes with copy, `⌥` shortcuts on `e.code`. Open: a `PRODUCT.md`.
+- Glass blur (GPU), rich-text editors (2026-10-11). Open: a `PRODUCT.md`.
 - Input from anywhere (2026-10-22): selected text captured in any app (Windows accessibility,
   not terminals), double-tap modifiers (a global keyboard hook), link previews, backgrounds.
-- For captures (2026-10-22): an overlay of our own, drawing tools beyond annotations, a board,
-  presentation mode.
+- For captures (2026-10-22): drawing tools beyond annotations, a board, presentation mode. Our
+  own overlay, not taken then, was taken on 2026-11-01 (`features/capture.md`).
 - An agent's cockpit (2026-10-26): sessions, an editor, browser automation, remote control,
   notification badges, wake lock; whitespace-only files hidden from the list; linked worktrees
   picked in the top bar (2026-10-31: the repository is what is reviewed; an agent's worktree shows

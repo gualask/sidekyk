@@ -1,8 +1,8 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 
-import { type ImageDrop, imageFile, type NotesPort } from '@/modules/notes';
-import { attachListener } from './events';
+import { type CaptureEvent, type ImageDrop, imageFile, type NotesPort } from '@/modules/notes';
+import { attachListener, onTauriEvent } from './events';
 
 /** The last part of a path, whichever separator it uses. */
 function fileName(path: string): string {
@@ -85,4 +85,11 @@ export const tauriNotes: NotesPort = {
     imageUrl: (book, image, thumb) =>
         convertFileSrc(`${encodeURIComponent(book)}/${imageFile(image, thumb)}`, 'note-image'),
     onImageDrop,
+    // `capture.rs`
+    canCapture: () => invoke('can_capture'),
+    startCapture: () => invoke('start_capture'),
+    onCapture: (listener) => onTauriEvent<CaptureEvent>('capture', listener),
+    addCapture: (book) => invoke('add_capture', { book }),
+    setMarking: (marking) => invoke('set_marking', { marking }),
+    openCaptureSettings: () => invoke('open_capture_settings'),
 };

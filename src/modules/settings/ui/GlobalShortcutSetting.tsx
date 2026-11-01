@@ -11,7 +11,7 @@ import {
     useShortcutRecording,
     useUpdateSettings,
 } from '../application/settings.queries';
-import type { GlobalShortcut } from '../model/settings.types';
+import type { GlobalShortcut, Settings, ShortcutAction } from '../model/settings.types';
 import {
     formatShortcut,
     neededModifiers,
@@ -22,38 +22,46 @@ import {
 } from '../model/shortcut-keys';
 import { shortcutChangeError, shortcutProblem } from '../model/shortcut-problem';
 
+/** The setting each shortcut is stored in. */
+const SETTING = {
+    toggle: 'globalShortcut',
+    capture: 'captureShortcut',
+} as const satisfies Record<ShortcutAction, keyof Settings>;
+
 /**
- * The global shortcut that shows and hides Sidekyk. On macOS and Windows: a switch, and under it
- * the field that records a new combination, with what is wrong with it. On Linux the desktop's
- * own shortcut runs a command, which the setting gives to copy. Its changes and their failures
- * are its own.
+ * A global shortcut: the one that shows and hides Sidekyk, or the one that captures an area of
+ * the screen, where capture is built. On macOS and Windows: a switch, and under it the field that
+ * records a new combination, with what is wrong with it. On Linux the desktop's own shortcut runs
+ * a command, which the setting gives to copy. Its changes and their failures are its own.
  */
-export function GlobalShortcutSetting() {
+export function GlobalShortcutSetting({ action }: { action: ShortcutAction }) {
     const settings = useSettings().data;
     const update = useUpdateSettings();
-    const status = useGlobalShortcutStatus().data;
+    const status = useGlobalShortcutStatus().data?.[action];
     const id = useId();
     const i18n = useTranslation();
-    const shortcut = settings.globalShortcut;
+    const field = SETTING[action];
+    const shortcut = settings[field];
 
     if (!status) return null;
-    if (status.kind === 'command') return <ToggleCommand command={status.command} />;
+    if (status.kind === 'command') {
+        return <DesktopCommand action={action} command={status.command} />;
+    }
     if (status.kind === 'unavailable') {
-        return <Row id={id} description={i18n.t('shortcut.unavailable')} />;
+        return <Row id={id} action={action} description={i18n.t('shortcut.unavailable')} />;
     }
 
-    const change = (globalShortcut: GlobalShortcut) =>
-        update.mutate({ ...settings, globalShortcut });
+    const change = (next: GlobalShortcut) => update.mutate({ ...settings, [field]: next });
     // the change that failed says why; otherwise what the shortcut registered has against it
     const warning =
         update.isError && update.variables
-            ? shortcutChangeError(update.error, update.variables.globalShortcut.keys, MACOS, i18n)
-            : (shortcutProblem(status, MACOS, i18n)?.detail ?? null);
+            ? shortcutChangeError(action, update.error, update.variables[field].keys, MACOS, i18n)
+            : (shortcutProblem(action, status, MACOS, i18n)?.detail ?? null);
 
     return (
         <div className="py-2">
             <div className="flex items-center gap-4">
-                <Row id={id} description={i18n.t('shortcut.description')} />
+                <Row id={id} action={action} description={i18n.t('shortcut.description')} />
                 <Switch.Root
                     aria-labelledby={id}
                     className="switch"
@@ -86,12 +94,20 @@ export function GlobalShortcutSetting() {
 }
 
 /** The setting's name and what it does. */
-function Row({ id, description }: { id: string; description: string }) {
+function Row({
+    id,
+    action,
+    description,
+}: {
+    id: string;
+    action: ShortcutAction;
+    description: string;
+}) {
     const { t } = useTranslation();
     return (
         <div className="min-w-0 flex-1">
             <div id={id} className="font-semibold">
-                {t('shortcut.label')}
+                {t(action === 'toggle' ? 'shortcut.toggleLabel' : 'shortcut.captureLabel')}
             </div>
             <div className="mt-0.5 text-xs text-ui-text-muted">{description}</div>
         </div>
@@ -229,13 +245,13 @@ function ShortcutRecorder({
 }
 
 /** Linux: the command for the desktop's keyboard settings, to copy. */
-function ToggleCommand({ command }: { command: string }) {
+function DesktopCommand({ action, command }: { action: ShortcutAction; command: string }) {
     const id = useId();
     const { copied, copy } = useCopyToClipboard();
     const i18n = useTranslation();
     return (
         <div className="py-2">
-            <Row id={id} description={i18n.t('shortcut.linux')} />
+            <Row id={id} action={action} description={i18n.t('shortcut.linux')} />
             <div className="mt-2 flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface-subtle py-1 pr-1 pl-3">
                 <code className="min-w-0 flex-1 truncate font-mono text-[12.5px]" title={command}>
                     {command}

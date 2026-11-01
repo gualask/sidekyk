@@ -55,7 +55,7 @@ async fn with_store<T: Send + 'static>(
 }
 
 /// Runs `work` on a book's notes, once the book is known.
-async fn with_notes<T: Send + 'static>(
+pub(super) async fn with_notes<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
     book: String,
@@ -579,7 +579,7 @@ pub(crate) async fn export_notes(
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
         let book = project_book(&project);
-        let texts = texts::current(app);
+        let texts = texts::current();
         let images: Vec<String> = store.with_notes(files, &book, |_, notes| {
             notes
                 .iter()

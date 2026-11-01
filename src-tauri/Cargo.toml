@@ -95,3 +95,64 @@ tauri-plugin-single-instance = "2.5.2"
 # 50 ms and Wayland has none, so there the desktop's own shortcut runs `sidekyk --toggle`.
 [target.'cfg(any(target_os = "macos", windows))'.dependencies]
 tauri-plugin-global-shortcut = "2.4.1"
+
+# Capture (`infrastructure/capture/`): ScreenCaptureKit reads the display (decided 2026-11-01),
+# AppKit and CoreAnimation show it frozen. Only `objc2-screen-capture-kit` is new; the rest is
+# in the tree through Tauri, with the features named here.
+[target.'cfg(target_os = "macos")'.dependencies]
+block2 = "0.6"
+dispatch2 = { version = "0.3", default-features = false, features = ["std"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSCursor",
+  "NSEvent",
+  "NSFont",
+  "NSFontDescriptor",
+  "NSPanel",
+  "NSResponder",
+  "NSScreen",
+  "NSTrackingArea",
+  "NSView",
+  "NSWindow",
+  "objc2-core-foundation",
+  "objc2-quartz-core",
+] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFCGTypes", "CFString"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = [
+  "std",
+  "CGBitmapContext",
+  "CGColor",
+  "CGColorSpace",
+  "CGContext",
+  "CGDirectDisplay",
+  "CGImage",
+  "CGWindow",
+] }
+objc2-foundation = { version = "0.3", default-features = false, features = [
+  "std",
+  "NSArray",
+  "NSDictionary",
+  "NSError",
+  "NSGeometry",
+  "NSString",
+  "NSValue",
+] }
+objc2-quartz-core = { version = "0.3", default-features = false, features = [
+  "std",
+  "CALayer",
+  "CATextLayer",
+  "CATransaction",
+  "objc2-core-foundation",
+  "objc2-core-graphics",
+] }
+objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = [
+  "std",
+  "SCScreenshotManager",
+  "SCShareableContent",
+  "SCStream",
+  "block2",
+  "libc",
+  "objc2-core-foundation",
+  "objc2-core-graphics",
+] }

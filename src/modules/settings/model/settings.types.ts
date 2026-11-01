@@ -14,9 +14,10 @@ import type { NoteLines } from '@/shared/notes/note-lines';
 export type Theme = 'dark' | 'light';
 
 /**
- * The shortcut that shows and hides Sidekyk from any app. `keys` is its combination as the
- * backend registers it: modifiers first, then a `KeyboardEvent.code`, such as `Control+Alt+Space`
- * (see `model/shortcut-keys.ts`). Kept on Linux, which registers no shortcut of its own.
+ * A global shortcut, from any app: the one that shows and hides Sidekyk, or the one that captures
+ * an area of the screen. `keys` is its combination as the backend registers it: modifiers first,
+ * then a `KeyboardEvent.code`, such as `Control+Alt+Space` (see `model/shortcut-keys.ts`). Kept
+ * on Linux, which registers no shortcut of its own.
  */
 export interface GlobalShortcut {
     enabled: boolean;
@@ -27,7 +28,10 @@ export interface Settings {
     /** The UI's language; null until the system's is stored, at the first start. */
     language: Locale | null;
     theme: Theme;
+    /** The shortcut that shows and hides Sidekyk. */
     globalShortcut: GlobalShortcut;
+    /** The shortcut that captures an area of the screen. */
+    captureShortcut: GlobalShortcut;
     /** The view a diff opens in. */
     diffView: DiffView;
     /** How a file that has a preview opens. */
@@ -44,7 +48,16 @@ export interface Settings {
     noteLines: NoteLines;
 }
 
-/** Where the global shortcut stands, as the backend registered it. */
+/** What a global shortcut does: shows and hides Sidekyk, or captures an area of the screen. */
+export type ShortcutAction = 'toggle' | 'capture';
+
+/** Where each global shortcut stands; `capture` is null where capture is not built yet. */
+export interface GlobalShortcutStatuses {
+    toggle: GlobalShortcutStatus;
+    capture: GlobalShortcutStatus | null;
+}
+
+/** Where a global shortcut stands, as the backend registered it. */
 export type GlobalShortcutStatus =
     | { kind: 'off' }
     /**
@@ -54,10 +67,12 @@ export type GlobalShortcutStatus =
     | { kind: 'active'; keys: string; conflict: boolean }
     /**
      * The stored shortcut could not be registered at startup, as another app or the system holds
-     * it: none works.
+     * it: it does not work.
      */
     | { kind: 'refused'; keys: string }
+    /** The stored shortcut has the other's keys, which that one took first: it does not work. */
+    | { kind: 'inUse'; keys: string }
     /** No global shortcut on this system: the plugin could not start. */
     | { kind: 'unavailable' }
-    /** Linux: the desktop's own shortcut runs this command, which shows or hides Sidekyk. */
+    /** Linux: the desktop's own shortcut runs this command, which does what the shortcut would. */
     | { kind: 'command'; command: string };

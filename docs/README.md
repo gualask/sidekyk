@@ -16,7 +16,8 @@ reason, numbers, sources. One fact in one file; the others point to it.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `note-images.md`: images in notes: in, thumbnails, copy, export, files.
-  - `background.md`: tray, global shortcut, hidden window.
+  - `capture.md`: an area of the screen captured into a note: overlay, entries, per system.
+  - `background.md`: tray, global shortcuts, hidden window.
   - `languages.md`: English and Italian, catalogs, `i18n:check`.
 - `testing.md`: what the checks, fixtures and timing tests cover; the container fixture.
 - Plans, designs agreed but not built, are local and not versioned: `../.cflow/plans/`; specs

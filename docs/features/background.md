@@ -6,12 +6,14 @@ hidden.
 ## Behaviour
 
 - Tray (2026-10-24): it tells the app runs, nothing about projects. A click shows the window on
-  macOS and Windows, the right button opens the menu (Show, Quit, in the UI's language); on Linux
-  every click opens the menu (appindicator reports no clicks). Closing the window hides it to the
-  tray.
+  macOS and Windows, the right button opens the menu (Show, Capture where it is built, Quit, in
+  the UI's language; `capture.md`); on Linux every click opens the menu (appindicator reports no
+  clicks). Closing the window hides it to the tray.
 - Global shortcut: shows the window when hidden, minimized or behind, hides it in front (on macOS
   the whole app). Default `⌃⌥Space`, provisional. On Linux the desktop's shortcut runs `sidekyk
-  --toggle`.
+  --toggle`. A second one captures an area of the screen where capture is built (`capture.md`):
+  each has its own row in Settings, keys, switch and problem; neither may take the other's keys.
+  While a new one is typed, neither acts.
 - Hidden, minimized or covered: no git; on show only what may have changed is read
   (`projects.md`).
 - The window is created hidden and shown after the first paint.
@@ -26,7 +28,8 @@ hidden.
 - First show: `show_window` once the project list is read; the backend shows it after 3 s anyway.
 - Global shortcut: `tauri-plugin-global-shortcut` on macOS and Windows (+160 KiB). A modifier plus
   a letter, digit or named key, or F1-F20 alone; no punctuation (codes name US keys); checked in
-  the backend. A refused one keeps the previous and shows a problem; macOS accepts duplicates
+  the backend. A refused one keeps the previous and shows a problem; a press tells the two apart
+  by the plugin's id of capture's, read without the lock a change holds. macOS accepts duplicates
   silently, so its own shortcuts are read (`CopySymbolicHotKeys`,
   `infrastructure/system_shortcuts.rs`) to warn. `⌥`-only shortcuts work on macOS 27.
 

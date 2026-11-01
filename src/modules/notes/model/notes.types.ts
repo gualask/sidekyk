@@ -57,6 +57,13 @@ export interface Mark extends MarkPoint {
     tail: MarkPoint | null;
 }
 
+/**
+ * How a capture ended (`modules/capture` in the backend, `CaptureEvent`): an area picked, which
+ * `addCapture` makes a note; the system not letting Sidekyk read the screen; a failure. A cancel
+ * tells nothing.
+ */
+export type CaptureEvent = { kind: 'taken' } | { kind: 'refused' } | { kind: 'failed' };
+
 /** The note images go to: one there, or a new one on top of a list. */
 export type ImageTarget = { kind: 'note'; id: string } | { kind: 'new'; list: string };
 

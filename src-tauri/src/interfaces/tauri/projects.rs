@@ -37,7 +37,7 @@ pub(crate) async fn choose_project_folder(
         let Some(folder) = app
             .dialog()
             .file()
-            .set_title(texts::current(app).choose_folder)
+            .set_title(texts::current().choose_folder)
             .blocking_pick_folder()
         else {
             return Ok(None);
@@ -149,7 +149,7 @@ pub(crate) async fn relocate_project(
         let Some(folder) = app
             .dialog()
             .file()
-            .set_title(texts::current(app).locate.replace("{name}", &project.name))
+            .set_title(texts::current().locate.replace("{name}", &project.name))
             .blocking_pick_folder()
         else {
             return Ok(None);

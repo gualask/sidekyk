@@ -60,17 +60,22 @@ interface Editing {
  * pointing back; a mark drags, the handle of the one selected moves its tail's tip (dropped on
  * the label, the tail goes); a double click writes its text. `⌘Z`/`⇧⌘Z` undo and redo, `⌫` takes
  * the selected one out. Done ends with `onDone` given the marks (null when unchanged), and
- * whether the editor may go (it stays when they were not saved); Cancel or `Esc`, with null,
- * after asking when the session changed something.
+ * whether the editor may go (it stays when they were not saved); Cancel or `Esc` with `onCancel`,
+ * after asking when the session changed something. A capture's names where its note went.
  */
 export function MarkEditor({
     book,
     image,
+    place = null,
     onDone,
+    onCancel,
 }: {
     book: string;
     image: NoteImage;
+    /** Where the note is (a project, the Inbox), for a capture just made a note; else null. */
+    place?: string | null;
     onDone: (marks: Mark[] | null) => Promise<boolean>;
+    onCancel: () => void;
 }) {
     const port = useNotesPort();
     const { t } = useTranslation();
@@ -107,6 +112,12 @@ export function MarkEditor({
         observer.observe(element);
         return () => observer.disconnect();
     }, []);
+
+    // a capture meanwhile would open its marks in place of these: it only shows the window
+    useEffect(() => {
+        void port.setMarking(true).catch(() => undefined);
+        return () => void port.setMarking(false).catch(() => undefined);
+    }, [port]);
 
     useEffect(() => {
         let live = true;
@@ -327,7 +338,7 @@ export function MarkEditor({
     /** Leaves without keeping the session's changes: asked first when there are any. */
     const cancel = () => {
         if (saving) return;
-        if (sameMarks(pending(), initial)) void onDone(null);
+        if (sameMarks(pending(), initial)) onCancel();
         else setAsking(true);
     };
 
@@ -369,6 +380,11 @@ export function MarkEditor({
             onKeyDown={onKeyDown}
         >
             <header className="flex items-center gap-2 pb-2 pl-1.5">
+                {place ? (
+                    <span className="max-w-[40%] shrink-0 truncate text-xs font-semibold text-ui-text-secondary">
+                        {t('notes.annotateIn', { place })}
+                    </span>
+                ) : null}
                 <span className="min-w-0 flex-1 truncate text-xs text-ui-text-muted">
                     {t('notes.annotateHint')}
                 </span>
@@ -443,7 +459,7 @@ export function MarkEditor({
                 onKeep={() => setAsking(false)}
                 onDiscard={() => {
                     setAsking(false);
-                    void onDone(null);
+                    onCancel();
                 }}
             />
         </div>

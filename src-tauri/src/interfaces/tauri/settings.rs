@@ -42,15 +42,17 @@ pub(crate) fn window_theme(theme: Theme) -> tauri::Theme {
 /// What the backend writes for the user, in the language of the settings: the tray (once it is
 /// up), the first list of a project read from now on. Dialogs and exports read it as they open.
 pub(crate) fn apply_language(app: &tauri::AppHandle, language: Option<Language>) -> &'static Texts {
-    let texts = texts::texts(language);
+    let texts = texts::set(language);
     app.state::<NotesStore>().name_first_lists(texts.first_list);
     tray::speak(app, texts);
     texts
 }
 
 #[tauri::command]
-/// Every setting, as in effect.
-pub(crate) fn get_settings(app: tauri::AppHandle) -> Settings {
+/// Every setting, as in effect. Async, so off the main thread: a change of the settings holds
+/// them while it waits on the main thread (the shortcuts it registers, the tray's text, the
+/// theme), and a read there would wait for it in turn.
+pub(crate) async fn get_settings(app: tauri::AppHandle) -> Settings {
     app.state::<AppliedSettings>().current()
 }
 
@@ -69,8 +71,8 @@ pub(crate) async fn set_settings(
         if *applied == settings {
             return Ok(settings);
         }
-        // its own check: one the system turned down is tried again at each change
-        shortcut::apply(app, &settings.global_shortcut)?;
+        // their own check: one the system turned down is tried again at each change
+        shortcut::apply(app, &settings)?;
         if settings.theme != applied.theme {
             app.set_theme(Some(window_theme(settings.theme)));
         }

@@ -30,7 +30,7 @@ export function useSettingsWhenRead(): Settings | undefined {
 }
 
 /**
- * Where the global shortcut stands: read at startup, for the top bar's problems, and again after
+ * Where each global shortcut stands: read at startup, for the top bar's problems, and again after
  * each change of the settings. The backend answers from memory.
  */
 export function useGlobalShortcutStatus() {
