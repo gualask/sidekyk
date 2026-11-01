@@ -276,6 +276,29 @@ impl NoteBook {
         Ok((note.clone(), vec![Touched::Note(id.into())]))
     }
 
+    /// Puts `image` in the place of the note's image `id` was: the same image marked anew, or
+    /// given back unmarked. The files of the one it replaces stay until the book is next read.
+    pub(super) fn replace_image(
+        &mut self,
+        id: &str,
+        replaced: &str,
+        image: NoteImage,
+        now: u64,
+    ) -> anyhow::Result<(Note, Vec<Touched>)> {
+        let note = self.note_mut(id)?;
+        let place = note
+            .images
+            .iter_mut()
+            .find(|i| i.id == replaced)
+            .ok_or_else(|| anyhow::anyhow!("no image {replaced} in note {id}"))?;
+        if *place == image {
+            return Ok((note.clone(), Vec::new()));
+        }
+        *place = image;
+        note.edited = now;
+        Ok((note.clone(), vec![Touched::Note(id.into())]))
+    }
+
     /// Done, or open again in the place it had.
     pub(super) fn set_done(
         &mut self,

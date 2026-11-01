@@ -132,6 +132,7 @@ mod tests {
             width: 1,
             height: 1,
             bytes: 1,
+            marked: None,
         };
         let lists = [NoteList {
             id: "g".into(),

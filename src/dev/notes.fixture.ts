@@ -15,6 +15,7 @@ import {
     openNotes,
     type ProjectNotes,
     positionAt,
+    sourceImage,
 } from '@/modules/notes';
 import { REPOSITORY_IMAGES } from './fixture-files';
 
@@ -215,7 +216,7 @@ function bookOf(rows: [string, string, number, number | null][]): Book {
             images: (NOTE_IMAGES[text] ?? []).map(({ url, size, width, height }) => {
                 const id = newId();
                 IMAGE_URLS.set(id, url);
-                return { id, kind: 'png', width, height, bytes: size };
+                return { id, kind: 'png', width, height, bytes: size, marked: null };
             }),
         };
     });
@@ -368,6 +369,7 @@ export function fixtureNotes({
             width: bitmap.width,
             height: bitmap.height,
             bytes: bytes.length,
+            marked: null,
         };
         bitmap.close();
         const now = Date.now();
@@ -549,6 +551,36 @@ export function fixtureNotes({
             b.openList = id;
         },
         addImage,
+        // as the backend's `mark_image`: the drawn PNG under a new id, the image as given kept
+        markImage: async (key, id, image, marks, drawn) => {
+            const found = note(book(key), id);
+            const index = found.images.findIndex((i) => i.id === image);
+            if (index < 0) throw failure('unknown');
+            const current = found.images[index];
+            const given = sourceImage(current);
+            const source = { id: given.id, kind: given.kind, bytes: given.bytes };
+            let replacement: NoteImage;
+            if (marks.length === 0) {
+                replacement = given;
+            } else {
+                if (!drawn) throw failure('unknown');
+                const newImage = newId();
+                IMAGE_URLS.set(
+                    newImage,
+                    URL.createObjectURL(new Blob([drawn], { type: 'image/png' })),
+                );
+                replacement = {
+                    ...current,
+                    id: newImage,
+                    kind: 'png',
+                    bytes: drawn.length,
+                    marked: { source, marks },
+                };
+            }
+            found.images = found.images.map((i, at) => (at === index ? replacement : i));
+            found.edited = Date.now();
+            return { ...found };
+        },
         removeImage: async (key, id, image) => {
             const found = note(book(key), id);
             found.images = found.images.filter((i) => i.id !== image);

@@ -30,6 +30,31 @@ export interface NoteImage {
     height: number;
     /** The size of its file. */
     bytes: number;
+    /** Its marks and the image under them, when it is that image marked. */
+    marked: MarkedImage | null;
+}
+
+/** An image marked: a PNG drawn with its marks over the image as given, kept so they stay editable. */
+interface MarkedImage {
+    /** The image as given, as large as the marked one. */
+    source: { id: string; kind: ImageKind; bytes: number };
+    /** In the order they were placed, the last drawn on top. */
+    marks: Mark[];
+}
+
+/** A point in an image's pixels. */
+export interface MarkPoint {
+    x: number;
+    y: number;
+}
+
+/**
+ * A label on an image, a letter or a text, with a tail pointing at a spot; a tail with no text is
+ * a plain arrow. `x` and `y`, the label's middle, in the image's pixels.
+ */
+export interface Mark extends MarkPoint {
+    text: string;
+    tail: MarkPoint | null;
 }
 
 /** The note images go to: one there, or a new one on top of a list. */

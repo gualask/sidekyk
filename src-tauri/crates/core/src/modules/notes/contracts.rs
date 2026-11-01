@@ -96,6 +96,91 @@ pub struct NoteImage {
     pub height: u32,
     /// The size of its file.
     pub bytes: u64,
+    /// Its marks and the image under them, when it is that image marked; `None` in an image
+    /// stored before marks.
+    #[serde(default)]
+    pub marked: Option<MarkedImage>,
+}
+
+impl NoteImage {
+    /// The image as given: itself, or the one under its marks.
+    pub fn source(&self) -> NoteImage {
+        match &self.marked {
+            None => self.clone(),
+            Some(marked) => NoteImage {
+                id: marked.source.id.clone(),
+                kind: marked.source.kind,
+                width: self.width,
+                height: self.height,
+                bytes: marked.source.bytes,
+                marked: None,
+            },
+        }
+    }
+
+    /// The ids its files are named by: its own, and the image's under its marks.
+    pub fn ids(&self) -> impl Iterator<Item = &str> {
+        std::iter::once(self.id.as_str()).chain(self.marked.as_ref().map(|m| m.source.id.as_str()))
+    }
+
+    /// The kind of the image `id` names, if it is this one or the one under its marks.
+    pub fn kind_of(&self, id: &str) -> Option<ImageKind> {
+        match &self.marked {
+            _ if self.id == id => Some(self.kind),
+            Some(marked) if marked.source.id == id => Some(marked.source.kind),
+            _ => None,
+        }
+    }
+}
+
+/// An image marked: a PNG drawn by the frontend, the image as given under the marks it shows, so
+/// they stay editable.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MarkedImage {
+    /// The image as given, as large as the marked one.
+    pub source: SourceImage,
+    /// In the order they were placed, the last drawn on top.
+    pub marks: Vec<Mark>,
+}
+
+/// The image under the marks: its file is `<id>.<extension>`, its thumbnail `<id>.thumb.png`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceImage {
+    pub id: String,
+    pub kind: ImageKind,
+    pub bytes: u64,
+}
+
+impl SourceImage {
+    /// An image as given, kept under marks.
+    pub fn of(image: NoteImage) -> Self {
+        Self {
+            id: image.id,
+            kind: image.kind,
+            bytes: image.bytes,
+        }
+    }
+}
+
+/// A label on an image, a letter or a text, with a tail pointing at a spot; a tail with no text
+/// is a plain arrow. Points in the image's pixels.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Mark {
+    /// The label's middle.
+    pub x: u32,
+    pub y: u32,
+    pub text: String,
+    /// Where its tail points, if it has one.
+    pub tail: Option<MarkPoint>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MarkPoint {
+    pub x: u32,
+    pub y: u32,
 }
 
 /// The note images go to, as the frontend names it: one there, or a new one on top of a list.
@@ -396,6 +481,7 @@ mod tests {
             width: 4032,
             height: 3024,
             bytes: 1_008_550,
+            marked: None,
         };
         assert_eq!(
             serde_json::to_value(&image).unwrap(),
@@ -404,8 +490,15 @@ mod tests {
                 "kind": "jpeg",
                 "width": 4032,
                 "height": 3024,
-                "bytes": 1_008_550
+                "bytes": 1_008_550,
+                "marked": null
             })
+        );
+        let mut before_marks = serde_json::to_value(&image).unwrap();
+        before_marks.as_object_mut().unwrap().remove("marked");
+        assert_eq!(
+            serde_json::from_value::<NoteImage>(before_marks).unwrap(),
+            image
         );
         let mut json = serde_json::to_value(StoredNote {
             version: STORED_VERSION,
@@ -418,6 +511,54 @@ mod tests {
             .note
             .images
             .is_empty());
+    }
+
+    #[test]
+    fn a_marked_image_uses_the_frontend_field_names_and_gives_its_source_back() {
+        let marked = NoteImage {
+            id: "1111111111111111".into(),
+            kind: ImageKind::Png,
+            width: 800,
+            height: 600,
+            bytes: 90_000,
+            marked: Some(MarkedImage {
+                source: SourceImage {
+                    id: "00112233445566ff".into(),
+                    kind: ImageKind::Jpeg,
+                    bytes: 70_000,
+                },
+                marks: vec![Mark {
+                    x: 10,
+                    y: 20,
+                    text: "A".into(),
+                    tail: Some(MarkPoint { x: 30, y: 40 }),
+                }],
+            }),
+        };
+        let json = serde_json::to_value(&marked).unwrap();
+        assert_eq!(
+            json["marked"],
+            serde_json::json!({
+                "source": { "id": "00112233445566ff", "kind": "jpeg", "bytes": 70_000 },
+                "marks": [{ "x": 10, "y": 20, "text": "A", "tail": { "x": 30, "y": 40 } }]
+            })
+        );
+        assert_eq!(serde_json::from_value::<NoteImage>(json).unwrap(), marked);
+        let source = marked.source();
+        assert_eq!(
+            (source.id.as_str(), source.kind, source.bytes, source.width),
+            ("00112233445566ff", ImageKind::Jpeg, 70_000, 800)
+        );
+        assert!(source.marked.is_none());
+        assert_eq!(
+            marked.ids().collect::<Vec<_>>(),
+            ["1111111111111111", "00112233445566ff"]
+        );
+        assert_eq!(source.ids().collect::<Vec<_>>(), ["00112233445566ff"]);
+        assert_eq!(marked.kind_of("1111111111111111"), Some(ImageKind::Png));
+        assert_eq!(marked.kind_of("00112233445566ff"), Some(ImageKind::Jpeg));
+        assert_eq!(marked.kind_of("2222222222222222"), None);
+        assert_eq!(SourceImage::of(source), marked.marked.unwrap().source);
     }
 
     #[test]

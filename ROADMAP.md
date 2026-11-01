@@ -45,11 +45,10 @@ Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two
 
 `.cflow/plans/capture.md`.
 
-Built: `docs/features/note-images.md` (images in notes).
+Built: `docs/features/note-images.md` (images in notes, marks).
 
-- [ ] Annotate an image: arrows with their text, markers (A, B, C), editable later
 - [ ] Capture from a global shortcut: the system's tool picks the region, the image opens to
-      annotate in a new note of the project on screen. **After:** annotate
+      annotate in a new note of the project last on screen
 - [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`,
       tazly)
 

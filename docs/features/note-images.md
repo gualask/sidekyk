@@ -1,8 +1,8 @@
 # Images in notes
 
 A note holds text and, below it, images: pasted or dropped, shown as thumbnails, copied out as
-paths for an agent (built 2026-11-01). The notes themselves: `notes.md`. What comes next on images
-(annotate, capture): `../../.cflow/plans/capture.md`.
+paths for an agent, marked with letters and arrows (built 2026-11-01). The notes themselves:
+`notes.md`. What comes next on images (capture): `../../.cflow/plans/capture.md`.
 
 ## Behaviour
 
@@ -20,6 +20,19 @@ paths for an agent (built 2026-11-01). The notes themselves: `notes.md`. What co
 - A click on a thumbnail opens the image large over the app, never scaled up: size and weight, `←`
   `→` through the note's images, "Copy image" (PNG), `Esc` or a click outside closes. On hover a
   × takes an image out, with Undo.
+- Marks: "Annotate" in the viewer shows the image as given with its marks, editable. One object,
+  a label (a letter or a text) with an optional tail ending in an arrowhead; a tail without text
+  is a plain arrow. A click places the next letter, a drag from a spot places it at the release
+  with its tail pointing back; a mark drags; the selected one's handle (its tail's tip, or the
+  label's right side) moves the tip, dropped on the label the tail goes; a double click or `↵`
+  writes its text; `⌫` takes it out; `⌘Z`/`⇧⌘Z` (`Ctrl+Z`/`Ctrl+Y`). Done keeps them: the
+  marked image takes the original's place in the note, thumbnail, copy, "Copy image" and export
+  included; no marks left gives the original back. Cancel or `Esc` leaves without keeping what
+  the session changed, as `Esc` cancels everywhere in the app; with changes, it asks first.
+- A label stays whole inside the image, moved in from an edge, so the PNG never cuts it; at most
+  100 marks of 200 characters, the backend's limits.
+- A letter placed never changes: the next is the one after the highest (B deleted, D after C),
+  since the message names them; past Z, the first free one.
 - Copy: the note's text, then each image's absolute path on a line of its own, so an agent reads
   the file (Claude Code and Codex read it pasted bare, `Application Support`'s space included,
   outside their folder; 2026-11-01). A WSL project's note gives the paths as its distro names
@@ -53,7 +66,17 @@ paths for an agent (built 2026-11-01). The notes themselves: `notes.md`. What co
   names, `immutable` (an id names its bytes). CSP `img-src` lists it. `copy_note` composes the
   copy; for WSL, `wslpath -u` of the notes' folder once per distro and session. `note_image_png`
   gives a non-PNG image as PNG for the clipboard (`ClipboardItem`).
-- Frontend: `NoteImages` (thumbnails, viewer), `Composer` (the waiting images, their object URLs
+- Marked image: a PNG drawn in the webview (`draw-marks.ts`, the editor's own drawing code at
+  the image's size, the app's font loaded first) over the original as PNG (`note_image_png`),
+  sent with the marks (`mark_note_image`: a line of JSON, then the PNG raw). The backend checks
+  it (a PNG as large as the original, marks inside it, within the limits), gives it a
+  new id and a thumbnail, and keeps the original's id, kind and size and the marks in
+  `marked: { source, marks }` (none before marks, `serde(default)`): the original's files stay
+  with the note (sweep, move, `note-image:`). Points in the image's pixels, whole; the label's
+  size follows the image's longest side (`markSize`), the color is `--ui-mark`, the same in both
+  themes.
+- Frontend: `NoteImages` (thumbnails, viewer), `MarkEditor` (marks over the image fitted, a canvas
+  at its size on screen; geometry in `model/marks.ts`), `Composer` (the waiting images, their object URLs
   revoked when added or left out), `useColumnImages` (drops, the target lit up). Thumbnails have
   their box before they load (`thumbBox`): a card's measured height never moves.
 
@@ -70,5 +93,11 @@ paths for an agent (built 2026-11-01). The notes themselves: `notes.md`. What co
 - Images below the text, not inside it (2026-11-01): no rich editor; a note stays plain text.
 - A copy gives paths, not image bytes (2026-11-01, the maintainer): one copy serves an agent in a
   terminal; "Copy image" serves a colleague.
+- Marks (2026-11-01, KISS: more on felt need): one object, one color; no rectangle, highlight,
+  blur or crop. A secret, if ever, an opaque box: pixelated text can be recovered.
+- A marked image drawn in the webview, not in Rust (2026-11-01): the editor's code and font, so
+  what is copied is what was seen. WKWebView, `.local/note-thumbnails/` (`mode=flatten`):
+  2560x1664 in 130-210 ms, 5K in 400-600 ms with a transient peak of ~310 MB in WebContent and
+  ~250 MB in the GPU process; once, on Done.
 - A copy may ask the backend after the click: WKWebView writes the clipboard 0-3,000 ms after it
   (`.local/note-paste/`).

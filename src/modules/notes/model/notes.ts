@@ -102,6 +102,11 @@ export function imageFile(image: NoteImage, thumb: boolean): string {
     return `${image.id}.${image.kind === 'jpeg' ? 'jpg' : image.kind}`;
 }
 
+/** The image as given: itself, or the one under its marks, as large. */
+export function sourceImage(image: NoteImage): NoteImage {
+    return image.marked ? { ...image, ...image.marked.source, marked: null } : image;
+}
+
 /** How tall a card's thumbnails are, in CSS pixels; their width follows, within bounds. */
 const THUMB_HEIGHT = 72;
 const THUMB_WIDTH = { min: 40, max: 200 };

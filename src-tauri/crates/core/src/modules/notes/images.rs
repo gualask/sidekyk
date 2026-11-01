@@ -7,7 +7,7 @@ use std::io::Cursor;
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
 
-use super::contracts::{ImageKind, NoteImage};
+use super::contracts::{ImageKind, Mark, NoteImage};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 use crate::shared::id::is_id;
 
@@ -39,6 +39,7 @@ impl PreparedImage {
             width: self.width,
             height: self.height,
             bytes: self.original.len() as u64,
+            marked: None,
         }
     }
 }
@@ -137,9 +138,51 @@ pub fn as_png(kind: ImageKind, bytes: Vec<u8>) -> anyhow::Result<Vec<u8>> {
     Ok(png.into_inner())
 }
 
+/// The most marks an image takes, and the longest text of one (characters): a few letters or a
+/// short sentence each, far below what fits.
+const MAX_MARKS: usize = 100;
+const MAX_MARK_CHARS: usize = 200;
+
+/// Checks the marks of an image of `width` x `height`: within the limits, each point inside the
+/// image, a text or a tail to each.
+pub(super) fn check_marks(marks: &[Mark], width: u32, height: u32) -> anyhow::Result<()> {
+    anyhow::ensure!(marks.len() <= MAX_MARKS, "more than {MAX_MARKS} marks");
+    let inside = |x: u32, y: u32| x <= width && y <= height;
+    for mark in marks {
+        anyhow::ensure!(
+            mark.text.chars().count() <= MAX_MARK_CHARS,
+            "a mark's text over {MAX_MARK_CHARS} characters"
+        );
+        anyhow::ensure!(
+            !mark.text.trim().is_empty() || mark.tail.is_some(),
+            "a mark with neither text nor tail"
+        );
+        anyhow::ensure!(
+            inside(mark.x, mark.y) && mark.tail.is_none_or(|tail| inside(tail.x, tail.y)),
+            "a mark outside the image"
+        );
+    }
+    Ok(())
+}
+
 /// The file of an image, beside its notes.
 pub fn image_file(image: &NoteImage) -> String {
-    format!("{}.{}", image.id, image.kind.extension())
+    file_named(&image.id, image.kind)
+}
+
+/// The file of the image `id`, of `kind`.
+pub(super) fn file_named(id: &str, kind: ImageKind) -> String {
+    format!("{id}.{}", kind.extension())
+}
+
+/// Every file of an image: its own and its thumbnail, then the image's under its marks.
+pub(super) fn image_files(image: &NoteImage) -> Vec<String> {
+    let mut files = vec![image_file(image), thumb_file(&image.id)];
+    if image.marked.is_some() {
+        let source = image.source();
+        files.extend([image_file(&source), thumb_file(&source.id)]);
+    }
+    files
 }
 
 /// The file of an image's thumbnail.
@@ -261,6 +304,31 @@ pub(super) mod tests {
         assert_eq!(image::guess_format(&from_jpeg).unwrap(), ImageFormat::Png);
         let decoded = image::load_from_memory(&from_jpeg).unwrap();
         assert_eq!((decoded.width(), decoded.height()), (16, 8));
+    }
+
+    fn mark(x: u32, y: u32, text: &str, tail: Option<(u32, u32)>) -> Mark {
+        Mark {
+            x,
+            y,
+            text: text.into(),
+            tail: tail.map(|(x, y)| crate::modules::notes::contracts::MarkPoint { x, y }),
+        }
+    }
+
+    #[test]
+    fn marks_stay_inside_their_image_and_say_something() {
+        assert!(check_marks(&[], 10, 10).is_ok());
+        assert!(check_marks(&[mark(10, 0, "A", Some((0, 10)))], 10, 10).is_ok());
+        // a plain arrow
+        assert!(check_marks(&[mark(5, 5, "", Some((1, 1)))], 10, 10).is_ok());
+        assert!(check_marks(&[mark(5, 5, " ", None)], 10, 10).is_err());
+        assert!(check_marks(&[mark(11, 5, "A", None)], 10, 10).is_err());
+        assert!(check_marks(&[mark(5, 5, "A", Some((5, 11)))], 10, 10).is_err());
+        let long = "é".repeat(MAX_MARK_CHARS);
+        assert!(check_marks(&[mark(5, 5, &long, None)], 10, 10).is_ok());
+        assert!(check_marks(&[mark(5, 5, &format!("{long}x"), None)], 10, 10).is_err());
+        let many = vec![mark(1, 1, "A", None); MAX_MARKS + 1];
+        assert!(check_marks(&many, 10, 10).is_err());
     }
 
     #[test]

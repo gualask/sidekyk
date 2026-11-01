@@ -190,6 +190,7 @@ pub(crate) fn run() {
             tauri_commands::notes::set_note_done,
             tauri_commands::notes::add_note_image_files,
             tauri_commands::notes::add_note_image,
+            tauri_commands::notes::mark_note_image,
             tauri_commands::notes::remove_note_image,
             tauri_commands::notes::copy_note,
             tauri_commands::notes::note_image_png,

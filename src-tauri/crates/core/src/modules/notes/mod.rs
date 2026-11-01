@@ -11,8 +11,9 @@ mod store;
 
 pub use book::note_title;
 pub use contracts::{
-    Book, BookTarget, DeletedList, ImageKind, ImageTarget, ListTarget, MovedList, MovedNote, Note,
-    NoteImage, NoteList, NotesSummary, ProjectNotes, INBOX_BOOK,
+    Book, BookTarget, DeletedList, ImageKind, ImageTarget, ListTarget, Mark, MarkPoint,
+    MarkedImage, MovedList, MovedNote, Note, NoteImage, NoteList, NotesSummary, ProjectNotes,
+    SourceImage, INBOX_BOOK,
 };
 pub use images::{as_png, image_file, prepare, PreparedImage, MAX_IMAGE_BYTES};
 pub use markdown::{to_markdown, ExportWords, EXPORT_IMAGES};

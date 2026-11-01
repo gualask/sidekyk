@@ -70,6 +70,9 @@
     --ui-scrollbar-thumb: color-mix(in srgb, var(--ui-border-hover) 82%, transparent);
     --ui-scrollbar-thumb-hover: color-mix(in srgb, var(--ui-border-hover) 98%, transparent);
     --ui-shadow-soft: rgba(15, 23, 42, 0.12);
+    /* an image's marks, drawn into its pixels: the same in both themes */
+    --ui-mark: #e5484d;
+    --ui-mark-text: #ffffff;
     /* project avatars, the same in both themes */
     --ui-avatar-1: #6366f1;
     --ui-avatar-2: #0ea5e9;
@@ -178,6 +181,8 @@
     --color-ui-warning-soft-text: var(--ui-warning-soft-text);
     --color-ui-warning-on-solid: var(--ui-warning-on-solid);
     --color-ui-important: var(--ui-important);
+    --color-ui-mark: var(--ui-mark);
+    --color-ui-mark-text: var(--ui-mark-text);
     --color-ui-find-match: var(--ui-find-match);
     --color-ui-find-current: var(--ui-find-current);
     --color-ui-diff-add-bg: var(--ui-diff-add-bg);

@@ -4,7 +4,14 @@ import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { Move } from '../model/move-dialog';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
-import type { ImageTarget, Note, NoteImage, NoteList, ProjectNotes } from '../model/notes.types';
+import type {
+    ImageTarget,
+    Mark,
+    Note,
+    NoteImage,
+    NoteList,
+    ProjectNotes,
+} from '../model/notes.types';
 import { changeQueue } from './change-queue';
 import { type NotesPort, useNotesPort } from './notes.port';
 
@@ -220,6 +227,21 @@ export function useNoteActions(book: string) {
                 return { note, left: [] };
             },
             addImages,
+            /**
+             * Marks a note's image anew: `draw` gives the PNG of the marks over the image as
+             * given (none without marks). The note as stored, or undefined when it failed.
+             */
+            markImage: (
+                note: Note,
+                image: NoteImage,
+                marks: Mark[],
+                draw: () => Promise<Uint8Array<ArrayBuffer> | null>,
+            ) =>
+                send(
+                    t('notes.markImageFailed'),
+                    async () => port.markImage(book, note.id, image.id, marks, await draw()),
+                    (marked) => updated([marked]),
+                ),
             /** Takes an image out of a note; the toast puts it back. */
             removeImage: async (note: Note, image: NoteImage) => {
                 patch(note.id, { images: note.images.filter((i) => i.id !== image.id) });

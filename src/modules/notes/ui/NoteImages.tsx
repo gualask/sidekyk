@@ -1,13 +1,21 @@
 import { Dialog } from '@base-ui/react/dialog';
-import { IconChevronLeft, IconChevronRight, IconCopy, IconX } from '@tabler/icons-react';
-import { useState } from 'react';
+import {
+    IconChevronLeft,
+    IconChevronRight,
+    IconCopy,
+    IconPencil,
+    IconX,
+} from '@tabler/icons-react';
+import { useEffect, useRef, useState } from 'react';
 import { fileSize } from '@/shared/format/file-size';
 import { useTranslation } from '@/shared/i18n';
 import { copyLabel, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import { useNotesPort } from '../application/notes.port';
 import type { NoteActions } from '../application/notes.queries';
-import { thumbBox } from '../model/notes';
-import type { Note, NoteImage } from '../model/notes.types';
+import { sourceImage, thumbBox } from '../model/notes';
+import type { Mark, Note } from '../model/notes.types';
+import { drawnPng } from './draw-marks';
+import { MarkEditor } from './MarkEditor';
 
 /**
  * A note's images below its text: thumbnails of a fixed height, so the card's never moves while
@@ -66,7 +74,8 @@ export function NoteImages({
             {open !== null && note.images[open] ? (
                 <ImageViewer
                     book={book}
-                    images={note.images}
+                    note={note}
+                    actions={actions}
                     index={open}
                     onIndex={setOpen}
                     onClose={() => setOpen(null)}
@@ -78,17 +87,20 @@ export function NoteImages({
 
 /**
  * A note's image large, over the app: fitted, never scaled up; `←`/`→` go through the note's
- * images, `Esc` or a click outside closes. "Copy image" puts it on the clipboard as PNG.
+ * images, `Esc` or a click outside closes. "Copy image" puts it on the clipboard as PNG;
+ * "Annotate" opens its marks (`MarkEditor`), which keep the viewer open until they end.
  */
 function ImageViewer({
     book,
-    images,
+    note,
+    actions,
     index,
     onIndex,
     onClose,
 }: {
     book: string;
-    images: NoteImage[];
+    note: Note;
+    actions: NoteActions;
     index: number;
     onIndex: (index: number) => void;
     onClose: () => void;
@@ -97,91 +109,136 @@ function ImageViewer({
     const i18n = useTranslation();
     const { t } = i18n;
     const { copied, copyImage } = useCopyToClipboard();
+    const [marking, setMarking] = useState(false);
+    // the marks ended, the focus goes back to what opened them, so `Esc` closes the viewer next
+    const annotate = useRef<HTMLButtonElement>(null);
+    const marked = useRef(false);
+    useEffect(() => {
+        if (marking || !marked.current) return;
+        marked.current = false;
+        annotate.current?.focus();
+    }, [marking]);
+    const { images } = note;
     const image = images[index];
     const many = images.length > 1;
     const go = (step: number) => onIndex((index + step + images.length) % images.length);
     const copyTitle = copyLabel(copied, t('notes.copyImage'), i18n);
 
+    /** Keeps the marks, drawn over the image as given; whether the editor may close. */
+    const keepMarks = async (marks: Mark[] | null) => {
+        if (marks) {
+            const given = sourceImage(image);
+            const kept = await actions.markImage(note, image, marks, async () =>
+                marks.length === 0
+                    ? null
+                    : drawnPng(await port.imagePng(book, given), marks, image.width, image.height),
+            );
+            if (!kept) return false;
+        }
+        marked.current = true;
+        setMarking(false);
+        return true;
+    };
+
     return (
         <Dialog.Root
             open
+            disablePointerDismissal={marking}
             onOpenChange={(open) => {
-                if (!open) onClose();
+                // marking, `Esc` cancels the marks (the editor's), not the viewer
+                if (!open && !marking) onClose();
             }}
         >
             <Dialog.Portal>
                 <Dialog.Backdrop className="dialog-backdrop" />
                 <Dialog.Popup
-                    className="fixed inset-6 z-50 flex flex-col rounded-xl bg-ui-surface p-2 shadow-xl outline-none"
+                    className="fixed inset-6 z-20 flex flex-col rounded-xl bg-ui-surface p-2 shadow-xl outline-none"
                     aria-label={t('notes.image')}
                     onKeyDown={(event) => {
-                        if (!many) return;
+                        if (!many || marking) return;
                         if (event.key === 'ArrowLeft') go(-1);
                         else if (event.key === 'ArrowRight') go(1);
                     }}
                 >
-                    <header className="flex items-center gap-1 pb-2 pl-1.5">
-                        <span className="min-w-0 flex-1 truncate text-xs text-ui-text-muted tabular-nums">
-                            {t('notes.imageSize', {
-                                width: image.width,
-                                height: image.height,
-                                size: fileSize(image.bytes, i18n.formatTag),
-                            })}
-                        </span>
-                        {many ? (
-                            <>
-                                <span className="px-1 text-xs text-ui-text-muted tabular-nums">
-                                    {index + 1}/{images.length}
+                    {marking ? (
+                        <MarkEditor key={image.id} book={book} image={image} onDone={keepMarks} />
+                    ) : (
+                        <>
+                            <header className="flex items-center gap-1 pb-2 pl-1.5">
+                                <span className="min-w-0 flex-1 truncate text-xs text-ui-text-muted tabular-nums">
+                                    {t('notes.imageSize', {
+                                        width: image.width,
+                                        height: image.height,
+                                        size: fileSize(image.bytes, i18n.formatTag),
+                                    })}
                                 </span>
+                                {many ? (
+                                    <>
+                                        <span className="px-1 text-xs text-ui-text-muted tabular-nums">
+                                            {index + 1}/{images.length}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            className="btn-icon h-7 w-7"
+                                            title={t('notes.previousImage')}
+                                            aria-label={t('notes.previousImage')}
+                                            onClick={() => go(-1)}
+                                        >
+                                            <IconChevronLeft size={16} />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="btn-icon h-7 w-7"
+                                            title={t('notes.nextImage')}
+                                            aria-label={t('notes.nextImage')}
+                                            onClick={() => go(1)}
+                                        >
+                                            <IconChevronRight size={16} />
+                                        </button>
+                                    </>
+                                ) : null}
                                 <button
+                                    ref={annotate}
                                     type="button"
-                                    className="btn-icon h-7 w-7"
-                                    title={t('notes.previousImage')}
-                                    aria-label={t('notes.previousImage')}
-                                    onClick={() => go(-1)}
+                                    className="btn-ghost-sm"
+                                    onClick={() => setMarking(true)}
                                 >
-                                    <IconChevronLeft size={16} />
+                                    <IconPencil size={14} />
+                                    {t('notes.annotate')}
                                 </button>
                                 <button
                                     type="button"
-                                    className="btn-icon h-7 w-7"
-                                    title={t('notes.nextImage')}
-                                    aria-label={t('notes.nextImage')}
-                                    onClick={() => go(1)}
+                                    className="btn-ghost-sm"
+                                    title={copyTitle}
+                                    onClick={() =>
+                                        void copyImage(image.id, port.imagePng(book, image))
+                                    }
                                 >
-                                    <IconChevronRight size={16} />
+                                    <IconCopy size={14} />
+                                    {copyTitle}
                                 </button>
-                            </>
-                        ) : null}
-                        <button
-                            type="button"
-                            className="btn-ghost-sm"
-                            title={copyTitle}
-                            onClick={() => void copyImage(image.id, port.imagePng(book, image))}
-                        >
-                            <IconCopy size={14} />
-                            {copyTitle}
-                        </button>
-                        <Dialog.Close
-                            className="btn-icon h-7 w-7"
-                            title={t('notes.closeImage')}
-                            aria-label={t('notes.closeImage')}
-                        >
-                            <IconX size={16} />
-                        </Dialog.Close>
-                    </header>
-                    <div className="grid min-h-0 flex-1 place-items-center overflow-hidden">
-                        <img
-                            key={image.id}
-                            src={port.imageUrl(book, image, false)}
-                            alt={t('notes.image')}
-                            width={image.width}
-                            height={image.height}
-                            className="h-auto max-h-full w-auto max-w-full object-contain"
-                            decoding="async"
-                            draggable={false}
-                        />
-                    </div>
+                                <Dialog.Close
+                                    className="btn-icon h-7 w-7"
+                                    title={t('notes.closeImage')}
+                                    aria-label={t('notes.closeImage')}
+                                >
+                                    <IconX size={16} />
+                                </Dialog.Close>
+                            </header>
+                            <div className="grid min-h-0 flex-1 place-items-center overflow-hidden">
+                                <img
+                                    key={image.id}
+                                    src={port.imageUrl(book, image, false)}
+                                    alt={t('notes.image')}
+                                    width={image.width}
+                                    height={image.height}
+                                    className="h-auto max-h-full w-auto max-w-full object-contain"
+                                    decoding="async"
+                                    draggable={false}
+                                />
+                            </div>
+                        </>
+                    )}
                 </Dialog.Popup>
             </Dialog.Portal>
         </Dialog.Root>

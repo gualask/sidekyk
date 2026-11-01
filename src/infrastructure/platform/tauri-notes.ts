@@ -63,6 +63,14 @@ export const tauriNotes: NotesPort = {
         invoke('add_note_image', bytes, {
             headers: { 'x-book': encodeURIComponent(book), 'x-target': JSON.stringify(target) },
         }),
+    // `mark_note_image`: the marking as a line of JSON, then the PNG raw
+    markImage: (book, id, image, marks, drawn) => {
+        const line = new TextEncoder().encode(`${JSON.stringify({ book, id, image, marks })}\n`);
+        const body = new Uint8Array(line.length + (drawn?.length ?? 0));
+        body.set(line);
+        if (drawn) body.set(drawn, line.length);
+        return invoke('mark_note_image', body);
+    },
     removeImage: (book, id, image) => invoke('remove_note_image', { book, id, image }),
     copyNote: (book, id) => invoke('copy_note', { book, id }),
     imagePng: async (book, image) =>

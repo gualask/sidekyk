@@ -4,7 +4,14 @@ export { type ImageDrop, type NotesPort, NotesProvider } from './application/not
 export { addFiles } from './application/notes.queries';
 export { NotesSettingsProvider } from './application/notes-settings';
 // for the browser fixtures, which keep notes as the backend does
-export { doneNotes, imageFile, noteTitle, openNotes, positionAt } from './model/notes';
+export {
+    doneNotes,
+    imageFile,
+    noteTitle,
+    openNotes,
+    positionAt,
+    sourceImage,
+} from './model/notes';
 export {
     type BookTarget,
     type DeletedList,

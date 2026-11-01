@@ -10,6 +10,9 @@
 //! <folder>/<image>.thumb.png   its thumbnail
 //! ```
 //!
+//! A marked image is a PNG of its own, its JSON naming the image under its marks, whose files
+//! stay with it.
+//!
 //! A project's folder is named after it; the Inbox's is `inbox`, without `project.json`.
 //!
 //! Every book read stays in memory until the app quits or the book is deleted: every change goes
@@ -24,11 +27,14 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use super::book::{NoteBook, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
-    Book, DeletedList, ImageKind, ImageTarget, ListTarget, MovedList, MovedNote, Note, NoteImage,
-    NoteList, NotesSummary, ProjectNotes, StoredLists, StoredNote, StoredProject, StoredState,
-    STORED_VERSION,
+    Book, DeletedList, ImageKind, ImageTarget, ListTarget, Mark, MarkedImage, MovedList, MovedNote,
+    Note, NoteImage, NoteList, NotesSummary, ProjectNotes, SourceImage, StoredLists, StoredNote,
+    StoredProject, StoredState, STORED_VERSION,
 };
-use super::images::{image_file, image_of_file, thumb_file, PreparedImage, MAX_IMAGE_BYTES};
+use super::images::{
+    check_marks, file_named, image_file, image_files, image_of_file, thumb_file, PreparedImage,
+    MAX_IMAGE_BYTES,
+};
 use super::ports::NotesStorage;
 use crate::shared::id::{is_id, new_id};
 use crate::shared::sync::lock;
@@ -102,7 +108,8 @@ fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
             || book
                 .notes
                 .iter()
-                .any(|n| n.images.iter().any(|i| i.id == id))
+                .flat_map(|n| &n.images)
+                .any(|i| i.ids().any(|used| used == id))
     };
     let mut id = new_id();
     while used(&id) {
@@ -116,7 +123,7 @@ fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
 fn sweep(storage: &dyn NotesStorage, folder: &str, notes: &[Note], files: &[String]) {
     let kept: HashSet<&str> = notes
         .iter()
-        .flat_map(|n| n.images.iter().map(|i| i.id.as_str()))
+        .flat_map(|n| n.images.iter().flat_map(NoteImage::ids))
         .collect();
     for file in files {
         if image_of_file(file).is_some_and(|id| !kept.contains(id)) {
@@ -425,7 +432,7 @@ impl NotesStore {
         }
         let to = self.folder(storage, taker, taking)?;
         for image in &images {
-            for file in [image_file(image), thumb_file(&image.id)] {
+            for file in image_files(image) {
                 if let Some(bytes) = storage.read(from, &file, MAX_IMAGE_BYTES)? {
                     storage.write(&to, &file, &bytes)?;
                 }
@@ -655,6 +662,54 @@ impl NotesStore {
         self.change(storage, book, |notes| notes.remove_image(id, image, now()))
     }
 
+    /// Marks a note's image anew: `marked`, the PNG drawn with `marks` over the image as given,
+    /// takes its place with a new id; no marks give the image as given back. The files of a
+    /// marked image replaced stay until the book is next read, as a removed image's.
+    pub fn mark_image(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        id: &str,
+        image: &str,
+        marks: Vec<Mark>,
+        marked: Option<PreparedImage>,
+    ) -> anyhow::Result<Note> {
+        self.change_kept(storage, book, |kept| {
+            let source = kept
+                .notes
+                .find(id)?
+                .images
+                .iter()
+                .find(|i| i.id == image)
+                .ok_or_else(|| anyhow::anyhow!("no image {image} in note {id}"))?
+                .source();
+            let replacement = if marks.is_empty() {
+                source
+            } else {
+                let marked =
+                    marked.ok_or_else(|| anyhow::anyhow!("marks come with their image"))?;
+                anyhow::ensure!(
+                    marked.kind == ImageKind::Png
+                        && (marked.width, marked.height) == (source.width, source.height),
+                    "a marked image is a PNG as large as the image under it"
+                );
+                check_marks(&marks, source.width, source.height)?;
+                let folder = self.folder(storage, book, kept)?;
+                let drawn = marked.note_image(new_image_id(&kept.notes, &[]));
+                storage.write(&folder, &image_file(&drawn), &marked.original)?;
+                storage.write(&folder, &thumb_file(&drawn.id), &marked.thumb)?;
+                NoteImage {
+                    marked: Some(MarkedImage {
+                        source: SourceImage::of(source),
+                        marks,
+                    }),
+                    ..drawn
+                }
+            };
+            kept.notes.replace_image(id, image, replacement, now())
+        })
+    }
+
     /// The bytes of an image of a note, or of its thumbnail (PNG), by the name of its file, and
     /// their kind; `None` for a file no note of the book has. Read outside the lock.
     pub fn image(
@@ -669,18 +724,19 @@ impl NotesStore {
         let found = {
             let mut books = lock(&self.books);
             let kept = self.kept_book(&mut books, storage, book)?;
-            let image = kept
+            // an image, or the one under its marks
+            let kind = kept
                 .notes
                 .notes
                 .iter()
                 .flat_map(|n| &n.images)
-                .find(|i| i.id == id);
-            match (image, &kept.folder) {
+                .find_map(|i| i.kind_of(id));
+            match (kind, &kept.folder) {
                 (Some(_), Some(folder)) if file == thumb_file(id) => {
                     Some((folder.clone(), ImageKind::Png))
                 }
-                (Some(image), Some(folder)) if file == image_file(image) => {
-                    Some((folder.clone(), image.kind))
+                (Some(kind), Some(folder)) if file == file_named(id, kind) => {
+                    Some((folder.clone(), kind))
                 }
                 _ => None,
             }
@@ -1896,5 +1952,172 @@ pub mod tests {
                 image_file(&note.images[0])
             )]
         );
+    }
+
+    /// `screenshot()` drawn over: a PNG as large, with other pixels.
+    fn marked_screenshot() -> PreparedImage {
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
+            64,
+            32,
+            image::Rgb([229, 72, 77]),
+        ))
+        .write_to(&mut png, image::ImageFormat::Png)
+        .unwrap();
+        super::super::images::prepare(png.into_inner()).unwrap()
+    }
+
+    fn letter(text: &str) -> Mark {
+        Mark {
+            x: 10,
+            y: 10,
+            text: text.into(),
+            tail: Some(crate::modules::notes::contracts::MarkPoint { x: 40, y: 20 }),
+        }
+    }
+
+    /// A note of `shop()` with `screenshot()`, then that image marked with an A.
+    fn a_marked_note(storage: &MemoryStorage, store: &NotesStore) -> (Note, Note) {
+        let general = store.notes(storage, &shop()).unwrap().open_list;
+        let note = store
+            .add_images(
+                storage,
+                &shop(),
+                ImageTarget::New { list: general },
+                vec![screenshot()],
+            )
+            .unwrap();
+        let marked = store
+            .mark_image(
+                storage,
+                &shop(),
+                &note.id,
+                &note.images[0].id,
+                vec![letter("A")],
+                Some(marked_screenshot()),
+            )
+            .unwrap();
+        (note, marked)
+    }
+
+    #[test]
+    fn a_marked_image_takes_the_place_of_the_one_under_it_and_keeps_it() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let (note, marked) = a_marked_note(&storage, &store);
+        let given = &note.images[0];
+        let image = &marked.images[0];
+        assert_eq!(marked.images.len(), 1);
+        assert_ne!(image.id, given.id);
+        assert_eq!(
+            (image.kind, image.width, image.height),
+            (ImageKind::Png, 64, 32)
+        );
+        let under = image.marked.as_ref().unwrap();
+        assert_eq!(under.source.id, given.id);
+        assert_eq!(under.marks, [letter("A")]);
+        assert_eq!(image.source(), *given);
+        // the marked image, its thumbnail and the image under it are served
+        for (id, file) in [
+            (&image.id, image_file(image)),
+            (&image.id, thumb_file(&image.id)),
+            (&given.id, image_file(given)),
+        ] {
+            assert!(
+                store.image(&storage, &shop(), &file).unwrap().is_some(),
+                "{id}: {file}"
+            );
+        }
+        assert_eq!(
+            store.notes(&storage, &shop()).unwrap().notes[0].images,
+            marked.images
+        );
+        let folder = storage.names()[0].0.clone();
+        let (_, copied) = store.note_copy(&storage, &shop(), &note.id).unwrap();
+        assert_eq!(
+            copied,
+            [format!("/data/notes/{folder}/{}", image_file(image))]
+        );
+    }
+
+    #[test]
+    fn marked_again_it_keeps_the_image_given_and_without_marks_gives_it_back() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let (note, marked) = a_marked_note(&storage, &store);
+        let again = store
+            .mark_image(
+                &storage,
+                &shop(),
+                &note.id,
+                &marked.images[0].id,
+                vec![letter("A"), letter("B")],
+                Some(marked_screenshot()),
+            )
+            .unwrap();
+        let image = &again.images[0];
+        assert_ne!(image.id, marked.images[0].id);
+        assert_eq!(image.source(), note.images[0]);
+        assert_eq!(image.marked.as_ref().unwrap().marks.len(), 2);
+        let back = store
+            .mark_image(&storage, &shop(), &note.id, &image.id, Vec::new(), None)
+            .unwrap();
+        assert_eq!(back.images, note.images);
+    }
+
+    #[test]
+    fn marks_come_with_a_png_as_large_as_the_image_under_them() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let (note, marked) = a_marked_note(&storage, &store);
+        let id = &marked.images[0].id;
+        let mark = |marks, drawn| store.mark_image(&storage, &shop(), &note.id, id, marks, drawn);
+        assert!(mark(vec![letter("A")], None).is_err());
+        let small = super::super::images::prepare(super::super::images::tests::encoded(
+            32,
+            32,
+            image::ImageFormat::Png,
+        ))
+        .unwrap();
+        assert!(mark(vec![letter("A")], Some(small)).is_err());
+        let jpeg = super::super::images::prepare(super::super::images::tests::encoded(
+            64,
+            32,
+            image::ImageFormat::Jpeg,
+        ))
+        .unwrap();
+        assert!(mark(vec![letter("A")], Some(jpeg)).is_err());
+        let outside = Mark {
+            x: 65,
+            ..letter("A")
+        };
+        assert!(mark(vec![outside], Some(marked_screenshot())).is_err());
+        assert_eq!(store.notes(&storage, &shop()).unwrap().notes[0], marked);
+    }
+
+    #[test]
+    fn the_image_under_marks_outlives_the_sessions_and_moves_with_its_note() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let (note, marked) = a_marked_note(&storage, &store);
+        let given = note.images[0].clone();
+        let image = marked.images[0].clone();
+        let next = NotesStore::default();
+        next.notes(&storage, &shop()).unwrap();
+        assert_eq!(files_of(&storage, &given).len(), 2);
+        assert_eq!(files_of(&storage, &image).len(), 2);
+
+        next.move_note(&storage, &shop(), &note.id, &docs(), ListTarget::Open)
+            .unwrap();
+        for file in [
+            image_file(&image),
+            image_file(&given),
+            thumb_file(&given.id),
+        ] {
+            assert!(
+                next.image(&storage, &docs(), &file).unwrap().is_some(),
+                "{file}"
+            );
+        }
     }
 }

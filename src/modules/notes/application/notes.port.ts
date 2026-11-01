@@ -4,6 +4,7 @@ import type {
     DeletedList,
     ImageTarget,
     ListTarget,
+    Mark,
     MovedList,
     MovedNote,
     Note,
@@ -72,6 +73,17 @@ export interface NotesPort {
     exportNotes(projectId: string): Promise<string | null>;
     /** Adds an image pasted (its bytes) to a note, or to a new one on top of a list. */
     addImage(book: string, target: ImageTarget, bytes: Uint8Array<ArrayBuffer>): Promise<Note>;
+    /**
+     * Marks a note's image anew: `drawn`, the PNG of `marks` over the image as given, takes its
+     * place; no marks (and no PNG) give the image as given back.
+     */
+    markImage(
+        book: string,
+        id: string,
+        image: string,
+        marks: Mark[],
+        drawn: Uint8Array<ArrayBuffer> | null,
+    ): Promise<Note>;
     /** Takes an image out of a note; `restoreNote` with the note as it was puts it back. */
     removeImage(book: string, id: string, image: string): Promise<Note>;
     /** What a note's copy puts on the clipboard: its text, then where its images are. */

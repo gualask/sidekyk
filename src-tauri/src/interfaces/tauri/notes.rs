@@ -16,7 +16,7 @@ use crate::infrastructure::notes_files::{
 use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, BookTarget, DeletedList, ImageTarget,
-    ListTarget, MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
+    ListTarget, Mark, MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
     EXPORT_IMAGES, INBOX_BOOK, MAX_IMAGE_BYTES,
 };
 use sidekyk_core::modules::projects::{
@@ -204,6 +204,52 @@ fn pasted(request: &tauri::ipc::Request<'_>) -> anyhow::Result<(String, ImageTar
     let book = percent_decoded(header("x-book")?);
     let target = serde_json::from_str(header("x-target")?)?;
     Ok((book, target, bytes.clone()))
+}
+
+/// What marks a note's image, before the PNG drawn with them: the body's first line.
+#[derive(Debug, serde::Deserialize)]
+struct Marking {
+    book: String,
+    id: String,
+    image: String,
+    marks: Vec<Mark>,
+}
+
+#[tauri::command]
+/// Marks a note's image anew, or gives the image under its marks back when there are none. The
+/// body is the marking as JSON, a line of its own (JSON escapes every line end in it), then the
+/// PNG drawn with the marks, raw: none without marks.
+pub(crate) async fn mark_note_image(
+    app: tauri::AppHandle,
+    request: tauri::ipc::Request<'_>,
+) -> Result<Note, AppError> {
+    let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
+        return Err(anyhow::anyhow!("a marking comes raw").into());
+    };
+    let (marking, png) = marking(body).map_err(AppError::from)?;
+    let Marking {
+        book,
+        id,
+        image,
+        marks,
+    } = marking;
+    with_notes("mark_note_image", app, book, move |store, files, book| {
+        let drawn = (!png.is_empty()).then(|| prepare(png)).transpose()?;
+        store.mark_image(files, book, &id, &image, marks, drawn)
+    })
+    .await
+}
+
+/// A marking's JSON and its PNG, from the body that carries them.
+fn marking(body: &[u8]) -> anyhow::Result<(Marking, Vec<u8>)> {
+    let end = body
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .ok_or_else(|| anyhow::anyhow!("a marking ends its line"))?;
+    Ok((
+        serde_json::from_slice(&body[..end])?,
+        body[end + 1..].to_vec(),
+    ))
 }
 
 #[tauri::command]
@@ -592,6 +638,27 @@ mod tests {
     use std::cell::Cell;
 
     use super::*;
+
+    #[test]
+    fn a_marking_is_a_line_of_json_then_the_png() {
+        let json = r#"{"book":"inbox","id":"a","image":"b","marks":[{"x":1,"y":2,"text":"A\nB","tail":null}]}"#;
+        let png = [0x89, b'P', b'\n', b'G'];
+        let (read, drawn) = marking(&[json.as_bytes(), b"\n", &png].concat()).unwrap();
+        assert_eq!(
+            (read.book.as_str(), read.id.as_str(), read.image.as_str()),
+            ("inbox", "a", "b")
+        );
+        assert_eq!(read.marks[0].text, "A\nB");
+        assert_eq!(drawn, png);
+
+        let (read, drawn) = marking(
+            br#"{"book":"inbox","id":"a","image":"b","marks":[]}
+"#,
+        )
+        .unwrap();
+        assert!(read.marks.is_empty() && drawn.is_empty());
+        assert!(marking(b"{}").is_err());
+    }
 
     fn casa() -> anyhow::Result<Book> {
         Ok(Book::Project {

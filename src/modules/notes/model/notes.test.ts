@@ -8,6 +8,7 @@ import {
     openCounts,
     openNotes,
     positionAt,
+    sourceImage,
     thumbBox,
     withNotes,
     withoutNote,
@@ -111,6 +112,7 @@ describe('thumbBox', () => {
         width,
         height,
         bytes: 1,
+        marked: null,
     });
 
     it('keeps the image shape at the card height', () => {
@@ -121,5 +123,21 @@ describe('thumbBox', () => {
         expect(thumbBox(image(5120, 300))).toEqual({ width: 200, height: 72 });
         expect(thumbBox(image(100, 4000))).toEqual({ width: 40, height: 72 });
         expect(thumbBox(image(0, 0))).toEqual({ width: 40, height: 72 });
+    });
+});
+
+describe('sourceImage', () => {
+    const given = { id: 'g', kind: 'jpeg' as const, width: 8, height: 4, bytes: 70, marked: null };
+
+    it('is the image under the marks, as large', () => {
+        const marked = {
+            ...given,
+            id: 'm',
+            kind: 'png' as const,
+            bytes: 90,
+            marked: { source: { id: 'g', kind: 'jpeg' as const, bytes: 70 }, marks: [] },
+        };
+        expect(sourceImage(marked)).toEqual(given);
+        expect(sourceImage(given)).toBe(given);
     });
 });
