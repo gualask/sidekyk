@@ -588,9 +588,24 @@ impl Repositories for AgentRepositories {
         self.call(Request::FileStamp { repository, path }, &nothing)
     }
 
-    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>> {
+    fn image(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+        blob: Option<&str>,
+    ) -> anyhow::Result<Vec<u8>> {
         let (repository, path) = (info.clone(), path.to_string());
-        self.call_bytes(Request::Image { repository, path })
+        let blob = blob.map(str::to_string);
+        self.call_bytes(Request::Image {
+            repository,
+            path,
+            blob,
+        })
+    }
+
+    fn blob_size(&self, info: &RepositoryInfo, blob: &str) -> anyhow::Result<u64> {
+        let (repository, blob) = (info.clone(), blob.to_string());
+        self.call(Request::BlobSize { repository, blob }, &nothing)
     }
 
     fn markdown_preview(

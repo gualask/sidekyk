@@ -1,38 +1,16 @@
 import type { DiffLine } from './diff-parser';
-import type {
-    ChangedFile,
-    Commit,
-    FileChange,
-    FileVersion,
-    LineColors,
-    SyntaxColors,
-    SyntaxTone,
-} from './repository.types';
+import type { LineColors, SyntaxColors, SyntaxTone } from './repository.types';
+import type { DiffSides } from './sides';
 
 /** Lines asked for at once: the backend colors a version whole, then serves it a block at a time. */
 export const COLOR_BLOCK = 256;
 
-/** A version of a file whose lines are colored. */
-export interface ColorSource {
-    path: string;
-    version: FileVersion;
-}
-
-/**
- * Where the viewer's lines take their colors: a removed line from the old version, every other
- * line from the new one. A side is null when there is none (a new file, a root commit).
- */
-export interface ColorSides {
-    old: ColorSource | null;
-    new: ColorSource | null;
-}
-
-type Side = keyof ColorSides;
+type Side = keyof DiffSides;
 
 /** What a viewer's lines are colored from: the sides of a file in a project. */
 export interface FileSyntax {
     projectId: string;
-    sides: ColorSides;
+    sides: DiffSides;
 }
 
 /** A block of lines of one side, from its first line. */
@@ -60,39 +38,6 @@ export function lineCheck(text: string): number {
     return hash;
 }
 
-/** The sides of a working-tree change: an area compares two of the working tree, index and HEAD. */
-export function changeSides(file: Pick<ChangedFile, 'path' | 'origPath' | 'area'>): ColorSides {
-    const was = file.origPath ?? file.path;
-    if (file.area === 'staged') {
-        return {
-            old: { path: was, version: { kind: 'head' } },
-            new: { path: file.path, version: { kind: 'index' } },
-        };
-    }
-    return {
-        old: file.area === 'unstaged' ? { path: was, version: { kind: 'index' } } : null,
-        new: { path: file.path, version: { kind: 'worktree' } },
-    };
-}
-
-/** The sides of a file of a commit: the commit, against its parent. */
-export function commitSides(
-    commit: Pick<Commit, 'sha' | 'parent'>,
-    file: Pick<FileChange, 'path' | 'origPath'>,
-): ColorSides {
-    return {
-        old: commit.parent
-            ? { path: file.origPath ?? file.path, version: { kind: 'commit', sha: commit.parent } }
-            : null,
-        new: { path: file.path, version: { kind: 'commit', sha: commit.sha } },
-    };
-}
-
-/** A file of the working tree, as the Files panel shows it. */
-export function fileSides(path: string): ColorSides {
-    return { old: null, new: { path, version: { kind: 'worktree' } } };
-}
-
 /** The side a line takes its colors from and its number there; null for a note. */
 function lineSource(line: DiffLine): { side: Side; number: number } | null {
     if (line.kind === 'note') return null;
@@ -111,7 +56,7 @@ function lineBlock(line: DiffLine): { block: ColorBlock; offset: number } | null
 }
 
 /** The blocks these lines fall in, each once, on the sides there are. */
-export function blocksOf(lines: Iterable<DiffLine>, sides: ColorSides): ColorBlock[] {
+export function blocksOf(lines: Iterable<DiffLine>, sides: DiffSides): ColorBlock[] {
     const blocks = new Map<string, ColorBlock>();
     for (const line of lines) {
         const found = lineBlock(line);

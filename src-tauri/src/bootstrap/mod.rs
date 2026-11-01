@@ -97,6 +97,7 @@ pub(crate) fn run() {
                 tauri_commands::project_file::respond(
                     context.app_handle(),
                     request.uri().path(),
+                    request.uri().query(),
                     responder,
                 )
             },
@@ -170,6 +171,7 @@ pub(crate) fn run() {
             tauri_commands::repository::get_file_content,
             tauri_commands::repository::get_markdown_preview,
             tauri_commands::repository::get_file_stamp,
+            tauri_commands::repository::get_blob_size,
             tauri_commands::links::open_url,
             tauri_commands::repository::get_syntax_colors,
             tauri_commands::notes::get_notes,

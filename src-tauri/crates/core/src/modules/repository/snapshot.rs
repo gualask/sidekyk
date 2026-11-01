@@ -157,6 +157,16 @@ fn changed_file(
         additions: counts.additions,
         deletions: counts.deletions,
         binary: counts.binary,
+        // a staged file compares HEAD with the index, an unstaged one the index with the tree
+        old_blob: match area {
+            ChangeArea::Staged => entry.head_blob.clone(),
+            ChangeArea::Unstaged => entry.index_blob.clone(),
+            ChangeArea::Untracked => None,
+        },
+        new_blob: match area {
+            ChangeArea::Staged => entry.index_blob.clone(),
+            ChangeArea::Unstaged | ChangeArea::Untracked => None,
+        },
     }
 }
 

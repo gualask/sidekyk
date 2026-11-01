@@ -18,6 +18,8 @@ function file(path: string, area: ChangedFile['area']): ChangedFile {
         additions: 1,
         deletions: 0,
         binary: false,
+        oldBlob: null,
+        newBlob: null,
     };
 }
 

@@ -8,6 +8,7 @@ import type {
     RecentCommits,
     UnifiedDiff,
 } from '@/modules/repository';
+import { LOGO_BLOB } from './fixture-files';
 
 /** The fixture's clock: commits are dated back from when the page loaded. */
 const NOW = Math.floor(Date.now() / 1000);
@@ -26,8 +27,9 @@ function file(
     diff: string,
     counts: { additions: number | null; deletions: number | null; binary?: boolean },
     origPath: string | null = null,
+    newBlob: string | null = null,
 ): FileChange & { diff: string } {
-    return { path, origPath, kind, binary: false, ...counts, diff };
+    return { path, origPath, kind, binary: false, oldBlob: null, newBlob, ...counts, diff };
 }
 
 const REVIEW_COMMITS: FixtureCommit[] = [
@@ -107,6 +109,8 @@ new file mode 100644
 Binary files /dev/null and b/public/logo.png differ
 `,
                 { additions: null, deletions: null, binary: true },
+                null,
+                LOGO_BLOB,
             ),
         ],
     },

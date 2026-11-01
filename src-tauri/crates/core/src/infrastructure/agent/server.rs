@@ -121,14 +121,21 @@ pub fn serve(
                 on_thread(Box::new(move |r| value(r.file_stamp(&repository, &path)?)));
             }
             // bytes as they are, after their message: a failure is a reply as any other
-            Request::Image { repository, path } => {
+            Request::Image {
+                repository,
+                path,
+                blob,
+            } => {
                 let (repositories, output) = (repositories.clone(), output.clone());
                 std::thread::spawn(move || {
-                    match guarded(|| repositories.image(&repository, &path)) {
+                    match guarded(|| repositories.image(&repository, &path, blob.as_deref())) {
                         Ok(bytes) => reply_bytes(&output, id, &bytes),
                         Err(error) => reply(&output, id, Err(error)),
                     }
                 });
+            }
+            Request::BlobSize { repository, blob } => {
+                on_thread(Box::new(move |r| value(r.blob_size(&repository, &blob)?)));
             }
             Request::MarkdownPreview { repository, path } => {
                 on_thread(Box::new(move |r| {
@@ -247,6 +254,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::MarkdownPreview { .. } => "markdownPreview",
         Request::FileStamp { .. } => "fileStamp",
         Request::Image { .. } => "image",
+        Request::BlobSize { .. } => "blobSize",
         Request::SyntaxColors { .. } => "syntaxColors",
         Request::SearchFiles { .. } => "searchFiles",
         Request::SearchContents { .. } => "searchContents",

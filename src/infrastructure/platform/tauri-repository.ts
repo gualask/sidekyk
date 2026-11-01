@@ -26,10 +26,15 @@ export const tauriRepository: RepositoryPort = {
     getDirectory: (projectId, path) => invoke('get_directory', { projectId, path }),
     getFileContent: (projectId, path) => invoke('get_file_content', { projectId, path }),
     getFileStamp: (projectId, path) => invoke('get_file_stamp', { projectId, path }),
+    getBlobSize: (projectId, blob) => invoke('get_blob_size', { projectId, blob }),
     // `project_file.rs`: the project and the path encoded whole, the id once before (an older one
-    // is a path), the stamp as a query
-    projectFileUrl: (projectId, path, { size, modified }) =>
-        `${convertFileSrc(`${encodeURIComponent(projectId)}/${path}`, 'project-file')}?v=${modified}-${size}`,
+    // is a path), the stamp or the object as a query
+    projectFileUrl: (projectId, path, source) =>
+        `${convertFileSrc(`${encodeURIComponent(projectId)}/${path}`, 'project-file')}?${
+            source.kind === 'blob'
+                ? `blob=${source.blob}`
+                : `v=${source.stamp.modified}-${source.stamp.size}`
+        }`,
     getMarkdownPreview: (projectId, path) => invoke('get_markdown_preview', { projectId, path }),
     openUrl: (url) => invoke('open_url', { url }),
     getSyntaxColors: (projectId, request) => invoke('get_syntax_colors', { projectId, request }),

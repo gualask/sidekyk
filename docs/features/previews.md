@@ -1,7 +1,7 @@
 # Previews
 
-Files shown as they read in the viewer: Markdown, SVG, images (built 2026-10-25). Nothing a file
-holds runs, nothing leaves the machine.
+Files shown as they read in the viewer: Markdown, SVG, images (built 2026-10-25), a changed
+image's two sides (2026-11-01). Nothing a file holds runs, nothing leaves the machine.
 
 ## Behaviour
 
@@ -13,6 +13,12 @@ holds runs, nothing leaves the machine.
   holds for the panel's files while the app runs and the setting stays. A changed file with a
   preview: "Changes | Full file | Preview", Preview showing the working tree's version, nothing
   marked; a deleted file has none.
+- A changed image (the kinds above, not SVG): "Changes | Preview", no whole file. Changes shows
+  its two sides next to each other, as VS Code, one above the other in a panel narrower than
+  42rem; each named above and with its pixel and file size below. Sides as git's areas: staged
+  "HEAD | Index", unstaged "Index | Working tree"; a commit's file its parent's and its own, named
+  by their short hash. Added or new: the right side alone; deleted: the left alone, and no
+  Preview; renamed: the left from the old path. `n`/`p` go to the next or previous file at once.
 - A switch keeps the place: the code opens on the line of the block at the top, the preview on
   the block holding the code's top line. `⌘F` in a preview opens the code with its find bar from
   that line. A selection copies as plain text.
@@ -45,6 +51,14 @@ holds runs, nothing leaves the machine.
   mtime), so a changed file is another URL. CSP: `img-src 'self' data: project-file:
   http://project-file.localhost`. Through the helper the bytes follow their message as a raw frame
   (`wsl.md`).
+- An image's git sides: `?blob=<id>` instead of the stamp, the object read whole by id
+  (`git cat-file blob`, a 40 or 64 hex id only, same limit), so its URL names its bytes exactly
+  and the cache never serves another version. Its size before it loads: `get_blob_size`
+  (`cat-file -s`). The ids come with the changed files, `oldBlob`/`newBlob`: status's `hH`/`hI`
+  for the working tree, `diff-tree --raw` for a commit, no git call of their own; the snapshot's
+  time unchanged (`.local/snapshot-cost`, 2026-11-01). `ImageDiff` shows the sides
+  (`imageSides` in `model/sides.ts`: the diff's sides, as for syntax colors, with their objects),
+  each an `ImageView`.
 - Links outside: `open_url` (`interfaces/tauri/links.rs`) allows `http`, `https`, `mailto` only,
   through `tauri-plugin-opener`. The window never navigates away from the app's page
   (`on_navigation`) nor opens another (`on_new_window` denies).
@@ -75,6 +89,9 @@ holds runs, nothing leaves the machine.
 - Bare URLs as text: pulldown-cmark has no GFM autolink literal; no detection of our own until
   READMEs read badly without it.
 - A changed file's Preview shows the working tree, nothing marked; rendered diffs later.
+- Image sides by object id, not by area (`:path`, `HEAD:path`) with the id as a cache key
+  (2026-11-01): the index can change between the snapshot and the load, and a URL would then
+  cache bytes it does not name. No swipe or onion skin, which no editor has.
 
 ## Sources
 

@@ -16,6 +16,8 @@ function file(
         additions,
         deletions,
         binary: additions === null,
+        oldBlob: null,
+        newBlob: null,
     };
 }
 

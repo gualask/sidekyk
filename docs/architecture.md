@@ -30,7 +30,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                    └─▶ get_syntax_colors         blocks of lines on screen
 ```
 
-- A commit's files and diffs never change: cached under `['commit', …]`, read once.
+- A commit's files and diffs never change: cached under `['commit', …]`, read once; so does a git
+  object's size (`get_blob_size`, a side of an image's diff), under `['blob', …]`.
 - Commands name a project by its id and serve only projects in the list; the core reads a folder
   by its root on the machine that holds it (`features/wsl.md`).
 

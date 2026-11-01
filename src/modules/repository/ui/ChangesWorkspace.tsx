@@ -16,19 +16,21 @@ import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
 import { useFileViewChoice, useLinkedAnchor } from '../application/view-choice';
 import { fileKey } from '../model/file-groups';
-import { hasPreview } from '../model/preview';
+import { hasPreview, isImage } from '../model/preview';
 import { projectErrorMessage } from '../model/project-error';
 import { selectedFile, selectionOf } from '../model/selection';
+import { changeSides, commitSides, imageSides } from '../model/sides';
 import { fileTarget } from '../model/targets';
 import { CommitFileList } from './CommitFileList';
 import { ChangeDiffView, CommitDiffView } from './DiffView';
 import { FileHeader } from './FileHeader';
 import { FileList } from './FileList';
+import { ImageDiff } from './ImageDiff';
 import { fittingRowsWidth } from './list-layout';
 import { PreviewPane } from './PreviewPane';
 import { RecentCommits } from './RecentCommits';
 import { TextFileView } from './TextFileView';
-import { DIFF_VIEWS, PREVIEW_VIEW, type ViewSwitch } from './view-options';
+import { DIFF_VIEWS, IMAGE_VIEWS, PREVIEW_VIEW, type ViewSwitch } from './view-options';
 
 const NEXT_KEYS = new Set(['ArrowDown', 'j']);
 const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
@@ -192,6 +194,13 @@ export function ChangesWorkspace({
               }
             : null;
 
+    // an image shows its sides or as it reads, with no whole file; the diff's view stays as chosen
+    const imageSwitch: ViewSwitch<'changes' | 'preview'> = {
+        value: changedPreview ? 'preview' : 'changes',
+        options: IMAGE_VIEWS,
+        onChange: (next) => setPreviewChanged(next === 'preview'),
+    };
+
     const listWidth = useSidebarWidth('changes', LIST_WIDTH);
     const folder = projectFolder(project);
     const listBox = useRef<HTMLElement>(null);
@@ -265,7 +274,21 @@ export function ChangesWorkspace({
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {/* until the settings say which view a diff opens in, no diff is asked for */}
                     {!diffView ? null : viewed ? (
-                        commitFile && commitFind ? (
+                        commitFile && isImage(commitFile.path) ? (
+                            <ImageDiff
+                                key={`${shownKey}:image`}
+                                projectId={project.id}
+                                sides={imageSides(commitSides(viewed, commitFile), commitFile)}
+                                header={header}
+                                onPastEnd={stepFile}
+                                renderHeader={() => (
+                                    <FileHeader
+                                        path={commitFile.path}
+                                        origPath={commitFile.origPath}
+                                    />
+                                )}
+                            />
+                        ) : commitFile && commitFind ? (
                             <CommitDiffView
                                 key={`${shownKey}:${diffView.view}`}
                                 projectId={project.id}
@@ -300,7 +323,11 @@ export function ChangesWorkspace({
                                 <FileHeader
                                     path={selected.path}
                                     origPath={selected.origPath}
-                                    view={viewSwitch(() => 0, selected.path)}
+                                    view={
+                                        isImage(selected.path)
+                                            ? imageSwitch
+                                            : viewSwitch(() => 0, selected.path)
+                                    }
                                     showIn={showInFiles(selected.path, () => null)}
                                 />
                             )}
@@ -310,6 +337,27 @@ export function ChangesWorkspace({
                                 setPreviewChanged(false);
                                 find.open(selected.path, { query: '', line: line ?? 1 });
                             }}
+                        />
+                    ) : selected && isImage(selected.path) ? (
+                        <ImageDiff
+                            key={`${shownKey}:image`}
+                            projectId={project.id}
+                            sides={imageSides(changeSides(selected), selected)}
+                            header={header}
+                            onPastEnd={stepFile}
+                            renderHeader={() => (
+                                <FileHeader
+                                    path={selected.path}
+                                    origPath={selected.origPath}
+                                    // a deleted image has nothing to show as it reads
+                                    view={selected.kind === 'deleted' ? null : imageSwitch}
+                                    showIn={
+                                        selected.kind === 'deleted'
+                                            ? null
+                                            : showInFiles(selected.path, () => null)
+                                    }
+                                />
+                            )}
                         />
                     ) : selected ? (
                         <ChangeDiffView

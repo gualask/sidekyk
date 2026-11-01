@@ -124,6 +124,11 @@ pub struct ChangedFile {
     pub additions: Option<u32>,
     pub deletions: Option<u32>,
     pub binary: bool,
+    /// The objects of the diff's sides, for the viewer to show an image's: the left HEAD's for a
+    /// staged file, the index's otherwise; the right the index's for a staged file, `None` for
+    /// the working tree's. `None` where a side has no file.
+    pub old_blob: Option<String>,
+    pub new_blob: Option<String>,
 }
 
 /// Everything that differs from HEAD, staged or not. `files` counts every changed path, new files
@@ -149,6 +154,10 @@ pub struct FileChange {
     pub additions: Option<u32>,
     pub deletions: Option<u32>,
     pub binary: bool,
+    /// The objects of the sides, the parent's and the commit's, for the viewer to show an
+    /// image's: `None` where a side has no file.
+    pub old_blob: Option<String>,
+    pub new_blob: Option<String>,
 }
 
 /// A repository at a glance: its card, the breadcrumb. Cheap enough to
@@ -365,6 +374,8 @@ mod tests {
                 additions: None,
                 deletions: Some(2),
                 binary: false,
+                old_blob: Some("aa1".into()),
+                new_blob: None,
             }],
             summary: RepositorySummary {
                 branch: BranchStatus {
@@ -393,7 +404,9 @@ mod tests {
                     "kind": "type-changed",
                     "additions": null,
                     "deletions": 2,
-                    "binary": false
+                    "binary": false,
+                    "oldBlob": "aa1",
+                    "newBlob": null
                 }],
                 "summary": {
                     "branch": {
@@ -544,6 +557,8 @@ mod tests {
                 additions: Some(1),
                 deletions: Some(0),
                 binary: false,
+                old_blob: Some("aa1".into()),
+                new_blob: Some("bb2".into()),
             }],
             truncated: false,
         };
@@ -556,7 +571,9 @@ mod tests {
                     "kind": "renamed",
                     "additions": 1,
                     "deletions": 0,
-                    "binary": false
+                    "binary": false,
+                    "oldBlob": "aa1",
+                    "newBlob": "bb2"
                 }],
                 "truncated": false
             })

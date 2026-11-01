@@ -10,6 +10,7 @@ import type {
     FileDiffRequest,
     FileStamp,
     FolderKind,
+    ImageSource,
     MarkdownDocument,
     RecentCommits,
     RepositoryChangedEvent,
@@ -48,11 +49,14 @@ export interface RepositoryPort {
     getFileContent(projectId: string, path: string): Promise<FileContent>;
     /** The size and last change of a file of the tree. */
     getFileStamp(projectId: string, path: string): Promise<FileStamp>;
+    /** The size of a git object, a side of an image's diff. */
+    getBlobSize(projectId: string, blob: string): Promise<number>;
     /**
-     * The URL an image of the tree loads from, read by the WebView itself; it names the file's
-     * stamp, so a changed file is another URL.
+     * The URL an image loads from, read by the WebView itself: the tree's file at `path`, or a git
+     * object with `path`'s type. It names the file's stamp or the object, so other bytes are
+     * another URL.
      */
-    projectFileUrl(projectId: string, path: string, stamp: FileStamp): string;
+    projectFileUrl(projectId: string, path: string, source: ImageSource): string;
     /**
      * A Markdown file of the tree as its preview shows it, links and images resolved against the
      * tree; null when it is not text (binary, a link, a submodule).

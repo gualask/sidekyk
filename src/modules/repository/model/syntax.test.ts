@@ -1,16 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffLine } from './diff-parser';
 import type { SyntaxColors } from './repository.types';
-import {
-    blockKey,
-    blocksOf,
-    changeSides,
-    commitSides,
-    fileSides,
-    lineCheck,
-    lineColors,
-    textParts,
-} from './syntax';
+import { changeSides } from './sides';
+import { blockKey, blocksOf, lineCheck, lineColors, textParts } from './syntax';
 
 function line(
     kind: DiffLine['kind'],
@@ -27,34 +19,6 @@ describe('lineCheck', () => {
         expect(lineCheck('')).toBe(0x811c9dc5);
         expect(lineCheck('fn main() {}')).toBe(0x9f731f0f);
         expect(lineCheck('é→😀')).toBe(0x7ab3ca77);
-    });
-});
-
-describe('sides', () => {
-    it('compare the versions each area compares', () => {
-        const worktree = { kind: 'worktree' } as const;
-        expect(changeSides({ path: 'a.ts', origPath: null, area: 'unstaged' })).toEqual({
-            old: { path: 'a.ts', version: { kind: 'index' } },
-            new: { path: 'a.ts', version: worktree },
-        });
-        expect(changeSides({ path: 'b.ts', origPath: 'a.ts', area: 'staged' })).toEqual({
-            old: { path: 'a.ts', version: { kind: 'head' } },
-            new: { path: 'b.ts', version: { kind: 'index' } },
-        });
-        expect(changeSides({ path: 'n.ts', origPath: null, area: 'untracked' })).toEqual({
-            old: null,
-            new: { path: 'n.ts', version: worktree },
-        });
-        expect(fileSides('r.md')).toEqual({ old: null, new: { path: 'r.md', version: worktree } });
-    });
-
-    it('compare a commit with its parent, a root commit with nothing', () => {
-        const file = { path: 'b.ts', origPath: 'a.ts' };
-        expect(commitSides({ sha: 'c2', parent: 'c1' }, file)).toEqual({
-            old: { path: 'a.ts', version: { kind: 'commit', sha: 'c1' } },
-            new: { path: 'b.ts', version: { kind: 'commit', sha: 'c2' } },
-        });
-        expect(commitSides({ sha: 'c1', parent: null }, file).old).toBeNull();
     });
 });
 

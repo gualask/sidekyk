@@ -1873,6 +1873,11 @@
     }
   },
   "sizes": {
+    "images": {
+      "hero-after.png": 2838,
+      "hero-before.png": 1817,
+      "logo.png": 430
+    },
     "shop": {
       "README.md": 127,
       "docs/architecture/overview.md": 79,

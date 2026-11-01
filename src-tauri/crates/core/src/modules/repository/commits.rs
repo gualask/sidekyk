@@ -12,7 +12,7 @@ use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
 use super::numstat::{parse_numstat_z, Counts};
 use super::open::existing_root;
 use super::ports::{git_checked, RepositoryBackend, LITERAL_PATHSPECS};
-use super::status::kind_of;
+use super::status::{kind_of, object_id};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// How many commits are listed, as many as a page of VS Code's graph (`scm.graph.pageSize`).
@@ -132,7 +132,11 @@ fn parse_diff_tree_z(bytes: &[u8], truncated: bool) -> Vec<FileChange> {
     let mut files = Vec::new();
     while rest.first() == Some(&b':') {
         let Some(meta) = field(&mut rest) else { break };
-        let status = meta.rsplit(' ').next().and_then(|s| s.chars().next());
+        // `:<old mode> <new mode> <old id> <new id> <status>`
+        let parts: Vec<&str> = meta.split(' ').collect();
+        let status = parts.last().and_then(|s| s.chars().next());
+        let blob = |at: usize| parts.get(at).copied().and_then(object_id);
+        let (old_blob, new_blob) = (blob(2), blob(3));
         let Some(first) = field(&mut rest) else { break };
         let (path, orig_path) = if matches!(status, Some('R' | 'C')) {
             let Some(second) = field(&mut rest) else {
@@ -149,6 +153,8 @@ fn parse_diff_tree_z(bytes: &[u8], truncated: bool) -> Vec<FileChange> {
             additions: None,
             deletions: None,
             binary: false,
+            old_blob,
+            new_blob,
         });
     }
     if rest.first() == Some(&b':') {
@@ -278,6 +284,8 @@ mod tests {
                     additions: Some(3),
                     deletions: Some(1),
                     binary: false,
+                    old_blob: Some("aa".into()),
+                    new_blob: Some("bb".into()),
                 },
                 FileChange {
                     path: "logo.png".into(),
@@ -286,6 +294,9 @@ mod tests {
                     additions: None,
                     deletions: None,
                     binary: true,
+                    // no parent's file: git prints an id of zeros
+                    old_blob: None,
+                    new_blob: Some("cc".into()),
                 },
                 FileChange {
                     path: "new.ts".into(),
@@ -294,6 +305,8 @@ mod tests {
                     additions: Some(2),
                     deletions: Some(0),
                     binary: false,
+                    old_blob: Some("dd".into()),
+                    new_blob: Some("ee".into()),
                 },
             ]
         );

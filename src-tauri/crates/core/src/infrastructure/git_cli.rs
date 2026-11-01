@@ -262,14 +262,14 @@ mod tests {
     use crate::modules::folder::{folder_kind, load_folder_tree, resolve_folder, FolderKind};
     use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
-        load_changes_ignoring_whitespace, load_commit_activity, load_commit_file_diff,
-        load_commit_files, load_file_content, load_file_diff, load_file_stamp, load_file_tree,
-        load_image, load_recent_commits, load_snapshot, load_summary, load_version_text,
-        repository_name, resolve_repository, ChangeArea, ChangeKind, Changed, Commit,
-        CommitFileDiffRequest, CommitRequest, FileContent, FileDiffRequest, FileVersion,
-        FolderAdded, FolderWatcher, Hiding, IgnoredPaths, RepositoryChange, RepositoryInfo,
-        RepositorySnapshot, RepositoryWatcher, VersionText, Visible, Watch, WatchedFolders,
-        MAX_IMAGE_BYTES,
+        load_blob_image, load_blob_size, load_changes_ignoring_whitespace, load_commit_activity,
+        load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
+        load_file_stamp, load_file_tree, load_image, load_recent_commits, load_snapshot,
+        load_summary, load_version_text, repository_name, resolve_repository, ChangeArea,
+        ChangeKind, Changed, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
+        FileDiffRequest, FileVersion, FolderAdded, FolderWatcher, Hiding, IgnoredPaths,
+        RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText,
+        Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,
@@ -288,6 +288,13 @@ mod tests {
         let backend = LocalRepositoryBackend::default();
         let out = backend.git(root, args, usize::MAX).unwrap();
         assert_eq!(out.code, 0, "git {args:?}: {}", out.stderr);
+    }
+
+    /// The id of the object `spec` names (`HEAD:path`, `:path`, a commit).
+    fn object(root: &Path, spec: &str) -> String {
+        let backend = LocalRepositoryBackend::default();
+        let out = backend.git(root, &["rev-parse", spec], 128).unwrap();
+        String::from_utf8(out.stdout).unwrap().trim().to_string()
     }
 
     fn write(root: &Path, rel: &str, body: &str) {
@@ -334,15 +341,20 @@ mod tests {
 
         let snapshot = load_snapshot(&backend, &repo.info).unwrap();
         let value = snapshot_json(&snapshot);
+        let (head_cart, index_cart) = (
+            object(root, "HEAD:src/cart.ts"),
+            object(root, ":src/cart.ts"),
+        );
+        let readme = object(root, ":README.md");
 
         assert_eq!(value["summary"]["branch"]["head"], "main");
         assert_eq!(
             value["files"],
             json!([
-                { "path": "src/cart.ts", "origPath": null, "area": "staged", "kind": "modified", "additions": 2, "deletions": 1, "binary": false },
-                { "path": "README.md", "origPath": null, "area": "unstaged", "kind": "deleted", "additions": 0, "deletions": 1, "binary": false },
-                { "path": "src/cart.ts", "origPath": null, "area": "unstaged", "kind": "modified", "additions": 1, "deletions": 0, "binary": false },
-                { "path": "notes/todo.md", "origPath": null, "area": "untracked", "kind": "untracked", "additions": 3, "deletions": 0, "binary": false },
+                { "path": "src/cart.ts", "origPath": null, "area": "staged", "kind": "modified", "additions": 2, "deletions": 1, "binary": false, "oldBlob": head_cart, "newBlob": index_cart },
+                { "path": "README.md", "origPath": null, "area": "unstaged", "kind": "deleted", "additions": 0, "deletions": 1, "binary": false, "oldBlob": readme, "newBlob": null },
+                { "path": "src/cart.ts", "origPath": null, "area": "unstaged", "kind": "modified", "additions": 1, "deletions": 0, "binary": false, "oldBlob": index_cart, "newBlob": null },
+                { "path": "notes/todo.md", "origPath": null, "area": "untracked", "kind": "untracked", "additions": 3, "deletions": 0, "binary": false, "oldBlob": null, "newBlob": null },
             ])
         );
         // vs HEAD: cart +3 -1, README -1; the new todo counts as a file, its lines unread
@@ -670,12 +682,13 @@ mod tests {
             parent: c.parent.clone(),
         };
         let files = load_commit_files(&backend, &repo.info, &commit(last)).unwrap();
+        let blob = |commit: &str, path: &str| object(root, &format!("{commit}:{path}"));
         assert_eq!(
             serde_json::to_value(&files).unwrap(),
             json!({
                 "files": [
-                    { "path": "logo.png", "origPath": null, "kind": "added", "additions": null, "deletions": null, "binary": true },
-                    { "path": "src/basket.ts", "origPath": "src/cart.ts", "kind": "renamed", "additions": 1, "deletions": 1, "binary": false },
+                    { "path": "logo.png", "origPath": null, "kind": "added", "additions": null, "deletions": null, "binary": true, "oldBlob": null, "newBlob": blob(&last.sha, "logo.png") },
+                    { "path": "src/basket.ts", "origPath": "src/cart.ts", "kind": "renamed", "additions": 1, "deletions": 1, "binary": false, "oldBlob": blob(&first.sha, "src/cart.ts"), "newBlob": blob(&last.sha, "src/basket.ts") },
                 ],
                 "truncated": false
             })
@@ -937,6 +950,62 @@ mod tests {
             );
             assert!(load_image(&backend, &repo.info, "linked/secret.png").is_err());
         }
+    }
+
+    #[test]
+    fn an_images_sides_are_named_by_their_objects_and_read_whole() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        let object = |spec: &str| object(root, spec);
+        write(root, "logo.png", "PNG\0one");
+        git(root, &["add", "."]);
+        git(root, &["commit", "-q", "-m", "logo"]);
+        write(root, "logo.png", "PNG\0two!");
+        git(root, &["add", "logo.png"]);
+        write(root, "logo.png", "PNG\0three");
+        let (head, index) = (object("HEAD:logo.png"), object(":logo.png"));
+
+        // staged: HEAD and the index; unstaged: the index and the tree, which has no object
+        let snapshot = load_snapshot(&backend, &repo.info).unwrap();
+        let blobs = |area: ChangeArea| {
+            let file = snapshot.files.iter().find(|f| f.area == area).unwrap();
+            (file.old_blob.clone(), file.new_blob.clone())
+        };
+        assert_eq!(
+            blobs(ChangeArea::Staged),
+            (Some(head.clone()), Some(index.clone()))
+        );
+        assert_eq!(blobs(ChangeArea::Unstaged), (Some(index.clone()), None));
+
+        assert_eq!(
+            load_blob_image(&backend, &repo.info, &head).unwrap(),
+            b"PNG\0one"
+        );
+        assert_eq!(load_blob_size(&backend, &repo.info, &index).unwrap(), 8);
+        // only a whole id reaches git
+        for bad in ["HEAD:logo.png", &head[..7], "--output=x"] {
+            assert!(load_blob_image(&backend, &repo.info, bad).is_err(), "{bad}");
+            assert!(load_blob_size(&backend, &repo.info, bad).is_err(), "{bad}");
+        }
+        let absent = "0".repeat(39) + "1";
+        assert!(load_blob_image(&backend, &repo.info, &absent).is_err());
+
+        // a commit's: its parent's and its own
+        let commit = object("HEAD");
+        let parent = object("HEAD~1");
+        let files = load_commit_files(
+            &backend,
+            &repo.info,
+            &CommitRequest {
+                sha: commit,
+                parent: Some(parent),
+            },
+        )
+        .unwrap();
+        assert_eq!(files.files[0].old_blob, None, "new in that commit");
+        assert_eq!(files.files[0].new_blob, Some(head));
     }
 
     #[test]

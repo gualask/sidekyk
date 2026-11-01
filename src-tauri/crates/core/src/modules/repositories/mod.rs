@@ -331,12 +331,25 @@ impl Repositories for LocalRepositories {
         repository::load_file_stamp(&*self.backend, info, path)
     }
 
-    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>> {
+    fn image(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+        blob: Option<&str>,
+    ) -> anyhow::Result<Vec<u8>> {
         if preview::image_type(path).is_none() {
             return Err(user_facing(UserFacingErrorCode::FileMissing));
         }
+        // an object is git's, whether or not its path is in the tree (a deleted file's)
+        if let Some(blob) = blob {
+            return repository::load_blob_image(&*self.backend, info, blob);
+        }
         self.tree_holding(info, path)?;
         repository::load_image(&*self.backend, info, path)
+    }
+
+    fn blob_size(&self, info: &RepositoryInfo, blob: &str) -> anyhow::Result<u64> {
+        repository::load_blob_size(&*self.backend, info, blob)
     }
 
     fn markdown_preview(

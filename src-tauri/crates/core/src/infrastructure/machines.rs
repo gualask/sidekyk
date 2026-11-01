@@ -208,7 +208,10 @@ mod tests {
         fn file_stamp(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileStamp> {
             unreachable!()
         }
-        fn image(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<Vec<u8>> {
+        fn image(&self, _: &RepositoryInfo, _: &str, _: Option<&str>) -> anyhow::Result<Vec<u8>> {
+            unreachable!()
+        }
+        fn blob_size(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<u64> {
             unreachable!()
         }
         fn markdown_preview(

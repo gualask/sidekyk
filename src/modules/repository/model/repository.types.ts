@@ -42,6 +42,13 @@ export interface FileChange {
     additions: number | null;
     deletions: number | null;
     binary: boolean;
+    /**
+     * The git objects of the diff's sides, for an image's: a commit's parent's and its own; for a
+     * staged file HEAD's and the index's, for an unstaged one the index's and null (the working
+     * tree's file). null where a side has no file, and in a summary.
+     */
+    oldBlob: string | null;
+    newBlob: string | null;
 }
 
 /** One file in one area. A file with both staged and unstaged edits appears twice. */
@@ -296,6 +303,9 @@ export interface FileStamp {
     size: number;
     modified: number;
 }
+
+/** Which bytes an image's URL loads: the tree's file as its stamp says, or a git object's. */
+export type ImageSource = { kind: 'file'; stamp: FileStamp } | { kind: 'blob'; blob: string };
 
 /** One version of a file: the two sides of a diff, or the file the Files panel shows. */
 export type FileVersion =

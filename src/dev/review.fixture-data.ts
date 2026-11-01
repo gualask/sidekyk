@@ -5,6 +5,7 @@ import type {
     UnifiedDiff,
 } from '@/modules/repository';
 import type { ProjectInfo } from '@/shared/projects/project-info';
+import { HERO_BLOB, LOGO_BLOB } from './fixture-files';
 import { fixtureSummary } from './fixture-summary';
 import { CHECKOUT_TS, type LongFile, ORDERS_TS } from './long.fixture-data';
 import { localProject } from './projects.fixture';
@@ -95,6 +96,11 @@ index 0000000..e69de29
 Binary files /dev/null and b/public/logo.png differ
 `;
 
+const HERO_PNG = `diff --git a/public/hero.png b/public/hero.png
+index 9e4b2a7..3f1c8d2 100644
+Binary files a/public/hero.png and b/public/hero.png differ
+`;
+
 /** A new file too large for its lines to be counted. */
 const SEED_SQL = `diff --git a/db/seed.sql b/db/seed.sql
 new file mode 100644
@@ -151,8 +157,12 @@ index 4e1f2a3..b8c9d0e 100644
  }
 `;
 
-/** A file of the fixture, its diff, and the whole file when the fixture has it. */
-type FixtureFile = ChangedFile & { diff: string; whole?: string };
+/**
+ * A file of the fixture, its diff, and the whole file when the fixture has it; its sides' objects
+ * only where an image shows them.
+ */
+type FixtureFile = Omit<ChangedFile, 'oldBlob' | 'newBlob'> &
+    Partial<Pick<ChangedFile, 'oldBlob' | 'newBlob'>> & { diff: string; whole?: string };
 
 /** A long file of the fixture, changed in several places, in an area. */
 function longChange(path: string, area: 'unstaged' | 'staged', file: LongFile): FixtureFile {
@@ -260,12 +270,30 @@ const FILES: FixtureFile[] = [
         additions: null,
         deletions: null,
         binary: true,
+        newBlob: LOGO_BLOB,
         diff: LOGO_PNG,
+    },
+    {
+        path: 'public/hero.png',
+        origPath: null,
+        area: 'unstaged',
+        kind: 'modified',
+        additions: null,
+        deletions: null,
+        binary: true,
+        oldBlob: HERO_BLOB,
+        diff: HERO_PNG,
     },
 ];
 
 export function reviewSnapshot(clean: boolean): RepositorySnapshot {
-    const files = clean ? [] : FILES.map(({ diff: _diff, whole: _whole, ...file }) => file);
+    const files = clean
+        ? []
+        : FILES.map(({ diff: _diff, whole: _whole, oldBlob = null, newBlob = null, ...file }) => ({
+              ...file,
+              oldBlob,
+              newBlob,
+          }));
     const branch = {
         head: 'feature/coupons',
         commit: 'a1b2c3d',

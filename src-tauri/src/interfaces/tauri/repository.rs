@@ -220,6 +220,19 @@ pub(crate) async fn get_file_stamp(
 }
 
 #[tauri::command]
+/// The size of a git object, a side of an image's diff.
+pub(crate) async fn get_blob_size(
+    app: tauri::AppHandle,
+    project_id: String,
+    blob: String,
+) -> Result<u64, AppError> {
+    on_project("get_blob_size", app, project_id, move |on| {
+        on.repositories.blob_size(on.info, &blob)
+    })
+    .await
+}
+
+#[tauri::command]
 /// A Markdown file of a project's tree as its preview shows it; none when it is not text.
 pub(crate) async fn get_markdown_preview(
     app: tauri::AppHandle,

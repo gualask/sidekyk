@@ -71,9 +71,18 @@ pub trait Repositories: Send + Sync {
     /// The size and last change of a file of a project's tree.
     fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp>;
 
-    /// An image of a project's tree, its bytes whole (at most `MAX_IMAGE_BYTES`), for the viewer
-    /// and the Markdown preview to show.
-    fn image(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Vec<u8>>;
+    /// An image's bytes whole (at most `MAX_IMAGE_BYTES`), for the viewer and the Markdown preview
+    /// to show: the file of a project's tree at `path`, or the object `blob` (a side of the
+    /// image's diff) when given, `path` then telling its type.
+    fn image(
+        &self,
+        info: &RepositoryInfo,
+        path: &str,
+        blob: Option<&str>,
+    ) -> anyhow::Result<Vec<u8>>;
+
+    /// The size of the object `blob`, a side of an image's diff.
+    fn blob_size(&self, info: &RepositoryInfo, blob: &str) -> anyhow::Result<u64>;
 
     /// A Markdown file of a project's tree as its preview's tree, its links and images resolved
     /// against the tree; none when it is not text (binary, a link, a submodule).

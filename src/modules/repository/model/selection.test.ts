@@ -12,6 +12,8 @@ function file(path: string, kind: ChangedFile['kind'] = 'modified'): ChangedFile
         additions: 1,
         deletions: 0,
         binary: false,
+        oldBlob: null,
+        newBlob: null,
     };
 }
 

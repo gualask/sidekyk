@@ -13,6 +13,8 @@ const FILES: ChangedFile[] = Array.from({ length: FILE_COUNT }, (_, i) => ({
     additions: (i % 40) + 1,
     deletions: i % 7,
     binary: false,
+    oldBlob: null,
+    newBlob: null,
 }));
 
 /** A hunk's lines; unchanged lines between hunks are left to `wholeFileDiff`. */

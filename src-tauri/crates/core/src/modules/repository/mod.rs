@@ -43,6 +43,6 @@ pub use ports::{
 };
 pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_stamp, load_file_tree, load_image, FileTree};
-pub use version::{load_version_text, VersionText};
+pub use version::{load_blob_image, load_blob_size, load_version_text, VersionText};
 pub use watched::{classify, WatchedChanges};
 pub use whitespace::load_changes_ignoring_whitespace;

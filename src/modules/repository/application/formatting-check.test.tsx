@@ -15,6 +15,8 @@ const INDENTED: ChangedFile = {
     additions: 4,
     deletions: 4,
     binary: false,
+    oldBlob: null,
+    newBlob: null,
 };
 
 const SNAPSHOT: RepositorySnapshot = {

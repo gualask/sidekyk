@@ -40,7 +40,8 @@ import type {
     MarkdownInline,
     MarkdownTarget,
 } from '../model/repository.types';
-import { blocksOf, fileSides, type LineSpans, textParts } from '../model/syntax';
+import { fileSides } from '../model/sides';
+import { blocksOf, type LineSpans, textParts } from '../model/syntax';
 import { TONE_CLASS } from './syntax-tones';
 
 /** Where a preview is read: its first line on screen, for the code to open on. */

@@ -37,10 +37,8 @@ has.
 
 `.cflow/plans/previews.md`.
 
-Built: `docs/features/previews.md` (Markdown, SVG, images).
+Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two sides).
 
-- [ ] **Next:** a changed image's two sides next to each other, as VS Code (design agreed
-      2026-10-26 in the plan; nothing open)
 - [ ] PDF in the file viewer
 - [ ] Mermaid diagrams in the Markdown preview (nice to have)
 

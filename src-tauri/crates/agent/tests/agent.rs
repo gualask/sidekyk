@@ -139,14 +139,27 @@ fn the_helper_answers_as_the_app_reads_directly() {
         json(&local.markdown_preview(&info, "README.md").unwrap())
     );
     assert_eq!(
-        agent.image(&info, "docs/logo.png").unwrap(),
+        agent.image(&info, "docs/logo.png", None).unwrap(),
         [0x89, b'P', b'N', b'G', 0, 0xFF, b'\n']
     );
     assert_eq!(
         agent.file_stamp(&info, "docs/logo.png").unwrap(),
         local.file_stamp(&info, "docs/logo.png").unwrap()
     );
-    let not_an_image = agent.image(&info, "src/cart.ts").unwrap_err();
+    // a side of an image's diff, by its object
+    let out = Command::new("git")
+        .args(["rev-parse", "HEAD:docs/logo.png"])
+        .current_dir(dir.path())
+        .output()
+        .unwrap();
+    let blob = String::from_utf8(out.stdout).unwrap();
+    let blob = blob.trim();
+    assert_eq!(
+        agent.image(&info, "docs/logo.png", Some(blob)).unwrap(),
+        [0x89, b'P', b'N', b'G', 0, 0xFF, b'\n']
+    );
+    assert_eq!(agent.blob_size(&info, blob).unwrap(), 7);
+    let not_an_image = agent.image(&info, "src/cart.ts", None).unwrap_err();
     assert_eq!(
         user_facing_code(&not_an_image),
         Some(UserFacingErrorCode::FileMissing)

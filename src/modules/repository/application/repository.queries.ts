@@ -24,15 +24,15 @@ import type {
     Directory,
     FileDiffRequest,
     FolderKind,
+    ImageSource,
     RepositorySnapshot,
     SyntaxColors,
 } from '../model/repository.types';
+import type { DiffSides, FileSide } from '../model/sides';
 import {
     blockKey,
     COLOR_BLOCK,
     type ColorBlock,
-    type ColorSides,
-    type ColorSource,
     type LineSpans,
     lineColors,
 } from '../model/syntax';
@@ -74,8 +74,10 @@ export const repositoryKeys = {
         [...repositoryKeys.of(projectId), 'preview', path] as const,
     stamp: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'stamp', path] as const,
+    /** Outside `of`: a git object never changes, so its size is read once. */
+    blob: (projectId: string, blob: string) => ['blob', projectId, blob] as const,
     /** The working tree's, the index's or HEAD's: `[3]` is the version. */
-    colors: (projectId: string, { path, version }: ColorSource, first: number) =>
+    colors: (projectId: string, { path, version }: FileSide, first: number) =>
         [...repositoryKeys.of(projectId), 'colors', version.kind, path, first] as const,
 };
 
@@ -345,21 +347,35 @@ export function useFileContent(projectId: string, path: string | null) {
     });
 }
 
-/** An image's URL, from its stamp: read again, and so loaded again, once the file changed. */
-export function useImageSource(projectId: string, path: string) {
+/**
+ * An image's URL and size: of the tree's file at `path`, from its stamp, read again, and so loaded
+ * again, once the file changed; or of the git object `blob` (a side of the image's diff), which
+ * never changes.
+ */
+export function useImageSource(projectId: string, path: string, blob: string | null = null) {
     const port = useRepositoryPort();
-    const stamp = useQuery({
-        queryKey: repositoryKeys.stamp(projectId, path),
-        queryFn: () => port.getFileStamp(projectId, path),
+    const { data, isPending, isError, error } = useQuery({
+        queryKey:
+            blob === null
+                ? repositoryKeys.stamp(projectId, path)
+                : repositoryKeys.blob(projectId, blob),
+        queryFn: async (): Promise<{ size: number; source: ImageSource }> => {
+            if (blob !== null) {
+                const size = await port.getBlobSize(projectId, blob);
+                return { size, source: { kind: 'blob', blob } };
+            }
+            const stamp = await port.getFileStamp(projectId, path);
+            return { size: stamp.size, source: { kind: 'file', stamp } };
+        },
+        staleTime: blob === null ? 0 : Number.POSITIVE_INFINITY,
     });
-    const { data, isPending, isError, error } = stamp;
     return {
-        data,
+        size: data?.size,
         isPending,
         isError,
         error,
         tooLarge: data !== undefined && data.size > MAX_IMAGE_BYTES,
-        url: data ? port.projectFileUrl(projectId, path, data) : null,
+        url: data ? port.projectFileUrl(projectId, path, data.source) : null,
     };
 }
 
@@ -437,7 +453,7 @@ const NO_COLORS: ShownColors = { colorsOf: () => undefined, tooLarge: false };
  */
 export function useSyntaxColors(
     projectId: string,
-    sides: ColorSides,
+    sides: DiffSides,
     blocks: readonly ColorBlock[],
 ): ShownColors {
     const port = useRepositoryPort();

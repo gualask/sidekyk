@@ -7,7 +7,7 @@ import type { FileFinder } from '../application/find';
 import { useFileContent } from '../application/repository.queries';
 import { textLines, textRows } from '../model/diff-rows';
 import { hasCodeAndPreview, previewKind } from '../model/preview';
-import { fileSides } from '../model/syntax';
+import { fileSides } from '../model/sides';
 import type { PreviewActions } from './MarkdownPreview';
 import { Notice, Pane, type PaneHeader } from './Pane';
 import { PreviewPane } from './PreviewPane';

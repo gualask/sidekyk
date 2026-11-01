@@ -7,7 +7,13 @@ import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import { fixtureFileContent, fixtureFolderTree, fixtureTree } from './files.fixture-data';
-import { editedText, fixturePreview, VAULT_IMAGES } from './fixture-files';
+import {
+    editedText,
+    FIXTURE_BLOBS,
+    fixturePreview,
+    REPOSITORY_IMAGES,
+    VAULT_IMAGES,
+} from './fixture-files';
 import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
@@ -228,6 +234,10 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         if (large(projectId)) return largeSnapshot();
         return reviewSnapshot(!scenarioData(projectId));
     };
+
+    // a folder without git holds the Vault's images, the repository its own
+    const imagesOf = (projectId: string) =>
+        DOCUMENT_ROOTS.includes(rootOf(projectId)) ? VAULT_IMAGES : REPOSITORY_IMAGES;
 
     // as the backend, the tree is built once and kept: the fixtures never change on disk
     const trees = new Map<string, ReturnType<typeof fixtureTree>>();
@@ -529,12 +539,19 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             getFileContent: async (projectId, path) => contentOf(projectId, path),
             // the fixtures' images, as Vite serves them; any other is missing
             getFileStamp: async (projectId, path) => {
-                if (!tree(projectId).has(path) || !(path in VAULT_IMAGES)) {
-                    throw failure('file_missing');
-                }
-                return { size: VAULT_IMAGES[path].size, modified: 0 };
+                const image = imagesOf(projectId)[path];
+                if (!tree(projectId).has(path) || !image) throw failure('file_missing');
+                return { size: image.size, modified: 0 };
             },
-            projectFileUrl: (_projectId, path) => VAULT_IMAGES[path]?.url ?? '',
+            getBlobSize: async (projectId, blob) => {
+                readable(projectId);
+                const image = FIXTURE_BLOBS[blob];
+                if (!image) throw failure('file_missing');
+                return image.size;
+            },
+            projectFileUrl: (projectId, path, source) =>
+                (source.kind === 'blob' ? FIXTURE_BLOBS[source.blob] : imagesOf(projectId)[path])
+                    ?.url ?? '',
             getMarkdownPreview: async (projectId, path) => {
                 // the backend's own preview of that text (`fixture-files/previews.json`)
                 const content = contentOf(projectId, path);

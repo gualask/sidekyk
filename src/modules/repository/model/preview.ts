@@ -42,6 +42,11 @@ export function hasPreview(path: string): boolean {
     return previewKind(path) !== null;
 }
 
+/** Whether a file is an image: its changes are its two sides, it has no text. */
+export function isImage(path: string): boolean {
+    return previewKind(path) === 'image';
+}
+
 /** Whether a file shows both as it reads and as its text: the switch "Code | Preview". */
 export function hasCodeAndPreview(path: string): boolean {
     const kind = previewKind(path);

@@ -16,6 +16,10 @@ pub(super) struct StatusEntry {
     pub(super) orig_path: Option<String>,
     pub(super) staged: Option<ChangeKind>,
     pub(super) unstaged: Option<ChangeKind>,
+    /// The objects of the path in HEAD (of `orig_path` for a rename) and in the index: `None`
+    /// where it is not.
+    pub(super) head_blob: Option<String>,
+    pub(super) index_blob: Option<String>,
 }
 
 const SHORT_COMMIT: usize = 7;
@@ -32,13 +36,22 @@ pub(super) fn kind_of(code: char) -> Option<ChangeKind> {
     }
 }
 
-fn tracked_entry(xy: &str, path: &str, orig_path: Option<String>) -> StatusEntry {
-    let mut codes = xy.chars();
+/// An object id as git prints it, `None` for the one of zeros that stands for no object.
+pub(super) fn object_id(id: &str) -> Option<String> {
+    (!id.is_empty() && id.bytes().any(|b| b != b'0')).then(|| id.to_string())
+}
+
+/// `fields`: `<XY> <sub> <mH> <mI> <mW> <hH> <hI> …`, the path last.
+fn tracked_entry(fields: &[&str], path: &str, orig_path: Option<String>) -> StatusEntry {
+    let mut codes = fields[0].chars();
+    let blob = |at: usize| fields.get(at).copied().and_then(object_id);
     StatusEntry {
         path: path.to_string(),
         orig_path,
         staged: codes.next().and_then(kind_of),
         unstaged: codes.next().and_then(kind_of),
+        head_blob: blob(5),
+        index_blob: blob(6),
     }
 }
 
@@ -79,16 +92,16 @@ pub(super) fn parse_porcelain_v2(bytes: &[u8]) -> StatusReport {
             // 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
             "1" => {
                 let fields: Vec<&str> = rest.splitn(8, ' ').collect();
-                if let [xy, .., path] = fields.as_slice() {
-                    report.entries.push(tracked_entry(xy, path, None));
+                if let [.., path] = fields.as_slice() {
+                    report.entries.push(tracked_entry(&fields, path, None));
                 }
             }
             // 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>, then <origPath> as its own record
             "2" => {
                 let fields: Vec<&str> = rest.splitn(9, ' ').collect();
                 let orig_path = records.next().map(str::to_string);
-                if let [xy, .., path] = fields.as_slice() {
-                    report.entries.push(tracked_entry(xy, path, orig_path));
+                if let [.., path] = fields.as_slice() {
+                    report.entries.push(tracked_entry(&fields, path, orig_path));
                 }
             }
             // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
@@ -99,6 +112,9 @@ pub(super) fn parse_porcelain_v2(bytes: &[u8]) -> StatusReport {
                         orig_path: None,
                         staged: None,
                         unstaged: Some(ChangeKind::Conflicted),
+                        // the index holds the stages, not one version
+                        head_blob: None,
+                        index_blob: None,
                     });
                 }
             }
@@ -107,6 +123,8 @@ pub(super) fn parse_porcelain_v2(bytes: &[u8]) -> StatusReport {
                 orig_path: None,
                 staged: None,
                 unstaged: Some(ChangeKind::Untracked),
+                head_blob: None,
+                index_blob: None,
             }),
             _ => {}
         }
@@ -158,6 +176,7 @@ mod tests {
         let report = parse_porcelain_v2(&z(&[
             "1 .M N... 100644 100644 100644 aaa bbb src/with space.ts",
             "1 MD N... 100644 100644 000000 aaa bbb lib.rs",
+            "1 A. N... 000000 100644 100644 0000000000000000000000000000000000000000 ddd new.png",
             "2 R. N... 100644 100644 100644 aaa bbb R100 new name.ts",
             "old name.ts",
             "u UU N... 100644 100644 100644 100644 aaa bbb ccc conflict.ts",
@@ -173,30 +192,49 @@ mod tests {
                     orig_path: None,
                     staged: None,
                     unstaged: Some(ChangeKind::Modified),
+                    head_blob: Some("aaa".into()),
+                    index_blob: Some("bbb".into()),
                 },
                 StatusEntry {
                     path: "lib.rs".into(),
                     orig_path: None,
                     staged: Some(ChangeKind::Modified),
                     unstaged: Some(ChangeKind::Deleted),
+                    head_blob: Some("aaa".into()),
+                    index_blob: Some("bbb".into()),
+                },
+                // nothing in HEAD: git prints an id of zeros
+                StatusEntry {
+                    path: "new.png".into(),
+                    orig_path: None,
+                    staged: Some(ChangeKind::Added),
+                    unstaged: None,
+                    head_blob: None,
+                    index_blob: Some("ddd".into()),
                 },
                 StatusEntry {
                     path: "new name.ts".into(),
                     orig_path: Some("old name.ts".into()),
                     staged: Some(ChangeKind::Renamed),
                     unstaged: None,
+                    head_blob: Some("aaa".into()),
+                    index_blob: Some("bbb".into()),
                 },
                 StatusEntry {
                     path: "conflict.ts".into(),
                     orig_path: None,
                     staged: None,
                     unstaged: Some(ChangeKind::Conflicted),
+                    head_blob: None,
+                    index_blob: None,
                 },
                 StatusEntry {
                     path: "notes/todo.md".into(),
                     orig_path: None,
                     staged: None,
                     unstaged: Some(ChangeKind::Untracked),
+                    head_blob: None,
+                    index_blob: None,
                 },
             ]
         );

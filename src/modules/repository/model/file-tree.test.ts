@@ -97,6 +97,8 @@ describe('changeMarks', () => {
         additions: 1,
         deletions: 0,
         binary: false,
+        oldBlob: null,
+        newBlob: null,
     });
 
     it('marks files and the folders above them, an edit over a new file', () => {

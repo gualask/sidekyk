@@ -42,7 +42,8 @@ fn fixture_previews_are_the_parsers() {
     let root = fixture_files();
     let mut sizes: BTreeMap<String, BTreeMap<String, u64>> = BTreeMap::new();
     let mut previews: BTreeMap<String, MarkdownDocument> = BTreeMap::new();
-    for project in ["vault", "shop"] {
+    // `images`: the repository's images and the git objects of their other sides
+    for project in ["vault", "shop", "images"] {
         sizes.insert(project.into(), files(&root.join(project)));
     }
     for (folder, project) in [

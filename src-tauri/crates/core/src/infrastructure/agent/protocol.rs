@@ -85,6 +85,11 @@ pub enum Request {
     Image {
         repository: RepositoryInfo,
         path: String,
+        blob: Option<String>,
+    },
+    BlobSize {
+        repository: RepositoryInfo,
+        blob: String,
     },
     SyntaxColors {
         repository: RepositoryInfo,

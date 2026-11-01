@@ -1,6 +1,7 @@
 //! A project's images for the WebView, at `project-file://localhost/<projectId>/<path>`
 //! (`http://project-file.localhost/…` on Windows): the viewer and the Markdown preview load them
-//! as any image, so the WebView decodes them itself and no copy goes through the JS heap.
+//! as any image, so the WebView decodes them itself and no copy goes through the JS heap. The
+//! file of the tree, or with `?blob=<id>` that git object, a side of the image's diff.
 
 use std::borrow::Cow;
 
@@ -13,9 +14,14 @@ use super::repository::on_project;
 
 pub(crate) const SCHEME: &str = "project-file";
 
-/// Answers a request off the main thread: the image of a project's tree, or 404 with no body.
-/// What a file holds never runs: an SVG opened alone gets a policy that allows no script.
-pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSchemeResponder) {
+/// Answers a request off the main thread: the image of a project's tree or of git, or 404 with no
+/// body. What a file holds never runs: an SVG opened alone gets a policy that allows no script.
+pub(crate) fn respond(
+    app: &tauri::AppHandle,
+    uri_path: &str,
+    query: Option<&str>,
+    responder: UriSchemeResponder,
+) {
     let Some((project_id, path)) = target(uri_path) else {
         tracing::debug!(uri_path, "not a project's file");
         responder.respond(not_found());
@@ -26,12 +32,13 @@ pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSche
         responder.respond(not_found());
         return;
     };
+    let blob = query.and_then(blob);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let image = on_project("project_file", app, project_id, move |on| {
             // a project shown is read: this never starts a stopped WSL distro
             on.readable_without_starting()?;
-            on.repositories.image(on.info, &path)
+            on.repositories.image(on.info, &path, blob.as_deref())
         })
         .await;
         responder.respond(match image {
@@ -42,7 +49,7 @@ pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSche
                     "default-src 'none'; style-src 'unsafe-inline'",
                 )
                 .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-                // the URL names the file's stamp: a changed file is another URL
+                // the URL names the file's stamp or the object: changed bytes are another URL
                 .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
                 .body(Cow::Owned(bytes))
                 .unwrap_or_else(|_| not_found()),
@@ -58,6 +65,14 @@ fn target(uri_path: &str) -> Option<(String, String)> {
     let decoded = percent_decoded(uri_path.trim_start_matches('/'));
     let (project_id, path) = decoded.split_once('/')?;
     (!project_id.is_empty() && !path.is_empty()).then(|| (percent_decoded(project_id), path.into()))
+}
+
+/// The object a query names (`blob=<id>`), checked by the core before git reads it.
+fn blob(query: &str) -> Option<String> {
+    query
+        .split('&')
+        .find_map(|pair| pair.strip_prefix("blob="))
+        .map(percent_decoded)
 }
 
 fn not_found() -> Response<Cow<'static, [u8]>> {
@@ -83,5 +98,12 @@ mod tests {
         );
         assert_eq!(target("/b0000000000000a1"), None);
         assert_eq!(target("/"), None);
+    }
+
+    #[test]
+    fn a_query_may_name_a_git_object() {
+        assert_eq!(blob("blob=ab12"), Some("ab12".into()));
+        assert_eq!(blob("v=1-2&blob=ab12"), Some("ab12".into()));
+        assert_eq!(blob("v=1761000000000-2048"), None);
     }
 }

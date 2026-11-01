@@ -192,6 +192,8 @@ mod tests {
             additions: Some(1),
             deletions: Some(0),
             binary: false,
+            old_blob: None,
+            new_blob: None,
         }
     }
 

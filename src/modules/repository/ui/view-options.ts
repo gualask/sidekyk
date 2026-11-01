@@ -27,6 +27,12 @@ export const PREVIEW_VIEW: ViewOption<'preview'> = {
     title: 'fileHeader.previewTitle',
 };
 
+/** A changed image's: its two sides, or as it reads; it has no whole file. */
+export const IMAGE_VIEWS: readonly ViewOption<'changes' | 'preview'>[] = [
+    { value: 'changes', label: 'diffView.changes', title: 'fileHeader.imageChangesTitle' },
+    PREVIEW_VIEW,
+];
+
 export const FILE_VIEWS: readonly ViewOption<FileView>[] = [
     { value: 'code', label: 'fileView.code', title: 'fileHeader.codeTitle' },
     PREVIEW_VIEW,
