@@ -6,7 +6,7 @@ import { relativeTime, relativeTimeWidth } from '@/shared/time/relative-time';
 import { useRecentCommits } from '../application/repository.queries';
 import { commitDate, shortSha } from '../model/commits';
 import type { Commit } from '../model/repository.types';
-import { LIST_HEADING } from './list-heading';
+import { LIST_HEADING } from './list-styles';
 import { useVirtualRows } from './use-virtual-rows';
 import { VirtualItems } from './VirtualItems';
 

@@ -37,6 +37,11 @@ pub trait RepositoryBackend: Send + Sync {
     /// is not a file there: missing, a link (never followed), a folder, or behind a link.
     fn file_stamp(&self, root: &Path, path: &Path) -> Option<FileStamp>;
 
+    /// The last change of each of `paths` (relative, `/` between names) under `root`, in their
+    /// order, in parallel: a link's own, never followed; `None` when nothing is there, it is a
+    /// folder, or a folder on the way is not a real one. Each folder on the way is checked once.
+    fn modified_times(&self, root: &Path, paths: &[&str]) -> Vec<Option<i64>>;
+
     /// The file at `path` (relative) under `root`, to read as a stream, or `None` when it is not a
     /// file there: missing, a link (never followed), a folder, or behind a folder that is a link.
     fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>>;

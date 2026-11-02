@@ -91,6 +91,11 @@ impl FileTree {
         &self.files
     }
 
+    /// Whether more files were listed than the tree holds.
+    pub fn truncated(&self) -> bool {
+        self.truncated
+    }
+
     pub fn contains_file(&self, path: &str) -> bool {
         self.files
             .binary_search_by(|file| file.as_str().cmp(path))

@@ -69,6 +69,9 @@ pub enum Request {
         repository: RepositoryInfo,
         path: String,
     },
+    RecentFiles {
+        repository: RepositoryInfo,
+    },
     FileContent {
         repository: RepositoryInfo,
         path: String,

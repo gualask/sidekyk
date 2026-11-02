@@ -24,6 +24,7 @@ export const tauriRepository: RepositoryPort = {
     getCommitFileDiff: (projectId, request) =>
         invoke('get_commit_file_diff', { projectId, request }),
     getDirectory: (projectId, path) => invoke('get_directory', { projectId, path }),
+    getRecentFiles: (projectId) => invoke('get_recent_files', { projectId }),
     getFileContent: (projectId, path) => invoke('get_file_content', { projectId, path }),
     getFileStamp: (projectId, path) => invoke('get_file_stamp', { projectId, path }),
     getBlobSize: (projectId, blob) => invoke('get_blob_size', { projectId, blob }),

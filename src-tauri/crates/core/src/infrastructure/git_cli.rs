@@ -2,6 +2,7 @@
 //! answer is what the user's own git would print), the disk read directly, and the walk of a
 //! folder without git (`folder_walk`).
 
+use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -15,6 +16,7 @@ use crate::modules::repository::{
     FileStamp, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
 };
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
+use crate::shared::threads::threads;
 
 /// No git call takes longer: past it git is killed and the call fails with `git_timed_out`, so a
 /// hung command (a network drive, a huge repository) cannot hold a snapshot forever. Its message
@@ -170,14 +172,38 @@ impl RepositoryBackend for LocalRepositoryBackend {
         if !meta.is_file() {
             return None;
         }
-        let modified = meta
-            .modified()
-            .ok()?
-            .duration_since(std::time::UNIX_EPOCH)
-            .ok()?;
         Some(FileStamp {
             size: meta.len(),
-            modified: i64::try_from(modified.as_millis()).unwrap_or(i64::MAX),
+            modified: modified_millis(&meta)?,
+        })
+    }
+
+    fn modified_times(&self, root: &Path, paths: &[&str]) -> Vec<Option<i64>> {
+        let times = |part: &[&str]| {
+            let mut folders = RealFolders::new(root);
+            part.iter()
+                .map(|path| {
+                    folders
+                        .holds(path)
+                        .then(|| modified_at(root, path))
+                        .flatten()
+                })
+                .collect::<Vec<_>>()
+        };
+        // the tree's order keeps a folder's files together, so each part checks few folders
+        let part = paths.len().div_ceil(threads()).max(MIN_TIMES_PER_THREAD);
+        if paths.len() <= part {
+            return times(paths);
+        }
+        std::thread::scope(|scope| {
+            let parts: Vec<_> = paths
+                .chunks(part)
+                .map(|chunk| (chunk.len(), scope.spawn(move || times(chunk))))
+                .collect();
+            parts
+                .into_iter()
+                .flat_map(|(len, handle)| handle.join().unwrap_or_else(|_| vec![None; len]))
+                .collect()
         })
     }
 
@@ -244,14 +270,67 @@ fn inside(root: &Path, path: &Path) -> Option<(PathBuf, std::fs::Metadata)> {
     let mut folder = root.to_path_buf();
     for name in path.parent()?.components() {
         folder.push(name);
-        let meta = std::fs::symlink_metadata(&folder).ok()?;
-        if !meta.is_dir() {
+        if !is_real_folder(&folder) {
             return None;
         }
     }
     let full = root.join(path);
     let meta = std::fs::symlink_metadata(&full).ok()?;
     Some((full, meta))
+}
+
+/// Whether a folder is at `path`, itself and not a link to one.
+fn is_real_folder(path: &Path) -> bool {
+    std::fs::symlink_metadata(path).is_ok_and(|meta| meta.is_dir())
+}
+
+/// Fewer last changes than this are read on the caller's thread: a thread costs more than them.
+const MIN_TIMES_PER_THREAD: usize = 1_024;
+
+/// A file's last change, in milliseconds since the Unix epoch; `None` before it.
+fn modified_millis(meta: &std::fs::Metadata) -> Option<i64> {
+    let since = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?;
+    Some(i64::try_from(since.as_millis()).unwrap_or(i64::MAX))
+}
+
+/// The last change of what is at `path` under `root`, a link's own; `None` for a folder.
+fn modified_at(root: &Path, path: &str) -> Option<i64> {
+    let meta = std::fs::symlink_metadata(root.join(path)).ok()?;
+    if meta.is_dir() {
+        return None;
+    }
+    modified_millis(&meta)
+}
+
+/// The folders on the way to files under `root`, each checked once: a real folder, not a link,
+/// as `inside` checks them for one file.
+struct RealFolders<'a> {
+    root: &'a Path,
+    known: HashMap<&'a str, bool>,
+}
+
+impl<'a> RealFolders<'a> {
+    fn new(root: &'a Path) -> Self {
+        Self {
+            root,
+            known: HashMap::new(),
+        }
+    }
+
+    /// Whether every folder above `path` (`/` between names) is a real one.
+    fn holds(&mut self, path: &'a str) -> bool {
+        let (root, known) = (self.root, &mut self.known);
+        path.match_indices('/').all(|(end, _)| {
+            let folder = &path[..end];
+            *known
+                .entry(folder)
+                .or_insert_with(|| is_real_folder(&root.join(folder)))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -264,9 +343,9 @@ mod tests {
     use crate::modules::repository::{
         load_blob_image, load_blob_size, load_changes_ignoring_whitespace, load_commit_activity,
         load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
-        load_file_stamp, load_file_tree, load_image, load_recent_commits, load_snapshot,
-        load_summary, load_version_text, repository_name, resolve_repository, ChangeArea,
-        ChangeKind, Changed, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
+        load_file_stamp, load_file_tree, load_image, load_recent_commits, load_recent_files,
+        load_snapshot, load_summary, load_version_text, repository_name, resolve_repository,
+        ChangeArea, ChangeKind, Changed, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
         FileDiffRequest, FileVersion, FolderAdded, FolderWatcher, Hiding, IgnoredPaths,
         RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText,
         Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
@@ -950,6 +1029,55 @@ mod tests {
             );
             assert!(load_image(&backend, &repo.info, "linked/secret.png").is_err());
         }
+    }
+
+    #[test]
+    fn modified_times_come_from_the_disk_never_through_a_linked_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        let backend = LocalRepositoryBackend::default();
+        let at = |path: &str, secs: u64| {
+            write(root, path, "x");
+            let time = std::time::UNIX_EPOCH + Duration::from_secs(secs);
+            std::fs::File::options()
+                .write(true)
+                .open(root.join(path))
+                .unwrap()
+                .set_modified(time)
+                .unwrap();
+        };
+        at("a.md", 1_000);
+        at("docs/b.md", 2_000);
+        std::fs::create_dir(root.join("empty")).unwrap();
+        assert_eq!(
+            backend.modified_times(root, &["a.md", "docs/b.md", "docs", "gone.md", "empty/x"]),
+            [Some(1_000_000), Some(2_000_000), None, None, None]
+        );
+
+        #[cfg(unix)]
+        {
+            let outside = tempfile::tempdir().unwrap();
+            write(outside.path(), "secret.md", "s");
+            std::os::unix::fs::symlink(outside.path(), root.join("linked")).unwrap();
+            std::os::unix::fs::symlink("a.md", root.join("alias.md")).unwrap();
+            let times = backend.modified_times(root, &["linked/secret.md", "alias.md"]);
+            assert_eq!(times[0], None, "behind a linked folder");
+            assert!(times[1].is_some(), "a link's own time");
+        }
+
+        // enough files for several threads, each part in the callers' order
+        let many: Vec<String> = (0..3 * MIN_TIMES_PER_THREAD)
+            .map(|i| format!("many/{}/{i}", i % 7))
+            .collect();
+        for (i, path) in many.iter().enumerate() {
+            at(path, 10_000 + i as u64);
+        }
+        let paths: Vec<&str> = many.iter().map(String::as_str).collect();
+        let times = backend.modified_times(root, &paths);
+        let expected: Vec<Option<i64>> = (0..many.len())
+            .map(|i| Some((10_000 + i as i64) * 1_000))
+            .collect();
+        assert_eq!(times, expected);
     }
 
     #[test]
@@ -1710,7 +1838,8 @@ mod tests {
         )
     }
 
-    /// Times the snapshot, the summary, the file tree, the palette's search over it, the recent
+    /// Times the snapshot, the summary, the file tree, its files by last change, the palette's
+    /// search over it, the recent
     /// commits with the files of the newest, and the diff of the largest changed file on a real
     /// repository, and its files walked as a folder without git's are:
     /// `SIDEKYK_BENCH_REPO=/path/to/repo cargo test --release backend_timings -- --ignored --nocapture`
@@ -1755,6 +1884,14 @@ mod tests {
             "root folder: {}",
             time(20, || {
                 tree.directory("");
+            })
+        );
+        println!(
+            "recent files ({} files): {}",
+            tree.files().len(),
+            time(20, || {
+                let recent = load_recent_files(&backend, &repo.info, &tree).unwrap();
+                serde_json::to_vec(&recent).unwrap();
             })
         );
 

@@ -68,6 +68,7 @@ export const repositoryKeys = {
     formatting: (projectId: string) => ['formatting', projectId] as const,
     directory: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'directory', path] as const,
+    recent: (projectId: string) => [...repositoryKeys.of(projectId), 'recent'] as const,
     file: (projectId: string, path: string) =>
         [...repositoryKeys.of(projectId), 'file', path] as const,
     preview: (projectId: string, path: string) =>
@@ -333,6 +334,19 @@ export function useTreeDirectories(projectId: string, open: ReadonlySet<string>)
         return (path: string) => byPath.get(path);
     }, [key, data]);
     return { read, error };
+}
+
+/**
+ * The tree's files by their last change, newest first, while `enabled` (Recent shows): any change
+ * on disk reads them again, and so does the window shown after one.
+ */
+export function useRecentFiles(projectId: string, enabled: boolean) {
+    const port = useRepositoryPort();
+    return useQuery({
+        queryKey: repositoryKeys.recent(projectId),
+        queryFn: () => port.getRecentFiles(projectId),
+        enabled,
+    });
 }
 
 /** A file of the tree that did not change, as the Files panel shows it. */

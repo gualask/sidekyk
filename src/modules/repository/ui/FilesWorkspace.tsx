@@ -1,5 +1,5 @@
-import { IconCopyMinus, IconFileText } from '@tabler/icons-react';
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
+import { IconClock, IconCopyMinus, IconFileText, IconListTree } from '@tabler/icons-react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
@@ -11,16 +11,23 @@ import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSessionState } from '@/shared/ui/session-state';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useFileFind } from '../application/find';
-import { useFolderKind, useTreeDirectories } from '../application/repository.queries';
+import {
+    useFolderKind,
+    useRecentFiles,
+    useTreeDirectories,
+} from '../application/repository.queries';
 import { useSelectedFile } from '../application/selection';
 import { useShownTarget } from '../application/shown-target';
 import { useFileViewChoice, useLinkedAnchor } from '../application/view-choice';
 import { changeMarks, foldersAbove, treeMove, treeRows } from '../model/file-tree';
+import { recentMove, recentRows } from '../model/recent-files';
 import { selectionOf } from '../model/selection';
 import { fileTarget } from '../model/targets';
 import { ChangeDiffView } from './DiffView';
 import { FileHeader } from './FileHeader';
 import { FileTree } from './FileTree';
+import { RecentList } from './RecentList';
+import { recentFittingWidth, timeFormats } from './recent-layout';
 import { TextFileView } from './TextFileView';
 import { FILES_TREE_WIDTH, fittingWidth } from './tree-layout';
 
@@ -33,6 +40,9 @@ interface TreeState {
 }
 
 const CLOSED: TreeState = { open: new Set(), selected: null };
+
+/** How Files lists the project's files: as a tree, or by their last change (Recent). */
+type FilesView = 'tree' | 'recent';
 
 /**
  * The keys the tree takes: in a tile `j`/`k` and `Space`, the arrows moving among tiles and `↵`
@@ -49,8 +59,9 @@ const FULL_KEYS = new Set([
 ]);
 
 /**
- * The Files panel: the project's files as a tree. The file shown is the one of Changes (one
- * selection for both): the tree reveals it, and a file picked in the tree shows there. In a tile
+ * The Files panel: the project's files as a tree, or by their last change (Recent). The file shown
+ * is the one of Changes (one selection for both): the tree reveals it, Recent selects it, and a
+ * file picked in either shows there; what this says of the tree holds for Recent too. In a tile
  * Files is the tree alone: a file picked shows in Changes, or in a folder without git, where there
  * is no Changes, in Files full screen. Full screen the file shows next to the tree, a changed one
  * whole with its changes marked, any other as its text. No filter here: the command palette finds
@@ -71,6 +82,12 @@ export function FilesWorkspace({
     const projectId = project.id;
     const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
     const { open, selected } = state;
+    const [view, setView] = useSessionState<FilesView>(`files-view:${projectId}`, 'tree');
+    // Recent's row the keyboard is on, apart from the tree's: a folder is never one
+    const [recentSelected, setRecentSelected] = useSessionState<string | null>(
+        `recent-selected:${projectId}`,
+        null,
+    );
     const repository = useFolderKind(project).kind === 'repository';
     // the file shown, one for both panels: Changes selects it in its list
     const {
@@ -89,14 +106,35 @@ export function FilesWorkspace({
     const marks = useMemo(() => changeMarks(files), [files]);
     const { read, error } = useTreeDirectories(projectId, open);
     const rows = useMemo(() => treeRows(open, read), [open, read]);
-    const truncated = read('')?.truncated ?? false;
+    // read only while it shows; grouped by day as of the read, since no timer runs
+    const recent = useRecentFiles(projectId, view === 'recent');
+    const { formatTag } = i18n;
+    const listed = useMemo(() => {
+        const now = Date.now();
+        const { files: dated = [], more = 0 } = recent.data ?? {};
+        return { rows: recentRows(dated, more, now), formats: timeFormats(formatTag, now) };
+    }, [recent.data, formatTag]);
+    const shown =
+        view === 'tree'
+            ? { error, truncated: read('')?.truncated ?? false }
+            : { error: recent.error, truncated: recent.data?.truncated ?? false };
+    // what fits every row the view shows whole
+    const fitting = useCallback(
+        (box: HTMLElement) =>
+            view === 'tree'
+                ? fittingWidth(rows, box)
+                : recentFittingWidth(listed.rows, listed.formats, box),
+        [view, rows, listed],
+    );
 
-    // the file shown, wherever it was picked, is revealed: the folders above it open
+    // the file shown, wherever it was picked, is revealed: the folders above it open, and Recent
+    // selects it
     const reveal = useEffectEvent((path: string) => {
         setState((current) => ({
             open: new Set([...current.open, ...foldersAbove(path)]),
             selected: path,
         }));
+        setRecentSelected(path);
     });
     useEffect(() => {
         if (file) reveal(file);
@@ -136,6 +174,15 @@ export function FilesWorkspace({
             const ours = place === 'full' ? FULL_KEYS : TILE_KEYS;
             if (!hasKeys || !ours.has(event.key) || event.defaultPrevented) return;
             if (!isOwnKey(event)) return;
+            if (view === 'recent') {
+                const move = recentMove(listed.rows, recentSelected, event.key);
+                if (!move) return;
+                event.preventDefault();
+                if (move.kind === 'open') pick(move.path);
+                else if (place === 'tile') openFile(move.path);
+                else setRecentSelected(move.path);
+                return;
+            }
             const move = treeMove(rows, selected, event.key);
             if (!move) return;
             event.preventDefault();
@@ -149,49 +196,80 @@ export function FilesWorkspace({
 
     const treeWidth = useSidebarWidth('files', FILES_TREE_WIDTH);
     const treeBox = useRef<HTMLDivElement>(null);
-    // as VS Code's "Collapse Folders in Explorer"; the file shown is revealed again once another
-    // is picked
-    const collapse = header
+    // the other view's icon, as VS Code's "View as Tree" and "View as List"; then, for the tree,
+    // VS Code's "Collapse Folders in Explorer": the file shown is revealed again once another is
+    // picked
+    const other = view === 'tree' ? 'files.showRecent' : 'files.showTree';
+    const actions = header
         ? createPortal(
               <>
-                  {/* in a tile the button sits on the right, by the zoom, as Changes' actions do */}
+                  {/* in a tile the buttons sit on the right, by the zoom, as Changes' actions do */}
                   {place === 'tile' ? <span className="flex-1" /> : null}
                   <button
                       type="button"
                       className="btn-icon h-[26px] w-[26px]"
-                      title={i18n.t('files.collapse')}
-                      aria-label={i18n.t('files.collapse')}
-                      disabled={open.size === 0}
-                      onClick={() => setState((current) => ({ ...current, open: new Set() }))}
+                      title={i18n.t(other)}
+                      aria-label={i18n.t(other)}
+                      onClick={() => setView(view === 'tree' ? 'recent' : 'tree')}
                   >
-                      <IconCopyMinus size={14} />
+                      {view === 'tree' ? <IconClock size={14} /> : <IconListTree size={14} />}
                   </button>
+                  {view === 'tree' ? (
+                      <button
+                          type="button"
+                          className="btn-icon h-[26px] w-[26px]"
+                          title={i18n.t('files.collapse')}
+                          aria-label={i18n.t('files.collapse')}
+                          disabled={open.size === 0}
+                          onClick={() => setState((current) => ({ ...current, open: new Set() }))}
+                      >
+                          <IconCopyMinus size={14} />
+                      </button>
+                  ) : null}
               </>,
               header,
           )
         : null;
-    const tree = (
+    const label = i18n.t('files.of', { name: project.name });
+    const empty = view === 'recent' && recent.data?.files.length === 0;
+    const listing = (
         <div className="flex h-full flex-col">
-            {error ? (
+            {shown.error ? (
                 <div className="px-3 py-2 font-sans text-sm text-ui-danger">
-                    {errorMessage(error, i18n)}
+                    {errorMessage(shown.error, i18n)}
+                </div>
+            ) : null}
+            {empty ? (
+                <div className="px-3 py-2 font-sans text-sm text-ui-text-muted">
+                    {i18n.t('files.recent.empty')}
                 </div>
             ) : null}
             <div className="min-h-0 flex-1">
-                <FileTree
-                    rows={rows}
-                    marks={marks}
-                    selected={selected}
-                    label={i18n.t('files.of', { name: project.name })}
-                    onClick={(row) => {
-                        if (row.kind === 'folder') toggle(row.path);
-                        else pick(row.path);
-                    }}
-                />
+                {view === 'tree' ? (
+                    <FileTree
+                        rows={rows}
+                        marks={marks}
+                        selected={selected}
+                        label={label}
+                        onClick={(row) => {
+                            if (row.kind === 'folder') toggle(row.path);
+                            else pick(row.path);
+                        }}
+                    />
+                ) : (
+                    <RecentList
+                        rows={listed.rows}
+                        formats={listed.formats}
+                        marks={marks}
+                        selected={recentSelected}
+                        label={label}
+                        onClick={pick}
+                    />
+                )}
             </div>
         </div>
     );
-    const tooMany = truncated ? (
+    const tooMany = shown.truncated ? (
         <div className="border-b border-ui-border bg-ui-warning-soft px-3 py-2 text-sm text-ui-warning-soft-text">
             {i18n.t('files.tooMany')}
         </div>
@@ -200,9 +278,9 @@ export function FilesWorkspace({
     // in a tile, the tile's splitter fits the tree, as the tree's own does full screen
     useEffect(() => {
         if (!tileFit) return;
-        tileFit(() => (treeBox.current ? fittingWidth(rows, treeBox.current) : 0));
+        tileFit(() => (treeBox.current ? fitting(treeBox.current) : 0));
         return () => tileFit(null);
-    }, [tileFit, rows]);
+    }, [tileFit, fitting]);
 
     // the tree's edge, by the file viewer full screen
     const splitter = (
@@ -210,7 +288,7 @@ export function FilesWorkspace({
             width={treeWidth}
             box={treeBox}
             place="edge"
-            fitting={(box) => fittingWidth(rows, box)}
+            fitting={fitting}
             what="tree"
         />
     );
@@ -222,9 +300,9 @@ export function FilesWorkspace({
                 ref={treeBox}
                 className="flex h-full w-full flex-col bg-ui-surface font-mono text-[12.5px]"
             >
-                {collapse}
+                {actions}
                 {tooMany}
-                <div className="min-h-0 flex-1">{tree}</div>
+                <div className="min-h-0 flex-1">{listing}</div>
             </div>
         );
     }
@@ -281,7 +359,7 @@ export function FilesWorkspace({
 
     return (
         <div className="flex h-full flex-col">
-            {collapse}
+            {actions}
             {tooMany}
             <div className="flex min-h-0 flex-1">
                 <div
@@ -289,7 +367,7 @@ export function FilesWorkspace({
                     className="shrink-0 border-r border-ui-border bg-ui-surface font-mono text-[12.5px]"
                     style={treeWidth.style}
                 >
-                    {tree}
+                    {listing}
                 </div>
                 {splitter}
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">{viewer}</main>

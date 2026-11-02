@@ -1,4 +1,10 @@
-import type { ChangedFile, Directory, FileContent, TreeEntry } from '@/modules/repository';
+import type {
+    ChangedFile,
+    Directory,
+    FileContent,
+    RecentFiles,
+    TreeEntry,
+} from '@/modules/repository';
 import { FILE_TEXTS, VAULT_PATHS } from './fixture-files';
 
 /** The files git lists in the review scenario's repository, besides the changed ones. */
@@ -99,6 +105,28 @@ class FixtureTree {
         };
     }
 
+    /**
+     * Its files by a last change made up from their place in the list, spread over today, the
+     * week, the month and before; the `fresh` ones minutes ago, the first the newest.
+     */
+    recent(now: number, fresh: readonly string[]): RecentFiles {
+        const dated = this.files.map((path, index) => {
+            const at = fresh.indexOf(path);
+            const age =
+                at >= 0
+                    ? (at + 1) * 3 * MINUTE
+                    : (AGES[index % AGES.length] ?? 0) + (index % 50) * MINUTE;
+            return { path, modified: now - age };
+        });
+        // `files` is sorted by path: a stable sort keeps that order within a time, as the backend
+        dated.sort((a, b) => b.modified - a.modified);
+        return {
+            files: dated.slice(0, MAX_ENTRIES),
+            more: Math.max(0, dated.length - MAX_ENTRIES),
+            truncated: false,
+        };
+    }
+
     has(path: string): boolean {
         const slash = path.lastIndexOf('/');
         const folder = this.folders.get(slash < 0 ? '' : path.slice(0, slash));
@@ -107,6 +135,14 @@ class FixtureTree {
 }
 
 const MAX_ENTRIES = 10_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+/** How long ago the files not fresh changed, by their place in the list. */
+const AGES = [2 * HOUR, 26 * HOUR, 3 * DAY, 5 * DAY, 12 * DAY, 24 * DAY, 90 * DAY, 400 * DAY];
+
+/** The files of the Vault an agent just wrote, newest first. */
+export const FRESH_VAULT_PATHS = ['journal/2026-10-24.md', 'ideas.md', 'images/screenshot.png'];
 const byName = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' }).compare;
 
 /** A folder without git's tree, as its walk lists it. */

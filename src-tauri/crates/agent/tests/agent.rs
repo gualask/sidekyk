@@ -127,6 +127,9 @@ fn the_helper_answers_as_the_app_reads_directly() {
         json(&agent.directory(&info, "").unwrap()),
         json(&local.directory(&info, "").unwrap())
     );
+    let recent = agent.recent_files(&info).unwrap();
+    assert!(recent.files.iter().any(|file| file.path == "src/cart.ts"));
+    assert_eq!(json(&recent), json(&local.recent_files(&info).unwrap()));
     assert!(matches!(
         agent.file_content(&info, "src/cart.ts").unwrap(),
         FileContent::Text { text, .. } if text == "a\nB\nc\nd\n"

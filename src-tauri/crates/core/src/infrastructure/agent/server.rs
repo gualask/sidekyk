@@ -112,6 +112,9 @@ pub fn serve(
             Request::Directory { repository, path } => {
                 on_thread(Box::new(move |r| value(r.directory(&repository, &path)?)));
             }
+            Request::RecentFiles { repository } => {
+                on_thread(Box::new(move |r| value(r.recent_files(&repository)?)));
+            }
             Request::FileContent { repository, path } => {
                 on_thread(Box::new(move |r| {
                     value(r.file_content(&repository, &path)?)
@@ -250,6 +253,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::CommitFiles { .. } => "commitFiles",
         Request::CommitFileDiff { .. } => "commitFileDiff",
         Request::Directory { .. } => "directory",
+        Request::RecentFiles { .. } => "recentFiles",
         Request::FileContent { .. } => "fileContent",
         Request::MarkdownPreview { .. } => "markdownPreview",
         Request::FileStamp { .. } => "fileStamp",

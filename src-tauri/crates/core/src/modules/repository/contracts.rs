@@ -321,6 +321,26 @@ pub struct Directory {
     pub truncated: bool,
 }
 
+/// One file of the tree and its last change.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentFile {
+    pub path: String,
+    /// Milliseconds since the Unix epoch.
+    pub modified: i64,
+}
+
+/// The files of a project's tree by their last change, newest first: the Files panel's Recent.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecentFiles {
+    pub files: Vec<RecentFile>,
+    /// Older files past the most the list holds.
+    pub more: u32,
+    /// The project has more files than the tree holds (`MAX_TREE_PATHS`).
+    pub truncated: bool,
+}
+
 /// One version of a file: the two sides of a diff, or the file the Files panel shows. A commit's
 /// parent is a commit too.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Deserialize, Serialize)]
@@ -627,6 +647,22 @@ mod tests {
         for (content, json) in cases {
             assert_eq!(serde_json::to_value(content).unwrap(), json);
         }
+        let recent = RecentFiles {
+            files: vec![RecentFile {
+                path: "out/report.md".into(),
+                modified: 1_793_000_000_000,
+            }],
+            more: 3,
+            truncated: true,
+        };
+        assert_eq!(
+            serde_json::to_value(recent).unwrap(),
+            serde_json::json!({
+                "files": [{ "path": "out/report.md", "modified": 1_793_000_000_000_i64 }],
+                "more": 3,
+                "truncated": true
+            })
+        );
     }
 
     #[test]

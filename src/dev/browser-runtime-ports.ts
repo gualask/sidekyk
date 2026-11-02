@@ -6,7 +6,12 @@ import type { GlobalShortcutStatuses, Settings, ShortcutAction } from '@/modules
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
-import { fixtureFileContent, fixtureFolderTree, fixtureTree } from './files.fixture-data';
+import {
+    FRESH_VAULT_PATHS,
+    fixtureFileContent,
+    fixtureFolderTree,
+    fixtureTree,
+} from './files.fixture-data';
 import {
     editedText,
     FIXTURE_BLOBS,
@@ -541,6 +546,16 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
             getDirectory: async (projectId, path) => tree(projectId).directory(path),
+            // the changed files the newest, as an agent just wrote them
+            getRecentFiles: async (projectId) => {
+                const fresh =
+                    kindOf(projectId) === 'plain'
+                        ? FRESH_VAULT_PATHS
+                        : snapshot(projectId)
+                              .files.filter((file) => file.kind !== 'deleted')
+                              .map((file) => file.path);
+                return tree(projectId).recent(Date.now(), fresh);
+            },
             getFileContent: async (projectId, path) => contentOf(projectId, path),
             // the fixtures' images, as Vite serves them; any other is missing
             getFileStamp: async (projectId, path) => {

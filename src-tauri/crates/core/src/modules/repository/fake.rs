@@ -34,6 +34,10 @@ pub(crate) trait FakeBackend: Send + Sync {
         unreachable!()
     }
 
+    fn modified_times(&self, _root: &Path, _paths: &[&str]) -> Vec<Option<i64>> {
+        unreachable!()
+    }
+
     fn open_file(&self, _root: &Path, _path: &Path) -> Option<Box<dyn Read + Send>> {
         unreachable!()
     }
@@ -88,6 +92,10 @@ impl<T: FakeBackend> RepositoryBackend for T {
 
     fn file_stamp(&self, root: &Path, path: &Path) -> Option<FileStamp> {
         FakeBackend::file_stamp(self, root, path)
+    }
+
+    fn modified_times(&self, root: &Path, paths: &[&str]) -> Vec<Option<i64>> {
+        FakeBackend::modified_times(self, root, paths)
     }
 
     fn open_file(&self, root: &Path, path: &Path) -> Option<Box<dyn Read + Send>> {

@@ -11,7 +11,7 @@ use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::repositories::Repositories;
 use sidekyk_core::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryInfo,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles, RepositoryInfo,
     RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -189,6 +189,18 @@ pub(crate) async fn get_directory(
 ) -> Result<Directory, AppError> {
     on_project("get_directory", app, project_id, move |on| {
         on.repositories.directory(on.info, &path)
+    })
+    .await
+}
+
+#[tauri::command]
+/// The files of a project's tree by their last change, newest first: the Files panel's Recent.
+pub(crate) async fn get_recent_files(
+    app: tauri::AppHandle,
+    project_id: String,
+) -> Result<RecentFiles, AppError> {
+    on_project("get_recent_files", app, project_id, move |on| {
+        on.repositories.recent_files(on.info)
     })
     .await
 }

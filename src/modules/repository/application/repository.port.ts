@@ -13,6 +13,7 @@ import type {
     ImageSource,
     MarkdownDocument,
     RecentCommits,
+    RecentFiles,
     RepositoryChangedEvent,
     RepositorySnapshot,
     RepositorySummary,
@@ -45,6 +46,8 @@ export interface RepositoryPort {
     getCommitFileDiff(projectId: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
     /** What a folder holds, `''` for the root: read from the backend's list, no git. */
     getDirectory(projectId: string, path: string): Promise<Directory>;
+    /** The tree's files by their last change on disk, newest first: no git. */
+    getRecentFiles(projectId: string): Promise<RecentFiles>;
     /** A file of the tree, as the Files panel shows it. */
     getFileContent(projectId: string, path: string): Promise<FileContent>;
     /** The size and last change of a file of the tree. */

@@ -25,8 +25,8 @@ use crate::modules::preview::MarkdownDocument;
 use crate::modules::repositories::{OnChange, Repositories};
 use crate::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryChange,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles,
+    RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -576,6 +576,11 @@ impl Repositories for AgentRepositories {
     fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory> {
         let (repository, path) = (info.clone(), path.to_string());
         self.call(Request::Directory { repository, path }, &nothing)
+    }
+
+    fn recent_files(&self, info: &RepositoryInfo) -> anyhow::Result<RecentFiles> {
+        let repository = info.clone();
+        self.call(Request::RecentFiles { repository }, &nothing)
     }
 
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {

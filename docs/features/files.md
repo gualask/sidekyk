@@ -1,6 +1,7 @@
 # Files
 
-The project's tree and the view of any file in it (built 2026-10-17).
+The project's tree and the view of any file in it (built 2026-10-17); Recent, its files by last
+change (2026-11-02).
 
 ## Behaviour
 
@@ -13,6 +14,13 @@ The project's tree and the view of any file in it (built 2026-10-17).
 - File view: files of the tree only, the first 2 MiB, notices for binary, link and submodule,
   links never followed; the same rows and copy as diffs. Markdown, SVG and images show as they
   read too (`previews.md`).
+- Recent (2026-11-02), with or without git: an icon in the header switches the tree for the files
+  by last change on disk, newest first, as VS Code's Source Control switches tree and list; kept
+  per project for the session. Headings as a file manager by date modified: Today, Yesterday,
+  Previous 7 days, Previous 30 days, Earlier, each with its count. A row: name, its folder muted,
+  the time (`14:32` today and yesterday, `Mon 18:05` in the week, then the date, with its year when
+  not this one); the whole date and a change's word in the tooltip; a change colors the name as in
+  the tree. Keys, picking and the tile as the tree's. Files deleted are not listed.
 - A folder without git (2026-10-24): no change colors. Hidden: what `.gitignore` and `.ignore`
   files say (each for its folder and below, `.ignore` first), git's global excludes, and always
   VCS folders (`.git`, `.hg`, `.svn`, `.jj`, `.sl`, `.repo`, `CVS`) and OS files (`.DS_Store`,
@@ -35,6 +43,14 @@ The project's tree and the view of any file in it (built 2026-10-17).
   (`may_have_changed`: `stat` against the tree); a batch marked while hidden and a project switch
   too. A read racing a change is not kept. Without git the same: walked again, not patched from
   batches.
+- `get_recent_files`: the tree's files (the cached list) timed by
+  `RepositoryBackend::modified_times`: `lstat` in parallel (8 threads, one below 1,024 files), each
+  folder on the way checked once against links (a link's own time, never followed), sorted newest
+  first, path order within a time; at most 10,000 plus a count. Read only while Recent shows,
+  again at any change on disk and when the window shows after one; grouped as of the read, no
+  timer. Measured (release, warm cache): Zed's clone 4.2 ms (4,366 files, JSON included);
+  200,000 files of `~/Library` 230-250 ms warm, 1.45 s cold, 1.5 MB of JSON; `file_stamp` per file
+  on one thread 2.9 s.
 - `get_file_content`: files of the tree only. `read_entry` refuses a path through a linked folder,
   gives a link's target unfollowed, a submodule as a folder, a file's first 2 MiB cut at a whole
   line (binary by NUL).
@@ -52,5 +68,13 @@ The project's tree and the view of any file in it (built 2026-10-17).
   `--files`) 10-25% slower; one thread 3-13x slower.
 - A folder without git walked again on a file added or removed (2026-10-24), as `ls-files` runs
   again: one path for both kinds, until a measure asks otherwise.
+- Recent from the disk's times, not the watcher (2026-11-02): only the project on screen is
+  watched, and an agent works while the window is hidden or another project shows; the times hold
+  whatever writes, across restarts, at no cost in the background. Costs: a file copied or unpacked
+  with its old time (`cp -p`, `unzip`) shows as old, a deleted one leaves no trace. Not the tree
+  sorted by date modified (VS Code's `explorer.sortOrder: "modified"`): a folder sorts by its own
+  time, which changes only when an entry comes or goes, and touched files stay in closed folders.
+  Computed whole at each read: a batch patching the times is left until the cost shows (in the
+  worst case it is below the walk a folder without git already does again on a file added).
 - Hidden rules as Zed (every `.gitignore` it meets); the always-hidden names are the VCS folders
   and OS files of Zed's `file_scan_exclusions`.

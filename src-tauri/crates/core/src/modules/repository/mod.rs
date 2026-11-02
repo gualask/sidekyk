@@ -13,6 +13,7 @@ mod limits;
 mod numstat;
 mod open;
 mod ports;
+mod recent;
 mod snapshot;
 mod status;
 mod tree;
@@ -25,8 +26,9 @@ pub use commits::{load_commit_file_diff, load_commit_files, load_recent_commits}
 pub use contracts::{
     AreaLines, ChangeKind, ChangedFile, ChangesIgnoringWhitespace, CommitActivity,
     CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    FileStamp, FileVersion, RecentCommits, RepositoryChange, RepositoryChangedEvent,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff, REPOSITORY_CHANGED_EVENT,
+    FileStamp, FileVersion, RecentCommits, RecentFile, RecentFiles, RepositoryChange,
+    RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    REPOSITORY_CHANGED_EVENT,
 };
 #[cfg(test)]
 pub use contracts::{ChangeArea, Commit};
@@ -41,6 +43,7 @@ pub use ports::{
     Changed, FolderAdded, FolderRules, FolderWatcher, GitOutput, RepositoryBackend,
     RepositoryWatcher, Walked, Watch, WorktreeEntry,
 };
+pub use recent::load_recent_files;
 pub use snapshot::{load_snapshot, load_summary};
 pub use tree::{load_file_content, load_file_stamp, load_file_tree, load_image, FileTree};
 pub use version::{load_blob_image, load_blob_size, load_version_text, VersionText};

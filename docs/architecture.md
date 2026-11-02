@@ -24,6 +24,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                                    ├─▶ get_file_diff             one file, one area
                                    ├─▶ get_recent_commits        only while unfolded
                                    ├─▶ get_directory             each open folder, from memory
+                                   ├─▶ get_recent_files          only while Recent shows
                                    ├─▶ get_file_content          the unchanged file shown
                                    ├─▶ get_markdown_preview      a Markdown file as it reads
                                    ├─▶ get_file_stamp            an image's size and mtime

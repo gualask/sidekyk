@@ -24,6 +24,7 @@ export {
     type MarkdownDocument,
     REPOSITORY_CHANGED_EVENT,
     type RecentCommits,
+    type RecentFiles,
     type RepositoryChangedEvent,
     type RepositorySnapshot,
     type RepositorySummary,

@@ -7,8 +7,8 @@ use crate::modules::folder::FolderKind;
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RepositoryChange,
-    RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles,
+    RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -64,6 +64,9 @@ pub trait Repositories: Send + Sync {
 
     /// What a folder of a project's folder holds, from its files in memory; `""` is the root.
     fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory>;
+
+    /// The files of a project's tree by their last change on disk, newest first.
+    fn recent_files(&self, info: &RepositoryInfo) -> anyhow::Result<RecentFiles>;
 
     /// One file of a project's tree. Only a file of the tree is read, so never one hidden.
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent>;

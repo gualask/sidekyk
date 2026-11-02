@@ -3,7 +3,7 @@ import { useTranslation } from '@/shared/i18n';
 import { fileKey, fileListRows } from '../model/file-groups';
 import type { ChangedFile } from '../model/repository.types';
 import { FILE_ROW_HEIGHT, FileRow } from './FileRow';
-import { LIST_HEADING } from './list-heading';
+import { LIST_HEADING } from './list-styles';
 import { useVirtualRows } from './use-virtual-rows';
 import { VirtualItems } from './VirtualItems';
 

@@ -2,6 +2,7 @@ import { IconChevronRight } from '@tabler/icons-react';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import type { TreeRow } from '../model/file-tree';
+import { LIST_MORE } from './list-styles';
 import {
     TREE_INDENT,
     TREE_PADDING_LEFT,
@@ -18,7 +19,7 @@ function tooltip(
     t: Translator['t'],
 ): string {
     if (!mark) return row.path;
-    return `${row.path} · ${t(row.kind === 'folder' ? 'tree.hasChanges' : CHANGE_MARK_WORD[mark])}`;
+    return `${row.path}\n${t(row.kind === 'folder' ? 'tree.hasChanges' : CHANGE_MARK_WORD[mark])}`;
 }
 
 /** A name of the tree; a folder sharing its row with the folders inside it shows their `/`. */
@@ -80,7 +81,7 @@ export function FileTree({
                     if (row.kind === 'more') {
                         return (
                             <div
-                                className="flex h-[22px] items-center truncate font-sans text-xs text-ui-text-muted italic"
+                                className={LIST_MORE}
                                 style={{ paddingLeft: indent + TREE_TWISTY }}
                             >
                                 {t('tree.more', { count: row.count.toLocaleString(formatTag) })}

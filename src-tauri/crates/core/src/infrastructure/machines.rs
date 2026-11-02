@@ -140,7 +140,7 @@ mod tests {
     use crate::modules::repository::{
         ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles,
         CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits,
-        RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+        RecentFiles, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
     };
     use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
     use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -200,6 +200,9 @@ mod tests {
             unreachable!()
         }
         fn directory(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<Directory> {
+            unreachable!()
+        }
+        fn recent_files(&self, _: &RepositoryInfo) -> anyhow::Result<RecentFiles> {
             unreachable!()
         }
         fn file_content(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileContent> {

@@ -198,6 +198,22 @@ export interface Directory {
     truncated: boolean;
 }
 
+/** One file of the tree and its last change on disk. */
+export interface RecentFile {
+    path: string;
+    /** Milliseconds since the Unix epoch. */
+    modified: number;
+}
+
+/** The files of a project's tree by their last change, newest first: the Files panel's Recent. */
+export interface RecentFiles {
+    files: RecentFile[];
+    /** Older files past the most the list holds (10,000). */
+    more: number;
+    /** The project has more files than the tree holds (200,000). */
+    truncated: boolean;
+}
+
 /** A file as the Files panel shows it. */
 export type FileContent =
     /** `truncated`: larger than 2 MiB, cut at its last whole line. */

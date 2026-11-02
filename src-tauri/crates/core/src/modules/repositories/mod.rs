@@ -17,8 +17,8 @@ use crate::modules::preview::{self, MarkdownDocument};
 use crate::modules::repository::{
     self, ChangedFile, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
     CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, FileTree,
-    RecentCommits, RepositoryBackend, RepositoryInfo, RepositorySnapshot, RepositorySummary,
-    RepositoryWatcher, UnifiedDiff, WatchedFolders,
+    RecentCommits, RecentFiles, RepositoryBackend, RepositoryInfo, RepositorySnapshot,
+    RepositorySummary, RepositoryWatcher, UnifiedDiff, WatchedFolders,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -319,6 +319,11 @@ impl Repositories for LocalRepositories {
 
     fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory> {
         Ok(self.file_tree(info)?.directory(path))
+    }
+
+    fn recent_files(&self, info: &RepositoryInfo) -> anyhow::Result<RecentFiles> {
+        let tree = self.file_tree(info)?;
+        repository::load_recent_files(&*self.backend, info, &tree)
     }
 
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
