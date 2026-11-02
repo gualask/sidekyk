@@ -10,15 +10,16 @@ problems. Why semantic zoom: `../product.md`.
   / project / panel) in the top bar is the only "where am I".
 - Start (2026-10-23): level 0, the project shown last selected; `sidekyk <folder>` opens its
   project at level 1.
-- Panels from the project (2026-10-23, 2026-10-24): a repository has Changes, Files and Notes; a
-  folder without git Files (the main tile, its own viewer) and Notes; no folder, Notes only, shown
-  at level 1 as full screen and with no level 2 (`↵`, zooming in and `1`-`9` do nothing). The top
+- Panels from the project (2026-10-23, 2026-10-24, 2026-11-02): a repository has Changes, Files
+  and Notes; a folder without git Notes (the main tile) and Files beside, whose file picked opens
+  Files full screen (`files.md`); no folder, Notes only, shown at level 1 as full screen and with
+  no level 2 (`↵`, zooming in and `1`-`9` do nothing). The top
   bar's facts only for a repository. `git init` or `.git` removed switches the panels at the level
   shown. A stopped WSL distro: `wsl.md`. Until the kind is read, nothing is drawn.
 - Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the Inbox
   down to 320 px; the window's least width (760 px) fits both.
 - Tiles, the only level 1 layout (tabs dropped 2026-10-13): the main tile on the left keeps 560 px;
-  Files above Notes in the side column, which gives way first. The column has one width, the
+  the others in the side column (Files above Notes), which gives way first. The column has one width, the
   tree's (as VS Code's sidebar), at least the widest tile shown (Files 160 px, Notes 320 px). Its
   splitter's double click fits; the one between Files and Notes evens them. Files and Notes
   minimize to chips in the top bar; each project keeps its tiles.
@@ -65,8 +66,9 @@ problems. Why semantic zoom: `../product.md`.
   (`take_opened_project`). `onProjectsChanged` also runs once as listening starts, so a change made
   before is not missed.
 - Panels (`app/panels.ts`): each says what it needs (`PanelDefinition.needs`: Changes a repository,
-  Files a folder, Notes nothing); `projectTiles(kind)` gives a project's panels, the first the main
-  tile, with its card's summaries and what opens full screen. A panel asked for that the project
+  Files a folder, Notes nothing); `projectTiles(kind)` gives a project's panels in their keys'
+  order, the main tile (the first, Notes without git), its card's summaries and what opens full
+  screen. A tile's panel can open itself full screen (`PanelProps.zoomIn`). A panel asked for that the project
   lacks gives way to its main one.
 - Keys: `app/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with
   `useWindowKeys`, and the workspace skips handled keys. The shortcuts card (`ShortcutsHelp`, lazy)
@@ -94,3 +96,8 @@ problems. Why semantic zoom: `../product.md`.
   not virtualized), Headless UI 54/none, Ariakit 38/35 (0.x), Ark 48/25, React Aria 56/22.
   CSS-only tooltips cannot flip. Never in the first paint chunk.
 - Panel icon in a tile, not its title (2026-10-17): the title repeated what the panel shows.
+- Notes the main tile of a folder without git (2026-11-02; Files since 2026-10-24): its uses are a
+  topic with its material, a folder of documents or images, notes with captures; the files are
+  looked up, a key away. A file picked in the tree opens Files full screen, not in the main tile in
+  place of the notes (one meaning per tile, no new part) nor in a wider column (as wide as the
+  tree). An agent at work before `git init` is a short phase.

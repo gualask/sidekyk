@@ -6,8 +6,8 @@ The project's tree and the view of any file in it (built 2026-10-17).
 
 - Tree as VS Code's: folders first, compact folders, change colors (amber, green new; a folder takes
   the strongest) with words in the tooltip, never a horizontal scrollbar; collapse-all.
-- In a repository's tile the tree alone, Changes being the viewer; full screen, and in a folder
-  without git, tree and viewer.
+- In a tile the tree alone: a file picked shows in Changes, or without git in Files full screen
+  (click, `Space`, `↵`; `j`/`k` move the file `↵` opens; 2026-11-02); full screen tree and viewer.
 - One selection for both panels, as VS Code's explorer follows the editor (2026-10-17): Changes
   selects the file in its list, Files reveals it. A commit's file leaves the tree alone.
 - File view: files of the tree only, the first 2 MiB, notices for binary, link and submodule,

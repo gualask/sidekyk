@@ -36,13 +36,14 @@ export function sideMinWidth(panels: readonly PanelDefinition[]): number {
 
 /**
  * A project's panels, from what it has: those whose needs it meets, in their order. With several,
- * level 1 lays them out as tiles: the first on the left (Changes for a repository, Files for a
+ * level 1 lays them out as tiles: the main one on the left (Changes for a repository, Notes for a
  * folder without git), filling what the side column leaves; the others in that column, top to
  * bottom (Files above Notes), each can be minimized to the top bar; the column is as wide as
  * Files' tree, wider while Notes is in it, and gives way first. With one (Notes, without folder),
  * level 1 shows it as full screen does and there is no level 2.
  */
 export interface ProjectTiles {
+    /** In the order of their shortcuts, as the palette and the card list them. */
     panels: readonly PanelDefinition[];
     main: PanelDefinition;
     /** Empty when the project has one panel. */
@@ -63,8 +64,9 @@ function summariesOf(panels: readonly PanelDefinition[]): PanelSummary[] {
     return panels.flatMap(({ id, summary }) => (summary ? [{ id, summary }] : []));
 }
 
-function tilesOf(panels: readonly PanelDefinition[]): ProjectTiles {
-    const [main, ...side] = panels;
+/** The project's tiles: `main` on the left (the first panel unless named), the others beside. */
+function tilesOf(panels: readonly PanelDefinition[], main = panels[0]): ProjectTiles {
+    const side = panels.filter((panel) => panel !== main);
     return {
         panels,
         main,
@@ -74,14 +76,18 @@ function tilesOf(panels: readonly PanelDefinition[]): ProjectTiles {
     };
 }
 
-function tilesMeeting(met: (need: PanelNeed) => boolean): ProjectTiles {
-    return tilesOf(PANELS.filter((panel) => !panel.needs || met(panel.needs)));
+function tilesMeeting(met: (need: PanelNeed) => boolean, main?: PanelDefinition): ProjectTiles {
+    return tilesOf(
+        PANELS.filter((panel) => !panel.needs || met(panel.needs)),
+        main,
+    );
 }
 
 /** One value per kind of project, so the panels of a project keep their identity across renders. */
 const TILES = {
     repository: tilesMeeting(() => true),
-    plain: tilesMeeting((need) => need === 'folder'),
+    // notes first, the files a tree beside, which opens a file full screen (2026-11-02)
+    plain: tilesMeeting((need) => need === 'folder', notesPanel),
     // a folder in a stopped WSL distro: its Start panel in place of the folder's, Notes beside
     stopped: tilesOf([startPanel, notesPanel]),
     none: tilesMeeting(() => false),

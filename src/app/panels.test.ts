@@ -14,11 +14,11 @@ describe('projectTiles', () => {
         expect(deepestLevel(tiles)).toBe(2);
     });
 
-    it('gives a folder without git Files and Notes, Files on the left', () => {
+    it('gives a folder without git Files and Notes, Notes on the left', () => {
         const tiles = projectTiles('plain');
         expect(tiles.panels).toEqual([filesPanel, notesPanel]);
-        expect(tiles.main).toBe(filesPanel);
-        expect(tiles.side).toEqual([notesPanel]);
+        expect(tiles.main).toBe(notesPanel);
+        expect(tiles.side).toEqual([filesPanel]);
         expect(tiles.fullScreen).toEqual(tiles.panels);
         expect(tiles.summaries.map((summary) => summary.id)).toEqual(['files', 'notes']);
         expect(deepestLevel(tiles)).toBe(2);
@@ -58,5 +58,12 @@ describe('tileBeside', () => {
         expect(tileBeside(tiles, changesPanel, 1, ['files'])).toBe(notesPanel);
         expect(tileBeside(tiles, notesPanel, 1, [])).toBeUndefined();
         expect(tileBeside(projectTiles(null), notesPanel, -1, [])).toBeUndefined();
+    });
+
+    it('starts from the main tile, Notes before Files without git', () => {
+        const tiles = projectTiles('plain');
+        expect(tileBeside(tiles, notesPanel, 1, [])).toBe(filesPanel);
+        expect(tileBeside(tiles, filesPanel, -1, [])).toBe(notesPanel);
+        expect(tileBeside(tiles, notesPanel, 1, ['files'])).toBeUndefined();
     });
 });

@@ -50,9 +50,9 @@ const FULL_KEYS = new Set([
 
 /**
  * The Files panel: the project's files as a tree. The file shown is the one of Changes (one
- * selection for both): the tree reveals it, and a file picked in the tree shows there. In a
- * repository's tile Files is the tree alone, Changes being the viewer; full screen, and in a
- * folder without git where there is no Changes, the file shows next to the tree, a changed one
+ * selection for both): the tree reveals it, and a file picked in the tree shows there. In a tile
+ * Files is the tree alone: a file picked shows in Changes, or in a folder without git, where there
+ * is no Changes, in Files full screen. Full screen the file shows next to the tree, a changed one
  * whole with its changes marked, any other as its text. No filter here: the command palette finds
  * files, and shows them in the tree.
  */
@@ -65,6 +65,7 @@ export function FilesWorkspace({
     selected: hasKeys,
     show,
     findInFiles,
+    zoomIn,
 }: PanelProps) {
     const i18n = useTranslation();
     const projectId = project.id;
@@ -105,6 +106,12 @@ export function FilesWorkspace({
         setSelection((current) => selectionOf(path, current));
         setOpenOn(hunk === null ? null : { file: path, hunk });
     };
+    // a file picked shows beside the tree full screen; from a tile in Changes, or without git in
+    // Files full screen
+    const pick = (path: string) => {
+        openFile(path);
+        if (!repository) zoomIn?.();
+    };
     const toggle = (path: string) => {
         setState((current) => {
             const next = new Set(current.open);
@@ -122,7 +129,8 @@ export function FilesWorkspace({
     });
 
     // before the workspace's keys, so `↵` opens what is selected instead of zooming; in a tile a
-    // file moved to shows at once, as in Changes' list
+    // file moved to becomes the one shown, as in Changes' list: there at once, without git once
+    // `↵` zooms in
     useWindowKeys(
         (event) => {
             const ours = place === 'full' ? FULL_KEYS : TILE_KEYS;
@@ -132,9 +140,9 @@ export function FilesWorkspace({
             if (!move) return;
             event.preventDefault();
             if (move.kind === 'toggle') toggle(move.path);
-            else if (move.kind === 'open' || (place === 'tile' && !move.folder)) {
-                openFile(move.path);
-            } else setState((current) => ({ ...current, selected: move.path }));
+            else if (move.kind === 'open') pick(move.path);
+            else if (place === 'tile' && !move.folder) openFile(move.path);
+            else setState((current) => ({ ...current, selected: move.path }));
         },
         { capture: true },
     );
@@ -177,7 +185,7 @@ export function FilesWorkspace({
                     label={i18n.t('files.of', { name: project.name })}
                     onClick={(row) => {
                         if (row.kind === 'folder') toggle(row.path);
-                        else openFile(row.path);
+                        else pick(row.path);
                     }}
                 />
             </div>
@@ -207,7 +215,7 @@ export function FilesWorkspace({
         />
     );
 
-    if (place === 'tile' && repository) {
+    if (place === 'tile') {
         // in a tile the tree fills it; the app sets its width, the tree's (one setting)
         return (
             <div

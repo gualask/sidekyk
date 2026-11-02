@@ -44,6 +44,8 @@ export interface PanelProps {
     show: (panel: string, target: PanelTarget) => void;
     /** Looks for a text in all the project's files, as `⌘F` does from where no file is open. */
     findInFiles: (query: string) => void;
+    /** In a tile: shows the panel full screen, as the tile's own button does. Null full screen. */
+    zoomIn: (() => void) | null;
 }
 
 /**

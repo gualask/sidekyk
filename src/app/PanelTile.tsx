@@ -132,6 +132,7 @@ export function PanelTile({
                             selected,
                             show,
                             findInFiles,
+                            zoomIn: onZoomIn ?? null,
                         }}
                     />
                 </Suspense>

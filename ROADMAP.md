@@ -25,8 +25,6 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 `.cflow/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
 has.
 
-- [ ] Layout without git: what takes Changes' tile (today Files; Notes leaning, decided with
-      Capture)
 - [ ] What changed without git: recently modified files, no diffs
 - [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
       section per repository in Changes

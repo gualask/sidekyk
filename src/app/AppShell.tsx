@@ -296,15 +296,13 @@ export function AppShell() {
             const next = panelById(id);
             if (next && tiles?.fullScreen.includes(next)) zoom(2, next);
         },
-        // as a file picked in the tree: in Files' own viewer when it is full screen or there is no
-        // Changes, else Changes
-        openFile: (path, find) =>
-            show(
-                (level === 2 && panel === filesPanel) || !hasChanges
-                    ? filesPanel.id
-                    : changesPanel.id,
-                fileTarget(path, null, find ?? null),
-            ),
+        // as a file picked in the tree: in Changes when the project has it and Files is not full
+        // screen, else in Files full screen, its tile being the tree alone
+        openFile: (path, find) => {
+            const asked = fileTarget(path, null, find ?? null);
+            if (hasChanges && !(level === 2 && panel === filesPanel)) show(changesPanel.id, asked);
+            else if (tiles?.panels.includes(filesPanel)) zoom(2, filesPanel, asked);
+        },
         // in Notes, at the same zoom; at all projects, an Inbox note in its column, a project's
         // in its panels, Notes selected
         openNotes: (book, list, note) => {
