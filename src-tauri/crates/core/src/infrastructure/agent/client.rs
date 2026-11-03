@@ -501,6 +501,11 @@ impl Repositories for AgentRepositories {
         self.call(Request::Resolve { candidate }, &nothing)
     }
 
+    fn repositories_inside(&self, folder: &RepositoryInfo) -> anyhow::Result<Vec<RepositoryInfo>> {
+        let folder = folder.clone();
+        self.call(Request::RepositoriesInside { folder }, &nothing)
+    }
+
     fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind> {
         let repository = info.clone();
         self.call(Request::FolderKind { repository }, &nothing)

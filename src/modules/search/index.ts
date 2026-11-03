@@ -1,4 +1,5 @@
 export { type SearchPort, SearchProvider } from './application/search.port';
+export { useNameRanking } from './application/search.queries';
 export type { PaletteBook } from './model/palette-rows';
 export type {
     ContentEnd,

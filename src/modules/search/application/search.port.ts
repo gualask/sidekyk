@@ -9,7 +9,7 @@ export interface SearchPort {
      * newer search stops this one.
      */
     searchContents(
-        projectId: string,
+        folderId: string,
         query: string,
         onFiles: (files: ContentFile[]) => void,
     ): Promise<ContentEnd>;

@@ -1,19 +1,21 @@
 # Projects
 
-A project is a name, its notes and none or one folder: a repository, or a folder without git.
-Several projects, one on screen.
+A project is a name, its notes and none, one or several folders, each a repository or a folder
+without git, one on screen (`project-folders.md`). Several projects, one on screen.
 
 ## Behaviour
 
 - New project (2026-10-23): the last card at level 0 opens one dialog for everyone: Name and
-  Folder (optional; "None" until Choose…), Create disabled while the name is blank. A folder inside
-  a repository becomes the repository's root, any other is taken as it is (2026-10-24); its name
-  fills an empty name. Another project's folder is said under the field, with Open. Create opens
-  the new project at level 1.
-- Rename from the card's ⋯, the same dialog with the name only; two projects may share a name.
+  Folders (optional; "None" until Add folder…), Create disabled while the name is blank. A folder
+  inside a repository becomes the repository's root, any other is taken as it is (2026-10-24); the
+  first one's name fills an empty name. Another project's folder is said under them, with Open; a
+  folder above repositories asks what it becomes (`project-folders.md`). Create opens the new
+  project at level 1.
+- Edit from the card's ⋯: name and folders (`project-folders.md`); two projects may share a name.
   Remove from the card's ⋯: the folder is untouched, the notes are exported or deleted first
   (`notes.md`).
-- `sidekyk <folder>` opens the project of that folder, adding one named after it if none.
+- `sidekyk <folder>` opens the project of that folder, showing it, adding one named after it if
+  none; a folder above repositories opens New project on it instead.
 - What a folder is (2026-10-24): a repository when a `.git` (folder, or file for worktrees and
   submodules) is at its root, else a folder without git. Never stored: `git init` or `.git`
   removed changes the panels while the app runs (`workspace.md`).
@@ -32,17 +34,18 @@ Several projects, one on screen.
 - Top bar facts: branch, ahead/behind, changed files and lines against HEAD (`1.2k changed +1.2k
   −340`), or "clean".
 - A folder moved or deleted: problem `repository_missing` with Locate… (the project follows the
-  folder, keeping id, name, notes and layout) and Remove. Another project's folder is refused with
+  folder, which keeps its id; the project its name, notes and layout) and Remove. Another project's folder is refused with
   a toast and Open.
 
 ## How it is built
 
-- Identity: `{ id, name, folders }`, a folder local `{ root }` or WSL `{ distro, root }`; one folder
-  for now, a list so several change nothing stored. Everything of a project (queries, layout,
-  notes, session state, avatar color) is keyed by `id`, made once (16 random hex digits,
-  `shared/id.rs`), never read by the frontend. Older stored forms are read: `{ id, name, location
-  }`, and before ids `{ name, location }` and `{ root, name }`, whose id is their location
-  (`Location::id_before_made_ids`), so their notes and layouts stay. One that cannot be read is
+- Identity: `{ id, name, folders }`, a folder `{ id }` and local `{ root }` or WSL
+  `{ distro, root }` (`project-folders.md`). Everything of a project (layout, notes, avatar color)
+  is keyed by `id`, everything of a folder (queries, session state) by its own, made once (16
+  random hex digits, `shared/id.rs`), never read by the frontend. Older stored forms are read: a
+  folder without id (its project's), `{ id, name, location }`, and before ids `{ name, location }`
+  and `{ root, name }`, whose id is their location (`Location::id_before_made_ids`), so their
+  notes and layouts stay. One that cannot be read is
   left out, not the whole list. Stored in app data beside the settings; changes run in one
   mutation scope, in order.
 - A folder is one project's: `ProjectList::at` finds a project by place (`Location::same_place`:
@@ -56,18 +59,17 @@ Several projects, one on screen.
 - Kind (`get_folder_kind`, `folder::folder_kind`, no git): `repository_missing` for a folder gone,
   else whether `.git` is at the root. One query for cards and level 1 (`useFolderKind`); a kind that
   cannot be read counts as a repository, its panels and problems telling why. A change of kind
-  comes from the watcher (`kind_changed`) and resets the project's queries.
-- Dialog (`ProjectDialog`, lazy): `choose_project_folder` picks a folder and says what it is
-  (`FolderChoice`: `Usable { path, name, location }`, `InProject { id, name }`), changing nothing;
-  `create_project` checks the folder again; `rename_project` stores only. Failures show in the
-  dialog.
-- Locate… (`relocate_project`): the folder resolves as a new project's and replaces the project's;
-  another project's is `Relocation::InProject`. `watch_active` compares id and folder, the
-  frontend reads the project again (`useReadProjectAgain`).
-- Without folder: `Project::repository` is `None`, never routed, watched or summarized; a
-  repository command on it is an internal error. A folder without git is routed and watched, never
+  comes from the watcher (`kind_changed`) and resets the folder's queries.
+- Dialogs (`NewProjectDialog` in the overview, `EditProjectDialog` from the app, lazy):
+  `choose_project_folder` picks a folder and says what it is (`FolderChoice`: `Usable { path,
+  name, location, repositories }`, `InProject { id, name }`), changing nothing; `create_project`
+  checks the folders again; `rename_project` stores only. Failures show in the dialog.
+- Locate… (`relocate_folder`): the folder resolves as a new project's and replaces the folder's
+  place, its id kept; another project's is `FolderChange::InProject`. `watch_on_screen` compares the
+  folder's id and place, the frontend reads the folder again (`useReadFolderAgain`).
+- Without folder: no folder to name, never routed, watched or summarized. A folder without git is routed and watched, never
   asked for a snapshot, summary, diff or commits.
-- Only the project on screen is watched (`changes.md`). The others show a summary (`load_summary`:
+- Only the folder on screen of the project on screen is watched (`changes.md`). The others show a summary (`load_summary`:
   status + numstat vs HEAD, new files counted not read, 52 ms on Zed's clone), read when level 0
   shows, and on show only if older than 30 s; inactive caches expire (`gcTime`).
 - Card parts: each panel's summary fills `lead`, `facts` or `body` (`SummaryPart`); Changes all
@@ -83,7 +85,8 @@ Several projects, one on screen.
 - One container, the project (2026-10-22): not global notes beside projects (two navigations, two
   places for a note); lists are topics inside it, the Inbox the one place outside. Panels come
   from what a project has, never from a template the user picks. One folder first, the model
-  shaped for several (VS Code's multi-root workspace) so stored projects change once.
+  shaped for several (VS Code's multi-root workspace) so stored projects change once; several
+  built 2026-11-02 (`project-folders.md`).
 - Id made once and kept (2026-10-22; made from the location 2026-10-18): a project without folder
   has no location, one with several no single one. A folder is one project's, found by place;
   stored ids stay, nothing migrated.

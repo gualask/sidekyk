@@ -34,6 +34,9 @@ pub enum Request {
     Resolve {
         candidate: PathBuf,
     },
+    RepositoriesInside {
+        folder: RepositoryInfo,
+    },
     FolderKind {
         repository: RepositoryInfo,
     },

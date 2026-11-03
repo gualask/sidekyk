@@ -40,3 +40,11 @@ export function activityDays(activity: CommitActivity, since: number): ActivityD
     }
     return days;
 }
+
+/** The commits of several repositories together, for one chart: a project's of several folders. */
+export function mergedActivity(activities: readonly CommitActivity[]): CommitActivity {
+    return {
+        commits: activities.flatMap((activity) => activity.commits),
+        more: activities.some((activity) => activity.more),
+    };
+}

@@ -14,7 +14,7 @@ use crate::infrastructure::{logging, settings_store};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
-use crate::interfaces::tauri::state::{open_folder, watch_active, ProjectsState};
+use crate::interfaces::tauri::state::{open_folder, ProjectsState};
 use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
@@ -60,8 +60,8 @@ fn is_app_page(url: &::tauri::Url) -> bool {
 fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
     let app = app.clone();
     std::thread::spawn(move || match open_folder(&app, &folder) {
-        Ok(list) => {
-            app.state::<ProjectsState>().set_opened(list.active);
+        Ok(opened) => {
+            app.state::<ProjectsState>().set_opened(opened);
             let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
         }
         Err(error) => tracing::warn!(
@@ -147,9 +147,6 @@ pub(crate) fn run() {
             if let Some(folder) = folder_argument(&args) {
                 open_or_log(app.handle(), folder);
             }
-            // the project on screen is watched even when the folder argument could not be opened;
-            // a moved or deleted repository shows its error in the project's panels
-            watch_active(app.handle());
             Ok(())
         })
         // a page loaded again (a crashed webview) forgets a shortcut its predecessor was recording
@@ -161,14 +158,18 @@ pub(crate) fn run() {
         .on_window_event(hide_on_close)
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
-            tauri_commands::projects::take_opened_project,
+            tauri_commands::projects::take_opened,
             tauri_commands::projects::choose_project_folder,
             tauri_commands::projects::create_project,
             tauri_commands::projects::rename_project,
             tauri_commands::projects::activate_project,
             tauri_commands::projects::remove_project,
             tauri_commands::projects::set_project_layout,
-            tauri_commands::projects::relocate_project,
+            tauri_commands::projects::relocate_folder,
+            tauri_commands::projects::show_project_folder,
+            tauri_commands::projects::add_project_folder,
+            tauri_commands::projects::remove_project_folder,
+            tauri_commands::projects::merge_projects,
             tauri_commands::repository::get_folder_kind,
             tauri_commands::repository::get_repository_snapshot,
             tauri_commands::repository::get_repository_summary,

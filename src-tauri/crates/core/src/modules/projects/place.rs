@@ -34,22 +34,48 @@ impl Location {
         self.same_place_as(other, IGNORE_CASE)
     }
 
-    fn same_place_as(&self, other: &Location, ignore_case: bool) -> bool {
+    /// Another folder of the same machine, at `root` as that machine names it.
+    pub fn with_root(&self, root: String) -> Location {
+        match self {
+            Self::Local { .. } => Self::Local { root },
+            Self::Wsl { distro, .. } => Self::Wsl {
+                distro: distro.clone(),
+                root,
+            },
+        }
+    }
+
+    /// Whether `other` is on the same machine: this one, or the same WSL distro.
+    pub fn same_machine(&self, other: &Location) -> bool {
         match (self, other) {
-            (Self::Local { root: a }, Self::Local { root: b }) => {
-                local_parts(Path::new(a), ignore_case) == local_parts(Path::new(b), ignore_case)
-            }
-            (
-                Self::Wsl {
-                    distro: a,
-                    root: a_root,
-                },
-                Self::Wsl {
-                    distro: b,
-                    root: b_root,
-                },
-            ) => same_distro(a, b) && linux_parts(a_root) == linux_parts(b_root),
+            (Self::Local { .. }, Self::Local { .. }) => true,
+            (Self::Wsl { distro: a, .. }, Self::Wsl { distro: b, .. }) => same_distro(a, b),
             _ => false,
+        }
+    }
+
+    /// Whether one of the two folders is the other or inside it, on one machine.
+    pub fn overlaps(&self, other: &Location) -> bool {
+        self.overlaps_as(other, IGNORE_CASE)
+    }
+
+    fn same_place_as(&self, other: &Location, ignore_case: bool) -> bool {
+        self.same_machine(other) && self.parts(ignore_case) == other.parts(ignore_case)
+    }
+
+    fn overlaps_as(&self, other: &Location, ignore_case: bool) -> bool {
+        if !self.same_machine(other) {
+            return false;
+        }
+        let (a, b) = (self.parts(ignore_case), other.parts(ignore_case));
+        a.starts_with(&b) || b.starts_with(&a)
+    }
+
+    /// The root in parts, as the machine holding it compares names.
+    fn parts(&self, ignore_case: bool) -> Vec<String> {
+        match self {
+            Self::Local { root } => local_parts(Path::new(root), ignore_case),
+            Self::Wsl { root, .. } => linux_parts(root),
         }
     }
 }
@@ -106,5 +132,34 @@ mod tests {
         assert!(!wsl("Ubuntu", "/s").same_place_as(&wsl("Ubuntu", "/S"), true));
         assert!(!wsl("Ubuntu", "/s").same_place_as(&wsl("Debian", "/s"), true));
         assert!(!local("/s").same_place_as(&wsl("Ubuntu", "/s"), true));
+    }
+
+    #[test]
+    fn folders_overlap_when_one_holds_the_other_on_one_machine() {
+        assert!(local("/Dev/shop").overlaps_as(&local("/Dev/shop/api"), false));
+        assert!(local("/Dev/shop/api").overlaps_as(&local("/dev/shop"), true));
+        assert!(local("/Dev/shop").overlaps_as(&local("/Dev/shop/"), false));
+        assert!(!local("/Dev/shop/api").overlaps_as(&local("/Dev/shop/web"), true));
+        assert!(!local("/Dev/shop").overlaps_as(&local("/Dev/shopping"), true));
+        assert!(wsl("Ubuntu", "/s").overlaps_as(&wsl("ubuntu", "/s/api"), false));
+        assert!(!wsl("Ubuntu", "/s").overlaps_as(&wsl("Debian", "/s/api"), false));
+        assert!(!local("/s").overlaps_as(&wsl("Ubuntu", "/s/api"), false));
+    }
+
+    #[test]
+    fn another_root_stays_on_its_machine() {
+        assert_eq!(local("/a").with_root("/b".into()), local("/b"));
+        assert_eq!(
+            wsl("Ubuntu", "/a").with_root("/b".into()),
+            wsl("Ubuntu", "/b")
+        );
+    }
+
+    #[test]
+    fn a_machine_is_this_one_or_one_distro() {
+        assert!(local("/a").same_machine(&local("/b")));
+        assert!(wsl("Ubuntu", "/a").same_machine(&wsl("ubuntu", "/b")));
+        assert!(!wsl("Ubuntu", "/a").same_machine(&wsl("Debian", "/a")));
+        assert!(!local("/a").same_machine(&wsl("Ubuntu", "/a")));
     }
 }

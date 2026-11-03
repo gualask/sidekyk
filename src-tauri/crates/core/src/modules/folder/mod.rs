@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 use crate::modules::repository::{existing_folder, RepositoryBackend};
 
 pub use changes::FolderChanges;
-pub use open::resolve_folder;
+pub use open::{repositories_inside, resolve_folder};
 pub use tree::load_folder_tree;
 
 /// What a project's folder is, found where it is read and never stored: a `git init` in it, or

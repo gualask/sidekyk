@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import type { ProjectList } from '@/modules/projects';
-import { type ProjectFailure, useProjectFailures } from '@/modules/repository';
+import { type FolderFailure, useFolderFailures } from '@/modules/repository';
 import { SHORTCUT_ACTIONS, shortcutProblem, useGlobalShortcutStatus } from '@/modules/settings';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
@@ -16,12 +16,12 @@ export interface Problem {
     fixes: { label: string; run: () => void }[];
 }
 
-/** What the problems of a project can do to it. */
+/** What the problems of a project's folder can do: to the folder, or to its project. */
 export interface ProjectFixes {
-    locate: (project: ProjectInfo) => void;
+    locate: (folder: ProjectFolder) => void;
     remove: (project: ProjectInfo) => void;
     /** Read it again, once fixed outside Sidekyk. */
-    retry: (project: ProjectInfo) => void;
+    retry: (folder: ProjectFolder) => void;
 }
 
 /**
@@ -35,16 +35,20 @@ export function useProblems(
     openSettings: () => void,
     fixProject: ProjectFixes,
 ): Problem[] {
-    const failures = useProjectFailures();
+    const failures = useFolderFailures();
     const shortcuts = useGlobalShortcutStatus().data;
     const i18n = useTranslation();
 
     return useMemo(() => {
-        const problems = (list?.projects ?? []).flatMap((project) => {
-            const failure = failures.get(project.id);
-            const problem = failure ? projectProblem(project, failure, fixProject, i18n) : null;
-            return problem ? [problem] : [];
-        });
+        const problems = (list?.projects ?? []).flatMap((project) =>
+            project.folders.flatMap((folder) => {
+                const failure = failures.get(folder.id);
+                const problem = failure
+                    ? folderProblem(project, folder, failure, fixProject, i18n)
+                    : null;
+                return problem ? [problem] : [];
+            }),
+        );
         for (const action of SHORTCUT_ACTIONS) {
             const shortcutIssue = shortcutProblem(action, shortcuts?.[action], MACOS, i18n);
             if (shortcutIssue) {
@@ -59,21 +63,21 @@ export function useProblems(
     }, [list, failures, fixProject, shortcuts, openSettings, i18n]);
 }
 
-/** A project's failure as a problem; none for one that tells nothing more than its panels do. */
-function projectProblem(
+/**
+ * A folder's failure as a problem; none for one that tells nothing more than its panels do.
+ */
+function folderProblem(
     project: ProjectInfo,
-    failure: ProjectFailure,
+    folder: ProjectFolder,
+    failure: FolderFailure,
     fixes: ProjectFixes,
     { t }: Translator,
 ): Problem | null {
-    const id = `${failure}:${project.id}`;
-    const locate = { label: t('problem.locate'), run: () => fixes.locate(project) };
+    const id = `${failure}:${folder.id}`;
+    const locate = { label: t('problem.locate'), run: () => fixes.locate(folder) };
     const remove = { label: t('common.remove'), run: () => fixes.remove(project) };
-    const retry = { label: t('problem.retry'), run: () => fixes.retry(project) };
+    const retry = { label: t('problem.retry'), run: () => fixes.retry(folder) };
     const name = project.name;
-    // only a folder can fail to be read
-    const folder = projectFolder(project);
-    if (!folder) return null;
     if (failure === 'repository_missing') {
         return {
             id,

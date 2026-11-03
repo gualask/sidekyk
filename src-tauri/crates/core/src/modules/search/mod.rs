@@ -167,9 +167,9 @@ mod tests {
     fn project(name: &str) -> Project {
         Project::new(
             name.into(),
-            Some(Location::Local {
+            [Location::Local {
                 root: format!("/dev/{name}"),
-            }),
+            }],
         )
     }
 

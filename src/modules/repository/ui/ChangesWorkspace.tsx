@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import type { DiffView } from '@/shared/git/diff-view';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
-import { projectFolder } from '@/shared/projects/project-info';
+import type { ProjectFolder } from '@/shared/projects/project-info';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
@@ -27,6 +27,7 @@ import { FileHeader } from './FileHeader';
 import { FileList } from './FileList';
 import { ImageDiff } from './ImageDiff';
 import { fittingRowsWidth } from './list-layout';
+import { OtherFolders } from './OtherFolders';
 import { PreviewPane } from './PreviewPane';
 import { RecentCommits } from './RecentCommits';
 import { TextFileView } from './TextFileView';
@@ -50,16 +51,24 @@ const LIST_WIDTH = { initial: 288, min: 200 };
  * instead, until going back to the working tree; a file picked in Files shows here too, as its
  * text when it did not change.
  */
-export function ChangesWorkspace({
+export function ChangesWorkspace({ folder, ...props }: PanelProps) {
+    // its panel shows only for a project with a folder
+    return folder ? <Changes folder={folder} {...props} /> : null;
+}
+
+function Changes({
     project,
+    folder,
     header,
     target,
     place,
     selected: hasKeys,
     show,
     findInFiles,
-}: PanelProps) {
+    showFolder,
+}: Omit<PanelProps, 'folder'> & { folder: ProjectFolder }) {
     const i18n = useTranslation();
+    const folderId = folder.id;
     // the file shown, one for both panels: the tree of Files reveals it
     const {
         snapshot,
@@ -68,11 +77,11 @@ export function ChangesWorkspace({
         setSelection,
         change: selected,
         path: selectedPath,
-    } = useSelectedFile(project.id, true);
-    const commitView = useCommitView(project.id);
+    } = useSelectedFile(folderId, true);
+    const commitView = useCommitView(folderId);
     const { commit: viewed, file: commitFile } = commitView;
     // the file shown, whose find bar goes when another shows
-    const find = useFileFind(project.id, selected?.path ?? selectedPath, findInFiles);
+    const find = useFileFind(folderId, selected?.path ?? selectedPath, findInFiles);
     const selectedIndex = selected ? files.indexOf(selected) : -1;
     // a file of the tree that did not change, once the list says so
     const unchanged = !selected && snapshot.isSuccess ? selectedPath : null;
@@ -202,7 +211,6 @@ export function ChangesWorkspace({
     };
 
     const listWidth = useSidebarWidth('changes', LIST_WIDTH);
-    const folder = projectFolder(project);
     const listBox = useRef<HTMLElement>(null);
 
     return (
@@ -246,7 +254,7 @@ export function ChangesWorkspace({
                         )}
                     </div>
                     <RecentCommits
-                        projectId={project.id}
+                        folderId={folderId}
                         open={commitView.listOpen}
                         onOpenChange={commitView.setListOpen}
                         viewed={viewed}
@@ -277,7 +285,7 @@ export function ChangesWorkspace({
                         commitFile && isImage(commitFile.path) ? (
                             <ImageDiff
                                 key={`${shownKey}:image`}
-                                projectId={project.id}
+                                folderId={folderId}
                                 sides={imageSides(commitSides(viewed, commitFile), commitFile)}
                                 header={header}
                                 onPastEnd={stepFile}
@@ -291,7 +299,7 @@ export function ChangesWorkspace({
                         ) : commitFile && commitFind ? (
                             <CommitDiffView
                                 key={`${shownKey}:${diffView.view}`}
-                                projectId={project.id}
+                                folderId={folderId}
                                 commit={viewed}
                                 file={commitFile}
                                 view={diffView.view}
@@ -316,7 +324,7 @@ export function ChangesWorkspace({
                     ) : selected && changedPreview ? (
                         <PreviewPane
                             key={`${shownKey}:preview`}
-                            projectId={project.id}
+                            folderId={folderId}
                             path={selected.path}
                             header={header}
                             renderHeader={() => (
@@ -341,7 +349,7 @@ export function ChangesWorkspace({
                     ) : selected && isImage(selected.path) ? (
                         <ImageDiff
                             key={`${shownKey}:image`}
-                            projectId={project.id}
+                            folderId={folderId}
                             sides={imageSides(changeSides(selected), selected)}
                             header={header}
                             onPastEnd={stepFile}
@@ -362,7 +370,7 @@ export function ChangesWorkspace({
                     ) : selected ? (
                         <ChangeDiffView
                             key={`${shownKey}:${diffView.view}`}
-                            projectId={project.id}
+                            folderId={folderId}
                             file={selected}
                             snapshot={snapshot}
                             view={diffView.view}
@@ -393,7 +401,7 @@ export function ChangesWorkspace({
                     ) : unchanged !== null ? (
                         <TextFileView
                             key={unchanged}
-                            projectId={project.id}
+                            folderId={folderId}
                             path={unchanged}
                             header={header}
                             finder={find.finderFor(unchanged)}
@@ -418,6 +426,7 @@ export function ChangesWorkspace({
                         <div className="flex h-full flex-col items-center justify-center gap-2 text-ui-text-muted">
                             <IconCircleCheck size={32} stroke={1.5} />
                             <p className="text-sm">{i18n.t('changes.nothing')}</p>
+                            <OtherFolders project={project} folder={folder} onShow={showFolder} />
                         </div>
                     ) : snapshot.isPending && folder?.kind === 'wsl' ? (
                         // the first read may start Sidekyk's helper in the distro

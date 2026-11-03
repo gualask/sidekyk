@@ -28,7 +28,7 @@ export interface PreviewHeader {
  * code instead (`onFind`, with the line on screen): the preview has no find of its own.
  */
 export function PreviewPane({
-    projectId,
+    folderId,
     path,
     header,
     renderHeader,
@@ -36,7 +36,7 @@ export function PreviewPane({
     openFile,
     onFind,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
@@ -67,14 +67,14 @@ export function PreviewPane({
             {header ? createPortal(renderHeader({ topLine }), header) : null}
             {previewKind(path) === 'markdown' ? (
                 <MarkdownPane
-                    projectId={projectId}
+                    folderId={folderId}
                     path={path}
                     openOn={openOn}
                     place={place}
                     openFile={openFile}
                 />
             ) : (
-                <ImageView projectId={projectId} path={path} />
+                <ImageView folderId={folderId} path={path} />
             )}
         </div>
     );
@@ -82,13 +82,13 @@ export function PreviewPane({
 
 /** A Markdown file's preview, or what it is instead: loading, a failure, not text. */
 function MarkdownPane({
-    projectId,
+    folderId,
     path,
     openOn,
     place,
     openFile,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     openOn: PreviewOpenOn | null;
     place: RefObject<PreviewPlace | null>;
@@ -97,7 +97,7 @@ function MarkdownPane({
     const i18n = useTranslation();
     const port = useRepositoryPort();
     const showToast = useShowToast();
-    const preview = useMarkdownPreview(projectId, path);
+    const preview = useMarkdownPreview(folderId, path);
     const actions: PreviewActions = {
         openFile,
         openUrl: (url) => {
@@ -119,7 +119,7 @@ function MarkdownPane({
     return (
         <Suspense fallback={null}>
             <MarkdownPreview
-                projectId={projectId}
+                folderId={folderId}
                 path={path}
                 document={preview.data}
                 openOn={openOn}

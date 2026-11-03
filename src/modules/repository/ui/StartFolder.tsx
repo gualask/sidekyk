@@ -1,7 +1,7 @@
 import { IconPlayerPlay } from '@tabler/icons-react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
-import { projectFolder } from '@/shared/projects/project-info';
+import type { ProjectFolder } from '@/shared/projects/project-info';
 import { useStartFolder } from '../application/repository.queries';
 import { projectErrorMessage } from '../model/project-error';
 
@@ -10,13 +10,14 @@ import { projectErrorMessage } from '../model/project-error';
  * only from here, so a note read or a project passed through starts nothing. Once started, the
  * folder's panels take its place.
  */
-export function StartFolder({ project }: PanelProps) {
+export function StartFolder({ folder }: PanelProps) {
+    return folder?.kind === 'wsl' ? <Start folder={folder} distro={folder.distro} /> : null;
+}
+
+function Start({ folder, distro }: { folder: ProjectFolder; distro: string }) {
     const i18n = useTranslation();
     const { t } = i18n;
-    const start = useStartFolder(project.id);
-    const folder = projectFolder(project);
-    if (folder?.kind !== 'wsl') return null;
-    const { distro } = folder;
+    const start = useStartFolder(folder.id);
     return (
         <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             {start.isPending ? (

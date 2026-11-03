@@ -1,5 +1,4 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
-import { Dialog } from '@base-ui/react/dialog';
 import {
     IconFile,
     IconFileSearch,
@@ -12,10 +11,11 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { useMemo, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
-import { type MessageKey, RichText, type Translator, useTranslation } from '@/shared/i18n';
+import { type MessageKey, type Translator, useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
+import { PickerDialog, PickerKeys } from '@/shared/ui/PickerDialog';
 import {
     type ContentResults,
     MIN_CONTENT_QUERY,
@@ -76,7 +76,7 @@ export function CommandPalette({
     initialText,
     projectName,
     projectId,
-    hasFiles,
+    filesFolder,
     stoppedDistro,
     currentFile,
     panels,
@@ -93,9 +93,9 @@ export function CommandPalette({
     projectName: string | null;
     /** The project whose files and notes are searched; null when all projects show. */
     projectId: string | null;
-    /** Whether that project has files to search: a folder. */
-    hasFiles: boolean;
-    /** The WSL distro holding that project's folder while it is stopped: no files until started. */
+    /** The id of that project's folder on screen, whose files are searched; null without one. */
+    filesFolder: string | null;
+    /** The WSL distro holding that folder while it is stopped: no files until started. */
     stoppedDistro: string | null;
     /** The file the project shows, whose lines found come first. */
     currentFile: string | null;
@@ -106,39 +106,36 @@ export function CommandPalette({
 }) {
     const { t } = useTranslation();
     return (
-        <Dialog.Root open={open} onOpenChange={onOpenChange}>
-            <Dialog.Portal>
-                <Dialog.Backdrop className="dialog-backdrop" />
-                <Dialog.Popup
-                    aria-label={t('palette.label')}
-                    className="dialog-popup top-[14vh] flex w-[min(680px,calc(100vw-32px))] flex-col overflow-hidden"
-                >
-                    <Palette
-                        mode={mode}
-                        onModeChange={onModeChange}
-                        initialText={initialText}
-                        projectName={projectName}
-                        projectId={projectId}
-                        hasFiles={hasFiles}
-                        stoppedDistro={stoppedDistro}
-                        currentFile={currentFile}
-                        panels={panels}
-                        books={books}
-                        onOpen={(item, query) => {
-                            onOpenChange(false);
-                            if (item.kind === 'project') actions.openProject(item.projectId);
-                            else if (item.kind === 'panel') actions.openPanel(item.id);
-                            else if (item.kind === 'file') actions.openFile(item.path);
-                            else if (item.kind === 'list') {
-                                actions.openNotes(item.book, item.id, null);
-                            } else if (item.kind === 'note') {
-                                actions.openNotes(item.book, item.list, item.id);
-                            } else actions.openFile(item.path, { query, line: item.number });
-                        }}
-                    />
-                </Dialog.Popup>
-            </Dialog.Portal>
-        </Dialog.Root>
+        <PickerDialog
+            open={open}
+            onOpenChange={onOpenChange}
+            label={t('palette.label')}
+            width="w-[min(680px,calc(100vw-32px))]"
+        >
+            <Palette
+                mode={mode}
+                onModeChange={onModeChange}
+                initialText={initialText}
+                projectName={projectName}
+                projectId={projectId}
+                filesFolder={filesFolder}
+                stoppedDistro={stoppedDistro}
+                currentFile={currentFile}
+                panels={panels}
+                books={books}
+                onOpen={(item, query) => {
+                    onOpenChange(false);
+                    if (item.kind === 'project') actions.openProject(item.projectId);
+                    else if (item.kind === 'panel') actions.openPanel(item.id);
+                    else if (item.kind === 'file') actions.openFile(item.path);
+                    else if (item.kind === 'list') {
+                        actions.openNotes(item.book, item.id, null);
+                    } else if (item.kind === 'note') {
+                        actions.openNotes(item.book, item.list, item.id);
+                    } else actions.openFile(item.path, { query, line: item.number });
+                }}
+            />
+        </PickerDialog>
     );
 }
 
@@ -152,7 +149,7 @@ function Palette({
     initialText,
     projectName,
     projectId,
-    hasFiles,
+    filesFolder,
     stoppedDistro,
     currentFile,
     panels,
@@ -164,7 +161,7 @@ function Palette({
     initialText: string;
     projectName: string | null;
     projectId: string | null;
-    hasFiles: boolean;
+    filesFolder: string | null;
     stoppedDistro: string | null;
     currentFile: string | null;
     panels: readonly PalettePanel[];
@@ -177,8 +174,8 @@ function Palette({
     const titles = useMemo(() => panels.map((panel) => panel.title), [panels]);
     const contents = mode === 'contents';
     const names = useSearch(query, titles, projectId, !contents);
-    // the project whose files are searched for a text: none without a folder
-    const filesOf = hasFiles ? projectId : null;
+    // the folder whose files are searched for a text: none without a project or a folder
+    const filesOf = projectId ? filesFolder : null;
     const found = useContentSearch(contents ? filesOf : null, query);
     const { items, rows } = useMemo(() => {
         if (contents)
@@ -221,7 +218,7 @@ function Palette({
     const empty = contents
         ? contentsNotice(filesOf, query, found, i18n)
         : names.data && rows.length === 0
-          ? t('palette.nothingFound')
+          ? t('common.nothingFound')
           : null;
 
     return (
@@ -253,7 +250,7 @@ function Palette({
                     placeholder={placeholder(
                         mode,
                         projectId,
-                        hasFiles,
+                        filesFolder !== null,
                         stoppedDistro,
                         projectName,
                         i18n,
@@ -315,34 +312,13 @@ function Palette({
                     </div>
                 ) : null}
             </Autocomplete.List>
-            <div className="dialog-foot">
-                <span>
-                    <RichText
-                        text={t('palette.move')}
-                        parts={{
-                            up: <kbd className="kbd">↑</kbd>,
-                            down: <kbd className="kbd">↓</kbd>,
-                        }}
-                    />
-                </span>
-                <span>
-                    <RichText
-                        text={t('palette.open')}
-                        parts={{ enter: <kbd className="kbd">↵</kbd> }}
-                    />
-                </span>
-                <span>
-                    <RichText
-                        text={t('common.escCloses')}
-                        parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                    />
-                </span>
+            <PickerKeys enter={t('common.enterOpens')}>
                 {contents && filesOf && query.trim().length >= MIN_CONTENT_QUERY ? (
                     <span className="ml-auto" aria-live="polite">
                         {contentsStatus(found, query, i18n)}
                     </span>
                 ) : null}
-            </div>
+            </PickerKeys>
         </Autocomplete.Root>
     );
 }
@@ -371,18 +347,18 @@ function placeholder(
 
 /** What the list says instead of lines found: why there are none yet, or none at all. */
 function contentsNotice(
-    projectId: string | null,
+    folderId: string | null,
     query: string,
     found: ContentResults | null,
     i18n: Translator,
 ): string | null {
-    if (!projectId || !query.trim()) return null;
+    if (!folderId || !query.trim()) return null;
     if (query.trim().length < MIN_CONTENT_QUERY) {
         return i18n.t('palette.typeMore', { count: MIN_CONTENT_QUERY });
     }
     if (!found || found.files.length > 0) return null;
     if (found.status === 'failed') return errorMessage(found.error, i18n);
-    return found.status === 'done' && found.query === query ? i18n.t('palette.nothingFound') : null;
+    return found.status === 'done' && found.query === query ? i18n.t('common.nothingFound') : null;
 }
 
 /** How far the search went: still reading, or what it found. */
@@ -473,7 +449,7 @@ function Row({
                 aria-setsize={count}
                 aria-posinset={index + 1}
                 onClick={() => onOpen(item)}
-                className="group flex h-full cursor-default items-center gap-2.5 rounded-lg px-3 outline-none select-none data-highlighted:bg-ui-accent-soft data-highlighted:text-ui-accent-on-soft"
+                className="pick-row group h-full"
             >
                 {item.kind === 'line' ? (
                     <span className="w-9 shrink-0 text-right font-mono text-[11px] text-ui-text-muted tabular-nums group-data-highlighted:text-ui-accent-on-soft">

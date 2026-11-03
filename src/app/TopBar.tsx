@@ -4,9 +4,10 @@ import { ProjectFacts } from '@/modules/repository';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutLabel } from '@/shared/platform/shortcut';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
+import { FolderMenu } from './FolderMenu';
 import { panelShortcut } from './panels';
 import type { Problem } from './problems';
 import { useTitleBarOverlaid } from './providers';
@@ -45,6 +46,7 @@ function Crumb({ onClick, children }: { onClick?: () => void; children: string }
 export function TopBar({
     level,
     project,
+    folder,
     panel,
     problems,
     onZoom,
@@ -55,9 +57,13 @@ export function TopBar({
     minimized,
     onRestore,
     facts,
+    onShowFolder,
+    onEditFolders,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
+    /** The project's folder on screen; null without folder. */
+    folder: ProjectFolder | null;
     panel: PanelDefinition;
     problems: Problem[];
     onZoom: (level: ZoomLevel) => void;
@@ -70,6 +76,10 @@ export function TopBar({
     onRestore: (panel: PanelDefinition) => void;
     /** A project's panels are on screen, Changes among them: its snapshot has the facts. */
     facts: boolean;
+    /** Shows another folder of the project on screen. */
+    onShowFolder: (folderId: string) => void;
+    /** Opens the project's name and folders, to change them. */
+    onEditFolders: () => void;
 }) {
     const { t } = useTranslation();
     const overlaid = useTitleBarOverlaid();
@@ -95,7 +105,18 @@ export function TopBar({
                         <Crumb onClick={level === 1 ? undefined : () => onZoom(1)}>
                             {project.name}
                         </Crumb>
-                        <RemoteTag folder={projectFolder(project)} />
+                        <RemoteTag folder={folder} />
+                    </>
+                ) : null}
+                {project && folder && level >= 1 && project.folders.length > 1 ? (
+                    <>
+                        {separator}
+                        <FolderMenu
+                            project={project}
+                            folder={folder}
+                            onShow={onShowFolder}
+                            onEdit={onEditFolders}
+                        />
                     </>
                 ) : null}
                 {level === 2 ? (
@@ -105,7 +126,7 @@ export function TopBar({
                     </>
                 ) : null}
             </nav>
-            {project && facts ? <ProjectFacts project={project} fromSnapshot /> : null}
+            {folder && facts ? <ProjectFacts folder={folder} fromSnapshot /> : null}
             <div className="ml-auto flex items-center gap-1.5">
                 {minimized.length > 0 ? (
                     <nav

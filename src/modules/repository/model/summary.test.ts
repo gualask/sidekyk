@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { createTranslator } from '@/shared/i18n';
 import type { RepositorySummary } from './repository.types';
-import { changedCount, compactCount } from './summary';
+import { changedCount, changedLabel, compactCount, summedTotals } from './summary';
 
 const summary = (files: number, truncated: boolean): RepositorySummary => ({
     branch: { head: 'main', commit: 'abc1234', upstream: null, ahead: 0, behind: 0 },
@@ -25,5 +26,33 @@ describe('compactCount', () => {
         expect(compactCount(48_700)).toBe('48k');
         expect(compactCount(999_999)).toBe('999k');
         expect(compactCount(1_250_000)).toBe('1.2M');
+    });
+});
+
+describe('summedTotals', () => {
+    it("adds several repositories' changes, cut when one is", () => {
+        const api = { totals: { files: 3, additions: 40, deletions: 12 }, truncated: false };
+        const web = { totals: { files: 1, additions: 8, deletions: 2 }, truncated: true };
+        expect(summedTotals([api, web])).toEqual({
+            totals: { files: 4, additions: 48, deletions: 14 },
+            truncated: true,
+        });
+        expect(changedCount(summedTotals([api, web]))).toBe('4+');
+        expect(summedTotals([])).toEqual({
+            totals: { files: 0, additions: 0, deletions: 0 },
+            truncated: false,
+        });
+    });
+});
+
+describe('changedLabel', () => {
+    const en = createTranslator('en', 'en');
+    it('says what changed, or clean', () => {
+        const totals = (files: number) => ({
+            totals: { files, additions: 0, deletions: 0 },
+            truncated: false,
+        });
+        expect(changedLabel(totals(0), en)).toBe('clean');
+        expect(changedLabel(totals(8), en)).toBe('8 changed');
     });
 });

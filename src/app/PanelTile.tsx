@@ -2,7 +2,7 @@ import { IconArrowsMaximize, IconMinus } from '@tabler/icons-react';
 import { type CSSProperties, Suspense, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -23,10 +23,12 @@ const FULL_WIDTH = { flexGrow: 1, flexBasis: 0 };
 export function PanelTile({
     panel,
     project,
+    folder,
     target,
     selected,
     show,
     findInFiles,
+    showFolder,
     tile,
     tileFit = null,
     onZoomIn,
@@ -35,12 +37,15 @@ export function PanelTile({
 }: {
     panel: PanelDefinition;
     project: ProjectInfo;
+    /** The project's folder on screen; null without folder. */
+    folder: ProjectFolder | null;
     /** What the panel is asked to show, if anything. */
     target: PanelTarget | null;
     /** The panel takes the keys: full screen, or the selected tile. */
     selected: boolean;
     show: PanelProps['show'];
     findInFiles: PanelProps['findInFiles'];
+    showFolder: PanelProps['showFolder'];
     /** The tile's size among a project's panels; none full screen. */
     tile?: CSSProperties;
     /** For a tile whose width the app sets: where the panel says how wide it needs it. */
@@ -121,10 +126,12 @@ export function PanelTile({
             <div className="relative min-h-0 flex-1">
                 <Suspense fallback={null}>
                     <Preloaded
-                        key={project.id}
+                        // another folder of the project is another panel, which starts as left
+                        key={`${project.id}:${folder?.id ?? ''}`}
                         of={panel.view}
                         props={{
                             project,
+                            folder,
                             header,
                             tileFit,
                             target,
@@ -132,6 +139,7 @@ export function PanelTile({
                             selected,
                             show,
                             findInFiles,
+                            showFolder,
                             zoomIn: onZoomIn ?? null,
                         }}
                     />

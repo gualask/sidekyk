@@ -7,9 +7,10 @@ problems. Why semantic zoom: `../product.md`.
 
 - Levels: 0 all projects (the Inbox, `notes.md`, and the cards, `projects.md`), 1 a project's
   panels as tiles, 2 one panel full screen; View Transitions, 320 ms. The breadcrumb (All projects
-  / project / panel) in the top bar is the only "where am I".
+  / project / panel; with several folders the one on screen after the project,
+  `project-folders.md`) in the top bar is the only "where am I".
 - Start (2026-10-23): level 0, the project shown last selected; `sidekyk <folder>` opens its
-  project at level 1.
+  project at level 1. A project of several folders asks which on entering (`project-folders.md`).
 - Panels from the project (2026-10-23, 2026-10-24, 2026-11-02): a repository has Changes, Files
   and Notes; a folder without git Notes (the main tile) and Files beside, whose file picked opens
   Files full screen (`files.md`); no folder, Notes only, shown at level 1 as full screen and with
@@ -61,9 +62,9 @@ problems. Why semantic zoom: `../product.md`.
   `preloadable` part, shown by `Preloaded`, renders at once once loaded, so a transition never
   captures an empty frame. `Preloaded` is one component at module level (2026-10-31): a factory
   defining one fails Biome's `noComponentHookFactories` (React's `component-hook-factories`).
-- Start at level 1: the backend keeps the project the folder argument opened
-  (`ProjectsState::opened`) and says the list changed; the frontend takes it once
-  (`take_opened_project`). `onProjectsChanged` also runs once as listening starts, so a change made
+- Start at level 1: the backend keeps what the folder argument opened (`ProjectsState::opened`:
+  a project and its folder, or a folder above repositories to ask about, `project-folders.md`) and says the list
+  changed; the frontend takes it once (`take_opened`). `onProjectsChanged` also runs once as listening starts, so a change made
   before is not missed.
 - Panels (`app/panels.ts`): each says what it needs (`PanelDefinition.needs`: Changes a repository,
   Files a folder, Notes nothing); `projectTiles(kind)` gives a project's panels in their keys'
@@ -84,6 +85,9 @@ problems. Why semantic zoom: `../product.md`.
   change. `set_settings` applies only what differs (2026-10-21): theme and language set again only
   when changed, the shortcut only when not registered as asked; a dragged sidebar only writes the
   file.
+- Pickers (the palette, Move, the folder to open, 2026-11-03): one shell, field and row of keys
+  (`shared/ui/PickerDialog.tsx`), rows `.pick-row`, names ranked by `useRanking`; each keeps its
+  own list and keys.
 - Toasts (`useShowToast`) only for failures nothing on screen waits for; Base UI's toaster loads
   with the first. A toast with an action (Undo) stays 6 s. Dialogs show their own errors. Problems
   (`app/problems.ts`) are derived from caches, never fetched.

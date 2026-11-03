@@ -2,7 +2,8 @@ use std::path::{Path, PathBuf};
 
 use super::{folder_kind, FolderKind};
 use crate::modules::repository::{
-    existing_folder, repository_name, resolve_repository, RepositoryBackend, RepositoryInfo,
+    compare_names, existing_folder, repository_name, resolve_repository, RepositoryBackend,
+    RepositoryInfo,
 };
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
@@ -39,4 +40,31 @@ pub fn resolve_folder(
         name: repository_name(&root),
         root,
     })
+}
+
+/// The repositories right inside `folder`, a folder without git, by name: each subfolder with a
+/// `.git` at its root, links not followed. A folder picked above several repositories (api, web)
+/// finds them, as VS Code looks one level down by default; none for a repository.
+pub fn repositories_inside(
+    backend: &dyn RepositoryBackend,
+    folder: &Path,
+) -> anyhow::Result<Vec<RepositoryInfo>> {
+    if folder_kind(backend, folder)? == FolderKind::Repository {
+        return Ok(Vec::new());
+    }
+    let mut found: Vec<RepositoryInfo> = backend
+        .folders(folder, Path::new(""))
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|name| backend.has_entry(&folder.join(name), Path::new(".git")))
+        .filter_map(|name| {
+            let root = folder.join(name).into_os_string().into_string().ok()?;
+            Some(RepositoryInfo {
+                name: repository_name(&root),
+                root,
+            })
+        })
+        .collect();
+    found.sort_by(|a, b| compare_names(&a.name, &b.name));
+    Ok(found)
 }

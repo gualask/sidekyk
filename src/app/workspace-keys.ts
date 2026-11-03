@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent } from 'react';
-import { neighbourProject, type ProjectList, useActivateProject } from '@/modules/projects';
+import { neighbourProject, type ProjectList } from '@/modules/projects';
 import type { PaletteMode } from '@/modules/search';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutKey } from '@/shared/platform/shortcut';
@@ -31,6 +31,7 @@ function isPlain(event: KeyboardEvent): boolean {
  */
 export function useWorkspaceKeys({
     list,
+    switchProject,
     zoomIn,
     zoomOut,
     openPanel,
@@ -41,6 +42,8 @@ export function useWorkspaceKeys({
     newNote,
 }: {
     list: ProjectList | undefined;
+    /** Goes to the project before or after the one on screen (`[`, `]`). */
+    switchProject: (projectId: string) => void;
     zoomIn: () => void;
     zoomOut: () => void;
     openPanel: (panel: PanelDefinition) => void;
@@ -51,8 +54,6 @@ export function useWorkspaceKeys({
     toggleHelp: () => void;
     newNote: () => void;
 }) {
-    const activate = useActivateProject();
-
     const onKeyDown = useEffectEvent((event: KeyboardEvent) => {
         if (event.defaultPrevented) return;
         const shortcut = shortcutKey(event);
@@ -90,7 +91,7 @@ export function useWorkspaceKeys({
         } else if (event.key === '[' || event.key === ']') {
             const next = list ? neighbourProject(list, event.key === ']' ? 1 : -1) : null;
             if (!next) return;
-            activate(next);
+            switchProject(next);
         } else {
             const panel = panelForKey(event.key);
             if (!panel) return;

@@ -10,3 +10,12 @@ export function placeName(location: ProjectLocation): string {
     const remote = remoteName(location);
     return remote ? `${location.root} (${remote})` : location.root;
 }
+
+/**
+ * How a folder is named among its project's folders: the last part of its root (`api` for
+ * `/Users/ale/shop/api`).
+ */
+export function folderName(location: ProjectLocation): string {
+    const parts = location.root.split(/[\\/]/).filter((part) => part !== '');
+    return parts.at(-1) ?? location.root;
+}

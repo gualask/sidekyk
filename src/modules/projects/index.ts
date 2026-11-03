@@ -2,14 +2,16 @@ export { type ProjectsPort, ProjectsProvider } from './application/projects.port
 export {
     DEFAULT_TILES_LAYOUT,
     useActivateProject,
+    useFolderOnScreen,
     useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
-    useRelocateProject,
+    useRelocateFolder,
     useRemoveProject,
 } from './application/projects.queries';
 export {
     type FolderChoice,
+    type Opened,
     PROJECTS_CHANGED_EVENT,
     type ProjectList,
     type ProjectsChangedEvent,
@@ -17,3 +19,6 @@ export {
 } from './model/project.types';
 export { activeProject, neighbourProject } from './model/project-list';
 export { ProjectsOverview } from './ui/ProjectsOverview';
+
+/** A project's name and folders, to change; loaded with its first opening. */
+export const loadEditProjectDialog = () => import('./ui/EditProjectDialog');

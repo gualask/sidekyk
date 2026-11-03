@@ -888,6 +888,49 @@ impl NotesStore {
         })
     }
 
+    /// Moves every list of `from` with its notes into `into`, after its own lists, then deletes
+    /// `from`: a project merged into another. A list whose name `into` has takes `from`'s label
+    /// after it ("Notes (web)"), so no list mixes unseen; a list without notes stays behind.
+    pub fn merge_book(
+        &self,
+        storage: &dyn NotesStorage,
+        from: &Book,
+        into: &Book,
+        label: &str,
+    ) -> anyhow::Result<()> {
+        project_only(from, "lists")?;
+        project_only(into, "lists")?;
+        self.exchange(storage, from, into, |giving, taking| {
+            let mut took = Vec::new();
+            for list in &giving.lists {
+                let notes: Vec<Note> = giving
+                    .notes
+                    .iter()
+                    .filter(|n| n.list == list.id)
+                    .cloned()
+                    .collect();
+                if notes.is_empty() {
+                    continue;
+                }
+                let lower = list.name.to_lowercase();
+                let name = if taking.lists.iter().any(|l| l.name.to_lowercase() == lower) {
+                    format!("{} ({label})", list.name)
+                } else {
+                    list.name.clone()
+                };
+                let named = NoteList {
+                    id: list.id.clone(),
+                    name,
+                };
+                let (_, _, touched) = taking.absorb(&named, notes, new_list_id(taking))?;
+                took.extend(touched);
+            }
+            // `from` goes whole below: nothing of it is written again
+            Ok(((), Vec::new(), took))
+        })?;
+        self.delete_book(storage, from)
+    }
+
     /// Brings a moved list back where it was with its notes, and takes them out of the project
     /// they went to, with the list made for them (undo). `from` and `to` are `moved`'s books.
     pub fn unmove_list(
@@ -1705,6 +1748,44 @@ pub mod tests {
             .unwrap();
         assert_eq!(texts(&store, &storage, &docs(), &theirs.id), ["theirs"]);
         assert_eq!(texts(&store, &storage, &shop(), &release.id), ["moved"]);
+    }
+
+    #[test]
+    fn a_project_merged_brings_its_lists_named_apart_and_goes() {
+        let storage = MemoryStorage::default();
+        let store = NotesStore::default();
+        let general = store.notes(&storage, &shop()).unwrap().open_list;
+        store
+            .add_note(&storage, &shop(), &general, "api's".into())
+            .unwrap();
+        let checkout = store.add_list(&storage, &shop(), "Checkout").unwrap();
+        store
+            .add_note(&storage, &shop(), &checkout.id, "flow".into())
+            .unwrap();
+        store.add_list(&storage, &shop(), "Empty").unwrap();
+        let theirs = store.notes(&storage, &docs()).unwrap().open_list;
+        store
+            .add_note(&storage, &docs(), &theirs, "theirs".into())
+            .unwrap();
+
+        store.merge_book(&storage, &shop(), &docs(), "web").unwrap();
+        let merged = store.notes(&storage, &docs()).unwrap();
+        let names: Vec<&str> = merged.lists.iter().map(|l| l.name.as_str()).collect();
+        let first = &merged.lists[0].name;
+        assert_eq!(
+            names,
+            [first.as_str(), &format!("{first} (web)"), "Checkout"]
+        );
+        assert_eq!(texts(&store, &storage, &docs(), &theirs), ["theirs"]);
+        assert_eq!(
+            texts(&store, &storage, &docs(), &merged.lists[1].id),
+            ["api's"]
+        );
+        assert_eq!(
+            texts(&store, &storage, &docs(), &merged.lists[2].id),
+            ["flow"]
+        );
+        assert_eq!(store.count(&storage, &shop()).unwrap(), 0);
     }
 
     #[test]

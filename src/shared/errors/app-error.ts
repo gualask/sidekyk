@@ -12,6 +12,8 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     distro_stopped: 'error.distroStopped',
     export_in_repository: 'error.exportInRepository',
     file_missing: 'error.fileMissing',
+    folder_elsewhere: 'error.folderElsewhere',
+    folder_overlaps: 'error.folderOverlaps',
     git_not_found: 'error.gitNotFound',
     git_timed_out: 'error.gitTimedOut',
     helper_failed: 'error.helperFailed',

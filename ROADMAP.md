@@ -23,10 +23,8 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 ## Projects with optional folders
 
 `.cflow/plans/project-folders.md`: a project is notes and zero or more folders, panels from what it
-has.
+has. Built: `docs/features/project-folders.md` (several folders, one on screen).
 
-- [ ] Several folders in a project (multi-root, e.g. api, web, ops): a root each in Files, a
-      section per repository in Changes
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
       (`.cflow/plans/project-folders.md`)
 

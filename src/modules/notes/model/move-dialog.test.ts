@@ -16,8 +16,12 @@ import { INBOX_BOOK, type Note, type ProjectNotes } from './notes.types';
 
 const projects: ProjectInfo[] = [
     { id: 'casa', name: 'Casa', folders: [] },
-    { id: 'shop', name: 'shop', folders: [{ kind: 'local', root: '/dev/shop' }] },
-    { id: 'shop2', name: 'Shop', folders: [{ kind: 'wsl', distro: 'Ubuntu', root: '/dev/shop' }] },
+    { id: 'shop', name: 'shop', folders: [{ id: 'f1', kind: 'local', root: '/dev/shop' }] },
+    {
+        id: 'shop2',
+        name: 'Shop',
+        folders: [{ id: 'f2', kind: 'wsl', distro: 'Ubuntu', root: '/dev/shop' }],
+    },
 ];
 
 const note: Note = {

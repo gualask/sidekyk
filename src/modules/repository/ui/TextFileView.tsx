@@ -22,7 +22,7 @@ const NO_HUNKS: [] = [];
  * the line that was at the top. An image shows as it is, having no text.
  */
 export function TextFileView({
-    projectId,
+    folderId,
     path,
     header,
     renderHeader,
@@ -32,7 +32,7 @@ export function TextFileView({
     anchor = null,
     openFile,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
@@ -67,7 +67,7 @@ export function TextFileView({
     if (previewed) {
         return (
             <PreviewPane
-                projectId={projectId}
+                folderId={folderId}
                 path={path}
                 header={header}
                 renderHeader={({ topLine }) =>
@@ -84,7 +84,7 @@ export function TextFileView({
     }
     return (
         <CodeView
-            projectId={projectId}
+            folderId={folderId}
             path={path}
             header={header}
             renderHeader={(pane) =>
@@ -98,14 +98,14 @@ export function TextFileView({
 
 /** The file's text on the viewer's rows, or what it is instead. */
 function CodeView({
-    projectId,
+    folderId,
     path,
     header,
     renderHeader,
     finder,
     openOnLine,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     header: HTMLElement | null;
     renderHeader: (pane: PaneHeader) => ReactNode;
@@ -113,12 +113,12 @@ function CodeView({
     openOnLine: number | null;
 }) {
     const i18n = useTranslation();
-    const content = useFileContent(projectId, path);
+    const content = useFileContent(folderId, path);
     const data = content.data;
     const text = data?.kind === 'text' ? data : null;
     const { rows, widest } = useMemo(() => textRows(textLines(text?.text ?? '')), [text]);
     const source = useMemo(() => ({ path, origPath: null, commit: null }), [path]);
-    const syntax = useMemo(() => ({ projectId, sides: fileSides(path) }), [projectId, path]);
+    const syntax = useMemo(() => ({ folderId, sides: fileSides(path) }), [folderId, path]);
 
     return (
         <Pane

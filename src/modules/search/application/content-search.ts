@@ -29,15 +29,15 @@ function empty(query: string): ContentResults {
  * The lines of a project's files where `query` is, as they come, once typing pauses. A new text
  * replaces the results once its first files come (or it ends with none), so the list does not
  * blink between keys. A search no longer wanted (the text changed, the palette went back to names
- * or closed) stops in the backend. Nothing while `projectId` is null or the text is too short.
+ * or closed) stops in the backend. Nothing while `folderId` is null or the text is too short.
  */
-export function useContentSearch(projectId: string | null, query: string): ContentResults | null {
+export function useContentSearch(folderId: string | null, query: string): ContentResults | null {
     const port = useSearchPort();
     const [results, setResults] = useState<ContentResults | null>(null);
-    const searchable = projectId !== null && query.trim().length >= MIN_CONTENT_QUERY;
+    const searchable = folderId !== null && query.trim().length >= MIN_CONTENT_QUERY;
 
     useEffect(() => {
-        if (!searchable || projectId === null) {
+        if (!searchable || folderId === null) {
             setResults(null);
             return;
         }
@@ -53,7 +53,7 @@ export function useContentSearch(projectId: string | null, query: string): Conte
         };
         const timer = setTimeout(() => {
             running = true;
-            port.searchContents(projectId, query, (files) =>
+            port.searchContents(folderId, query, (files) =>
                 update((current) => ({
                     ...current,
                     files: [...current.files, ...files].sort(byPath),
@@ -75,7 +75,7 @@ export function useContentSearch(projectId: string | null, query: string): Conte
             clearTimeout(timer);
             if (running) void port.stopContentSearch();
         };
-    }, [port, projectId, query, searchable]);
+    }, [port, folderId, query, searchable]);
 
     return searchable ? results : null;
 }

@@ -89,13 +89,13 @@ function CommitRow({
  * click on a commit shows its files in the list above, instead of the working tree's.
  */
 export function RecentCommits({
-    projectId,
+    folderId,
     open,
     onOpenChange,
     viewed,
     onView,
 }: {
-    projectId: string;
+    folderId: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     /** The commit whose files the list above shows, if any. */
@@ -104,7 +104,7 @@ export function RecentCommits({
 }) {
     const i18n = useTranslation();
     const timeWidth = useMemo(() => relativeTimeWidth(i18n), [i18n]);
-    const log = useRecentCommits(projectId, open);
+    const log = useRecentCommits(folderId, open);
     const commits = log.data?.commits ?? [];
     const more = log.data?.more ?? false;
     // the times are relative to when the list was read, so they move only with it

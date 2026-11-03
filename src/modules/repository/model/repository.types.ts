@@ -390,11 +390,11 @@ export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {
     /**
-     * 4 since it tells a change of kind; 3 brought the paths that changed; 2 named the project by
-     * its id, not its root.
+     * 5 names the folder by its id; 4 told a change of kind; 3 brought the paths that changed; 2
+     * named the project by its id, 1 by its root.
      */
-    version: 4;
-    projectId: string;
+    version: 5;
+    folderId: string;
     /** The index, HEAD or refs changed too: only then may the recent commits have. */
     gitDir: boolean;
     /**

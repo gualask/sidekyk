@@ -54,16 +54,16 @@ function finderOf(
 }
 
 /**
- * The text looked for in a project's viewer, the same in both panels and kept for the session:
+ * The text looked for in a folder's viewer, the same in both panels and kept for the session:
  * the bar shows on its file only, until closed or another file shows (`shown`, the shared
  * selection's path; null while it is not known yet).
  */
 export function useFileFind(
-    projectId: string,
+    folderId: string,
     shown: string | null,
     findInFiles: (query: string) => void,
 ) {
-    const [find, setFind] = useSessionState<FileFind | null>(`find:${projectId}`, null);
+    const [find, setFind] = useSessionState<FileFind | null>(`find:${folderId}`, null);
     // in an effect: the session's store is outside React, and is not set while rendering
     useEffect(() => {
         if (find && shown !== null && find.file !== shown) setFind(null);

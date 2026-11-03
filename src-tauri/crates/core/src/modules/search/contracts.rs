@@ -162,7 +162,7 @@ pub struct SearchResults {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::projects::Location;
+    use crate::modules::projects::{Location, ProjectFolder};
 
     #[test]
     fn request_and_results_use_the_frontend_field_names() {
@@ -186,9 +186,12 @@ mod tests {
                 project: Project {
                     id: "/r".into(),
                     name: "r".into(),
-                    folders: vec![Location::Wsl {
-                        distro: "Ubuntu".into(),
-                        root: "/r".into(),
+                    folders: vec![ProjectFolder {
+                        id: "/r".into(),
+                        location: Location::Wsl {
+                            distro: "Ubuntu".into(),
+                            root: "/r".into(),
+                        },
                     }],
                 },
                 score: 30,
@@ -241,7 +244,7 @@ mod tests {
                 "projects": [{
                     "id": "/r",
                     "name": "r",
-                    "folders": [{ "kind": "wsl", "distro": "Ubuntu", "root": "/r" }],
+                    "folders": [{ "id": "/r", "kind": "wsl", "distro": "Ubuntu", "root": "/r" }],
                     "score": 30,
                     "highlights": [[0, 1]]
                 }],

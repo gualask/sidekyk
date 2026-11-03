@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react';
 import type { MessageKey } from '@/shared/i18n';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { type Preloadable, preloadable } from '@/shared/ui/preloadable';
 
 /**
@@ -17,6 +17,8 @@ type PanelPlace = 'tile' | 'full';
 
 export interface PanelProps {
     project: ProjectInfo;
+    /** The project's folder on screen, which its panels of files read; null without folder. */
+    folder: ProjectFolder | null;
     /**
      * Where the panel shows what is open in it and the actions on it, through a portal: the
      * tile's header, or full screen a header of its own, shown only while the panel puts something
@@ -44,6 +46,8 @@ export interface PanelProps {
     show: (panel: string, target: PanelTarget) => void;
     /** Looks for a text in all the project's files, as `⌘F` does from where no file is open. */
     findInFiles: (query: string) => void;
+    /** Shows another folder of the project, at the same zoom. */
+    showFolder: (folderId: string) => void;
     /** In a tile: shows the panel full screen, as the tile's own button does. Null full screen. */
     zoomIn: (() => void) | null;
 }
@@ -61,6 +65,11 @@ export type SummaryPart = 'lead' | 'facts' | 'body';
  */
 export interface PanelSummaryProps {
     project: ProjectInfo;
+    /**
+     * The project's one folder, whose summary the card shows; null without folder, and with
+     * several (their summaries are the project's folders').
+     */
+    folder: ProjectFolder | null;
     part: SummaryPart;
     /** The project's folder is a repository: false without folder, or for a folder without git. */
     repository: boolean;

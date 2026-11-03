@@ -13,9 +13,9 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        └─▶ paths git ignores skipped (check-ignore, cached per directory);
                            without git, those the walk's rules hide
                        └─▶ `.git` come or gone at the root: watched again as the other kind
-                       └─▶ "repository-changed" { version: 4, projectId, gitDir, paths,
+                       └─▶ "repository-changed" { version: 5, folderId, gitDir, paths,
                                                   kindChanged }
-                             └─▶ frontend invalidates ['repository', projectId, …]
+                             └─▶ frontend invalidates ['repository', folderId, …]
                                  (kindChanged: reset; commits and staged diffs only when
                                  gitDir; the open file, diff and colors only when paths touch
                                  them; paths null over 100 or when unknown)

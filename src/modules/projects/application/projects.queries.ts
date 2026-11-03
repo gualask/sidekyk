@@ -1,8 +1,8 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useEffectEvent } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import type { ProjectList, TilesLayout } from '../model/project.types';
+import type { Opened, ProjectList, TilesLayout } from '../model/project.types';
 import { type ProjectsPort, useProjectsPort } from './projects.port';
 
 const projectsKey = ['projects'] as const;
@@ -34,6 +34,13 @@ function projectName(queryClient: QueryClient, projectId: string): string {
     return list?.projects.find((project) => project.id === projectId)?.name ?? projectId;
 }
 
+/** The name of the project a folder of the list on screen is of, for a message about it. */
+function folderName(queryClient: QueryClient, folderId: string): string {
+    const list = queryClient.getQueryData<ProjectList>(projectsKey);
+    const project = list?.projects.find((p) => p.folders.some((folder) => folder.id === folderId));
+    return project?.name ?? folderId;
+}
+
 /** The list, as every reader of it asks for it. */
 function projectsQuery(port: ProjectsPort) {
     return { queryKey: projectsKey, queryFn: () => port.getProjects() };
@@ -45,9 +52,10 @@ export function useProjects() {
 
 /**
  * Reads the list again when the backend changed it, such as a folder given on the command line;
- * the project that folder put on screen goes to `onOpened`, once the list read has it.
+ * what that folder did goes to `onOpened` once the list read has it: the project put on screen,
+ * or a folder above repositories to ask about.
  */
-export function useProjectsChangeSubscription(onOpened: (projectId: string) => void) {
+export function useProjectsChangeSubscription(onOpened: (opened: Opened) => void) {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     const opened = useEffectEvent(onOpened);
@@ -56,8 +64,8 @@ export function useProjectsChangeSubscription(onOpened: (projectId: string) => v
             port.onProjectsChanged(() => {
                 void (async () => {
                     await queryClient.invalidateQueries({ queryKey: projectsKey });
-                    const id = await port.takeOpenedProject();
-                    if (id !== null) opened(id);
+                    const taken = await port.takeOpened();
+                    if (taken !== null) opened(taken);
                 })();
             }),
         [port, queryClient],
@@ -71,25 +79,24 @@ export function useChooseProjectFolder() {
 }
 
 /**
- * Adds a project, with the folder chosen or none, and shows it; `onCreated` follows. A failure is
- * the dialog's to show: it is still open.
+ * Adds a project, with the folders chosen or none, and shows it. A failure is the dialog's to
+ * show: it is still open.
  */
-export function useCreateProject(onCreated: () => void) {
+export function useCreateProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
         ...projectsChange,
-        mutationFn: ({ name, folder }: { name: string; folder: string | null }) =>
-            port.createProject(name, folder),
+        mutationFn: ({ name, folders }: { name: string; folders: string[] }) =>
+            port.createProject(name, folders),
         onSuccess: (list) => {
             showList(queryClient, list);
-            onCreated();
         },
     });
 }
 
 /** Names a project anew. A failure is the dialog's to show: it is still open. */
-export function useRenameProject(onRenamed: () => void) {
+export function useRenameProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
@@ -98,14 +105,13 @@ export function useRenameProject(onRenamed: () => void) {
             port.renameProject(projectId, name),
         onSuccess: (list) => {
             showList(queryClient, list);
-            onRenamed();
         },
     });
 }
 
 /**
- * Shows a project at once; the backend catches up (it starts watching the repository). Showing
- * the project already on screen does nothing. A failure puts the list back as the backend has it,
+ * Shows a project at once while the backend catches up. Showing the project already on screen
+ * does nothing. A failure puts the list back as the backend has it, unless a later change waits,
  * and a toast says why: the switch has already left the screen that asked for it.
  */
 export function useActivateProject() {
@@ -126,13 +132,8 @@ export function useActivateProject() {
             showList(queryClient, list);
         },
         onError: (error, projectId) => {
-            showToast(
-                errorToast(
-                    i18n.t('projects.openFailed', { name: projectName(queryClient, projectId) }),
-                    error,
-                    i18n,
-                ),
-            );
+            const name = projectName(queryClient, projectId);
+            showToast(errorToast(i18n.t('projects.openFailed', { name }), error, i18n));
             if (isLastChange(queryClient)) {
                 void queryClient.invalidateQueries({ queryKey: projectsKey });
             }
@@ -172,15 +173,15 @@ export function useRemoveProject() {
 }
 
 /**
- * Asks where a moved repository is now, and its project follows it there: `readAgain` reads it at
- * its new place (its id, so its queries, stay). A folder that is another project's is not taken:
- * a toast says whose, with `open` for it. A failure is a toast.
+ * Asks where a moved folder of a project is now, and the project follows it there: `readAgain`
+ * reads it at its new place (its id, so its queries, stay). A folder that is another project's is
+ * not taken: a toast says whose, with `open` for it. A failure is a toast.
  */
-export function useRelocateProject({
+export function useRelocateFolder({
     readAgain,
     open,
 }: {
-    readAgain: (projectId: string) => void;
+    readAgain: (folderId: string) => void;
     open: (projectId: string) => void;
 }) {
     const port = useProjectsPort();
@@ -189,24 +190,24 @@ export function useRelocateProject({
     const i18n = useTranslation();
     return useMutation({
         ...projectsChange,
-        mutationFn: (projectId: string) => port.relocateProject(projectId),
-        onSuccess: (relocation, projectId) => {
-            if (relocation?.kind === 'inProject') {
-                const { id, name } = relocation;
+        mutationFn: (folderId: string) => port.relocateFolder(folderId),
+        onSuccess: (change, folderId) => {
+            if (change?.kind === 'inProject') {
+                const { id, name } = change;
                 showToast({
                     title: i18n.t('projects.folderInProject', { name }),
                     action: { label: i18n.t('common.open'), run: () => open(id) },
                 });
                 return;
             }
-            if (!relocation) return;
-            showList(queryClient, relocation.list);
-            readAgain(projectId);
+            if (!change) return;
+            showList(queryClient, change.list);
+            readAgain(folderId);
         },
-        onError: (error, projectId) => {
+        onError: (error, folderId) => {
             showToast(
                 errorToast(
-                    i18n.t('projects.locateFailed', { name: projectName(queryClient, projectId) }),
+                    i18n.t('projects.locateFailed', { name: folderName(queryClient, folderId) }),
                     error,
                     i18n,
                 ),
@@ -258,4 +259,80 @@ export function useProjectLayout(projectId: string | null) {
         [projectId, queryClient, mutate],
     );
     return [layout ?? DEFAULT_TILES_LAYOUT, change] as const;
+}
+
+/** A folder of a project, by both ids. */
+interface FolderOfProject {
+    projectId: string;
+    folderId: string;
+}
+
+/**
+ * Tells the backend the folder the window shows (null for none) whenever it changes: it watches
+ * that folder, and the palette looks in its files. One at a time, in order, so a quick switch ends
+ * on the last folder. A failure is a toast.
+ */
+export function useFolderOnScreen(folderId: string | null) {
+    const port = useProjectsPort();
+    const showToast = useShowToast();
+    const i18n = useTranslation();
+    const told = useRef<Promise<void>>(Promise.resolve());
+    const failed = useEffectEvent((error: unknown) =>
+        showToast(errorToast(i18n.t('projects.showFolderFailed'), error, i18n)),
+    );
+    useEffect(() => {
+        told.current = told.current.then(() => port.showProjectFolder(folderId)).catch(failed);
+    }, [port, folderId]);
+}
+
+/**
+ * Asks for another folder of a project, which it then follows. A folder that is another
+ * project's comes back as `inProject`, for the caller to offer the merge. A failure is the
+ * caller's to show.
+ */
+export function useAddProjectFolder() {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        ...projectsChange,
+        mutationFn: (projectId: string) => port.addProjectFolder(projectId),
+        onSuccess: (change) => {
+            if (change?.kind === 'changed') showList(queryClient, change.list);
+        },
+    });
+}
+
+/**
+ * Stops following a folder of a project; the folder and the notes stay. A failure is the
+ * caller's to show.
+ */
+export function useRemoveProjectFolder() {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        ...projectsChange,
+        mutationFn: ({ projectId, folderId }: FolderOfProject) =>
+            port.removeProjectFolder(projectId, folderId),
+        onSuccess: (list) => {
+            showList(queryClient, list);
+        },
+    });
+}
+
+/**
+ * Merges the project `from` into `into`: its folders and lists of notes go to `into`, and it goes;
+ * `onMerged` follows with both ids, for what kept their notes. A failure is the caller's to show.
+ */
+export function useMergeProjects(onMerged: (into: string, from: string) => void) {
+    const port = useProjectsPort();
+    const queryClient = useQueryClient();
+    return useMutation({
+        ...projectsChange,
+        mutationFn: ({ into, from }: { into: string; from: string }) =>
+            port.mergeProjects(into, from),
+        onSuccess: (list, { into, from }) => {
+            showList(queryClient, list);
+            onMerged(into, from);
+        },
+    });
 }

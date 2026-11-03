@@ -338,7 +338,9 @@ mod tests {
     //! End to end against a real git in a scratch repository.
 
     use super::*;
-    use crate::modules::folder::{folder_kind, load_folder_tree, resolve_folder, FolderKind};
+    use crate::modules::folder::{
+        folder_kind, load_folder_tree, repositories_inside, resolve_folder, FolderKind,
+    };
     use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
         load_blob_image, load_blob_size, load_changes_ignoring_whitespace, load_commit_activity,
@@ -1298,6 +1300,32 @@ mod tests {
     }
 
     #[test]
+    fn the_repositories_right_inside_a_folder_without_git_are_found_by_name() {
+        let backend = LocalRepositoryBackend::default();
+        let names = |folder: &Path| -> Vec<String> {
+            repositories_inside(&backend, folder)
+                .unwrap()
+                .into_iter()
+                .map(|found| found.name)
+                .collect()
+        };
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("web/.git")).unwrap();
+        // a worktree's or a submodule's `.git` is a file
+        write(dir.path(), "api/.git", "gitdir: elsewhere\n");
+        std::fs::create_dir_all(dir.path().join("docs/deep/.git")).unwrap();
+        write(dir.path(), "notes.md", "not a folder\n");
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(dir.path().join("web"), dir.path().join("link")).unwrap();
+        assert_eq!(names(dir.path()), ["api", "web"]);
+        let found = &repositories_inside(&backend, dir.path()).unwrap()[0];
+        assert!(found.root.ends_with("api"));
+        // a repository, or below one: none
+        assert!(names(&dir.path().join("web")).is_empty());
+        assert!(repositories_inside(&backend, &dir.path().join("gone")).is_err());
+    }
+
+    #[test]
     fn a_folder_is_a_repository_by_the_git_at_its_root() {
         let backend = LocalRepositoryBackend::default();
         let repo = scratch_repo();
@@ -1922,9 +1950,9 @@ mod tests {
             load_snapshot(&backend, &repo.info).unwrap().files.into();
         let project = Project::new(
             repo.info.name.clone(),
-            Some(Location::Local {
+            [Location::Local {
                 root: repo.info.root.clone(),
-            }),
+            }],
         );
         let palette: SearchRequest = serde_json::from_value(json!({
             "query": "srcmod",

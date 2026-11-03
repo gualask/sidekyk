@@ -250,6 +250,10 @@ impl Repositories for LocalRepositories {
         folder::resolve_folder(&*self.backend, candidate)
     }
 
+    fn repositories_inside(&self, folder: &RepositoryInfo) -> anyhow::Result<Vec<RepositoryInfo>> {
+        folder::repositories_inside(&*self.backend, Path::new(&folder.root))
+    }
+
     fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind> {
         folder::folder_kind(&*self.backend, Path::new(&info.root))
     }

@@ -293,7 +293,7 @@ export function DiffList({
         return row?.kind === 'line' ? [row.line] : [];
     });
     const colors = useSyntaxColors(
-        syntax.projectId,
+        syntax.folderId,
         syntax.sides,
         blocksOf(shownLines, syntax.sides),
     );

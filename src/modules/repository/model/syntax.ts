@@ -9,7 +9,7 @@ type Side = keyof DiffSides;
 
 /** What a viewer's lines are colored from: the sides of a file in a project. */
 export interface FileSyntax {
-    projectId: string;
+    folderId: string;
     sides: DiffSides;
 }
 

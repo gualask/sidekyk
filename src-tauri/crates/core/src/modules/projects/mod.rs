@@ -6,7 +6,7 @@ mod list;
 mod place;
 
 pub use contracts::{
-    FolderChoice, Location, Project, ProjectList, ProjectsChangedEvent, Relocation, TilesLayout,
-    PROJECTS_CHANGED_EVENT,
+    FolderChange, FolderChoice, Location, Opened, Project, ProjectFolder, ProjectList,
+    ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT,
 };
 pub use place::{same_distro, FoundFolder};

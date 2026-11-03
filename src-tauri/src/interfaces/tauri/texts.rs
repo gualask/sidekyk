@@ -15,8 +15,10 @@ pub(crate) struct Texts {
     pub(crate) quit: &'static str,
     /// The folder picker's title for a new project.
     pub(crate) choose_folder: &'static str,
-    /// `{name}`: the project's.
+    /// `{name}`: the folder's.
     pub(crate) locate: &'static str,
+    /// The folder picker's title for another folder of a project; `{name}`: the project's.
+    pub(crate) add_folder: &'static str,
     pub(crate) export_notes: &'static str,
     /// The file an export suggests; `{name}`: the project's.
     pub(crate) export_file: &'static str,
@@ -30,6 +32,7 @@ static ENGLISH: Texts = Texts {
     quit: "Quit Sidekyk",
     choose_folder: "Choose the project's folder",
     locate: "Locate {name}",
+    add_folder: "Add a folder to {name}",
     export_notes: "Export notes",
     export_file: "{name}-notes.md",
     export: ExportWords {
@@ -46,6 +49,7 @@ static ITALIAN: Texts = Texts {
     quit: "Esci da Sidekyk",
     choose_folder: "Scegli la cartella del progetto",
     locate: "Individua {name}",
+    add_folder: "Aggiungi una cartella a {name}",
     export_notes: "Esporta le note",
     export_file: "{name}-note.md",
     export: ExportWords {

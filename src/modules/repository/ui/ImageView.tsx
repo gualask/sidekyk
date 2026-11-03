@@ -14,12 +14,12 @@ import { Notice } from './Pane';
  * side of the image's diff, its `name` right above it.
  */
 export function ImageView({
-    projectId,
+    folderId,
     path,
     blob = null,
     name = null,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     blob?: string | null;
     name?: string | null;
@@ -35,7 +35,7 @@ export function ImageView({
             {content}
         </Notice>
     );
-    const image = useImageSource(projectId, path, blob);
+    const image = useImageSource(folderId, path, blob);
     const [shown, setShown] = useState<{ url: string; width: number; height: number } | null>(null);
     const [failed, setFailed] = useState<string | null>(null);
 

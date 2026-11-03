@@ -20,6 +20,10 @@ pub enum UserFacingErrorCode {
     DistroStopped,
     ExportInRepository,
     FileMissing,
+    /// A folder added to a project is on another machine than its folders (this one, a distro).
+    FolderElsewhere,
+    /// A folder added to a project is one of its folders, or holds one or is inside one.
+    FolderOverlaps,
     GitNotFound,
     GitTimedOut,
     /// The helper that reads a WSL project could not start, or stopped.
@@ -51,6 +55,8 @@ impl UserFacingErrorCode {
             Self::DistroStopped => "distro_stopped",
             Self::ExportInRepository => "export_in_repository",
             Self::FileMissing => "file_missing",
+            Self::FolderElsewhere => "folder_elsewhere",
+            Self::FolderOverlaps => "folder_overlaps",
             Self::GitNotFound => "git_not_found",
             Self::GitTimedOut => "git_timed_out",
             Self::HelperFailed => "helper_failed",
@@ -82,6 +88,8 @@ impl UserFacingErrorCode {
         Self::DistroStopped,
         Self::ExportInRepository,
         Self::FileMissing,
+        Self::FolderElsewhere,
+        Self::FolderOverlaps,
         Self::GitNotFound,
         Self::GitTimedOut,
         Self::HelperFailed,
@@ -239,6 +247,8 @@ mod tests {
                 "export_in_repository",
             ),
             (UserFacingErrorCode::FileMissing, "file_missing"),
+            (UserFacingErrorCode::FolderElsewhere, "folder_elsewhere"),
+            (UserFacingErrorCode::FolderOverlaps, "folder_overlaps"),
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::HelperFailed, "helper_failed"),

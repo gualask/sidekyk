@@ -131,18 +131,18 @@ function DiffPane({
 
 /** A file changed in the working tree, in its area: in Changes, and in Files whole. */
 export function ChangeDiffView({
-    projectId,
+    folderId,
     file,
     snapshot,
     ...shown
 }: DiffShown & {
-    projectId: string;
+    folderId: string;
     file: ChangedFile;
     /** The snapshot the file is from, which formatting is counted over when asked. */
     snapshot: SnapshotRead;
 }) {
-    const formattingCheck = useFormattingCheck(projectId, snapshot);
-    const diff = useFileDiff(projectId, {
+    const formattingCheck = useFormattingCheck(folderId, snapshot);
+    const diff = useFileDiff(folderId, {
         path: file.path,
         origPath: file.origPath,
         area: file.area,
@@ -150,8 +150,8 @@ export function ChangeDiffView({
     });
     const { path, origPath, area } = file;
     const syntax = useMemo(
-        () => ({ projectId, sides: changeSides({ path, origPath, area }) }),
-        [projectId, path, origPath, area],
+        () => ({ folderId, sides: changeSides({ path, origPath, area }) }),
+        [folderId, path, origPath, area],
     );
     return (
         <DiffPane
@@ -167,12 +167,12 @@ export function ChangeDiffView({
 
 /** A file of a commit, against the commit's parent. */
 export function CommitDiffView({
-    projectId,
+    folderId,
     commit,
     file,
     ...shown
-}: DiffShown & { projectId: string; commit: Commit; file: FileChange }) {
-    const diff = useCommitFileDiff(projectId, {
+}: DiffShown & { folderId: string; commit: Commit; file: FileChange }) {
+    const diff = useCommitFileDiff(folderId, {
         commit: commitRequest(commit),
         path: file.path,
         origPath: file.origPath,
@@ -181,8 +181,8 @@ export function CommitDiffView({
     const { sha, parent } = commit;
     const { path, origPath } = file;
     const syntax = useMemo(
-        () => ({ projectId, sides: commitSides({ sha, parent }, { path, origPath }) }),
-        [projectId, sha, parent, path, origPath],
+        () => ({ folderId, sides: commitSides({ sha, parent }, { path, origPath }) }),
+        [folderId, sha, parent, path, origPath],
     );
     return (
         <DiffPane

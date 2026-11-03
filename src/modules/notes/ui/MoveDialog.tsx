@@ -1,11 +1,11 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
-import { Dialog } from '@base-ui/react/dialog';
 import { IconFolderCode, IconInbox, IconList, IconPlus, IconX } from '@tabler/icons-react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type RefObject, useMemo, useRef, useState } from 'react';
 import { RichText, type Translator, useTranslation } from '@/shared/i18n';
 import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
+import { useRanking } from '@/shared/ui/hooks/use-ranking';
+import { PickerDialog, PickerField, PickerKeys } from '@/shared/ui/PickerDialog';
 import { useMoveTargets } from '../application/move-targets';
 import { useNotes } from '../application/notes.queries';
 import {
@@ -45,39 +45,24 @@ export function MoveDialog({
     const { t } = useTranslation();
     const input = useRef<HTMLInputElement>(null);
     return (
-        <Dialog.Root
-            open
+        <PickerDialog
             onOpenChange={(open) => {
                 if (!open) onClose();
             }}
+            title={t(subject.kind === 'note' ? 'notes.moveNote' : 'notes.moveList')}
+            description={subject.kind === 'note' ? noteTitle(subject.note.text) : subject.list.name}
+            initialFocus={input}
+            width="w-[min(520px,calc(100vw-32px))]"
         >
-            <Dialog.Portal>
-                <Dialog.Backdrop className="dialog-backdrop" />
-                <Dialog.Popup
-                    initialFocus={input}
-                    className="dialog-popup top-[14vh] flex w-[min(520px,calc(100vw-32px))] flex-col overflow-hidden"
-                >
-                    <div className="px-4 pt-3.5">
-                        <Dialog.Title className="text-[15px] font-bold">
-                            {t(subject.kind === 'note' ? 'notes.moveNote' : 'notes.moveList')}
-                        </Dialog.Title>
-                        <Dialog.Description className="truncate text-xs text-ui-text-muted">
-                            {subject.kind === 'note'
-                                ? noteTitle(subject.note.text)
-                                : subject.list.name}
-                        </Dialog.Description>
-                    </div>
-                    <MoveField
-                        input={input}
-                        subject={subject}
-                        onMove={(move) => {
-                            onClose();
-                            onMove(move);
-                        }}
-                    />
-                </Dialog.Popup>
-            </Dialog.Portal>
-        </Dialog.Root>
+            <MoveField
+                input={input}
+                subject={subject}
+                onMove={(move) => {
+                    onClose();
+                    onMove(move);
+                }}
+            />
+        </PickerDialog>
     );
 }
 
@@ -109,16 +94,7 @@ function MoveField({
         [subject, state.chip, books, chipNotes],
     );
     const names = useMemo(() => stepNames(step), [step]);
-    const typed = state.query.trim();
-    // while the next ranking comes the previous stays, if it ranked the same names
-    const ranked = useQuery({
-        queryKey: ['move-rank', typed, names],
-        queryFn: async () => ({ names, order: await rank(typed, names) }),
-        enabled: typed !== '',
-        placeholderData: keepPreviousData,
-        gcTime: 0,
-    });
-    const order = ranked.data?.names === names ? ranked.data.order : null;
+    const order = useRanking(rank, state.query, names);
     const rows = useMemo(() => moveRows(step, state.query, order), [step, state.query, order]);
 
     /** A chip put or taken away by a click: the field keeps the focus. */
@@ -143,49 +119,46 @@ function MoveField({
             autoHighlight
             onItemHighlighted={(row) => setHighlighted(row ?? null)}
         >
-            <div className="mx-4 mt-3 mb-2 flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface-subtle px-2 focus-within:border-ui-accent">
-                {state.chip ? (
-                    <span className="chip shrink-0 gap-0.5 pr-0.5">
-                        <span className="max-w-[180px] truncate">{state.chip.name}</span>
-                        {/* out of the Tab order: Tab completes, Backspace takes the chip away */}
-                        <button
-                            type="button"
-                            tabIndex={-1}
-                            className="btn-icon h-5 w-5"
-                            aria-label={t('notes.moveUnchip', { name: state.chip.name })}
-                            onClick={() => change({ chip: null, query: '' })}
-                        >
-                            <IconX size={12} />
-                        </button>
-                    </span>
-                ) : null}
-                <Autocomplete.Input
-                    ref={input}
-                    aria-label={t('notes.moveWhere')}
-                    placeholder={placeholder(subject, state, chipNotes, i18n)}
-                    spellCheck={false}
-                    autoComplete="off"
-                    className="h-9 min-w-0 flex-1 border-0 bg-transparent text-[13.5px] text-ui-text outline-none placeholder:text-ui-text-muted"
-                    onKeyDown={(event) => {
-                        if (event.metaKey || event.ctrlKey || event.altKey) return;
-                        if (event.key === 'Tab' && !event.shiftKey) {
+            <PickerField
+                before={
+                    state.chip ? (
+                        <span className="chip shrink-0 gap-0.5 pr-0.5">
+                            <span className="max-w-[180px] truncate">{state.chip.name}</span>
+                            {/* out of the Tab order: Tab completes, Backspace takes the chip away */}
+                            <button
+                                type="button"
+                                tabIndex={-1}
+                                className="btn-icon h-5 w-5"
+                                aria-label={t('notes.moveUnchip', { name: state.chip.name })}
+                                onClick={() => change({ chip: null, query: '' })}
+                            >
+                                <IconX size={12} />
+                            </button>
+                        </span>
+                    ) : null
+                }
+                ref={input}
+                aria-label={t('notes.moveWhere')}
+                placeholder={placeholder(subject, state, chipNotes, i18n)}
+                onKeyDown={(event) => {
+                    if (event.metaKey || event.ctrlKey || event.altKey) return;
+                    if (event.key === 'Tab' && !event.shiftKey) {
+                        event.preventDefault();
+                        setState(completed(subject, state, highlighted));
+                    } else if (event.key === 'Backspace') {
+                        const next = withoutChip(state);
+                        if (next) {
                             event.preventDefault();
-                            setState(completed(subject, state, highlighted));
-                        } else if (event.key === 'Backspace') {
-                            const next = withoutChip(state);
-                            if (next) {
-                                event.preventDefault();
-                                setState(next);
-                            }
-                        } else if (event.key === 'Enter') {
-                            // one way for every ↵: with a row chosen or not
-                            event.preventDefault();
-                            event.preventBaseUIHandler();
-                            act(entered(subject, state, highlighted, chipNotes));
+                            setState(next);
                         }
-                    }}
-                />
-            </div>
+                    } else if (event.key === 'Enter') {
+                        // one way for every ↵: with a row chosen or not
+                        event.preventDefault();
+                        event.preventBaseUIHandler();
+                        act(entered(subject, state, highlighted, chipNotes));
+                    }
+                }}
+            />
             <Autocomplete.List className="max-h-[50vh] min-h-0 overflow-auto overscroll-contain px-1.5 pb-1.5 empty:hidden">
                 {rows.map((row, index) => (
                     <Autocomplete.Item
@@ -197,22 +170,13 @@ function MoveField({
                             event.preventBaseUIHandler();
                             act(entered(subject, state, row, chipNotes));
                         }}
-                        className="group flex min-h-[34px] cursor-default items-center gap-2.5 rounded-lg px-3 py-1 outline-none select-none data-highlighted:bg-ui-accent-soft data-highlighted:text-ui-accent-on-soft"
+                        className="pick-row group min-h-[34px] py-1"
                     >
                         <Row row={row} shared={row.kind === 'book' && shared.has(row.book)} />
                     </Autocomplete.Item>
                 ))}
             </Autocomplete.List>
-            <div className="dialog-foot">
-                <span>
-                    <RichText
-                        text={t('notes.moveChoose')}
-                        parts={{
-                            up: <kbd className="kbd">↑</kbd>,
-                            down: <kbd className="kbd">↓</kbd>,
-                        }}
-                    />
-                </span>
+            <PickerKeys enter={t('notes.moveEnter')}>
                 {subject.kind === 'note' && !state.chip ? (
                     <span>
                         <RichText
@@ -221,19 +185,7 @@ function MoveField({
                         />
                     </span>
                 ) : null}
-                <span>
-                    <RichText
-                        text={t('notes.moveEnter')}
-                        parts={{ enter: <kbd className="kbd">↵</kbd> }}
-                    />
-                </span>
-                <span>
-                    <RichText
-                        text={t('common.escCloses')}
-                        parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                    />
-                </span>
-            </div>
+            </PickerKeys>
         </Autocomplete.Root>
     );
 }

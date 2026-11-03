@@ -50,15 +50,15 @@ impl RepositoryChange {
     }
 }
 
-/// Emitted when files or refs of the project on screen changed on disk. The frontend refetches
-/// what it shows of that project.
+/// Emitted when files or refs of the folder on screen changed on disk. The frontend refetches
+/// what it shows of that folder.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
-    /// 4: with a change of kind; 3 brought the paths that changed; 2 named the project by its
-    /// id, 1 by its root.
+    /// 5 names the folder by its id; 4: with a change of kind; 3 brought the paths that changed;
+    /// 2 named the project by its id, 1 by its root.
     pub version: u8,
-    pub project_id: String,
+    pub folder_id: String,
     /// As in `RepositoryChange`.
     pub git_dir: bool,
     /// As in `RepositoryChange`.
@@ -68,10 +68,10 @@ pub struct RepositoryChangedEvent {
 }
 
 impl RepositoryChangedEvent {
-    pub fn new(project_id: &str, change: RepositoryChange) -> Self {
+    pub fn new(folder_id: &str, change: RepositoryChange) -> Self {
         Self {
-            version: 4,
-            project_id: project_id.to_string(),
+            version: 5,
+            folder_id: folder_id.to_string(),
             git_dir: change.git_dir,
             paths: change.paths,
             kind_changed: change.kind_changed,
@@ -466,8 +466,8 @@ mod tests {
             ))
             .unwrap(),
             serde_json::json!({
-                "version": 4,
-                "projectId": "/r",
+                "version": 5,
+                "folderId": "/r",
                 "gitDir": true,
                 "paths": null,
                 "kindChanged": false
@@ -482,8 +482,8 @@ mod tests {
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("p", change)).unwrap(),
             serde_json::json!({
-                "version": 4,
-                "projectId": "p",
+                "version": 5,
+                "folderId": "p",
                 "gitDir": false,
                 "paths": ["src/a.ts"],
                 "kindChanged": false

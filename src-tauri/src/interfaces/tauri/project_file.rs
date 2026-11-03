@@ -1,4 +1,4 @@
-//! A project's images for the WebView, at `project-file://localhost/<projectId>/<path>`
+//! A project's images for the WebView, at `project-file://localhost/<folderId>/<path>`
 //! (`http://project-file.localhost/…` on Windows): the viewer and the Markdown preview load them
 //! as any image, so the WebView decodes them itself and no copy goes through the JS heap. The
 //! file of the tree, or with `?blob=<id>` that git object, a side of the image's diff.
@@ -10,7 +10,7 @@ use sidekyk_core::shared::url::percent_decoded;
 use tauri::http::{header, Response, StatusCode};
 use tauri::UriSchemeResponder;
 
-use super::repository::on_project;
+use super::repository::on_folder;
 
 pub(crate) const SCHEME: &str = "project-file";
 
@@ -22,7 +22,7 @@ pub(crate) fn respond(
     query: Option<&str>,
     responder: UriSchemeResponder,
 ) {
-    let Some((project_id, path)) = target(uri_path) else {
+    let Some((folder_id, path)) = target(uri_path) else {
         tracing::debug!(uri_path, "not a project's file");
         responder.respond(not_found());
         return;
@@ -35,7 +35,7 @@ pub(crate) fn respond(
     let blob = query.and_then(blob);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let image = on_project("project_file", app, project_id, move |on| {
+        let image = on_folder("project_file", app, folder_id, move |on| {
             // a project shown is read: this never starts a stopped WSL distro
             on.readable_without_starting()?;
             on.repositories.image(on.info, &path, blob.as_deref())
@@ -58,13 +58,13 @@ pub(crate) fn respond(
     });
 }
 
-/// The project and the path a request names: `/<projectId>/<path>`, which `convertFileSrc`
+/// The folder and the path a request names: `/<folderId>/<path>`, which `convertFileSrc`
 /// encodes whole, the id encoded once before (an id is opaque: an older one is its folder's path,
 /// slashes included).
 fn target(uri_path: &str) -> Option<(String, String)> {
     let decoded = percent_decoded(uri_path.trim_start_matches('/'));
-    let (project_id, path) = decoded.split_once('/')?;
-    (!project_id.is_empty() && !path.is_empty()).then(|| (percent_decoded(project_id), path.into()))
+    let (folder_id, path) = decoded.split_once('/')?;
+    (!folder_id.is_empty() && !path.is_empty()).then(|| (percent_decoded(folder_id), path.into()))
 }
 
 /// The object a query names (`blob=<id>`), checked by the core before git reads it.

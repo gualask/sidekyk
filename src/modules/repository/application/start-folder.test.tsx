@@ -2,21 +2,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, type ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectFolder } from '@/shared/projects/project-info';
 import { renderHook } from '@/shared/testing/render-hook';
 import { type RepositoryPort, RepositoryProvider } from './repository.port';
 import { useFolderKind, useStartFolder } from './repository.queries';
 
-const API: ProjectInfo = {
-    id: 'api',
-    name: 'api',
-    folders: [{ kind: 'wsl', distro: 'Debian', root: '/home/dev/api' }],
-};
+const API: ProjectFolder = { id: 'api', kind: 'wsl', distro: 'Debian', root: '/home/dev/api' };
 
 /** A distro stopped until a read asks to start it, as the backend's `readable_without_starting`. */
 function stoppedDistro() {
     let running = false;
-    const getFolderKind = vi.fn(async (_projectId: string, start: boolean) => {
+    const getFolderKind = vi.fn(async (_folderId: string, start: boolean) => {
         if (start) running = true;
         if (!running) throw { code: 'distro_stopped', message: 'Debian is not running' };
         return 'repository' as const;

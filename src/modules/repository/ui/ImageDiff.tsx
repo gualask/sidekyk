@@ -21,13 +21,13 @@ const AREA_NAMES: Record<Exclude<FileVersion['kind'], 'commit'>, MessageKey> = {
  * or previous file at once (`onPastEnd`).
  */
 export function ImageDiff({
-    projectId,
+    folderId,
     sides,
     header,
     renderHeader,
     onPastEnd,
 }: {
-    projectId: string;
+    folderId: string;
     sides: ImageSides;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
@@ -54,7 +54,7 @@ export function ImageDiff({
             {header ? createPortal(renderHeader(), header) : null}
             <div className="flex h-full flex-col @2xl:flex-row">
                 {shown.map(({ at, side }) => (
-                    <SideView key={at} projectId={projectId} side={side} />
+                    <SideView key={at} folderId={folderId} side={side} />
                 ))}
             </div>
         </div>
@@ -62,14 +62,14 @@ export function ImageDiff({
 }
 
 /** One side, named by its git area, or a commit's by its short hash. */
-function SideView({ projectId, side }: { projectId: string; side: ImageSide }) {
+function SideView({ folderId, side }: { folderId: string; side: ImageSide }) {
     const i18n = useTranslation();
     const { version } = side;
     const name =
         version.kind === 'commit' ? shortSha(version.sha) : i18n.t(AREA_NAMES[version.kind]);
     return (
         <section className="min-h-0 min-w-0 flex-1">
-            <ImageView projectId={projectId} path={side.path} blob={side.blob} name={name} />
+            <ImageView folderId={folderId} path={side.path} blob={side.blob} name={name} />
         </section>
     );
 }

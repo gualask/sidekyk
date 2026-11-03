@@ -5,6 +5,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_AREA_LABEL } from '@/shared/git/change-area';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
+import type { ProjectFolder } from '@/shared/projects/project-info';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
@@ -67,8 +68,14 @@ const FULL_KEYS = new Set([
  * whole with its changes marked, any other as its text. No filter here: the command palette finds
  * files, and shows them in the tree.
  */
-export function FilesWorkspace({
+export function FilesWorkspace({ folder, ...props }: PanelProps) {
+    // its panel shows only for a project with a folder
+    return folder ? <Files folder={folder} {...props} /> : null;
+}
+
+function Files({
     project,
+    folder,
     header,
     tileFit,
     target,
@@ -77,18 +84,18 @@ export function FilesWorkspace({
     show,
     findInFiles,
     zoomIn,
-}: PanelProps) {
+}: Omit<PanelProps, 'folder'> & { folder: ProjectFolder }) {
     const i18n = useTranslation();
-    const projectId = project.id;
-    const [state, setState] = useSessionState<TreeState>(`tree:${projectId}`, CLOSED);
+    const folderId = folder.id;
+    const [state, setState] = useSessionState<TreeState>(`tree:${folderId}`, CLOSED);
     const { open, selected } = state;
-    const [view, setView] = useSessionState<FilesView>(`files-view:${projectId}`, 'tree');
+    const [view, setView] = useSessionState<FilesView>(`files-view:${folderId}`, 'tree');
     // Recent's row the keyboard is on, apart from the tree's: a folder is never one
     const [recentSelected, setRecentSelected] = useSessionState<string | null>(
-        `recent-selected:${projectId}`,
+        `recent-selected:${folderId}`,
         null,
     );
-    const repository = useFolderKind(project).kind === 'repository';
+    const repository = useFolderKind(folder).kind === 'repository';
     // the file shown, one for both panels: Changes selects it in its list
     const {
         snapshot,
@@ -96,18 +103,18 @@ export function FilesWorkspace({
         setSelection,
         change,
         path: file,
-    } = useSelectedFile(projectId, repository);
-    const find = useFileFind(projectId, change?.path ?? file, findInFiles);
+    } = useSelectedFile(folderId, repository);
+    const find = useFileFind(folderId, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
     // how a file with a preview shows, and the element a link of one named in the file it leads to
     const fileView = useFileViewChoice();
     const linked = useLinkedAnchor(file);
     const marks = useMemo(() => changeMarks(files), [files]);
-    const { read, error } = useTreeDirectories(projectId, open);
+    const { read, error } = useTreeDirectories(folderId, open);
     const rows = useMemo(() => treeRows(open, read), [open, read]);
     // read only while it shows; grouped by day as of the read, since no timer runs
-    const recent = useRecentFiles(projectId, view === 'recent');
+    const recent = useRecentFiles(folderId, view === 'recent');
     const { formatTag } = i18n;
     const listed = useMemo(() => {
         const now = Date.now();
@@ -311,7 +318,7 @@ export function FilesWorkspace({
     const viewer = change ? (
         <ChangeDiffView
             key={`${change.area}:${change.path}`}
-            projectId={projectId}
+            folderId={folderId}
             file={change}
             snapshot={snapshot}
             view="file"
@@ -340,7 +347,7 @@ export function FilesWorkspace({
     ) : repository && !snapshot.isSuccess ? null : (
         <TextFileView
             key={file}
-            projectId={projectId}
+            folderId={folderId}
             path={file}
             header={header}
             finder={find.finderFor(file)}

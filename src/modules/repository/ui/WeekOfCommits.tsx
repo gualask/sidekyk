@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { CardWell, WellMessage } from '@/shared/ui/CardWell';
-import { useCommitActivity } from '../application/repository.queries';
+import { type ActivitySource, useCommitActivities } from '../application/repository.queries';
 import { ACTIVITY_DAYS, type ActivityDay, activityDays, activitySince } from '../model/activity';
 import { LineCounts } from './LineCounts';
 
@@ -11,19 +11,20 @@ const DAY_FORMAT: Intl.DateTimeFormatOptions = { weekday: 'short', day: 'numeric
 /**
  * The last seven days of commits on a project's card, across its width: a bar a day, as tall as
  * the lines its commits changed (to the busiest day of the week), green the lines added at the
- * bottom, red the removed above; what the week added up to over it.
+ * bottom, red the removed above; what the week added up to over it. A project of several
+ * repositories shows their commits together.
  */
-export function WeekOfCommits({ projectId, head }: { projectId: string; head: string | null }) {
+export function WeekOfCommits({ sources }: { sources: readonly ActivitySource[] }) {
     return (
         <CardWell>
-            <WeekChart projectId={projectId} head={head} />
+            <WeekChart sources={sources} />
         </CardWell>
     );
 }
 
-function WeekChart({ projectId, head }: { projectId: string; head: string | null }) {
+function WeekChart({ sources }: { sources: readonly ActivitySource[] }) {
     const since = activitySince(new Date());
-    const activity = useCommitActivity(projectId, head, since);
+    const activity = useCommitActivities(sources, since);
     const i18n = useTranslation();
     const { t } = i18n;
     const dayFormat = useMemo(
@@ -31,7 +32,7 @@ function WeekChart({ projectId, head }: { projectId: string; head: string | null
         [i18n.formatTag],
     );
     if (activity.isError) return <WellMessage>{t('week.unreadable')}</WellMessage>;
-    if (head !== null && !activity.data) return null;
+    if (!activity.data) return null;
     const days = activity.data ? activityDays(activity.data, since) : [];
     if (days.every((day) => day.commits === 0)) {
         return <WellMessage>{t('week.none', { count: ACTIVITY_DAYS })}</WellMessage>;

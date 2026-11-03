@@ -1,10 +1,15 @@
 import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
-import type { FolderChoice, ProjectList } from '@/modules/projects';
+import type { FolderChoice, Opened, ProjectList } from '@/modules/projects';
 import type { FileContent, FolderKind, RepositoryChangedEvent } from '@/modules/repository';
 import type { GlobalShortcutStatuses, Settings, ShortcutAction } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import {
+    type ProjectFolder,
+    type ProjectInfo,
+    type ProjectLocation,
+    projectFolder,
+} from '@/shared/projects/project-info';
 import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
 import {
     FRESH_VAULT_PATHS,
@@ -61,6 +66,7 @@ const PICKED_REPOSITORY = {
     path: '/Users/dev/Projects/api-gateway/src',
     name: 'api-gateway',
     location: { kind: 'local', root: '/Users/dev/Projects/api-gateway' },
+    repositories: [],
 } as const satisfies FolderChoice;
 
 /** A folder without git the folder picker finds. */
@@ -69,22 +75,64 @@ const PICKED_PLAIN = {
     path: '/Users/dev/Documents/papers',
     name: 'papers',
     location: { kind: 'local', root: '/Users/dev/Documents/papers' },
+    repositories: [],
 } as const satisfies FolderChoice;
 
+/** A folder without git the folder picker finds, with repositories right inside it. */
+const PARENT_ROOT = '/Users/dev/Projects';
+const INSIDE_PARENT = ['api-gateway', 'billing', 'docs-site', 'shop'];
+
+/** The parent of repositories picked, each said whose it is in `list`. */
+function pickedParent(list: ProjectList): FolderChoice {
+    return {
+        kind: 'usable',
+        path: PARENT_ROOT,
+        name: 'Projects',
+        location: { kind: 'local', root: PARENT_ROOT },
+        repositories: INSIDE_PARENT.map((name) => {
+            const root = `${PARENT_ROOT}/${name}`;
+            const project = list.projects.find((p) => p.folders.some((f) => f.root === root));
+            return {
+                path: root,
+                name,
+                location: { kind: 'local', root },
+                inProject: project?.name ?? null,
+            };
+        }),
+    };
+}
+
+/** Where a path the picker gave is: a folder picked, or a repository inside the parent. */
+function pickedLocation(path: string): ProjectLocation | null {
+    const picked = [PICKED_REPOSITORY, PICKED_PLAIN].find((p) => p.path === path);
+    if (picked) return picked.location;
+    const inside = INSIDE_PARENT.some((name) => path === `${PARENT_ROOT}/${name}`);
+    return inside || path === PARENT_ROOT ? { kind: 'local', root: path } : null;
+}
+
 /** The folders without git, until `sidekykDev.gitInit`: they list notes in Markdown. */
-const DOCUMENT_ROOTS: readonly string[] = [VAULT_ROOT, PICKED_PLAIN.location.root];
+const DOCUMENT_ROOTS: readonly string[] = [VAULT_ROOT, PICKED_PLAIN.location.root, PARENT_ROOT];
 
 /**
- * What the folder picker gives in turn, to see each answer of the New project dialog: a repository
- * no project follows, the scenario's own repository, then a folder without git.
+ * What the folder picker gives in turn, to see each answer of the New project dialog: a parent of
+ * repositories, a repository no project follows, the scenario's own repository, then a folder
+ * without git.
  */
 const PICKED_FOLDERS: readonly ((list: ProjectList) => FolderChoice)[] = [
+    pickedParent,
     () => PICKED_REPOSITORY,
     (list) =>
         list.projects.some((p) => p.id === FIXTURE_REPOSITORY.id)
             ? { kind: 'inProject', id: FIXTURE_REPOSITORY.id, name: FIXTURE_REPOSITORY.name }
             : PICKED_PLAIN,
     () => PICKED_PLAIN,
+];
+
+/** What the folder picker gives in turn to add a folder to a project. */
+const ADDED_FOLDERS: readonly { location: ProjectLocation }[] = [
+    PICKED_REPOSITORY,
+    { location: { kind: 'local', root: CLEAN_PROJECTS[0].folders[0].root } },
+    { location: { kind: 'local', root: PARENT_ROOT } },
 ];
 
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
@@ -101,10 +149,22 @@ const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools');
 /** How long Sidekyk's helper takes to start in a distro, as the first read of a WSL project waits. */
 const HELPER_START_MS = 1500;
 
+/**
+ * In `review`: the scenario's project with a second repository beside its own, clean, to switch
+ * between them.
+ */
+const TWO_FOLDER_PROJECT: ProjectInfo = {
+    ...FIXTURE_REPOSITORY,
+    folders: [
+        ...FIXTURE_REPOSITORY.folders,
+        { id: 'c0000000000000f2', kind: 'local', root: '/Users/dev/Projects/shop-web' },
+    ],
+};
+
 function initialProjects(scenario: Scenario): ProjectInfo[] {
     if (scenario === 'no-repo') return [];
     if (scenario === 'review') {
-        return [FIXTURE_REPOSITORY, CLEAN_PROJECTS[0], WSL_PROJECT, VAULT_PROJECT, TOPIC_PROJECT];
+        return [TWO_FOLDER_PROJECT, CLEAN_PROJECTS[0], WSL_PROJECT, VAULT_PROJECT, TOPIC_PROJECT];
     }
     if (scenario === 'problems') {
         return [FIXTURE_REPOSITORY, MISSING_PROJECT, STOPPED_PROJECT, GONE_PROJECT, NO_GIT_PROJECT];
@@ -127,11 +187,22 @@ function failure(code: string) {
     return { code, message: code };
 }
 
-let projectSeq = 0;
-/** 16 hex digits, as the backend's new project ids. */
-function newProjectId(): string {
-    projectSeq += 1;
-    return (0xa0000000 + projectSeq).toString(16).padStart(16, '0');
+let idSeq = 0;
+/** 16 hex digits, as the backend's new project and folder ids. */
+function newId(): string {
+    idSeq += 1;
+    return (0xa0000000 + idSeq).toString(16).padStart(16, '0');
+}
+
+/** A folder found at `location`, with a new id, as the backend makes one for a project. */
+function newFolder(location: ProjectLocation): ProjectFolder {
+    return { ...location, id: newId() };
+}
+
+/** Whether one of two roots is the other or inside it, as `Location::overlaps` (one machine). */
+function overlaps(a: string, b: string): boolean {
+    const inside = (root: string, of: string) => root === of || root.startsWith(`${of}/`);
+    return inside(a, b) || inside(b, a);
 }
 
 /** The fixtures' runtime: the ports, and what stands in for the command line. */
@@ -159,11 +230,40 @@ export interface BrowserRuntime {
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
 export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const projects = initialProjects(scenario);
-    let list: ProjectList = { projects, active: projects[0]?.id ?? null, layouts: {} };
+    let list: ProjectList = {
+        projects,
+        active: projects[0]?.id ?? null,
+        layouts: {},
+    };
+    // the folder the window shows, as it last told it (`showProjectFolder`)
+    let onScreen: string | null = null;
     const project = (projectId: string) => {
         const found = list.projects.find((p) => p.id === projectId);
         if (!found) throw failure('project_not_found');
         return found;
+    };
+    // as `ProjectList::folder`: a folder of a project of the list, by its id
+    const folder = (folderId: string) => {
+        const found = list.projects
+            .flatMap((p) => p.folders)
+            .find((candidate) => candidate.id === folderId);
+        if (!found) throw failure('project_not_found');
+        return found;
+    };
+    // the id of the folder on screen, when it is that project's
+    const shownFolderOf = (projectId: string | null) => {
+        const found = list.projects.find((p) => p.id === projectId);
+        return found?.folders.some((f) => f.id === onScreen) ? onScreen : null;
+    };
+    // the project following the folder at `root`, if one does
+    const projectAt = (root: string) =>
+        list.projects.find((p) => p.folders.some((f) => f.root === root));
+    const followed = (root: string) => projectAt(root) !== undefined;
+    // the folder a project shows, by the project's name, which `sidekykDev` names it by: the one
+    // on screen, else its first
+    const shownOf = (name: string) => {
+        const found = list.projects.find((p) => p.name === name);
+        return found?.folders.find((f) => f.id === onScreen) ?? found?.folders[0] ?? null;
     };
     const update = (next: ProjectList) => {
         list = next;
@@ -192,85 +292,86 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             : { kind: 'active', keys: STORED_SHORTCUT, conflict: false },
         capture: { kind: 'active', keys: STORED_CAPTURE_SHORTCUT, conflict: false },
     };
-    // the scenario's data belongs to its first project; any other is clean
-    const scenarioData = (projectId: string) =>
-        projectId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
-    const rootOf = (projectId: string) => projectFolder(project(projectId))?.root ?? '';
+    // the scenario's data belongs to its first project, and its folder, of the same id; any other
+    // is clean
+    const scenarioData = (folderId: string) =>
+        folderId === FIXTURE_REPOSITORY.id && scenario !== 'clean';
+    const rootOf = (folderId: string) => folder(folderId).root;
     // what is a folder without git, by its root: `gitInit` and `gitRemove` change it
     const plainRoots = new Set(DOCUMENT_ROOTS);
-    const kindOf = (projectId: string): FolderKind =>
-        plainRoots.has(rootOf(projectId)) ? 'plain' : 'repository';
+    const kindOf = (folderId: string): FolderKind =>
+        plainRoots.has(rootOf(folderId)) ? 'plain' : 'repository';
     // the folder is there, no git asked
-    const present = (projectId: string) => {
+    const present = (folderId: string) => {
         // missing where it was, not where Locate… finds it
-        if (rootOf(projectId) === projectFolder(MISSING_PROJECT)?.root) {
+        if (rootOf(folderId) === projectFolder(MISSING_PROJECT)?.root) {
             throw failure('repository_missing');
         }
-        if (projectId === GONE_PROJECT.id) throw failure('distro_missing');
+        if (folderId === GONE_PROJECT.id) throw failure('distro_missing');
     };
     // a repository git can read: the frontend never asks a folder without git
-    const readable = (projectId: string) => {
-        present(projectId);
-        if (projectId === NO_GIT_PROJECT.id) throw failure('git_not_found');
-        if (kindOf(projectId) === 'plain') throw failure('unknown');
+    const readable = (folderId: string) => {
+        present(folderId);
+        if (folderId === NO_GIT_PROJECT.id) throw failure('git_not_found');
+        if (kindOf(folderId) === 'plain') throw failure('unknown');
     };
     // as the backend: the kind and the summary never start a distro, the Start panel does; a
     // distro running gets its helper started by the first read
     const running = new Set(['Ubuntu', 'Alpine']);
     const helpers = new Set<string>();
-    const distroOf = (projectId: string) => {
-        const folder = projectFolder(project(projectId));
-        return folder?.kind === 'wsl' ? folder.distro : null;
+    const distroOf = (folderId: string) => {
+        const found = folder(folderId);
+        return found.kind === 'wsl' ? found.distro : null;
     };
     // `distro_stopped` unless the project's distro runs, as `readable_without_starting`
-    const readableWithoutStarting = (projectId: string) => {
-        const distro = distroOf(projectId);
+    const readableWithoutStarting = (folderId: string) => {
+        const distro = distroOf(folderId);
         if (distro && !helpers.has(distro) && !running.has(distro)) {
             throw failure('distro_stopped');
         }
     };
     // the helper takes a while the first time, the distro started with it
-    const startHelper = async (projectId: string) => {
-        const distro = distroOf(projectId);
+    const startHelper = async (folderId: string) => {
+        const distro = distroOf(folderId);
         if (distro && !helpers.has(distro)) {
             await new Promise((started) => setTimeout(started, HELPER_START_MS));
             helpers.add(distro);
             running.add(distro);
         }
     };
-    const large = (projectId: string) => scenario === 'large' && scenarioData(projectId);
-    const snapshot = (projectId: string) => {
-        readable(projectId);
-        if (large(projectId)) return largeSnapshot();
-        return reviewSnapshot(!scenarioData(projectId));
+    const large = (folderId: string) => scenario === 'large' && scenarioData(folderId);
+    const snapshot = (folderId: string) => {
+        readable(folderId);
+        if (large(folderId)) return largeSnapshot();
+        return reviewSnapshot(!scenarioData(folderId));
     };
 
     // a folder without git holds the Vault's images, the repository its own
-    const imagesOf = (projectId: string) =>
-        DOCUMENT_ROOTS.includes(rootOf(projectId)) ? VAULT_IMAGES : REPOSITORY_IMAGES;
+    const imagesOf = (folderId: string) =>
+        DOCUMENT_ROOTS.includes(rootOf(folderId)) ? VAULT_IMAGES : REPOSITORY_IMAGES;
 
     // as the backend, the tree is built once and kept: the fixtures never change on disk
     const trees = new Map<string, ReturnType<typeof fixtureTree>>();
-    const tree = (projectId: string) => {
-        present(projectId);
-        let found = trees.get(projectId);
+    const tree = (folderId: string) => {
+        present(folderId);
+        let found = trees.get(folderId);
         if (!found) {
-            found = DOCUMENT_ROOTS.includes(rootOf(projectId))
+            found = DOCUMENT_ROOTS.includes(rootOf(folderId))
                 ? fixtureFolderTree()
-                : fixtureTree(large(projectId), snapshot(projectId).files);
-            trees.set(projectId, found);
+                : fixtureTree(large(folderId), snapshot(folderId).files);
+            trees.set(folderId, found);
         }
         return found;
     };
 
     // as the backend, the palette searches the files of the tree, as the last snapshot found them
     // changed: none when they cannot be read
-    const searchedFiles = (projectId: string | null) => {
-        if (!projectId) return null;
+    const searchedFiles = (folderId: string | null) => {
+        if (!folderId) return null;
         try {
-            readableWithoutStarting(projectId);
-            const changed = kindOf(projectId) === 'plain' ? [] : snapshot(projectId).files;
-            return { paths: tree(projectId).files, changed };
+            readableWithoutStarting(folderId);
+            const changed = kindOf(folderId) === 'plain' ? [] : snapshot(folderId).files;
+            return { paths: tree(folderId).files, changed };
         } catch {
             return null;
         }
@@ -294,10 +395,12 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const tellProjectsChanged = () => {
         for (const listener of projectsChanged) listener();
     };
-    // the project a folder given on the command line put on screen, until the app takes it
-    let opened: string | null = null;
+    // what a folder given on the command line did, until the app takes it
+    let opened: Opened | null = null;
     // how many folders the picker gave, for the next answer of `PICKED_FOLDERS`
     let pickedFolders = 0;
+    // how many folders were added to a project, for the next of `ADDED_FOLDERS`
+    let addedFolders = 0;
     // as the backend, notes need the Inbox or a project in the list, not its repository: a moved
     // one's stay
     const notes = fixtureNotes({
@@ -314,7 +417,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         },
         // as `ProjectList::add`: last, without folder, on screen only when none was
         makeProject: (name) => {
-            const made: ProjectInfo = { id: newProjectId(), name: name.trim(), folders: [] };
+            const made: ProjectInfo = { id: newId(), name: name.trim(), folders: [] };
             const active = list.active ?? made.id;
             update({ ...list, projects: [...list.projects, made], active });
             return made.id;
@@ -336,33 +439,33 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     };
 
     // the versions a diff compares, from the diffs and files served below
-    const texts = (projectId: string): FixtureTexts => ({
+    const texts = (folderId: string): FixtureTexts => ({
         changeDiff: (area, path) => {
             // a folder without git has no changes
-            if (kindOf(projectId) === 'plain') return null;
-            if (!snapshot(projectId).files.some((f) => f.area === area && f.path === path))
+            if (kindOf(folderId) === 'plain') return null;
+            if (!snapshot(folderId).files.some((f) => f.area === area && f.path === path))
                 return null;
-            const diff = large(projectId)
+            const diff = large(folderId)
                 ? wholeFileDiff(largeDiff())
                 : reviewDiff({ area, path, wholeFile: true });
             return diff.text;
         },
         fileText: (path) => {
-            if (!tree(projectId).has(path)) return null;
+            if (!tree(folderId).has(path)) return null;
             const content = fixtureFileContent(path);
             return content.kind === 'text' ? content.text : null;
         },
         commitDiff: (sha, path) => {
-            for (const { sha: commitSha, parent } of recentCommits(large(projectId)).commits) {
+            for (const { sha: commitSha, parent } of recentCommits(large(folderId)).commits) {
                 const side = commitSha === sha ? 'new' : parent === sha ? 'old' : null;
                 if (!side) continue;
                 const commit = { sha: commitSha, parent };
-                const file = commitFiles(large(projectId), commit).files.find(
+                const file = commitFiles(large(folderId), commit).files.find(
                     (f) => (side === 'new' ? f.path : (f.origPath ?? f.path)) === path,
                 );
                 if (!file) continue;
                 const request = { commit, path: file.path, origPath: file.origPath };
-                const diff = commitFileDiff(large(projectId), { ...request, wholeFile: true });
+                const diff = commitFileDiff(large(folderId), { ...request, wholeFile: true });
                 return { text: wholeFileDiff(diff).text, side };
             }
             return null;
@@ -373,22 +476,22 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const repositoryChanged = new Set<(event: RepositoryChangedEvent) => void>();
     // files written while the page runs (`writeFile`), by project and path
     const written = new Map<string, string>();
-    const contentOf = (projectId: string, path: string): FileContent => {
-        if (!tree(projectId).has(path)) throw failure('file_missing');
-        const text = written.get(`${projectId}\0${path}`);
+    const contentOf = (folderId: string, path: string): FileContent => {
+        if (!tree(folderId).has(path)) throw failure('file_missing');
+        const text = written.get(`${folderId}\0${path}`);
         return text === undefined
             ? fixtureFileContent(path)
             : { kind: 'text', text, truncated: false };
     };
     const writeFile = (name: string, path: string, text = editedText(name, path)) => {
-        const found = list.projects.find((p) => p.name === name);
-        if (!found) throw new Error(`No project ${name}`);
         if (text === undefined)
             throw new Error(`No later version of ${path} in fixture-files/edits`);
-        written.set(`${found.id}\0${path}`, text);
+        const shown = shownOf(name);
+        if (!shown) throw new Error(`No project ${name} with a folder`);
+        written.set(`${shown.id}\0${path}`, text);
         const event: RepositoryChangedEvent = {
-            version: 4,
-            projectId: found.id,
+            version: 5,
+            folderId: shown.id,
             gitDir: false,
             paths: [path],
             kindChanged: false,
@@ -397,14 +500,13 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     };
 
     const setKind = (name: string, kind: FolderKind) => {
-        const found = list.projects.find((p) => p.name === name);
-        const root = found ? projectFolder(found)?.root : undefined;
-        if (!found || !root) throw new Error(`No project ${name} with a folder`);
-        if (kind === 'plain') plainRoots.add(root);
-        else plainRoots.delete(root);
+        const shown = shownOf(name);
+        if (!shown) throw new Error(`No project ${name} with a folder`);
+        if (kind === 'plain') plainRoots.add(shown.root);
+        else plainRoots.delete(shown.root);
         const event: RepositoryChangedEvent = {
-            version: 4,
-            projectId: found.id,
+            version: 5,
+            folderId: shown.id,
             gitDir: true,
             paths: null,
             kindChanged: true,
@@ -413,15 +515,24 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     };
 
     const openFolder = (name: string) => {
+        // above repositories of no project: nothing changes, the dialog asks
+        if (name === 'Projects' && !list.projects.some((p) => p.name === name)) {
+            const choice = pickedParent(list);
+            if (choice.kind === 'usable' && choice.repositories.some((r) => r.inProject === null)) {
+                opened = { kind: 'choice', choice };
+                tellProjectsChanged();
+                return;
+            }
+        }
         const found = list.projects.find((p) => p.name === name);
         const shown: ProjectInfo = found ?? {
-            id: newProjectId(),
+            id: newId(),
             name,
-            folders: [{ kind: 'local', root: `/Users/dev/Projects/${name}` }],
+            folders: [newFolder({ kind: 'local', root: `/Users/dev/Projects/${name}` })],
         };
         const projects = found ? list.projects : [...list.projects, shown];
         update({ ...list, projects, active: shown.id });
-        opened = shown.id;
+        opened = { kind: 'project', id: shown.id, folderId: shown.folders[0].id };
         tellProjectsChanged();
     };
 
@@ -429,7 +540,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         notes,
         projects: {
             getProjects: async () => list,
-            takeOpenedProject: async () => {
+            takeOpened: async () => {
                 const taken = opened;
                 opened = null;
                 return taken;
@@ -439,21 +550,20 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 pickedFolders += 1;
                 return picked;
             },
-            // as `ProjectList::add`, then on screen; a folder is the one picked, checked again
-            createProject: async (name, folder) => {
-                const picked = [PICKED_REPOSITORY, PICKED_PLAIN].find((p) => p.path === folder);
-                if (folder !== null && !picked) throw failure('repository_missing');
-                const location = picked?.location ?? null;
-                if (
-                    location &&
-                    list.projects.some((p) => projectFolder(p)?.root === location.root)
-                ) {
+            // as `ProjectList::add`, then on screen; the folders are those picked, checked again
+            createProject: async (name, paths) => {
+                const locations = paths.map((path) => {
+                    const location = pickedLocation(path);
+                    if (!location) throw failure('repository_missing');
+                    return location;
+                });
+                if (locations.some((location) => followed(location.root))) {
                     throw failure('unknown');
                 }
                 const made: ProjectInfo = {
-                    id: newProjectId(),
+                    id: newId(),
                     name: name.trim(),
-                    folders: location ? [location] : [],
+                    folders: locations.map(newFolder),
                 };
                 return update({ ...list, projects: [...list.projects, made], active: made.id });
             },
@@ -469,22 +579,94 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             activateProject: async (projectId) =>
                 update({ ...list, active: project(projectId).id }),
             removeProject: async (projectId) => removeProject(projectId),
-            // in `problems`, the moved project is found next to where it was; it keeps its id
-            relocateProject: async (projectId) => {
-                const moved = project(projectId);
-                const folder = projectFolder(moved);
-                if (!folder) throw new Error(`${moved.name} follows no folder`);
-                const root = `${folder.root}-moved`;
-                const other = list.projects.find((p) => projectFolder(p)?.root === root);
+            // in `problems`, the moved folder is found next to where it was; it keeps its id
+            relocateFolder: async (folderId) => {
+                const moved = folder(folderId);
+                const root = `${moved.root}-moved`;
+                const other = projectAt(root);
                 if (other) return { kind: 'inProject', id: other.id, name: other.name };
-                const folders = [{ kind: 'local' as const, root }];
                 return {
-                    kind: 'moved',
+                    kind: 'changed',
                     list: update({
                         ...list,
-                        projects: list.projects.map((p) => (p === moved ? { ...p, folders } : p)),
+                        projects: list.projects.map((p) => ({
+                            ...p,
+                            folders: p.folders.map((f) => (f === moved ? { ...f, root } : f)),
+                        })),
                     }),
                 };
+            },
+            showProjectFolder: async (folderId) => {
+                onScreen = folderId;
+            },
+            // in turn: a repository no project follows, another project's folder (to merge it),
+            // the parent of repositories (one of them the project's: refused)
+            addProjectFolder: async (projectId) => {
+                const target = project(projectId);
+                const picked = ADDED_FOLDERS[addedFolders % ADDED_FOLDERS.length];
+                addedFolders += 1;
+                const { root } = picked.location;
+                const other = projectAt(root);
+                if (other && other !== target) {
+                    return { kind: 'inProject', id: other.id, name: other.name };
+                }
+                if (target.folders.some((f) => f.kind !== 'local')) {
+                    throw failure('folder_elsewhere');
+                }
+                if (target.folders.some((f) => overlaps(f.root, root))) {
+                    throw failure('folder_overlaps');
+                }
+                const added = newFolder(picked.location);
+                return {
+                    kind: 'changed',
+                    list: update({
+                        ...list,
+                        projects: list.projects.map((p) =>
+                            p === target ? { ...p, folders: [...p.folders, added] } : p,
+                        ),
+                    }),
+                };
+            },
+            removeProjectFolder: async (projectId, folderId) => {
+                const target = project(projectId);
+                if (!target.folders.some((f) => f.id === folderId)) {
+                    throw failure('project_not_found');
+                }
+                return update({
+                    ...list,
+                    projects: list.projects.map((p) =>
+                        p === target
+                            ? { ...p, folders: p.folders.filter((f) => f.id !== folderId) }
+                            : p,
+                    ),
+                });
+            },
+            // as `merge_projects`: the folders follow, the notes move (`fixtureNotes` keeps them
+            // per project: they stay behind here), the project merged goes
+            mergeProjects: async (into, from) => {
+                const target = project(into);
+                const merged = project(from);
+                if (target === merged) throw failure('unknown');
+                const machines = new Set(
+                    [...target.folders, ...merged.folders].map((f) =>
+                        f.kind === 'wsl' ? f.distro : '',
+                    ),
+                );
+                if (machines.size > 1) throw failure('folder_elsewhere');
+                if (
+                    merged.folders.some((m) => target.folders.some((t) => overlaps(t.root, m.root)))
+                ) {
+                    throw failure('folder_overlaps');
+                }
+                const wasActive = list.active === from;
+                removeProject(from);
+                return update({
+                    ...list,
+                    projects: list.projects.map((p) =>
+                        p.id === into ? { ...p, folders: [...p.folders, ...merged.folders] } : p,
+                    ),
+                    active: wasActive ? into : list.active,
+                });
             },
             setProjectLayout: async (projectId, layout) =>
                 update({ ...list, layouts: { ...list.layouts, [project(projectId).id]: layout } }),
@@ -499,94 +681,94 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         },
         repository: {
             // as the backend: no git, and only the Start panel starts a distro
-            getFolderKind: async (projectId, start) => {
-                present(projectId);
-                if (start) await startHelper(projectId);
-                else readableWithoutStarting(projectId);
-                return kindOf(projectId);
+            getFolderKind: async (folderId, start) => {
+                present(folderId);
+                if (start) await startHelper(folderId);
+                else readableWithoutStarting(folderId);
+                return kindOf(folderId);
             },
-            getSnapshot: async (projectId) => {
-                readable(projectId);
-                await startHelper(projectId);
-                return snapshot(projectId);
+            getSnapshot: async (folderId) => {
+                readable(folderId);
+                await startHelper(folderId);
+                return snapshot(folderId);
             },
-            getSummary: async (projectId) => {
-                readable(projectId);
-                readableWithoutStarting(projectId);
-                return snapshot(projectId).summary;
+            getSummary: async (folderId) => {
+                readable(folderId);
+                readableWithoutStarting(folderId);
+                return snapshot(folderId).summary;
             },
-            getFileDiff: async (projectId, request) => {
-                readable(projectId);
-                if (!large(projectId)) return reviewDiff(request);
+            getFileDiff: async (folderId, request) => {
+                readable(folderId);
+                if (!large(folderId)) return reviewDiff(request);
                 return request.wholeFile ? wholeFileDiff(largeDiff()) : largeDiff();
             },
-            getChangesIgnoringWhitespace: async (projectId) => {
-                readable(projectId);
-                return fixtureIgnoringWhitespace(snapshot(projectId).files);
+            getChangesIgnoringWhitespace: async (folderId) => {
+                readable(folderId);
+                return fixtureIgnoringWhitespace(snapshot(folderId).files);
             },
             // every project has the same history, even with a clean working tree
-            getRecentCommits: async (projectId) => {
-                readable(projectId);
-                return recentCommits(large(projectId));
+            getRecentCommits: async (folderId) => {
+                readable(folderId);
+                return recentCommits(large(folderId));
             },
-            getCommitActivity: async (projectId, since) => {
-                readable(projectId);
-                if (scenarioData(projectId)) {
-                    return commitActivity(large(projectId) ? 'large' : 'busy', since);
+            getCommitActivity: async (folderId, since) => {
+                readable(folderId);
+                if (scenarioData(folderId)) {
+                    return commitActivity(large(folderId) ? 'large' : 'busy', since);
                 }
-                return commitActivity(projectId === CLEAN_PROJECTS[0].id ? 'quiet' : 'none', since);
+                return commitActivity(folderId === CLEAN_PROJECTS[0].id ? 'quiet' : 'none', since);
             },
-            getCommitFiles: async (projectId, commit) => {
-                readable(projectId);
-                return commitFiles(large(projectId), commit);
+            getCommitFiles: async (folderId, commit) => {
+                readable(folderId);
+                return commitFiles(large(folderId), commit);
             },
-            getCommitFileDiff: async (projectId, request) => {
-                readable(projectId);
-                const diff = commitFileDiff(large(projectId), request);
+            getCommitFileDiff: async (folderId, request) => {
+                readable(folderId);
+                const diff = commitFileDiff(large(folderId), request);
                 return request.wholeFile ? wholeFileDiff(diff) : diff;
             },
-            getDirectory: async (projectId, path) => tree(projectId).directory(path),
+            getDirectory: async (folderId, path) => tree(folderId).directory(path),
             // the changed files the newest, as an agent just wrote them
-            getRecentFiles: async (projectId) => {
+            getRecentFiles: async (folderId) => {
                 const fresh =
-                    kindOf(projectId) === 'plain'
+                    kindOf(folderId) === 'plain'
                         ? FRESH_VAULT_PATHS
-                        : snapshot(projectId)
+                        : snapshot(folderId)
                               .files.filter((file) => file.kind !== 'deleted')
                               .map((file) => file.path);
-                return tree(projectId).recent(Date.now(), fresh);
+                return tree(folderId).recent(Date.now(), fresh);
             },
-            getFileContent: async (projectId, path) => contentOf(projectId, path),
+            getFileContent: async (folderId, path) => contentOf(folderId, path),
             // the fixtures' images, as Vite serves them; any other is missing
-            getFileStamp: async (projectId, path) => {
-                const image = imagesOf(projectId)[path];
-                if (!tree(projectId).has(path) || !image) throw failure('file_missing');
+            getFileStamp: async (folderId, path) => {
+                const image = imagesOf(folderId)[path];
+                if (!tree(folderId).has(path) || !image) throw failure('file_missing');
                 return { size: image.size, modified: 0 };
             },
-            getBlobSize: async (projectId, blob) => {
-                readable(projectId);
+            getBlobSize: async (folderId, blob) => {
+                readable(folderId);
                 const image = FIXTURE_BLOBS[blob];
                 if (!image) throw failure('file_missing');
                 return image.size;
             },
-            projectFileUrl: (projectId, path, source) =>
-                (source.kind === 'blob' ? FIXTURE_BLOBS[source.blob] : imagesOf(projectId)[path])
+            projectFileUrl: (folderId, path, source) =>
+                (source.kind === 'blob' ? FIXTURE_BLOBS[source.blob] : imagesOf(folderId)[path])
                     ?.url ?? '',
-            getMarkdownPreview: async (projectId, path) => {
+            getMarkdownPreview: async (folderId, path) => {
                 // the backend's own preview of that text (`fixture-files/previews.json`)
-                const content = contentOf(projectId, path);
+                const content = contentOf(folderId, path);
                 return content.kind === 'text' ? fixturePreview(content.text) : null;
             },
             // a browser tab opens it in another, as the system's browser would
             openUrl: async (url) => {
                 window.open(url, '_blank', 'noopener,noreferrer');
             },
-            getSyntaxColors: async (projectId, { path, version, first, count }) => {
+            getSyntaxColors: async (folderId, { path, version, first, count }) => {
                 // as the backend: a file on disk is read without git
-                if (version.kind === 'worktree') present(projectId);
-                else readable(projectId);
+                if (version.kind === 'worktree') present(folderId);
+                else readable(folderId);
                 return fixtureColors(
-                    fixtureVersionText(texts(projectId), path, version),
+                    fixtureVersionText(texts(folderId), path, version),
                     first,
                     count,
                 );
@@ -602,19 +784,15 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 fixtureSearch(
                     request,
                     list.projects,
-                    searchedFiles(request.projectId),
+                    searchedFiles(shownFolderOf(request.projectId)),
                     searchedNotes(request.projectId),
                 ),
-            searchContents: async (projectId, query, onFiles) => {
-                readableWithoutStarting(projectId);
-                const { files, end } = fixtureContentSearch(
-                    tree(projectId).files,
-                    query,
-                    (path) => {
-                        const content = fixtureFileContent(path);
-                        return content.kind === 'text' ? content.text : null;
-                    },
-                );
+            searchContents: async (folderId, query, onFiles) => {
+                readableWithoutStarting(folderId);
+                const { files, end } = fixtureContentSearch(tree(folderId).files, query, (path) => {
+                    const content = fixtureFileContent(path);
+                    return content.kind === 'text' ? content.text : null;
+                });
                 if (files.length > 0) onFiles(files);
                 return end;
             },
@@ -661,8 +839,8 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         gitRemove: (name) => setKind(name, 'plain'),
         writeFile,
         stopDistro: (name) => {
-            const found = list.projects.find((p) => p.name === name);
-            const distro = found ? distroOf(found.id) : null;
+            const shown = shownOf(name);
+            const distro = shown ? distroOf(shown.id) : null;
             if (!distro) return;
             running.delete(distro);
             helpers.delete(distro);

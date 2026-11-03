@@ -25,6 +25,10 @@ pub trait Repositories: Send + Sync {
     /// (`folder::resolve_folder`).
     fn resolve(&self, candidate: &Path) -> anyhow::Result<RepositoryInfo>;
 
+    /// The repositories right inside a folder without git, by name
+    /// (`folder::repositories_inside`): none for a repository.
+    fn repositories_inside(&self, folder: &RepositoryInfo) -> anyhow::Result<Vec<RepositoryInfo>>;
+
     /// Whether a project's folder is a repository or a folder without git, without git.
     fn folder_kind(&self, info: &RepositoryInfo) -> anyhow::Result<FolderKind>;
 

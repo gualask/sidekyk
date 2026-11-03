@@ -9,20 +9,18 @@ import {
     useRef,
     useState,
 } from 'react';
-import { flushSync } from 'react-dom';
 import { useTranslation } from '@/shared/i18n';
 import type { SummaryPart } from '@/shared/panels/panel';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
-import { useActivateProject } from '../application/projects.queries';
-import type { ProjectList } from '../model/project.types';
+import type { FolderChoice, ProjectList } from '../model/project.types';
 import { ProjectAvatar } from './ProjectAvatar';
 
 /** Loaded when first asked for: the first paint does not show it. */
-const ProjectDialog = lazy(() =>
-    import('./ProjectDialog').then((module) => ({ default: module.ProjectDialog })),
+const NewProjectDialog = lazy(() =>
+    import('./NewProjectDialog').then((module) => ({ default: module.NewProjectDialog })),
 );
 
 const GRID_KEYS: Record<string, 'left' | 'right' | 'up' | 'down'> = {
@@ -51,38 +49,46 @@ function moveInGrid(event: KeyboardEvent<HTMLElement>) {
 
 /**
  * Level 0: one card per project, doubling as the project switcher, the "+ New project" card last
- * (alone without projects), which opens the New project dialog; a card's ⋯ renames or removes. It opens with the focus on the project on screen, so `↵` goes
- * back to it and the arrows start from it. It fills the room beside it down to one column of
+ * (alone without projects), which opens the New project dialog; a card's ⋯ edits (name, folders)
+ * or removes. It opens with the focus on the project on screen, so `↵` goes back to it and the
+ * arrows start from it. It fills the room beside it down to one column of
  * cards: what is beside gives way then.
  */
 export function ProjectsOverview({
     list,
+    zoomed,
     onOpen,
+    onEdit,
     onRemove,
     summary,
+    asked,
+    onAskedTaken,
 }: {
     list: ProjectList;
-    /** A project was picked or made: show it. */
-    onOpen: () => void;
+    /** The project whose card the zoom to its panels grows from, and back into. */
+    zoomed: string | null;
+    /** A project was picked or made: the app shows it, asking first which folder of several. */
+    onOpen: (projectId: string) => void;
+    /** A project's name and folders to change: the app opens its dialog. */
+    onEdit: (project: ProjectInfo) => void;
     /** A project's removal asked for: the app asks what to do with what it holds, then removes. */
     onRemove: (project: ProjectInfo) => void;
     /** What the panels tell about a project, below its name, part by part. */
     summary: (project: ProjectInfo, part: SummaryPart) => ReactNode;
+    /** A folder given on the command line to ask about: the New project dialog opens on it. */
+    asked: FolderChoice | null;
+    /** The dialog took `asked`. */
+    onAskedTaken: () => void;
 }) {
     const { t } = useTranslation();
-    // the dialog open: a new project, or the project to rename
-    const [dialog, setDialog] = useState<{ renaming: ProjectInfo | null } | null>(null);
-    const activate = useActivateProject();
-    // the card the zoom grows from: the one being opened, else the project on screen
-    const [opening, setOpening] = useState<string | null>(null);
-    const zoomed = opening ?? list.active;
+    // the New project dialog open, on a folder already picked or none
+    const [creating, setCreating] = useState<{ picked: FolderChoice | null } | null>(null);
+    useEffect(() => {
+        if (!asked) return;
+        setCreating({ picked: asked });
+        onAskedTaken();
+    }, [asked, onAskedTaken]);
     const grid = useRef<HTMLDivElement>(null);
-    // the zoom grows from its card, named before the zoom captures the screen it leaves
-    const open = (id: string) => {
-        flushSync(() => setOpening(id));
-        activate(id);
-        onOpen();
-    };
 
     useEffect(() => {
         grid.current?.querySelector<HTMLElement>('[data-current-card]')?.focus();
@@ -106,8 +112,8 @@ export function ProjectsOverview({
                         project={project}
                         selected={project.id === list.active}
                         zoomed={project.id === zoomed}
-                        onOpen={() => open(project.id)}
-                        onRename={() => setDialog({ renaming: project })}
+                        onOpen={() => onOpen(project.id)}
+                        onEdit={() => onEdit(project)}
                         onRemove={() => onRemove(project)}
                         summary={(part) => summary(project, part)}
                     />
@@ -116,7 +122,7 @@ export function ProjectsOverview({
                     type="button"
                     data-grid-cell
                     className="flex min-h-44 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ui-border p-4 text-center text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent"
-                    onClick={() => setDialog({ renaming: null })}
+                    onClick={() => setCreating({ picked: null })}
                 >
                     <span className="flex items-center gap-2 text-sm">
                         <IconPlus size={16} />
@@ -125,13 +131,13 @@ export function ProjectsOverview({
                     <span className="text-xs">{t('projects.newHint')}</span>
                 </button>
             </div>
-            {dialog ? (
+            {creating ? (
                 <Suspense fallback={null}>
-                    <ProjectDialog
-                        renaming={dialog.renaming}
+                    <NewProjectDialog
+                        picked={creating.picked}
                         onCreated={onOpen}
-                        onOpenProject={open}
-                        onClose={() => setDialog(null)}
+                        onOpenProject={onOpen}
+                        onClose={() => setCreating(null)}
                     />
                 </Suspense>
             ) : null}
@@ -144,7 +150,7 @@ function ProjectCard({
     selected,
     zoomed,
     onOpen,
-    onRename,
+    onEdit,
     onRemove,
     summary,
 }: {
@@ -153,7 +159,7 @@ function ProjectCard({
     /** The zoom to the project's panels grows from this card, or back into it. */
     zoomed: boolean;
     onOpen: () => void;
-    onRename: () => void;
+    onEdit: () => void;
     onRemove: () => void;
     summary: (part: SummaryPart) => ReactNode;
 }) {
@@ -205,9 +211,9 @@ function ProjectCard({
                 <Menu.Portal>
                     <Menu.Positioner sideOffset={4} align="end">
                         <Menu.Popup className="menu-popup">
-                            <Menu.Item className="menu-item" onClick={onRename}>
+                            <Menu.Item className="menu-item" onClick={onEdit}>
                                 <IconPencil size={14} />
-                                {t('projects.rename')}
+                                {t('projects.editMenu')}
                             </Menu.Item>
                             <Menu.Item className="menu-item danger" onClick={onRemove}>
                                 <IconTrash size={14} />

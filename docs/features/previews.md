@@ -44,7 +44,7 @@ image's two sides (2026-11-01). Nothing a file holds runs, nothing leaves the ma
   where the code starts, so `lineCheck` and the colors are the file's.
 - Read where the tree is: `Repositories::markdown_preview` (the helper parses for a WSL project);
   `get_markdown_preview`, null when the file is not text.
-- Images: `project-file://localhost/<projectId>/<path>` (`http://project-file.localhost/…` on
+- Images: `project-file://localhost/<folderId>/<path>` (`http://project-file.localhost/…` on
   Windows; `interfaces/tauri/project_file.rs`), an asynchronous URI scheme off the main thread:
   the tree, an image's extension, `MAX_IMAGE_BYTES`; answered with its type, `nosniff`, a policy
   allowing no script, a year's cache. The URL carries the file's stamp (`get_file_stamp`: size,

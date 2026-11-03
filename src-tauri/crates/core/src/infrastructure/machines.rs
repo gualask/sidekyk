@@ -5,8 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::wsl::{installed_distro, wsl_path, WslRepositories};
-use crate::modules::projects::{same_distro, FoundFolder, Location, Project, ProjectList};
+use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
 use crate::modules::repositories::{OnChange, Repositories};
+use crate::modules::repository::RepositoryInfo;
 
 pub struct Machines {
     /// This machine's repositories.
@@ -83,11 +84,27 @@ impl Machines {
         })
     }
 
-    /// Watches `project`, the one on screen, where its folder is; every other machine first
-    /// watches nothing, so a helper left idle closes in time. A project without folder is not
-    /// watched.
-    pub fn watch(&self, project: Option<&Project>, on_change: OnChange) {
-        let followed = project.and_then(Project::repository);
+    /// The repositories right inside `found`, a folder without git, on its machine: none for a
+    /// repository.
+    pub fn repositories_inside(&self, found: &FoundFolder) -> anyhow::Result<Vec<FoundFolder>> {
+        let folder = RepositoryInfo {
+            root: found.location.root().to_string(),
+            name: found.name.clone(),
+        };
+        let inside = self.of(&found.location).repositories_inside(&folder)?;
+        Ok(inside
+            .into_iter()
+            .map(|repository| FoundFolder {
+                name: repository.name,
+                location: found.location.with_root(repository.root),
+            })
+            .collect())
+    }
+
+    /// Watches `followed`, the folder on screen, as its repository, where it is; every other machine
+    /// first watches nothing, so a helper left idle closes in time. A project without folder
+    /// watches none.
+    pub fn watch(&self, followed: Option<(&Location, RepositoryInfo)>, on_change: OnChange) {
         for (machine, repositories) in self.every() {
             if !followed
                 .as_ref()
@@ -137,10 +154,11 @@ mod tests {
     use super::*;
     use crate::modules::folder::FolderKind;
     use crate::modules::preview::MarkdownDocument;
+    use crate::modules::projects::Project;
     use crate::modules::repository::{
         ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles,
         CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits,
-        RecentFiles, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+        RecentFiles, RepositorySnapshot, RepositorySummary, UnifiedDiff,
     };
     use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
     use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -155,6 +173,9 @@ mod tests {
 
     impl Repositories for Told {
         fn resolve(&self, _: &Path) -> anyhow::Result<RepositoryInfo> {
+            unreachable!()
+        }
+        fn repositories_inside(&self, _: &RepositoryInfo) -> anyhow::Result<Vec<RepositoryInfo>> {
             unreachable!()
         }
         fn folder_kind(&self, _: &RepositoryInfo) -> anyhow::Result<FolderKind> {
@@ -258,15 +279,15 @@ mod tests {
     fn a_project_without_folder_is_never_routed_to_a_machine() {
         let local = Arc::new(Told::default());
         let machines = Machines::new(local.clone(), PathBuf::new());
-        let home = Project::new("Home".into(), None);
+        let home = Project::new("Home".into(), []);
         let shop = Project::new(
             "shop".into(),
-            Some(Location::Local {
+            [Location::Local {
                 root: "/shop".into(),
-            }),
+            }],
         );
 
-        machines.watch(Some(&home), Box::new(|_| {}));
+        machines.watch(None, Box::new(|_| {}));
         machines.retain(&ProjectList {
             projects: vec![home.clone(), shop.clone()],
             ..ProjectList::default()
@@ -274,7 +295,11 @@ mod tests {
         assert_eq!(*lock(&local.watched), [None]);
         assert_eq!(*lock(&local.retained), [["/shop"]]);
 
-        machines.watch(Some(&shop), Box::new(|_| {}));
+        let folder = &shop.folders[0];
+        machines.watch(
+            Some((&folder.location, folder.repository(&shop))),
+            Box::new(|_| {}),
+        );
         assert_eq!(*lock(&local.watched), [None, Some("/shop".into())]);
     }
 }

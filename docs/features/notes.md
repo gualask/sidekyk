@@ -32,6 +32,7 @@ in notes: `note-images.md`. Sync: `../../.cflow/plans/notes-sync.md`.
   "New project “…”" (without folder) or "New list “…”". A note's own project starts as the chip.
   After a move a toast with Undo, which puts the note or list back where it was; a project made
   for the move stays.
+- A project merged into another brings its lists of notes (`project-folders.md`).
 - Found by `⌘K`, at level 0 across every book (`search.md`).
 
 ## How it is built

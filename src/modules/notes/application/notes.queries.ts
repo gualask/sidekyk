@@ -525,3 +525,17 @@ export function useCaptures(book: () => string, onAdded: (book: string, note: No
         return port.onCapture((event) => void told(event));
     }, [port]);
 }
+
+/**
+ * Forgets what is kept of some books' notes, changed outside the Notes panel (a project merged into
+ * another): read again when they show.
+ */
+export function useForgetBooks() {
+    const client = useQueryClient();
+    return useCallback(
+        (books: readonly string[]) => {
+            for (const book of books) void client.invalidateQueries({ queryKey: notesKey(book) });
+        },
+        [client],
+    );
+}

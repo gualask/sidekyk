@@ -70,6 +70,9 @@ pub fn serve(
             Request::Resolve { candidate } => {
                 on_thread(Box::new(move |r| value(r.resolve(&candidate)?)));
             }
+            Request::RepositoriesInside { folder } => {
+                on_thread(Box::new(move |r| value(r.repositories_inside(&folder)?)));
+            }
             Request::FolderKind { repository } => {
                 on_thread(Box::new(move |r| value(r.folder_kind(&repository)?)));
             }
@@ -243,6 +246,7 @@ fn send_message(output: &Output, message: &Message) {
 fn request_name(request: &Request) -> &'static str {
     match request {
         Request::Resolve { .. } => "resolve",
+        Request::RepositoriesInside { .. } => "repositoriesInside",
         Request::FolderKind { .. } => "folderKind",
         Request::Snapshot { .. } => "snapshot",
         Request::Summary { .. } => "summary",

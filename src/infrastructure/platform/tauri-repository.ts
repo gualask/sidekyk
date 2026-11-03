@@ -12,33 +12,32 @@ import { onTauriEvent } from './events';
  * window's visibility in `window.rs`.
  */
 export const tauriRepository: RepositoryPort = {
-    getFolderKind: (projectId, start) => invoke('get_folder_kind', { projectId, start }),
-    getSnapshot: (projectId) => invoke('get_repository_snapshot', { projectId }),
-    getSummary: (projectId) => invoke('get_repository_summary', { projectId }),
-    getFileDiff: (projectId, request) => invoke('get_file_diff', { projectId, request }),
-    getChangesIgnoringWhitespace: (projectId) =>
-        invoke('get_changes_ignoring_whitespace', { projectId }),
-    getRecentCommits: (projectId) => invoke('get_recent_commits', { projectId }),
-    getCommitActivity: (projectId, since) => invoke('get_commit_activity', { projectId, since }),
-    getCommitFiles: (projectId, commit) => invoke('get_commit_files', { projectId, commit }),
-    getCommitFileDiff: (projectId, request) =>
-        invoke('get_commit_file_diff', { projectId, request }),
-    getDirectory: (projectId, path) => invoke('get_directory', { projectId, path }),
-    getRecentFiles: (projectId) => invoke('get_recent_files', { projectId }),
-    getFileContent: (projectId, path) => invoke('get_file_content', { projectId, path }),
-    getFileStamp: (projectId, path) => invoke('get_file_stamp', { projectId, path }),
-    getBlobSize: (projectId, blob) => invoke('get_blob_size', { projectId, blob }),
+    getFolderKind: (folderId, start) => invoke('get_folder_kind', { folderId, start }),
+    getSnapshot: (folderId) => invoke('get_repository_snapshot', { folderId }),
+    getSummary: (folderId) => invoke('get_repository_summary', { folderId }),
+    getFileDiff: (folderId, request) => invoke('get_file_diff', { folderId, request }),
+    getChangesIgnoringWhitespace: (folderId) =>
+        invoke('get_changes_ignoring_whitespace', { folderId }),
+    getRecentCommits: (folderId) => invoke('get_recent_commits', { folderId }),
+    getCommitActivity: (folderId, since) => invoke('get_commit_activity', { folderId, since }),
+    getCommitFiles: (folderId, commit) => invoke('get_commit_files', { folderId, commit }),
+    getCommitFileDiff: (folderId, request) => invoke('get_commit_file_diff', { folderId, request }),
+    getDirectory: (folderId, path) => invoke('get_directory', { folderId, path }),
+    getRecentFiles: (folderId) => invoke('get_recent_files', { folderId }),
+    getFileContent: (folderId, path) => invoke('get_file_content', { folderId, path }),
+    getFileStamp: (folderId, path) => invoke('get_file_stamp', { folderId, path }),
+    getBlobSize: (folderId, blob) => invoke('get_blob_size', { folderId, blob }),
     // `project_file.rs`: the project and the path encoded whole, the id once before (an older one
     // is a path), the stamp or the object as a query
-    projectFileUrl: (projectId, path, source) =>
-        `${convertFileSrc(`${encodeURIComponent(projectId)}/${path}`, 'project-file')}?${
+    projectFileUrl: (folderId, path, source) =>
+        `${convertFileSrc(`${encodeURIComponent(folderId)}/${path}`, 'project-file')}?${
             source.kind === 'blob'
                 ? `blob=${source.blob}`
                 : `v=${source.stamp.modified}-${source.stamp.size}`
         }`,
-    getMarkdownPreview: (projectId, path) => invoke('get_markdown_preview', { projectId, path }),
+    getMarkdownPreview: (folderId, path) => invoke('get_markdown_preview', { folderId, path }),
     openUrl: (url) => invoke('open_url', { url }),
-    getSyntaxColors: (projectId, request) => invoke('get_syntax_colors', { projectId, request }),
+    getSyntaxColors: (folderId, request) => invoke('get_syntax_colors', { folderId, request }),
     onRepositoryChanged: (listener) =>
         onTauriEvent<RepositoryChangedEvent>(REPOSITORY_CHANGED_EVENT, listener),
     setWindowVisible: (visible) =>

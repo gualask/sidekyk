@@ -1,4 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useRanking } from '@/shared/ui/hooks/use-ranking';
 import { useSearchPort } from './search.port';
 
 /**
@@ -22,4 +23,10 @@ export function useSearch(
         placeholderData: keepPreviousData,
         gcTime: 0,
     });
+}
+
+/** The indexes of `names` matching `query`, best first, as the palette ranks names (`useRanking`). */
+export function useNameRanking(query: string, names: readonly string[]) {
+    const port = useSearchPort();
+    return useRanking(port.rankNames, query, names);
 }

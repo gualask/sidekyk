@@ -24,59 +24,59 @@ import type {
 
 /**
  * The repositories' runtime boundary: the native backend, or a fixture in browser dev mode. A
- * repository is named by its project's id, which must be a project the user added.
+ * repository is named by its folder's id, which must be a folder of a project the user added.
  */
 export interface RepositoryPort {
     /**
-     * Whether a project's folder is a repository or a folder without git: no git runs. `start`
+     * Whether a folder of a project is a repository or a folder without git: no git runs. `start`
      * starts a stopped WSL distro holding it, as opening the project does; the cards never do.
      */
-    getFolderKind(projectId: string, start: boolean): Promise<FolderKind>;
-    getSnapshot(projectId: string): Promise<RepositorySnapshot>;
+    getFolderKind(folderId: string, start: boolean): Promise<FolderKind>;
+    getSnapshot(folderId: string): Promise<RepositorySnapshot>;
     /** Branch, changed paths and line totals, cheap enough for every project on screen. */
-    getSummary(projectId: string): Promise<RepositorySummary>;
-    getFileDiff(projectId: string, request: FileDiffRequest): Promise<UnifiedDiff>;
+    getSummary(folderId: string): Promise<RepositorySummary>;
+    getFileDiff(folderId: string, request: FileDiffRequest): Promise<UnifiedDiff>;
     /** The staged and unstaged changes with whitespace ignored: a diff of each, only when asked. */
-    getChangesIgnoringWhitespace(projectId: string): Promise<ChangesIgnoringWhitespace>;
+    getChangesIgnoringWhitespace(folderId: string): Promise<ChangesIgnoringWhitespace>;
     /** The last commits of the branch on screen; none before the first commit. */
-    getRecentCommits(projectId: string): Promise<RecentCommits>;
+    getRecentCommits(folderId: string): Promise<RecentCommits>;
     /** The lines each commit of the branch on screen changed since `since` (Unix seconds). */
-    getCommitActivity(projectId: string, since: number): Promise<CommitActivity>;
-    getCommitFiles(projectId: string, commit: CommitRequest): Promise<CommitFiles>;
-    getCommitFileDiff(projectId: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
+    getCommitActivity(folderId: string, since: number): Promise<CommitActivity>;
+    getCommitFiles(folderId: string, commit: CommitRequest): Promise<CommitFiles>;
+    getCommitFileDiff(folderId: string, request: CommitFileDiffRequest): Promise<UnifiedDiff>;
     /** What a folder holds, `''` for the root: read from the backend's list, no git. */
-    getDirectory(projectId: string, path: string): Promise<Directory>;
+    getDirectory(folderId: string, path: string): Promise<Directory>;
     /** The tree's files by their last change on disk, newest first: no git. */
-    getRecentFiles(projectId: string): Promise<RecentFiles>;
+    getRecentFiles(folderId: string): Promise<RecentFiles>;
     /** A file of the tree, as the Files panel shows it. */
-    getFileContent(projectId: string, path: string): Promise<FileContent>;
+    getFileContent(folderId: string, path: string): Promise<FileContent>;
     /** The size and last change of a file of the tree. */
-    getFileStamp(projectId: string, path: string): Promise<FileStamp>;
+    getFileStamp(folderId: string, path: string): Promise<FileStamp>;
     /** The size of a git object, a side of an image's diff. */
-    getBlobSize(projectId: string, blob: string): Promise<number>;
+    getBlobSize(folderId: string, blob: string): Promise<number>;
     /**
      * The URL an image loads from, read by the WebView itself: the tree's file at `path`, or a git
      * object with `path`'s type. It names the file's stamp or the object, so other bytes are
      * another URL.
      */
-    projectFileUrl(projectId: string, path: string, source: ImageSource): string;
+    projectFileUrl(folderId: string, path: string, source: ImageSource): string;
     /**
      * A Markdown file of the tree as its preview shows it, links and images resolved against the
      * tree; null when it is not text (binary, a link, a submodule).
      */
-    getMarkdownPreview(projectId: string, path: string): Promise<MarkdownDocument | null>;
+    getMarkdownPreview(folderId: string, path: string): Promise<MarkdownDocument | null>;
     /**
      * A web or mail address a file shown links to, in the system's browser or mail app; the
      * backend refuses any other scheme.
      */
     openUrl(url: string): Promise<void>;
     /** The colors of a block of lines of one version of a file: colored whole once, then kept. */
-    getSyntaxColors(projectId: string, request: SyntaxRequest): Promise<SyntaxColors>;
+    getSyntaxColors(folderId: string, request: SyntaxRequest): Promise<SyntaxColors>;
     /** Returns a synchronous disposer. */
     onRepositoryChanged(listener: (event: RepositoryChangedEvent) => void): () => void;
     /**
      * While the window is hidden, changes on disk are not reported. Showing it again answers with
-     * the id of the project on screen when it changed meanwhile. Never fails: `null` when unsure.
+     * the id of the folder on screen when it changed meanwhile. Never fails: `null` when unsure.
      */
     setWindowVisible(visible: boolean): Promise<string | null>;
 }

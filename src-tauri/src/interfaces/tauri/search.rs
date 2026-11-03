@@ -5,7 +5,7 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::notes::project_book;
-use super::repository::on_project;
+use super::repository::on_folder;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::{Book, NotesStore};
@@ -54,15 +54,15 @@ pub(crate) async fn search(
 }
 
 #[tauri::command]
-/// The lines of the project's files where `query` is, sent through `on_files` as they are found
+/// The lines of a project's folder's files where `query` is, sent through `on_files` as they are found
 /// (`⌘F`); a newer search stops this one. A stopped WSL distro is not started for it.
 pub(crate) async fn search_contents(
     app: tauri::AppHandle,
-    project_id: String,
+    folder_id: String,
     query: String,
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
-    on_project("search_contents", app, project_id, move |on| {
+    on_folder("search_contents", app, folder_id, move |on| {
         on.readable_without_starting()?;
         on.repositories.search_contents(on.info, &query, &|files| {
             // the page went away: nothing left to stop

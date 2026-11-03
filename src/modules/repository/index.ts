@@ -1,9 +1,10 @@
 export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
 export {
-    type ProjectFailure,
+    type FolderFailure,
+    useFolderFailures,
     useFolderKind,
-    useProjectFailures,
-    useReadProjectAgain,
+    useProjectKind,
+    useReadFolderAgain,
     useRepositoryChangeSubscription,
 } from './application/repository.queries';
 export { RepositorySettingsProvider } from './application/repository-settings';
@@ -35,5 +36,6 @@ export {
 export { lineCheck } from './model/syntax';
 export { fileTarget } from './model/targets';
 export { changesPanel, filesPanel, startPanel } from './panel';
-export { ProjectFacts } from './ui/ProjectFacts';
+export { FOLDER_COLUMNS } from './ui/folder-columns';
+export { FolderFacts, ProjectFacts } from './ui/ProjectFacts';
 export { FILES_TREE_WIDTH } from './ui/tree-layout';

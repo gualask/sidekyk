@@ -8,6 +8,8 @@ reason, numbers, sources. One fact in one file; the others point to it.
 - `features/`: one file per area as built: behaviour, how it is built, decisions.
   - `workspace.md`: levels, tiles and sidebars, keys, settings, toasts and problems.
   - `projects.md`: identity, folders and their kind, level 0 cards, moved folders.
+  - `project-folders.md`: several folders in a project, one on screen; merging projects; a folder
+    above repositories.
   - `wsl.md`: WSL projects and the helper (protocol, lifecycle, shipping).
   - `changes.md`: snapshot, diffs, commits, the viewer.
   - `syntax-colors.md`

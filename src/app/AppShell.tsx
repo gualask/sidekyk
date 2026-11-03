@@ -7,17 +7,19 @@ import {
     notesPanel,
     notesTarget,
     useCaptures,
+    useForgetBooks,
 } from '@/modules/notes';
 import {
     activeProject,
+    type FolderChoice,
+    loadEditProjectDialog,
     type ProjectList,
     ProjectsOverview,
     type TilesLayout,
-    useActivateProject,
     useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
-    useRelocateProject,
+    useRelocateFolder,
     useRemoveProject,
 } from '@/modules/projects';
 import {
@@ -25,7 +27,8 @@ import {
     filesPanel,
     fileTarget,
     useFolderKind,
-    useReadProjectAgain,
+    useProjectKind,
+    useReadFolderAgain,
     useRepositoryChangeSubscription,
     useShownFile,
 } from '@/modules/repository';
@@ -39,7 +42,7 @@ import { loadSettingsDialog, useSettingsWhenRead } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget, SummaryPart } from '@/shared/panels/panel';
-import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
+import { onlyFolder, type ProjectFolder, type ProjectInfo } from '@/shared/projects/project-info';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
@@ -59,6 +62,7 @@ import {
     tileBeside,
 } from './panels';
 import { useProblems } from './problems';
+import { useProjectEntry } from './project-entry';
 import { useShowWindowWhen } from './providers';
 import { SideColumn } from './SideColumn';
 import { TopBar } from './TopBar';
@@ -71,6 +75,12 @@ const CommandPalette = preloadable(loadCommandPalette, (module) => module.Comman
 const RemoveProjectDialog = preloadable(
     loadRemoveProjectDialog,
     (module) => module.RemoveProjectDialog,
+);
+const EditProjectDialog = preloadable(loadEditProjectDialog, (module) => module.EditProjectDialog);
+/** Asked on entering a project of several folders; loaded while nothing else happens. */
+const FolderPicker = preloadable(
+    () => import('./FolderPicker'),
+    (module) => module.FolderPicker,
 );
 
 /** Loaded when first asked for: the first paint does not show it. */
@@ -111,8 +121,11 @@ export function AppShell() {
     // what that panel was asked to show, such as a file picked in the palette
     const [target, setTarget] = useState<Asked | null>(null);
     const project = projects.data ? activeProject(projects.data) : null;
-    // what its folder is: read without starting a stopped WSL distro, which its Start panel starts
-    const folderKind = useFolderKind(project);
+    // its folder on screen, which its panels of files read, and the ways into a project
+    const entry = useProjectEntry(projects.data, project);
+    const { folder } = entry;
+    // what that folder is: read without starting a stopped WSL distro, which its Start panel starts
+    const folderKind = useFolderKind(folder);
     // the project's panels, from what it has; none at all projects without projects, and not yet
     // while its folder's kind is read
     const tiles =
@@ -120,14 +133,16 @@ export function AppShell() {
             ? projectTiles(folderKind.stopped ? 'stopped' : folderKind.kind)
             : null;
     const hasChanges = tiles?.panels.includes(changesPanel) ?? false;
-    // as deep as the project goes: a project with one panel has no level 2, and without projects
-    // only all projects shows. The level kept follows the one shown, so another project opens at
-    // the level seen; while the panels wait, it stays
-    const level = !project
-        ? 0
-        : tiles
-          ? (Math.min(zoomLevel, deepestLevel(tiles)) as ZoomLevel)
-          : zoomLevel;
+    // as deep as the project goes: a project with one panel has no level 2, and without projects,
+    // or with several folders none picked (one gone), only all projects shows. The level kept
+    // follows the one shown, so another project opens at the level seen; while the panels wait,
+    // it stays
+    const level =
+        !project || (!folder && project.folders.length > 0)
+            ? 0
+            : tiles
+              ? (Math.min(zoomLevel, deepestLevel(tiles)) as ZoomLevel)
+              : zoomLevel;
     if (projects.data && level !== zoomLevel) setLevel(level);
     // a panel the project does not have gives way to its main one
     const panel = tiles && !tiles.panels.includes(shownPanel) ? tiles.main : shownPanel;
@@ -152,7 +167,6 @@ export function AppShell() {
         [level, tiles, i18n],
     );
     // the distro to start before the project's files are searched, while it is stopped
-    const folder = project ? projectFolder(project) : null;
     const stoppedDistro = folderKind.stopped && folder?.kind === 'wsl' ? folder.distro : null;
     // the Inbox's field takes the focus (`⌘N` at all projects)
     const [focusInbox, setFocusInbox] = useState(false);
@@ -185,7 +199,7 @@ export function AppShell() {
     const [helpOpen, setHelpOpen] = useState(false);
     const toggleHelp = () => setHelpOpen((open) => !open);
     // the file shown, whose lines found come first: worked out only while the palette is open
-    const shownFile = useShownFile(level > 0 ? (project?.id ?? null) : null);
+    const shownFile = useShownFile(level > 0 ? (folder?.id ?? null) : null);
     // a problem's fix in the settings: they open in place of the palette
     const openSettings = useCallback(() => {
         setPalette(closePalette);
@@ -194,7 +208,9 @@ export function AppShell() {
     // a project to remove, once asked what to do with its notes
     const [removing, setRemoving] = useState<ProjectInfo | null>(null);
     const { mutate: removeProject } = useRemoveProject();
-    const activate = useActivateProject();
+    // a project whose name and folders change: from its card, or from its folders in the top bar
+    const [editing, setEditing] = useState<ProjectInfo | null>(null);
+    const forgetBooks = useForgetBooks();
 
     /**
      * Every change of level goes through here, so it animates the same way everywhere. A target
@@ -261,20 +277,34 @@ export function AppShell() {
         setSettingsOpen((open) => !open);
     };
 
-    // a project's panels, or the panel already full screen
+    // a project's panels, or the panel already full screen. The panel asked for, not the one
+    // the project at all projects would show: a project of several folders, none picked, has
+    // Notes alone
     const openProject = (projectId: string) => {
-        activate(projectId);
-        if (level === 0) zoom(1);
+        const from = level;
+        entry.enter(projectId, () => {
+            if (from === 0) zoom(1, shownPanel);
+        });
     };
-    // a folder given on the command line: its project, already on screen, shows its panels
-    useProjectsChangeSubscription(() => zoom(1));
-    const readAgain = useReadProjectAgain();
-    const { mutate: relocate } = useRelocateProject({ readAgain, open: openProject });
+    // a folder given on the command line: its project, already on screen, shows its panels; a
+    // folder above repositories opens the New project dialog on it, at all projects
+    const [asked, setAsked] = useState<FolderChoice | null>(null);
+    const takeAsked = useCallback(() => setAsked(null), []);
+    useProjectsChangeSubscription((opened) => {
+        if (opened.kind === 'project') {
+            entry.enter(opened.id, () => zoom(1, shownPanel), opened.folderId);
+            return;
+        }
+        setAsked(opened.choice);
+        zoom(0);
+    });
+    const readAgain = useReadFolderAgain();
+    const { mutate: relocate } = useRelocateFolder({ readAgain, open: openProject });
     const fixProject = useMemo(
         () => ({
-            locate: (project: ProjectInfo) => relocate(project.id),
+            locate: (folder: ProjectFolder) => relocate(folder.id),
             remove: setRemoving,
-            retry: (project: ProjectInfo) => readAgain(project.id),
+            retry: (folder: ProjectFolder) => readAgain(folder.id),
         }),
         [relocate, readAgain],
     );
@@ -310,13 +340,14 @@ export function AppShell() {
             else if (level > 0 && book === project?.id) {
                 show(notesPanel.id, notesTarget(list, note));
             } else {
-                waitForPanels({
-                    project: book,
-                    panel: notesPanel.id,
-                    target: notesTarget(list, note),
+                entry.enter(book, () => {
+                    waitForPanels({
+                        project: book,
+                        panel: notesPanel.id,
+                        target: notesTarget(list, note),
+                    });
+                    zoom(1, notesPanel);
                 });
-                activate(book);
-                zoom(1, notesPanel);
             }
         },
     };
@@ -332,9 +363,13 @@ export function AppShell() {
         [projects.data, i18n],
     );
 
-    // every project has its panels (level 1), whatever its folder turns out to be
+    // every project has its panels (level 1), whatever its folder turns out to be; entering one
+    // of several folders asks which
     const zoomIn = () => {
-        if (project && level < (tiles ? deepestLevel(tiles) : 1)) zoom((level + 1) as ZoomLevel);
+        if (project && level === 0) openProject(project.id);
+        else if (project && level < (tiles ? deepestLevel(tiles) : 1)) {
+            zoom((level + 1) as ZoomLevel);
+        }
     };
     const zoomOut = () => {
         if (level > 0) zoom((level - 1) as ZoomLevel);
@@ -342,6 +377,9 @@ export function AppShell() {
 
     useWorkspaceKeys({
         list: projects.data,
+        // at all projects the card selected; below, the project's panels, a folder asked for
+        switchProject: (projectId) =>
+            level === 0 ? entry.select(projectId) : openProject(projectId),
         zoomIn,
         zoomOut,
         // full screen, from a project's panels or another panel
@@ -383,6 +421,7 @@ export function AppShell() {
             whenIdle(() => {
                 void SettingsDialog.preload();
                 void CommandPalette.preload();
+                void FolderPicker.preload();
                 for (const { summary } of SUMMARIES) void summary.preload();
             }),
         [],
@@ -393,6 +432,7 @@ export function AppShell() {
             <TopBar
                 level={level}
                 project={project}
+                folder={folder}
                 panel={panel}
                 problems={problems}
                 onZoom={zoom}
@@ -407,6 +447,8 @@ export function AppShell() {
                 }
                 onRestore={restore}
                 facts={level >= 1 && hasChanges}
+                onShowFolder={entry.showFolder}
+                onEditFolders={() => setEditing(project)}
             />
             <main className="min-h-0 flex-1">
                 {projects.isError ? (
@@ -416,7 +458,10 @@ export function AppShell() {
                 ) : projects.data ? (
                     <Workspace
                         list={projects.data}
+                        zoomed={entry.zoomed}
+                        openProject={openProject}
                         project={project}
+                        folder={folder}
                         tiles={tiles}
                         level={level}
                         panel={level === 1 ? selectedTile : panel}
@@ -428,7 +473,11 @@ export function AppShell() {
                         onMinimize={minimize}
                         show={show}
                         findInFiles={findInFiles}
+                        showFolder={entry.showFolder}
+                        onEdit={setEditing}
                         onRemove={setRemoving}
+                        asked={asked}
+                        onAskedTaken={takeAsked}
                         focusInbox={focusInbox}
                         onInboxFocused={inboxFocused}
                         inboxNote={inboxNote}
@@ -445,6 +494,32 @@ export function AppShell() {
                             project: removing,
                             onRemove: () => removeProject(removing.id),
                             onClose: () => setRemoving(null),
+                        }}
+                    />
+                </Suspense>
+            ) : null}
+            {entry.picker ? (
+                <Suspense fallback={null}>
+                    <Preloaded
+                        key={entry.picker.project.id}
+                        of={FolderPicker}
+                        props={{
+                            project: entry.picker.project,
+                            onPick: entry.picker.pick,
+                            onClose: entry.picker.close,
+                        }}
+                    />
+                </Suspense>
+            ) : null}
+            {editing ? (
+                <Suspense fallback={null}>
+                    <Preloaded
+                        key={editing.id}
+                        of={EditProjectDialog}
+                        props={{
+                            project: editing,
+                            onMerged: (into: string, from: string) => forgetBooks([into, from]),
+                            onClose: () => setEditing(null),
                         }}
                     />
                 </Suspense>
@@ -474,7 +549,9 @@ export function AppShell() {
                             initialText: palette.text,
                             projectName: project?.name ?? null,
                             projectId: level > 0 ? (project?.id ?? null) : null,
-                            hasFiles: tiles?.panels.includes(filesPanel) ?? false,
+                            filesFolder: tiles?.panels.includes(filesPanel)
+                                ? (folder?.id ?? null)
+                                : null,
                             stoppedDistro,
                             currentFile: palette.open ? shownFile() : null,
                             panels: palettePanels,
@@ -496,7 +573,10 @@ const SIDE_SIZE = { flexGrow: 1, flexBasis: 0 };
 
 function Workspace({
     list,
+    zoomed,
+    openProject,
     project,
+    folder,
     tiles,
     level,
     panel,
@@ -505,17 +585,27 @@ function Workspace({
     select,
     show,
     findInFiles,
+    showFolder,
     layout,
     onSplit,
     onMinimize,
+    onEdit,
     onRemove,
+    asked,
+    onAskedTaken,
     focusInbox,
     onInboxFocused,
     inboxNote,
     onInboxNoteRevealed,
 }: {
     list: ProjectList;
+    /** The project whose card the zoom grows from. */
+    zoomed: string | null;
+    /** Shows a project's panels, asking first which folder of several. */
+    openProject: (projectId: string) => void;
     project: ProjectInfo | null;
+    /** The project's folder on screen; null without folder. */
+    folder: ProjectFolder | null;
     /** The project's panels; null with no project, or while its folder's kind is read. */
     tiles: ProjectTiles | null;
     level: ZoomLevel;
@@ -526,11 +616,16 @@ function Workspace({
     select: (panel: PanelDefinition) => void;
     show: PanelProps['show'];
     findInFiles: PanelProps['findInFiles'];
+    showFolder: PanelProps['showFolder'];
     layout: TilesLayout;
     onSplit: (split: number) => void;
     onMinimize: (panel: PanelDefinition) => void;
     /** Asks to remove a project. */
+    onEdit: (project: ProjectInfo) => void;
     onRemove: (project: ProjectInfo) => void;
+    /** A folder given on the command line to ask about, until the New project dialog takes it. */
+    asked: FolderChoice | null;
+    onAskedTaken: () => void;
     /** The Inbox's field takes the focus. */
     focusInbox: boolean;
     onInboxFocused: () => void;
@@ -552,14 +647,20 @@ function Workspace({
                 />
                 <ProjectsOverview
                     list={list}
-                    onOpen={() => zoom(1)}
+                    zoomed={zoomed}
+                    onOpen={openProject}
+                    onEdit={onEdit}
                     onRemove={onRemove}
-                    summary={(card, part) => <CardSummaries project={card} part={part} />}
+                    asked={asked}
+                    onAskedTaken={onAskedTaken}
+                    summary={(card, part) => (
+                        <CardSummaries project={card} folder={onlyFolder(card)} part={part} />
+                    )}
                 />
             </div>
         );
     }
-    if (!tiles) return <WaitingPanels project={project} />;
+    if (!tiles) return <WaitingPanels folder={folder} />;
     // full screen, and a project's one panel at level 1
     if (level === 2 || tiles.side.length === 0) {
         return (
@@ -567,10 +668,12 @@ function Workspace({
                 <PanelTile
                     panel={panel}
                     project={project}
+                    folder={folder}
                     target={targetOf(panel.id)}
                     selected
                     show={show}
                     findInFiles={findInFiles}
+                    showFolder={showFolder}
                 />
             </div>
         );
@@ -583,10 +686,12 @@ function Workspace({
             <PanelTile
                 panel={main}
                 project={project}
+                folder={folder}
                 target={targetOf(main.id)}
                 selected={main === panel}
                 show={show}
                 findInFiles={findInFiles}
+                showFolder={showFolder}
                 tile={MAIN_SIZE}
                 onZoomIn={() => zoom(2, main)}
                 onSelect={() => select(main)}
@@ -601,10 +706,12 @@ function Workspace({
                         <PanelTile
                             panel={tile}
                             project={project}
+                            folder={folder}
                             target={targetOf(tile.id)}
                             selected={tile === panel}
                             show={show}
                             findInFiles={findInFiles}
+                            showFolder={showFolder}
                             tile={SIDE_SIZE}
                             tileFit={tileFit}
                             onZoomIn={() => zoom(2, tile)}
@@ -622,13 +729,22 @@ function Workspace({
  * What a project's panels tell on its card at all projects, from what its folder is: nothing until
  * that is read, which the cards ask without starting a WSL distro.
  */
-function CardSummaries({ project, part }: { project: ProjectInfo; part: SummaryPart }) {
-    const folderKind = useFolderKind(project, { freshOnShow: true });
+function CardSummaries({
+    project,
+    folder,
+    part,
+}: {
+    project: ProjectInfo;
+    folder: ProjectFolder | null;
+    part: SummaryPart;
+}) {
+    // a project of several folders has a repository's panels when one of them is
+    const folderKind = useProjectKind(project.folders, { freshOnShow: true });
     if (folderKind.waiting) return null;
     const repository = folderKind.kind === 'repository';
     return projectTiles(folderKind.kind).summaries.map(({ id, summary }) => (
         <Suspense key={id} fallback={null}>
-            <Preloaded of={summary} props={{ project, part, repository }} />
+            <Preloaded of={summary} props={{ project, folder, part, repository }} />
         </Suspense>
     ));
 }
@@ -637,9 +753,8 @@ function CardSummaries({ project, part }: { project: ProjectInfo; part: SummaryP
  * A project's panels before its folder's kind is read, as they wait for what they read: nothing
  * drawn, but for a WSL project, whose first read may start Sidekyk's helper in its distro.
  */
-function WaitingPanels({ project }: { project: ProjectInfo }) {
+function WaitingPanels({ folder }: { folder: ProjectFolder | null }) {
     const { t } = useTranslation();
-    const folder = projectFolder(project);
     return (
         <div
             className="flex h-full items-center justify-center text-sm text-ui-text-muted"

@@ -65,7 +65,7 @@ export interface PreviewActions {
 
 /** What every block of a document needs, without passing it down each level. */
 interface Context {
-    projectId: string;
+    folderId: string;
     path: string;
     actions: PreviewActions;
     goTo: (id: string) => void;
@@ -110,14 +110,14 @@ function estimate(block: MarkdownBlock): number {
  * is one of ours, its text escaped by React.
  */
 export default function MarkdownPreview({
-    projectId,
+    folderId,
     path,
     document,
     openOn,
     place,
     actions,
 }: {
-    projectId: string;
+    folderId: string;
     path: string;
     document: MarkdownDocument;
     openOn: PreviewOpenOn | null;
@@ -184,7 +184,7 @@ export default function MarkdownPreview({
     }));
 
     // every block on screen renders again with the list anyway: nothing to keep from one to the next
-    const context: Context = { projectId, path, actions, goTo, wrap: codeLines === 'wrap' };
+    const context: Context = { folderId, path, actions, goTo, wrap: codeLines === 'wrap' };
 
     return (
         <PreviewContext.Provider value={context}>
@@ -420,7 +420,7 @@ function BackLinks({ number, references }: { number: number; references: number 
 
 /** A code block: the file's own lines, colored as the file is, from where the code starts. */
 function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
-    const { projectId, path, wrap } = usePreview();
+    const { folderId, path, wrap } = usePreview();
     const sides = useMemo(() => fileSides(path), [path]);
     const asLines = useMemo<DiffLine[]>(
         () =>
@@ -434,7 +434,7 @@ function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
         [lines],
     );
     const colorBlocks = useMemo(() => blocksOf(asLines, sides), [asLines, sides]);
-    const colors = useSyntaxColors(projectId, sides, colorBlocks);
+    const colors = useSyntaxColors(folderId, sides, colorBlocks);
     return (
         <pre
             className={`rounded-lg bg-ui-surface px-4 py-3 font-mono text-[12.5px] leading-5 text-ui-syntax-text ${
@@ -650,8 +650,8 @@ function PreviewImage({
 
 /** An image of the project; too large, or not an image after all, its description instead. */
 function ProjectImage({ path, alt, title }: { path: string; alt: string; title: string | null }) {
-    const { projectId } = usePreview();
-    const image = useImageSource(projectId, path);
+    const { folderId } = usePreview();
+    const image = useImageSource(folderId, path);
     const [failed, setFailed] = useState<string | null>(null);
     if (image.isPending) return null;
     if (!image.url || image.tooLarge || failed === image.url) {

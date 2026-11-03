@@ -179,7 +179,7 @@ impl FileTree {
 
 /// The order of names in a folder, as VS Code's explorer: letters ignoring case, numbers by
 /// value ("file2" before "file10"), then the exact text, so the order is total.
-fn compare_names(a: &str, b: &str) -> Ordering {
+pub fn compare_names(a: &str, b: &str) -> Ordering {
     let (mut x, mut y) = (a, b);
     loop {
         match (x.chars().next(), y.chars().next()) {

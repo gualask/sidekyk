@@ -84,7 +84,7 @@ fn into_target<T>(
     let projects = app.state::<ProjectsState>();
     let moved = into_new_project(
         || {
-            let (project, _) = projects.update_with(app, |list| list.add(&name, None))?;
+            let (project, _) = projects.update_with(app, |list| list.add(&name, Vec::new()))?;
             Ok(project_book(&project))
         },
         run,
@@ -321,10 +321,13 @@ fn wsl_distro(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<Stri
         return Ok(None);
     };
     let project = app.state::<ProjectsState>().project(id)?;
-    Ok(project.folders.into_iter().find_map(|folder| match folder {
-        Location::Wsl { distro, .. } => Some(distro),
-        Location::Local { .. } => None,
-    }))
+    Ok(project
+        .folders
+        .into_iter()
+        .find_map(|folder| match folder.location {
+            Location::Wsl { distro, .. } => Some(distro),
+            Location::Local { .. } => None,
+        }))
 }
 
 /// How a distro names the notes' folder, asked once (`wslpath`) and kept: one `wsl.exe` per

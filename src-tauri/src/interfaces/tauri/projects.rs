@@ -11,7 +11,10 @@ use super::state::ProjectsState;
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::NotesStore;
-use sidekyk_core::modules::projects::{FolderChoice, ProjectList, Relocation, TilesLayout};
+use sidekyk_core::modules::projects::{
+    FolderChange, FolderChoice, Opened, Project, ProjectList, TilesLayout,
+};
+use sidekyk_core::modules::repository::repository_name;
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]
@@ -21,15 +24,16 @@ pub(crate) fn get_projects(app: tauri::AppHandle) -> ProjectList {
 }
 
 #[tauri::command]
-/// The project a folder given on the command line put on screen, once, to show its panels.
-pub(crate) fn take_opened_project(app: tauri::AppHandle) -> Option<String> {
+/// What a folder given on the command line did, once: a project to show its panels, or a folder
+/// above repositories to ask about.
+pub(crate) fn take_opened(app: tauri::AppHandle) -> Option<Opened> {
     app.state::<ProjectsState>().take_opened()
 }
 
 #[tauri::command]
 /// Asks for a new project's folder and says what it is: one no project has yet (inside a
-/// repository, the repository's root), with its name; or another project's. `None` when
-/// cancelled.
+/// repository, the repository's root), with its name and, for a folder without git, the
+/// repositories right inside it; or another project's. `None` when cancelled.
 pub(crate) async fn choose_project_folder(
     app: tauri::AppHandle,
 ) -> Result<Option<FolderChoice>, AppError> {
@@ -45,32 +49,33 @@ pub(crate) async fn choose_project_folder(
         let path = folder.into_path()?;
         let projects = app.state::<ProjectsState>();
         let found = projects.folder_at(&path)?;
+        let inside = projects.repositories_inside(&found)?;
         // given back to `create_project` as a string, as every path the frontend holds
         let path = path
             .into_os_string()
             .into_string()
             .map_err(|_| anyhow::anyhow!("the folder's path is not Unicode"))?;
-        Ok(Some(projects.list().folder_choice(path, found)))
+        Ok(Some(projects.list().folder_choice(path, found, inside)))
     })
     .await
 }
 
 #[tauri::command]
-/// Adds a project of this name, following the folder at `folder` (a path as
-/// `choose_project_folder` gave it, checked again) or none, and puts it on screen.
+/// Adds a project of this name, following the folders at `folders` (paths as
+/// `choose_project_folder` gave them, checked again; none, one or several), and puts it on screen.
 pub(crate) async fn create_project(
     app: tauri::AppHandle,
     name: String,
-    folder: Option<String>,
+    folders: Vec<String>,
 ) -> Result<ProjectList, AppError> {
     blocking("create_project", app, move |app| {
         let projects = app.state::<ProjectsState>();
-        let folder = match folder {
-            Some(path) => Some(projects.folder_at(Path::new(&path))?.location),
-            None => None,
-        };
+        let folders = folders
+            .iter()
+            .map(|path| Ok(projects.folder_at(Path::new(path))?.location))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         projects.update(app, |list| {
-            let project = list.add(&name, folder)?;
+            let project = list.add(&name, folders)?;
             list.activate(&project.id)
         })
     })
@@ -136,33 +141,123 @@ pub(crate) async fn set_project_layout(
 }
 
 #[tauri::command]
-/// Asks for the folder a moved repository is in now, and the project follows it there, keeping its
-/// id, notes and layout; a folder that is another project's is not taken, and that project comes
-/// back. `None` when cancelled.
-pub(crate) async fn relocate_project(
+/// The folder the window shows, `None` for none: it is watched while on screen, and the palette
+/// looks in its files.
+pub(crate) async fn show_project_folder(
+    app: tauri::AppHandle,
+    folder_id: Option<String>,
+) -> Result<(), AppError> {
+    blocking("show_project_folder", app, move |app| {
+        app.state::<ProjectsState>().show_folder(app, folder_id);
+        Ok(())
+    })
+    .await
+}
+
+/// What a folder picked did: the list after it, or the project that has that folder already.
+fn folder_change(other: Option<Project>, list: ProjectList) -> FolderChange {
+    match other {
+        Some(other) => FolderChange::InProject {
+            id: other.id,
+            name: other.name,
+        },
+        None => FolderChange::Changed { list },
+    }
+}
+
+#[tauri::command]
+/// Asks for another folder of a project, which it follows after its own; a folder that
+/// is another project's is not taken, and that project comes back, to merge it. `None` when
+/// cancelled.
+pub(crate) async fn add_project_folder(
     app: tauri::AppHandle,
     project_id: String,
-) -> Result<Option<Relocation>, AppError> {
-    blocking("relocate_project", app, move |app| {
+) -> Result<Option<FolderChange>, AppError> {
+    blocking("add_project_folder", app, move |app| {
         let projects = app.state::<ProjectsState>();
         let project = projects.project(&project_id)?;
         let Some(folder) = app
             .dialog()
             .file()
-            .set_title(texts::current().locate.replace("{name}", &project.name))
+            .set_title(texts::current().add_folder.replace("{name}", &project.name))
             .blocking_pick_folder()
         else {
             return Ok(None);
         };
         let found = projects.folder_at(&folder.into_path()?)?;
-        let (other, list) = projects.update_with(app, |list| list.relocate(&project_id, found))?;
-        Ok(Some(match other {
-            Some(other) => Relocation::InProject {
-                id: other.id,
-                name: other.name,
-            },
-            None => Relocation::Moved { list },
-        }))
+        let (other, list) =
+            projects.update_with(app, |list| list.add_folder(&project_id, found))?;
+        Ok(Some(folder_change(other, list)))
+    })
+    .await
+}
+
+#[tauri::command]
+/// Stops following one of a project's folders; the folder is left as it is, the project keeps its
+/// notes.
+pub(crate) async fn remove_project_folder(
+    app: tauri::AppHandle,
+    project_id: String,
+    folder_id: String,
+) -> Result<ProjectList, AppError> {
+    blocking("remove_project_folder", app, move |app| {
+        app.state::<ProjectsState>()
+            .update(app, |list| list.remove_folder(&project_id, &folder_id))
+    })
+    .await
+}
+
+#[tauri::command]
+/// Merges the project `from` into `into`: its folders follow `into`'s, its lists of notes move
+/// into it (one whose name is taken named after `from`), and `from` goes. The notes go first:
+/// if they cannot, nothing else changes.
+pub(crate) async fn merge_projects(
+    app: tauri::AppHandle,
+    into: String,
+    from: String,
+) -> Result<ProjectList, AppError> {
+    blocking("merge_projects", app, move |app| {
+        let projects = app.state::<ProjectsState>();
+        let (target, merged) = (projects.project(&into)?, projects.project(&from)?);
+        // before any note moves: folders on two machines or one inside another
+        projects.list().check_merge(&into, &from)?;
+        app.state::<NotesStore>().merge_book(
+            app.state::<NotesFiles>().inner(),
+            &project_book(&merged),
+            &project_book(&target),
+            &merged.name,
+        )?;
+        projects.update(app, |list| list.merge(&into, &from))
+    })
+    .await
+}
+
+#[tauri::command]
+/// Asks for the folder a moved folder of a project is in now, and the project follows it there,
+/// the folder keeping its id; a folder that is another project's is not taken, and that project
+/// comes back. `None` when cancelled.
+pub(crate) async fn relocate_folder(
+    app: tauri::AppHandle,
+    folder_id: String,
+) -> Result<Option<FolderChange>, AppError> {
+    blocking("relocate_folder", app, move |app| {
+        let projects = app.state::<ProjectsState>();
+        let (_, folder) = projects.folder(&folder_id)?;
+        let Some(picked) = app
+            .dialog()
+            .file()
+            .set_title(
+                texts::current()
+                    .locate
+                    .replace("{name}", &repository_name(folder.location.root())),
+            )
+            .blocking_pick_folder()
+        else {
+            return Ok(None);
+        };
+        let found = projects.folder_at(&picked.into_path()?)?;
+        let (other, list) = projects.update_with(app, |list| list.relocate(&folder_id, found))?;
+        Ok(Some(folder_change(other, list)))
     })
     .await
 }

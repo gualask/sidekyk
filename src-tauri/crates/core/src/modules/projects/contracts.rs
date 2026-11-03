@@ -32,43 +32,69 @@ pub struct Project {
     /// kept: a project whose folder moves keeps its id.
     pub id: String,
     pub name: String,
-    /// The folders it follows: none, or one repository.
-    pub folders: Vec<Location>,
+    /// The folders it follows, in the order they were added: none, one, or several on one
+    /// machine, none inside another.
+    pub folders: Vec<ProjectFolder>,
 }
 
 impl Project {
-    /// A new project, with a new id: none or one folder for now.
-    pub fn new(name: String, folder: Option<Location>) -> Self {
+    /// A new project, with a new id, following `folders`, each with a new id.
+    pub fn new(name: String, folders: impl IntoIterator<Item = Location>) -> Self {
         Self {
             id: new_id(),
             name,
-            folders: folder.into_iter().collect(),
+            folders: folders.into_iter().map(ProjectFolder::new).collect(),
         }
     }
 
-    /// A project as stored before ids were made: its id is its location's.
+    /// A project as stored before ids were made: its id is its location's, and its folder's too.
     pub fn stored_before_ids(name: String, location: Location) -> Self {
+        let id = location.id_before_made_ids();
         Self {
-            id: location.id_before_made_ids(),
+            folders: vec![ProjectFolder {
+                id: id.clone(),
+                location,
+            }],
+            id,
             name,
-            folders: vec![location],
         }
     }
 
-    /// The folder it follows, if any.
-    pub fn folder(&self) -> Option<&Location> {
-        self.folders.first()
+    /// Its folder of this id.
+    pub fn folder(&self, id: &str) -> Option<&ProjectFolder> {
+        self.folders.iter().find(|f| f.id == id)
     }
 
-    /// Its repository: the folder, which says what reads it, and the repository as the machine
-    /// holding it knows it. `None` for a project without folder.
-    pub fn repository(&self) -> Option<(&Location, RepositoryInfo)> {
-        let folder = self.folder()?;
-        let info = RepositoryInfo {
-            root: folder.root().to_string(),
-            name: self.name.clone(),
-        };
-        Some((folder, info))
+    /// Where its folders are, in their order.
+    pub fn locations(&self) -> impl Iterator<Item = &Location> {
+        self.folders.iter().map(|f| &f.location)
+    }
+}
+
+/// A folder a project follows: where it is, and an id of its own, which the frontend asks what
+/// reads it by (`docs/features/projects.md`). Made once and kept: a folder that moves keeps it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectFolder {
+    pub id: String,
+    #[serde(flatten)]
+    pub location: Location,
+}
+
+impl ProjectFolder {
+    pub fn new(location: Location) -> Self {
+        Self {
+            id: new_id(),
+            location,
+        }
+    }
+
+    /// The repository as the machine holding it knows it, named after `project`.
+    pub fn repository(&self, project: &Project) -> RepositoryInfo {
+        RepositoryInfo {
+            root: self.location.root().to_string(),
+            name: project.name.clone(),
+        }
     }
 }
 
@@ -109,12 +135,12 @@ impl Location {
     }
 }
 
-/// What Locate… did: the project follows its folder's new place, or that folder is another
-/// project's, which stays as it is.
+/// What a folder picked for a project did (Locate…, Add folder…): the project follows it, or that
+/// folder is another project's, which stays as it is.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
-pub enum Relocation {
-    Moved {
+pub enum FolderChange {
+    Changed {
         list: ProjectList,
     },
     #[serde(rename_all = "camelCase")]
@@ -125,7 +151,8 @@ pub enum Relocation {
 }
 
 /// A folder picked for a new project: one no project has yet (`path` as picked, to give back on
-/// creating it; `name` its folder's), or another project's.
+/// creating it; `name` its folder's), with the repositories right inside it when it is a folder
+/// without git (a parent of api and web); or another project's.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum FolderChoice {
@@ -134,21 +161,71 @@ pub enum FolderChoice {
         path: String,
         name: String,
         location: Location,
+        repositories: Vec<FolderInside>,
     },
     #[serde(rename_all = "camelCase")]
     InProject { id: String, name: String },
 }
 
-/// A project as stored: today `{ id, name, folders }`. Older forms are read too: one location
-/// with its id, one location without (before ids), or a root (before locations), the last two
-/// taking their location's id.
+impl FolderChoice {
+    /// Whether it is a folder without git with repositories right inside it that no project has
+    /// yet: the user says what it becomes (one project with them, a project each, itself).
+    pub fn holds_free_repositories(&self) -> bool {
+        match self {
+            Self::Usable { repositories, .. } => {
+                repositories.iter().any(|r| r.in_project.is_none())
+            }
+            Self::InProject { .. } => false,
+        }
+    }
+}
+
+/// What a folder given on the command line did, for the frontend to take once: a project put on
+/// screen with the folder to show, or a folder above repositories to ask about in the New project
+/// dialog.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", tag = "kind")]
+pub enum Opened {
+    #[serde(rename_all = "camelCase")]
+    Project {
+        id: String,
+        folder_id: String,
+    },
+    Choice {
+        choice: FolderChoice,
+    },
+}
+
+/// A repository right inside a folder picked: its path, as the picked one is written, to give
+/// back on creating a project; its name and place; the name of the project that has it already,
+/// if any.
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FolderInside {
+    pub path: String,
+    pub name: String,
+    pub location: Location,
+    pub in_project: Option<String>,
+}
+
+/// A project as stored: today `{ id, name, folders }`, each folder with its id. Older forms are
+/// read too: folders without ids (one at most), one location with its id, one location without
+/// (before ids), or a root (before locations), the last two taking their location's id. A folder
+/// stored without id was its project's only one, and takes the project's.
 #[derive(Deserialize)]
 struct StoredProject {
     id: Option<String>,
     name: String,
-    folders: Option<Vec<Location>>,
+    folders: Option<Vec<StoredFolder>>,
     location: Option<Location>,
     root: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct StoredFolder {
+    id: Option<String>,
+    #[serde(flatten)]
+    location: Location,
 }
 
 impl TryFrom<StoredProject> for Project {
@@ -165,10 +242,24 @@ impl TryFrom<StoredProject> for Project {
             (Some(folders), _) => (folders, stored.id.ok_or("a project with no id")?),
             (None, Some(location)) => {
                 let id = stored.id.unwrap_or_else(|| location.id_before_made_ids());
-                (vec![location], id)
+                let folder = StoredFolder { id: None, location };
+                (vec![folder], id)
             }
             (None, None) => return Err("a project with no folders"),
         };
+        if folders.len() > 1 && folders.iter().any(|f| f.id.is_none()) {
+            return Err("a folder with no id beside another");
+        }
+        if folders.iter().any(|f| f.id.as_deref() == Some("")) {
+            return Err("a folder with an empty id");
+        }
+        let folders = folders
+            .into_iter()
+            .map(|folder| ProjectFolder {
+                id: folder.id.unwrap_or_else(|| id.clone()),
+                location: folder.location,
+            })
+            .collect();
         Ok(Project {
             id,
             name: stored.name,
@@ -230,6 +321,13 @@ mod tests {
         }
     }
 
+    fn folder(id: &str, location: Location) -> ProjectFolder {
+        ProjectFolder {
+            id: id.into(),
+            location,
+        }
+    }
+
     #[test]
     fn project_list_serializes_with_the_frontend_field_names() {
         let list = ProjectList {
@@ -237,12 +335,15 @@ mod tests {
                 Project {
                     id: "0123456789abcdef".into(),
                     name: "r".into(),
-                    folders: vec![local("/r")],
+                    folders: vec![folder("0123456789abcdef", local("/r"))],
                 },
                 Project {
                     id: "fedcba9876543210".into(),
                     name: "shop".into(),
-                    folders: vec![wsl("Ubuntu", "/home/ale/shop")],
+                    folders: vec![
+                        folder("aaaaaaaaaaaaaaaa", wsl("Ubuntu", "/home/ale/shop/api")),
+                        folder("bbbbbbbbbbbbbbbb", wsl("Ubuntu", "/home/ale/shop/web")),
+                    ],
                 },
                 Project {
                     id: "00112233445566ff".into(),
@@ -264,12 +365,25 @@ mod tests {
                 {
                     "id": "0123456789abcdef",
                     "name": "r",
-                    "folders": [{ "kind": "local", "root": "/r" }]
+                    "folders": [{ "id": "0123456789abcdef", "kind": "local", "root": "/r" }]
                 },
                 {
                     "id": "fedcba9876543210",
                     "name": "shop",
-                    "folders": [{ "kind": "wsl", "distro": "Ubuntu", "root": "/home/ale/shop" }]
+                    "folders": [
+                        {
+                            "id": "aaaaaaaaaaaaaaaa",
+                            "kind": "wsl",
+                            "distro": "Ubuntu",
+                            "root": "/home/ale/shop/api"
+                        },
+                        {
+                            "id": "bbbbbbbbbbbbbbbb",
+                            "kind": "wsl",
+                            "distro": "Ubuntu",
+                            "root": "/home/ale/shop/web"
+                        }
+                    ]
                 },
                 { "id": "00112233445566ff", "name": "Home", "folders": [] }
             ],
@@ -289,7 +403,36 @@ mod tests {
         });
         let project = serde_json::from_value::<Project>(json).unwrap();
         assert_eq!(project.id, "wsl:Ubuntu:/home/ale/shop");
-        assert_eq!(project.folders, [wsl("Ubuntu", "/home/ale/shop")]);
+        assert_eq!(
+            project.folders,
+            [folder(
+                "wsl:Ubuntu:/home/ale/shop",
+                wsl("Ubuntu", "/home/ale/shop")
+            )]
+        );
+    }
+
+    #[test]
+    fn a_folder_stored_without_id_takes_its_project_s() {
+        let json = serde_json::json!({
+            "id": "0123456789abcdef",
+            "name": "r",
+            "folders": [{ "kind": "local", "root": "/r" }]
+        });
+        let project = serde_json::from_value::<Project>(json).unwrap();
+        assert_eq!(project.folders, [folder("0123456789abcdef", local("/r"))]);
+        let two = serde_json::json!({
+            "id": "0123456789abcdef",
+            "name": "r",
+            "folders": [{ "kind": "local", "root": "/r" }, { "id": "x", "kind": "local", "root": "/s" }]
+        });
+        assert!(serde_json::from_value::<Project>(two).is_err());
+        let empty = serde_json::json!({
+            "id": "0123456789abcdef",
+            "name": "r",
+            "folders": [{ "id": "", "kind": "local", "root": "/r" }]
+        });
+        assert!(serde_json::from_value::<Project>(empty).is_err());
     }
 
     #[test]
@@ -338,16 +481,18 @@ mod tests {
 
     #[test]
     fn a_new_project_gets_an_id_of_its_own() {
-        let a = Project::new("shop".into(), Some(local("/shop")));
-        let b = Project::new("shop".into(), Some(local("/shop")));
+        let a = Project::new("shop".into(), [local("/shop")]);
+        let b = Project::new("shop".into(), [local("/shop")]);
         assert_ne!(a.id, b.id);
-        assert_eq!(a.repository().unwrap().1.root, "/shop");
-        assert_eq!(Project::new("Home".into(), None).repository(), None);
+        assert_ne!(a.folders[0].id, b.folders[0].id);
+        assert_ne!(a.folders[0].id, a.id);
+        assert_eq!(a.folders[0].repository(&a).root, "/shop");
+        assert!(Project::new("Home".into(), []).folders.is_empty());
     }
 
     #[test]
-    fn a_relocation_tells_the_frontend_what_happened() {
-        let in_project = Relocation::InProject {
+    fn a_folder_change_tells_the_frontend_what_happened() {
+        let in_project = FolderChange::InProject {
             id: "0123456789abcdef".into(),
             name: "shop".into(),
         };
@@ -355,10 +500,10 @@ mod tests {
             serde_json::to_value(in_project).unwrap(),
             serde_json::json!({ "kind": "inProject", "id": "0123456789abcdef", "name": "shop" })
         );
-        let moved = Relocation::Moved {
+        let changed = FolderChange::Changed {
             list: ProjectList::default(),
         };
-        assert_eq!(serde_json::to_value(moved).unwrap()["kind"], "moved");
+        assert_eq!(serde_json::to_value(changed).unwrap()["kind"], "changed");
     }
 
     #[test]
@@ -369,6 +514,12 @@ mod tests {
             location: Location::Local {
                 root: "/Users/ale/Dev/api".into(),
             },
+            repositories: vec![FolderInside {
+                path: "/Users/ale/Dev/api/src/web".into(),
+                name: "web".into(),
+                location: local("/Users/ale/Dev/api/web"),
+                in_project: Some("Shop".into()),
+            }],
         };
         assert_eq!(
             serde_json::to_value(usable).unwrap(),
@@ -376,7 +527,15 @@ mod tests {
                 "kind": "usable",
                 "path": "/Users/ale/Dev/api/src",
                 "name": "api",
-                "location": { "kind": "local", "root": "/Users/ale/Dev/api" }
+                "location": { "kind": "local", "root": "/Users/ale/Dev/api" },
+                "repositories": [
+                    {
+                        "path": "/Users/ale/Dev/api/src/web",
+                        "name": "web",
+                        "location": { "kind": "local", "root": "/Users/ale/Dev/api/web" },
+                        "inProject": "Shop"
+                    }
+                ]
             })
         );
         let in_project = FolderChoice::InProject {
@@ -390,10 +549,57 @@ mod tests {
     }
 
     #[test]
+    fn a_folder_opened_tells_the_frontend_what_to_show() {
+        let project = Opened::Project {
+            id: "0123456789abcdef".into(),
+            folder_id: "aaaaaaaaaaaaaaaa".into(),
+        };
+        assert_eq!(
+            serde_json::to_value(project).unwrap(),
+            serde_json::json!({
+                "kind": "project",
+                "id": "0123456789abcdef",
+                "folderId": "aaaaaaaaaaaaaaaa"
+            })
+        );
+        let inside = |in_project: Option<&str>| FolderChoice::Usable {
+            path: "/dev/shop".into(),
+            name: "shop".into(),
+            location: local("/dev/shop"),
+            repositories: vec![FolderInside {
+                path: "/dev/shop/api".into(),
+                name: "api".into(),
+                location: local("/dev/shop/api"),
+                in_project: in_project.map(String::from),
+            }],
+        };
+        assert!(inside(None).holds_free_repositories());
+        assert!(!inside(Some("Shop")).holds_free_repositories());
+        let choice = Opened::Choice {
+            choice: inside(None),
+        };
+        assert_eq!(
+            serde_json::to_value(choice).unwrap()["choice"]["kind"],
+            "usable"
+        );
+    }
+
+    #[test]
     fn a_list_stored_before_layouts_reads_without_them() {
         let json = serde_json::json!({ "projects": [], "active": null });
         let list = serde_json::from_value::<ProjectList>(json).unwrap();
         assert!(list.layouts.is_empty());
+    }
+
+    #[test]
+    fn a_list_stored_with_the_folders_shown_reads_without_them() {
+        // the folder on screen was stored from 2026-11-02 to 2026-11-03; it is the window's now
+        let json = serde_json::json!({
+            "projects": [],
+            "active": null,
+            "shown": { "fedcba9876543210": "bbbbbbbbbbbbbbbb" }
+        });
+        assert!(serde_json::from_value::<ProjectList>(json).is_ok());
     }
 
     #[test]
