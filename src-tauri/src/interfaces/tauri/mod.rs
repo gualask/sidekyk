@@ -12,6 +12,7 @@ pub(crate) mod note_image;
 pub(crate) mod notes;
 pub(crate) mod project_file;
 pub(crate) mod projects;
+pub(crate) mod quick_note;
 pub(crate) mod repository;
 pub(crate) mod search;
 pub(crate) mod settings;

@@ -12,6 +12,8 @@ pub(crate) struct Texts {
     pub(crate) show: &'static str,
     /// The tray's item that starts a capture, and the overlay's button that takes the area.
     pub(crate) capture: &'static str,
+    /// The tray's item that opens a quick note.
+    pub(crate) note: &'static str,
     pub(crate) quit: &'static str,
     /// The folder picker's title for a new project.
     pub(crate) choose_folder: &'static str,
@@ -29,6 +31,7 @@ pub(crate) struct Texts {
 static ENGLISH: Texts = Texts {
     show: "Show Sidekyk",
     capture: "Capture",
+    note: "New Note",
     quit: "Quit Sidekyk",
     choose_folder: "Choose the project's folder",
     locate: "Locate {name}",
@@ -46,6 +49,7 @@ static ENGLISH: Texts = Texts {
 static ITALIAN: Texts = Texts {
     show: "Mostra Sidekyk",
     capture: "Cattura",
+    note: "Nuova nota",
     quit: "Esci da Sidekyk",
     choose_folder: "Scegli la cartella del progetto",
     locate: "Individua {name}",

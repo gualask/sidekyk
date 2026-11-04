@@ -50,7 +50,7 @@ export function useProblems(
             }),
         );
         for (const action of SHORTCUT_ACTIONS) {
-            const shortcutIssue = shortcutProblem(action, shortcuts?.[action], MACOS, i18n);
+            const shortcutIssue = shortcutProblem(action, shortcuts, MACOS, i18n);
             if (shortcutIssue) {
                 problems.push({
                     id: `${action}-shortcut`,

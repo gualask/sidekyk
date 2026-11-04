@@ -10,7 +10,8 @@ import { createBrowserRuntime, isScenario, SCENARIOS } from './browser-runtime-p
  * and `gitRemove(<name>)` for `git init` and `.git` removed in a project's folder;
  * `sidekykDev.stopDistro(<name>)` for `wsl --shutdown` of a WSL project's distro;
  * `sidekykDev.writeFile(<name>, <path>, <text>?)` for an agent writing a file, its later version
- * in `fixture-files/edits/` without a text (`docs/testing.md`).
+ * in `fixture-files/edits/` without a text (`docs/testing.md`); `sidekykDev.quickNote()` for the
+ * quick note's global shortcut.
  */
 export function DevModePage() {
     const params = new URLSearchParams(window.location.search);
@@ -23,9 +24,9 @@ export function DevModePage() {
     });
     // in an effect: the runtime kept, not the one of a second call StrictMode makes and drops
     useEffect(() => {
-        const { openFolder, gitInit, gitRemove, stopDistro, writeFile } = runtime;
+        const { openFolder, gitInit, gitRemove, stopDistro, writeFile, quickNote } = runtime;
         Object.assign(window, {
-            sidekykDev: { openFolder, gitInit, gitRemove, stopDistro, writeFile },
+            sidekykDev: { openFolder, gitInit, gitRemove, stopDistro, writeFile, quickNote },
         });
     }, [runtime]);
 

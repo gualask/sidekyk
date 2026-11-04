@@ -1,6 +1,6 @@
-//! The global shortcuts: the one that shows and hides the window and, where capture is built, the
-//! one that captures an area of the screen; which keys each registered, and where each stands.
-//! The system is reached through `ShortcutRegistrar`.
+//! The global shortcuts: the one that shows and hides the window and, where they are built, the
+//! one that captures an area of the screen and the one that opens a quick note; which keys each
+//! registered, and where each stands. The system is reached through `ShortcutRegistrar`.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -17,6 +17,8 @@ pub enum ShortcutAction {
     Toggle,
     /// Captures an area of the screen.
     Capture,
+    /// Opens a quick note for the Inbox.
+    Note,
 }
 
 /// Why the system did not register a shortcut.
@@ -46,11 +48,8 @@ pub struct GlobalShortcuts {
     recording: AtomicBool,
 }
 
-struct Shortcuts {
-    toggle: State,
-    /// `None` where capture is not built.
-    capture: Option<State>,
-}
+/// The shortcuts built here, the window's first, each with where it stands.
+struct Shortcuts(Vec<(ShortcutAction, State)>);
 
 #[derive(Default)]
 struct State {
@@ -62,50 +61,65 @@ struct State {
 }
 
 impl Shortcuts {
-    /// The shortcut doing this, and the keys of the other one, which it may not take.
-    fn split(&mut self, action: ShortcutAction) -> Option<(&mut State, Option<&ShortcutKeys>)> {
-        match (action, &mut self.capture) {
-            (ShortcutAction::Toggle, capture) => Some((
-                &mut self.toggle,
-                capture.as_ref().and_then(|c| c.registered.as_ref()),
-            )),
-            (ShortcutAction::Capture, Some(capture)) => {
-                Some((capture, self.toggle.registered.as_ref()))
-            }
-            (ShortcutAction::Capture, None) => None,
-        }
+    /// The shortcut doing this, if built, and the keys the others registered, which it may not
+    /// take.
+    fn split(&mut self, action: ShortcutAction) -> Option<(&mut State, Vec<ShortcutKeys>)> {
+        let others = self
+            .0
+            .iter()
+            .filter(|(other, _)| *other != action)
+            .filter_map(|(_, state)| state.registered.clone())
+            .collect();
+        let state = self
+            .0
+            .iter_mut()
+            .find(|(each, _)| *each == action)
+            .map(|(_, state)| state)?;
+        Some((state, others))
+    }
+
+    fn status(&self, action: ShortcutAction) -> Option<GlobalShortcutStatus> {
+        self.0
+            .iter()
+            .find(|(each, _)| *each == action)
+            .map(|(_, state)| state.status.clone())
     }
 }
 
 /// Each shortcut and its settings, the window's first.
-fn each(settings: &Settings) -> [(ShortcutAction, &GlobalShortcut); 2] {
+fn each(settings: &Settings) -> [(ShortcutAction, &GlobalShortcut); 3] {
     [
         (ShortcutAction::Toggle, &settings.global_shortcut),
         (ShortcutAction::Capture, &settings.capture_shortcut),
+        (ShortcutAction::Note, &settings.note_shortcut),
     ]
 }
 
 impl GlobalShortcuts {
-    /// `captures`: whether capture is built here, and so its shortcut offered.
-    pub fn new(captures: bool) -> Self {
+    /// `built`: the shortcuts beside the window's whose action is built here, and so offered.
+    pub fn new(built: &[ShortcutAction]) -> Self {
+        let mut shortcuts = vec![(ShortcutAction::Toggle, State::default())];
+        shortcuts.extend(
+            built
+                .iter()
+                .filter(|action| **action != ShortcutAction::Toggle)
+                .map(|action| (*action, State::default())),
+        );
         Self {
-            state: Mutex::new(Shortcuts {
-                toggle: State::default(),
-                capture: captures.then(State::default),
-            }),
+            state: Mutex::new(Shortcuts(shortcuts)),
             recording: AtomicBool::new(false),
         }
     }
 
-    /// Registers the stored shortcuts. One the system turns down, or with the other's keys, is
+    /// Registers the stored shortcuts. One the system turns down, or with another's keys, is
     /// left out, and its status says why, for the top bar's problems.
     pub fn start(&self, registrar: &impl ShortcutRegistrar, settings: &Settings) {
         let mut shortcuts = lock(&self.state);
         for (action, settings) in each(settings) {
-            let Some((state, other)) = shortcuts.split(action) else {
+            let Some((state, others)) = shortcuts.split(action) else {
                 continue;
             };
-            if let Err(code) = switch(registrar, action, state, other, settings) {
+            if let Err(code) = switch(registrar, action, state, &others, settings) {
                 tracing::warn!(keys = %settings.keys, code = code.as_str(), "no global shortcut");
                 let keys = settings.keys.clone();
                 match code {
@@ -124,35 +138,33 @@ impl GlobalShortcuts {
 
     /// The system offers no global shortcut: settings are only kept.
     pub fn unavailable(&self) {
-        let mut shortcuts = lock(&self.state);
-        shortcuts.toggle.status = GlobalShortcutStatus::Unavailable;
-        if let Some(capture) = &mut shortcuts.capture {
-            capture.status = GlobalShortcutStatus::Unavailable;
+        for (_, state) in &mut lock(&self.state).0 {
+            state.status = GlobalShortcutStatus::Unavailable;
         }
     }
 
     /// Registers the shortcuts of new settings in place of the current ones, before they are
-    /// stored. One the system turns down, that is not a shortcut, or that has the other's keys
-    /// (as registered: a swap in one change is refused) fails, and leaves both as they were.
+    /// stored. One the system turns down, that is not a shortcut, or that has another's keys
+    /// (as registered: a swap in one change is refused) fails, and leaves all as they were.
     pub fn apply(
         &self,
         registrar: &impl ShortcutRegistrar,
         settings: &Settings,
     ) -> anyhow::Result<()> {
         let mut shortcuts = lock(&self.state);
-        if shortcuts.toggle.status == GlobalShortcutStatus::Unavailable {
+        if shortcuts.status(ShortcutAction::Toggle) == Some(GlobalShortcutStatus::Unavailable) {
             return Ok(());
         }
         // the shortcuts switched by this change, and their settings before it
         let mut switched = Vec::new();
         for (action, settings) in each(settings) {
-            let Some((state, other)) = shortcuts.split(action) else {
+            let Some((state, others)) = shortcuts.split(action) else {
                 continue;
             };
             if state.applied.as_ref() == Some(settings) {
                 continue;
             }
-            if let Err(code) = switch(registrar, action, state, other, settings) {
+            if let Err(code) = switch(registrar, action, state, &others, settings) {
                 for (action, before) in switched {
                     restore(registrar, &mut shortcuts, action, before);
                 }
@@ -166,8 +178,9 @@ impl GlobalShortcuts {
     pub fn status(&self) -> GlobalShortcutStatuses {
         let shortcuts = lock(&self.state);
         GlobalShortcutStatuses {
-            toggle: shortcuts.toggle.status.clone(),
-            capture: shortcuts.capture.as_ref().map(|c| c.status.clone()),
+            toggle: shortcuts.status(ShortcutAction::Toggle).unwrap_or_default(),
+            capture: shortcuts.status(ShortcutAction::Capture),
+            note: shortcuts.status(ShortcutAction::Note),
         }
     }
 
@@ -188,10 +201,10 @@ fn restore(
     action: ShortcutAction,
     before: Option<GlobalShortcut>,
 ) {
-    let (Some((state, other)), Some(before)) = (shortcuts.split(action), before) else {
+    let (Some((state, others)), Some(before)) = (shortcuts.split(action), before) else {
         return;
     };
-    if let Err(code) = switch(registrar, action, state, other, &before) {
+    if let Err(code) = switch(registrar, action, state, &others, &before) {
         tracing::warn!(
             code = code.as_str(),
             "a global shortcut could not be put back"
@@ -205,7 +218,7 @@ fn switch(
     registrar: &impl ShortcutRegistrar,
     action: ShortcutAction,
     state: &mut State,
-    other: Option<&ShortcutKeys>,
+    others: &[ShortcutKeys],
     settings: &GlobalShortcut,
 ) -> Result<(), UserFacingErrorCode> {
     if !settings.enabled {
@@ -216,7 +229,7 @@ fn switch(
         return Ok(());
     }
     let keys = ShortcutKeys::parse(&settings.keys).ok_or(UserFacingErrorCode::InvalidShortcut)?;
-    if other == Some(&keys) {
+    if others.contains(&keys) {
         return Err(UserFacingErrorCode::ShortcutInUse);
     }
     if state.registered.as_ref() != Some(&keys) {
@@ -302,18 +315,27 @@ mod tests {
         }
     }
 
-    /// Settings with this shortcut to show the window, and capture's off.
+    /// Settings with this shortcut to show the window, and the others off.
     fn toggle(shortcut: GlobalShortcut) -> Settings {
         both(shortcut, off("Control+Alt+KeyC"))
     }
 
+    /// Settings with these shortcuts to show the window and to capture, and the note's off.
     fn both(toggle: GlobalShortcut, capture: GlobalShortcut) -> Settings {
+        all(toggle, capture, off("Control+Alt+KeyN"))
+    }
+
+    fn all(toggle: GlobalShortcut, capture: GlobalShortcut, note: GlobalShortcut) -> Settings {
         Settings {
             global_shortcut: toggle,
             capture_shortcut: capture,
+            note_shortcut: note,
             ..Settings::default()
         }
     }
+
+    /// Every shortcut built.
+    const ALL: [ShortcutAction; 2] = [ShortcutAction::Capture, ShortcutAction::Note];
 
     fn active(keys: &str, conflict: bool) -> GlobalShortcutStatus {
         GlobalShortcutStatus::Active {
@@ -329,7 +351,7 @@ mod tests {
     #[test]
     fn starts_with_the_stored_shortcuts() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(
             &system,
             &both(on("Control+Alt+Space"), on("Control+Alt+KeyC")),
@@ -346,20 +368,31 @@ mod tests {
             GlobalShortcutStatuses {
                 toggle: active("Control+Alt+Space", false),
                 capture: Some(active("Control+Alt+KeyC", false)),
+                note: Some(GlobalShortcutStatus::Off),
             }
         );
     }
 
     #[test]
-    fn without_capture_only_the_window_has_a_shortcut() {
+    fn only_the_shortcuts_built_are_registered() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(false);
+        let shortcuts = GlobalShortcuts::new(&[ShortcutAction::Note]);
         shortcuts.start(
             &system,
-            &both(on("Control+Alt+Space"), on("Control+Alt+KeyC")),
+            &all(
+                on("Control+Alt+Space"),
+                on("Control+Alt+KeyC"),
+                on("Control+Alt+KeyN"),
+            ),
         );
-        assert_eq!(system.keys(), ["Control+Alt+Space"]);
+        assert_eq!(system.keys(), ["Control+Alt+Space", "Control+Alt+KeyN"]);
         assert_eq!(shortcuts.status().capture, None);
+        assert_eq!(
+            shortcuts.status().note,
+            Some(active("Control+Alt+KeyN", false))
+        );
+        let none = GlobalShortcuts::new(&[]);
+        assert_eq!(none.status().note, None);
     }
 
     #[test]
@@ -368,7 +401,7 @@ mod tests {
             taken: vec!["Control+Alt+Space"],
             ..FakeSystem::default()
         };
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(
             &system,
             &both(on("Control+Alt+Space"), on("Control+Alt+KeyC")),
@@ -388,7 +421,7 @@ mod tests {
             taken: vec!["Control+Alt+Space"],
             ..FakeSystem::default()
         };
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(&system, &toggle(on("Control+Alt+Space")));
         // another setting changes: the shortcuts' settings come back as they were
         assert!(shortcuts
@@ -403,7 +436,7 @@ mod tests {
     #[test]
     fn a_new_shortcut_replaces_the_old_once_registered() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(
             &system,
             &both(on("Control+Alt+Space"), on("Control+Alt+KeyC")),
@@ -421,7 +454,7 @@ mod tests {
             taken: vec!["Shift+Super+Space"],
             ..FakeSystem::default()
         };
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(&system, &toggle(on("Control+Alt+Space")));
         let result = shortcuts.apply(&system, &toggle(on("Shift+Super+Space")));
         assert_eq!(code(result), Some(UserFacingErrorCode::ShortcutTaken));
@@ -435,7 +468,7 @@ mod tests {
     #[test]
     fn the_other_shortcuts_keys_keep_the_current_one_and_fail() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(
             &system,
             &both(on("Control+Alt+Space"), on("Control+Alt+KeyC")),
@@ -465,9 +498,36 @@ mod tests {
     }
 
     #[test]
+    fn no_shortcut_takes_the_keys_of_any_other() {
+        let system = FakeSystem::default();
+        let shortcuts = GlobalShortcuts::new(&ALL);
+        let before = all(
+            on("Control+Alt+Space"),
+            on("Control+Alt+KeyC"),
+            on("Control+Alt+KeyN"),
+        );
+        shortcuts.start(&system, &before);
+        for taken in ["Control+Alt+Space", "Control+Alt+KeyC"] {
+            let result = shortcuts.apply(
+                &system,
+                &all(on("Control+Alt+Space"), on("Control+Alt+KeyC"), on(taken)),
+            );
+            assert_eq!(code(result), Some(UserFacingErrorCode::ShortcutInUse));
+        }
+        assert_eq!(
+            system.keys(),
+            ["Control+Alt+Space", "Control+Alt+KeyC", "Control+Alt+KeyN"]
+        );
+        assert_eq!(
+            shortcuts.status().note,
+            Some(active("Control+Alt+KeyN", false))
+        );
+    }
+
+    #[test]
     fn the_others_keys_at_startup_leave_it_in_use() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(
             &system,
             &both(on("Control+Alt+KeyC"), on("Control+Alt+KeyC")),
@@ -487,7 +547,7 @@ mod tests {
             taken: vec!["Super+F6"],
             ..FakeSystem::default()
         };
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         let before = both(on("Control+Alt+Space"), on("Control+Alt+KeyC"));
         shortcuts.start(&system, &before);
         let result = shortcuts.apply(&system, &both(on("Super+F5"), on("Super+F6")));
@@ -505,7 +565,7 @@ mod tests {
     #[test]
     fn keys_that_are_no_shortcut_fail_before_the_system_is_asked() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(&system, &toggle(on("Control+Alt+Space")));
         let result = shortcuts.apply(&system, &toggle(on("Shift+KeyA")));
         assert_eq!(code(result), Some(UserFacingErrorCode::InvalidShortcut));
@@ -515,7 +575,7 @@ mod tests {
     #[test]
     fn turned_off_it_lets_go_and_on_again_it_registers() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(&system, &toggle(on("Control+Alt+Space")));
         shortcuts
             .apply(&system, &toggle(off("Control+Alt+Space")))
@@ -534,7 +594,7 @@ mod tests {
             its_own: vec!["Super+Space"],
             ..FakeSystem::default()
         };
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.start(&system, &toggle(on("Super+Space")));
         assert_eq!(shortcuts.status().toggle, active("Super+Space", true));
     }
@@ -542,7 +602,7 @@ mod tests {
     #[test]
     fn without_the_system_settings_are_only_kept() {
         let system = FakeSystem::default();
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         shortcuts.unavailable();
         assert!(shortcuts
             .apply(
@@ -556,13 +616,14 @@ mod tests {
             GlobalShortcutStatuses {
                 toggle: GlobalShortcutStatus::Unavailable,
                 capture: Some(GlobalShortcutStatus::Unavailable),
+                note: Some(GlobalShortcutStatus::Unavailable),
             }
         );
     }
 
     #[test]
     fn presses_do_nothing_while_a_new_shortcut_is_typed() {
-        let shortcuts = GlobalShortcuts::new(true);
+        let shortcuts = GlobalShortcuts::new(&ALL);
         assert!(shortcuts.takes_press());
         shortcuts.set_recording(true);
         assert!(!shortcuts.takes_press());

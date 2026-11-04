@@ -28,6 +28,7 @@ export {
 export { newNoteTarget, notesTarget } from './model/targets';
 export { notesPanel } from './panel';
 export { InboxColumn } from './ui/InboxColumn';
+export { QuickNote } from './ui/QuickNote';
 
 /** Asks about a project's notes before it is removed; loaded with the first removal. */
 export const loadRemoveProjectDialog = () => import('./ui/RemoveProjectDialog');

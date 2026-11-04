@@ -3,10 +3,12 @@ import type { ProjectsPort } from '@/modules/projects';
 import type { RepositoryPort } from '@/modules/repository';
 import type { SearchPort } from '@/modules/search';
 import type { SettingsPort } from '@/modules/settings';
+import type { QuickNotePort } from '@/shared/platform/quick-note';
 import type { TitleBarPort } from '@/shared/platform/title-bar';
 import { reportFrontendError } from './tauri-diagnostics';
 import { tauriNotes } from './tauri-notes';
 import { tauriProjects } from './tauri-projects';
+import { tauriQuickNote } from './tauri-quick-note';
 import { tauriRepository } from './tauri-repository';
 import { tauriSearch } from './tauri-search';
 import { tauriSettings } from './tauri-settings';
@@ -21,6 +23,7 @@ export type RuntimePorts = {
     search: SearchPort;
     settings: SettingsPort;
     titleBar: TitleBarPort;
+    quickNote: QuickNotePort;
     /** Records an uncaught frontend error where problems are investigated (the app's log). */
     reportError: (message: string) => void;
     /** Shows the window, created hidden so that startup shows no blank frame. */
@@ -34,6 +37,7 @@ export const tauriRuntimePorts: RuntimePorts = {
     search: tauriSearch,
     settings: tauriSettings,
     titleBar: tauriTitleBar,
+    quickNote: tauriQuickNote,
     reportError: reportFrontendError,
     showWindow,
 };

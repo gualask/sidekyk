@@ -1,5 +1,6 @@
 //! Tauri adapter for the global shortcuts, from any app: the one that shows and hides the window
-//! and, where capture is built, the one that captures an area of the screen. macOS and Windows
+//! and, where they are built, the one that captures an area of the screen and the one that opens
+//! a quick note. macOS and Windows
 //! register them through `tauri-plugin-global-shortcut`, which costs nothing until one is pressed
 //! (`modules/settings` decides which keys and where each stands). Linux registers none: the
 //! desktop's own shortcut runs `sidekyk --toggle`.
@@ -34,19 +35,47 @@ mod platform {
     use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
     use crate::infrastructure::capture as system_capture;
+    use crate::infrastructure::window::QUICK_NOTE_BUILT;
     use crate::interfaces::tauri::capture::capture;
+    use crate::interfaces::tauri::quick_note;
     use crate::interfaces::tauri::window::toggle_main_window;
     use sidekyk_core::modules::settings::{
         GlobalShortcutStatuses, GlobalShortcuts, RegisterError, Settings, ShortcutAction,
         ShortcutKeys, ShortcutRegistrar,
     };
 
-    /// The plugin's id of the capture shortcut registered, `NONE` without one: a press of any
-    /// other is the window's. Apart from `GlobalShortcuts`' state, which a press must not wait
-    /// for.
-    struct CaptureId(AtomicU64);
+    /// The plugin's ids of the capture and quick note shortcuts registered, `NONE` without one: a
+    /// press of any other is the window's. Apart from `GlobalShortcuts`' state, which a press
+    /// must not wait for.
+    struct PressIds {
+        capture: AtomicU64,
+        note: AtomicU64,
+    }
+
+    impl PressIds {
+        /// The id kept for a shortcut's presses; none for the window's, the one left.
+        fn of(&self, action: ShortcutAction) -> Option<&AtomicU64> {
+            match action {
+                ShortcutAction::Toggle => None,
+                ShortcutAction::Capture => Some(&self.capture),
+                ShortcutAction::Note => Some(&self.note),
+            }
+        }
+    }
 
     const NONE: u64 = u64::MAX;
+
+    /// The shortcuts built here beside the window's.
+    fn built() -> Vec<ShortcutAction> {
+        let mut built = Vec::new();
+        if system_capture::BUILT {
+            built.push(ShortcutAction::Capture);
+        }
+        if QUICK_NOTE_BUILT {
+            built.push(ShortcutAction::Note);
+        }
+        built
+    }
 
     /// The system's global shortcuts, through the plugin.
     struct PluginRegistrar<'a>(&'a AppHandle);
@@ -65,9 +94,8 @@ mod platform {
                     tracing::debug!(%error, keys = keys.as_str(), "global shortcut refused");
                     RegisterError::Taken
                 })?;
-            if action == ShortcutAction::Capture {
-                let id = self.0.state::<CaptureId>();
-                id.0.store(u64::from(shortcut.id()), Ordering::Relaxed);
+            if let Some(id) = self.0.state::<PressIds>().of(action) {
+                id.store(u64::from(shortcut.id()), Ordering::Relaxed);
             }
             Ok(())
         }
@@ -76,10 +104,9 @@ mod platform {
             let Ok(shortcut) = plugin_shortcut(keys) else {
                 return;
             };
-            if action == ShortcutAction::Capture {
-                let id = self.0.state::<CaptureId>();
-                // a new capture shortcut registers before the old one goes
-                let _ = id.0.compare_exchange(
+            if let Some(id) = self.0.state::<PressIds>().of(action) {
+                // a new shortcut registers before the old one goes
+                let _ = id.compare_exchange(
                     u64::from(shortcut.id()),
                     NONE,
                     Ordering::Relaxed,
@@ -111,8 +138,11 @@ mod platform {
 
     /// Starts the plugin and registers the stored shortcuts.
     pub(crate) fn start(app: &AppHandle, settings: &Settings) {
-        app.manage(GlobalShortcuts::new(system_capture::BUILT));
-        app.manage(CaptureId(AtomicU64::new(NONE)));
+        app.manage(GlobalShortcuts::new(&built()));
+        app.manage(PressIds {
+            capture: AtomicU64::new(NONE),
+            note: AtomicU64::new(NONE),
+        });
         let plugin = tauri_plugin_global_shortcut::Builder::new()
             .with_handler(|app, shortcut, event| {
                 if event.state != ShortcutState::Pressed
@@ -120,9 +150,12 @@ mod platform {
                 {
                     return;
                 }
-                let capture_id = app.state::<CaptureId>().0.load(Ordering::Relaxed);
-                if u64::from(shortcut.id()) == capture_id {
+                let id = u64::from(shortcut.id());
+                let ids = app.state::<PressIds>();
+                if id == ids.capture.load(Ordering::Relaxed) {
                     capture(app);
+                } else if id == ids.note.load(Ordering::Relaxed) {
+                    quick_note::toggle(app);
                 } else {
                     toggle_main_window(app);
                 }
@@ -185,13 +218,15 @@ mod platform {
         Ok(())
     }
 
-    /// The command to give the desktop's shortcut; capture is not built here yet.
+    /// The command to give the desktop's shortcut; capture and the quick note are not built here
+    /// yet.
     pub(super) fn status(_app: &AppHandle) -> GlobalShortcutStatuses {
         GlobalShortcutStatuses {
             toggle: GlobalShortcutStatus::Command {
                 command: toggle_command(),
             },
             capture: None,
+            note: None,
         }
     }
 

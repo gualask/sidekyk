@@ -23,6 +23,7 @@ in notes: `note-images.md`. Sync: `../../.cflow/plans/notes-sync.md`.
 - Inbox (2026-10-23): whatever comes to mind, to sort later; a column at level 0 left of the
   cards. Not a project: no card, level 1, folder, removal or rename. The field on top (`⌘N` at
   level 0), newest first. Its notes are edited, copied, moved or deleted; no lists, done or order.
+  From any app: the quick note (`quick-note.md`).
 - Move (2026-10-23): one dialog from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). A note
   goes between the Inbox and projects, or to another list; a list to another project, whole, into
   its list of the same name if any. Suggestions are the books ranked as the palette ranks names (a

@@ -1,21 +1,24 @@
 //! The tray icon: it tells the app runs while its window is hidden. A click shows the window, the
-//! menu shows it, starts a capture (where one is built) or quits. While it is there, closing the
+//! menu shows it, starts a capture or opens a quick note (where they are built), or quits. While it is there, closing the
 //! window only hides it.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem};
+use tauri::menu::{IsMenuItem, Menu, MenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
 use super::capture::capture;
+use super::quick_note;
 use super::texts::Texts;
 use super::window::show_main_window;
 use crate::infrastructure::capture as system_capture;
+use crate::infrastructure::window::QUICK_NOTE_BUILT;
 
 const SHOW: &str = "show";
 const CAPTURE: &str = "capture";
+const NOTE: &str = "note";
 const QUIT: &str = "quit";
 
 /// Managed once the icon is in the tray, which Tauri keeps until the app exits: its menu's items,
@@ -23,6 +26,7 @@ const QUIT: &str = "quit";
 struct Tray {
     show: MenuItem<tauri::Wry>,
     capture: MenuItem<tauri::Wry>,
+    note: MenuItem<tauri::Wry>,
     quit: MenuItem<tauri::Wry>,
 }
 
@@ -46,12 +50,17 @@ pub(crate) fn is_up(app: &AppHandle) -> bool {
 fn build(app: &AppHandle, texts: &Texts) -> tauri::Result<Tray> {
     let show = MenuItem::with_id(app, SHOW, texts.show, true, None::<&str>)?;
     let capture_item = MenuItem::with_id(app, CAPTURE, texts.capture, true, None::<&str>)?;
+    let note = MenuItem::with_id(app, NOTE, texts.note, true, None::<&str>)?;
     let quit = MenuItem::with_id(app, QUIT, texts.quit, true, None::<&str>)?;
-    let menu = if system_capture::BUILT {
-        Menu::with_items(app, &[&show, &capture_item, &quit])?
-    } else {
-        Menu::with_items(app, &[&show, &quit])?
-    };
+    let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = vec![&show];
+    if system_capture::BUILT {
+        items.push(&capture_item);
+    }
+    if QUICK_NOTE_BUILT {
+        items.push(&note);
+    }
+    items.push(&quit);
+    let menu = Menu::with_items(app, &items)?;
     TrayIconBuilder::new()
         .icon(icon(app))
         // drawn by macOS in the menu bar's colors; elsewhere the app's icon, in color
@@ -64,6 +73,7 @@ fn build(app: &AppHandle, texts: &Texts) -> tauri::Result<Tray> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             SHOW => show_main_window(app),
             CAPTURE => capture(app),
+            NOTE => quick_note::toggle(app),
             QUIT => app.exit(0),
             _ => {}
         })
@@ -81,6 +91,7 @@ fn build(app: &AppHandle, texts: &Texts) -> tauri::Result<Tray> {
     Ok(Tray {
         show,
         capture: capture_item,
+        note,
         quit,
     })
 }
@@ -110,6 +121,7 @@ pub(crate) fn speak(app: &AppHandle, texts: &'static Texts) {
             .show
             .set_text(texts.show)
             .and_then(|()| tray.capture.set_text(texts.capture))
+            .and_then(|()| tray.note.set_text(texts.note))
             .and_then(|()| tray.quit.set_text(texts.quit));
         if let Err(error) = result {
             tracing::warn!(%error, "could not update the tray menu");

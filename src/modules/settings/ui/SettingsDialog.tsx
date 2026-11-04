@@ -217,6 +217,7 @@ export function SettingsDialog({
                     <Section title={t('common.shortcuts')}>
                         <GlobalShortcutSetting action="toggle" />
                         <GlobalShortcutSetting action="capture" />
+                        <GlobalShortcutSetting action="note" />
                     </Section>
                     <Section title={t('settings.about')}>
                         <AboutSetting />

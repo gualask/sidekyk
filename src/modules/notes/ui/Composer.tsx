@@ -1,24 +1,17 @@
 import { IconPhoto, IconScreenshot, IconX } from '@tabler/icons-react';
-import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { shortcutLabel } from '@/shared/platform/shortcut';
 import { useNotesPort } from '../application/notes.port';
 import { type PendingImages, useCanCapture } from '../application/notes.queries';
-import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings';
+import { useNotesSettings } from '../application/notes-settings';
 import { autosize, fitLines, linesClass } from './notes-layout';
-
-/** Frees what pending images hold for their previews. */
-function release(pending: readonly PendingImages[]) {
-    for (const images of pending) {
-        for (const url of images.previews) URL.revokeObjectURL(url);
-    }
-}
+import { useNoteDraft } from './use-note-draft';
 
 /**
  * The field on top of notes: `↵` adds the note, `⇧↵` breaks the line, a paste into the empty field
- * adds it at once. Images pasted or dropped into the empty field add a note of them at once; with
- * text there, they wait below it for `↵`. `⌘N` (the app's key) brings the focus here, as its
- * placeholder says. Where the system captures, an icon at its right starts a capture, which
+ * adds it at once; images as `useNoteDraft` says. `⌘N` (the app's key) brings the focus here, as
+ * its placeholder says. Where the system captures, an icon at its right starts a capture, which
  * becomes a note of its own.
  */
 export function Composer({
@@ -57,10 +50,9 @@ export function Composer({
     const { t } = useTranslation();
     const port = useNotesPort();
     const canCapture = useCanCapture();
-    const [text, setText] = useState('');
-    const [pending, setPending] = useState<PendingImages[]>([]);
     const field = useRef<HTMLTextAreaElement>(null);
     const settings = useNotesSettings();
+    const draft = useNoteDraft({ field, onAdd, pasted, dropInto, onCleared: autosize });
     // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
     useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     useEffect(() => {
@@ -68,75 +60,22 @@ export function Composer({
         field.current?.focus();
         onFocused();
     }, [focus, onFocused]);
-    // the previews still waiting go with the field
-    const waiting = useRef(pending);
-    waiting.current = pending;
-    useEffect(() => () => release(waiting.current), []);
-    // one note at a time: a second ↵ while the first is being added adds nothing
-    const adding = useRef(false);
-    // the field keeps the text until a note is made of it, and the images until they are added:
-    // a failure loses nothing (images that failed wait below, to try again or leave out); what
-    // was typed meanwhile stays
-    const add = async (value: string, images: readonly PendingImages[]) => {
-        const note = value.trimEnd();
-        if ((note.trim() === '' && images.length === 0) || adding.current) return;
-        adding.current = true;
-        const { added, left } = await onAdd(note, images);
-        adding.current = false;
-        release(images.filter((p) => !left.includes(p)));
-        setPending((all) => [...all.filter((p) => !images.includes(p)), ...left]);
-        const typed = field.current;
-        if (!added || !typed || typed.value !== value) return;
-        setText('');
-        typed.value = '';
-        autosize(typed);
-    };
-    // images into the empty field make a note at once; with text, they wait for ↵
-    const take = (images: PendingImages) => {
-        const typed = field.current?.value ?? '';
-        if (typed.trim() === '' && waiting.current.length === 0) void add('', [images]);
-        else setPending((all) => [...all, images]);
-    };
-    dropInto.current = take;
 
     return (
         <div className="relative px-3 pt-2.5 pb-1">
             <textarea
                 ref={field}
                 rows={1}
-                value={text}
                 spellCheck={false}
                 placeholder={`${placeholder}  ${shortcutLabel('N')}`}
                 aria-label={label}
                 className={`block max-h-[132px] w-full resize-none rounded-lg border bg-ui-surface-subtle py-[7px] pl-2.5 text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${
                     canCapture ? 'pr-9' : 'pr-2.5'
                 } ${dropping ? 'border-ui-accent' : 'border-ui-border'} ${linesClass(settings.lines)}`}
+                {...draft.field}
                 onChange={(event) => {
-                    setText(event.target.value);
+                    draft.field.onChange(event);
                     autosize(event.target);
-                }}
-                onKeyDown={(event) => {
-                    if (onNoteFieldKey(event, settings)) return;
-                    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
-                        return;
-                    }
-                    event.preventDefault();
-                    void add(text, pending);
-                }}
-                onPaste={(event) => {
-                    // files copied (a screenshot, a file in the file manager): the backend
-                    // refuses those that are not images a note takes
-                    const files = [...event.clipboardData.files];
-                    if (files.length > 0) {
-                        event.preventDefault();
-                        take(pasted(files));
-                        return;
-                    }
-                    if (text !== '' || pending.length > 0) return;
-                    const typed = event.clipboardData.getData('text/plain');
-                    if (typed.trim() === '') return;
-                    event.preventDefault();
-                    void add(typed, []);
                 }}
             />
             {canCapture ? (
@@ -150,22 +89,32 @@ export function Composer({
                     <IconScreenshot size={16} />
                 </button>
             ) : null}
-            {pending.length > 0 ? (
-                <ul className="flex flex-wrap gap-1.5 pt-1.5" aria-label={t('notes.pending')}>
-                    {pending.map((images) => (
-                        <PendingChip
-                            key={images.previews[0] ?? images.names.join('\n')}
-                            images={images}
-                            onDrop={() => {
-                                release([images]);
-                                setPending((all) => all.filter((p) => p !== images));
-                            }}
-                        />
-                    ))}
-                </ul>
-            ) : null}
+            <PendingList pending={draft.pending} onDrop={draft.dropPending} />
             {hint ? <p className="px-0.5 pt-1 text-[11.5px] text-ui-text-muted">{hint}</p> : null}
         </div>
+    );
+}
+
+/** The images waiting below a field for `↵`, if any. */
+export function PendingList({
+    pending,
+    onDrop,
+}: {
+    pending: readonly PendingImages[];
+    onDrop: (images: PendingImages) => void;
+}) {
+    const { t } = useTranslation();
+    if (pending.length === 0) return null;
+    return (
+        <ul className="flex flex-wrap gap-1.5 pt-1.5" aria-label={t('notes.pending')}>
+            {pending.map((images) => (
+                <PendingChip
+                    key={images.previews[0] ?? images.names.join('\n')}
+                    images={images}
+                    onDrop={() => onDrop(images)}
+                />
+            ))}
+        </ul>
     );
 }
 

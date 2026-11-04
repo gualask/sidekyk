@@ -64,6 +64,7 @@ import {
 import { useProblems } from './problems';
 import { useProjectEntry } from './project-entry';
 import { useShowWindowWhen } from './providers';
+import { QuickNoteHost } from './QuickNoteHost';
 import { SideColumn } from './SideColumn';
 import { TopBar } from './TopBar';
 import type { ZoomLevel } from './workspace';
@@ -428,140 +429,144 @@ export function AppShell() {
     );
 
     return (
-        <div className="flex h-full flex-col">
-            <TopBar
-                level={level}
-                project={project}
-                folder={folder}
-                panel={panel}
-                problems={problems}
-                onZoom={zoom}
-                onOpenSettings={toggleSettings}
-                onOpenPalette={() => togglePalette('names')}
-                helpOpen={helpOpen}
-                onToggleHelp={toggleHelp}
-                minimized={
-                    level === 1 && tiles
-                        ? tiles.side.filter((tile) => layout.minimized.includes(tile.id))
-                        : []
-                }
-                onRestore={restore}
-                facts={level >= 1 && hasChanges}
-                onShowFolder={entry.showFolder}
-                onEditFolders={() => setEditing(project)}
-            />
-            <main className="min-h-0 flex-1">
-                {projects.isError ? (
-                    <div className="flex h-full items-center justify-center p-8 text-sm text-ui-danger">
-                        {errorMessage(projects.error, i18n)}
-                    </div>
-                ) : projects.data ? (
-                    <Workspace
-                        list={projects.data}
-                        zoomed={entry.zoomed}
-                        openProject={openProject}
-                        project={project}
-                        folder={folder}
-                        tiles={tiles}
-                        level={level}
-                        panel={level === 1 ? selectedTile : panel}
-                        target={target}
-                        zoom={zoom}
-                        select={setPanel}
-                        layout={layout}
-                        onSplit={(split) => changeLayout((current) => ({ ...current, split }))}
-                        onMinimize={minimize}
-                        show={show}
-                        findInFiles={findInFiles}
-                        showFolder={entry.showFolder}
-                        onEdit={setEditing}
-                        onRemove={setRemoving}
-                        asked={asked}
-                        onAskedTaken={takeAsked}
-                        focusInbox={focusInbox}
-                        onInboxFocused={inboxFocused}
-                        inboxNote={inboxNote}
-                        onInboxNoteRevealed={inboxRevealed}
-                    />
+        <QuickNoteHost>
+            <div className="flex h-full flex-col">
+                <TopBar
+                    level={level}
+                    project={project}
+                    folder={folder}
+                    panel={panel}
+                    problems={problems}
+                    onZoom={zoom}
+                    onOpenSettings={toggleSettings}
+                    onOpenPalette={() => togglePalette('names')}
+                    helpOpen={helpOpen}
+                    onToggleHelp={toggleHelp}
+                    minimized={
+                        level === 1 && tiles
+                            ? tiles.side.filter((tile) => layout.minimized.includes(tile.id))
+                            : []
+                    }
+                    onRestore={restore}
+                    facts={level >= 1 && hasChanges}
+                    onShowFolder={entry.showFolder}
+                    onEditFolders={() => setEditing(project)}
+                />
+                <main className="min-h-0 flex-1">
+                    {projects.isError ? (
+                        <div className="flex h-full items-center justify-center p-8 text-sm text-ui-danger">
+                            {errorMessage(projects.error, i18n)}
+                        </div>
+                    ) : projects.data ? (
+                        <Workspace
+                            list={projects.data}
+                            zoomed={entry.zoomed}
+                            openProject={openProject}
+                            project={project}
+                            folder={folder}
+                            tiles={tiles}
+                            level={level}
+                            panel={level === 1 ? selectedTile : panel}
+                            target={target}
+                            zoom={zoom}
+                            select={setPanel}
+                            layout={layout}
+                            onSplit={(split) => changeLayout((current) => ({ ...current, split }))}
+                            onMinimize={minimize}
+                            show={show}
+                            findInFiles={findInFiles}
+                            showFolder={entry.showFolder}
+                            onEdit={setEditing}
+                            onRemove={setRemoving}
+                            asked={asked}
+                            onAskedTaken={takeAsked}
+                            focusInbox={focusInbox}
+                            onInboxFocused={inboxFocused}
+                            inboxNote={inboxNote}
+                            onInboxNoteRevealed={inboxRevealed}
+                        />
+                    ) : null}
+                </main>
+                {removing ? (
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            key={removing.id}
+                            of={RemoveProjectDialog}
+                            props={{
+                                project: removing,
+                                onRemove: () => removeProject(removing.id),
+                                onClose: () => setRemoving(null),
+                            }}
+                        />
+                    </Suspense>
                 ) : null}
-            </main>
-            {removing ? (
-                <Suspense fallback={null}>
-                    <Preloaded
-                        key={removing.id}
-                        of={RemoveProjectDialog}
-                        props={{
-                            project: removing,
-                            onRemove: () => removeProject(removing.id),
-                            onClose: () => setRemoving(null),
-                        }}
-                    />
-                </Suspense>
-            ) : null}
-            {entry.picker ? (
-                <Suspense fallback={null}>
-                    <Preloaded
-                        key={entry.picker.project.id}
-                        of={FolderPicker}
-                        props={{
-                            project: entry.picker.project,
-                            onPick: entry.picker.pick,
-                            onClose: entry.picker.close,
-                        }}
-                    />
-                </Suspense>
-            ) : null}
-            {editing ? (
-                <Suspense fallback={null}>
-                    <Preloaded
-                        key={editing.id}
-                        of={EditProjectDialog}
-                        props={{
-                            project: editing,
-                            onMerged: (into: string, from: string) => forgetBooks([into, from]),
-                            onClose: () => setEditing(null),
-                        }}
-                    />
-                </Suspense>
-            ) : null}
-            {helpOpen ? (
-                <Suspense fallback={null}>
-                    <ShortcutsHelp onClose={() => setHelpOpen(false)} />
-                </Suspense>
-            ) : null}
-            {settingsOpen === null ? null : (
-                <Suspense fallback={null}>
-                    <Preloaded
-                        of={SettingsDialog}
-                        props={{ open: settingsOpen, onOpenChange: setSettingsOpen }}
-                    />
-                </Suspense>
-            )}
-            {palette.open === null ? null : (
-                <Suspense fallback={null}>
-                    <Preloaded
-                        of={CommandPalette}
-                        props={{
-                            open: palette.open,
-                            onOpenChange: (open) => setPalette((current) => ({ ...current, open })),
-                            mode: palette.mode,
-                            onModeChange: (mode) => setPalette((current) => ({ ...current, mode })),
-                            initialText: palette.text,
-                            projectName: project?.name ?? null,
-                            projectId: level > 0 ? (project?.id ?? null) : null,
-                            filesFolder: tiles?.panels.includes(filesPanel)
-                                ? (folder?.id ?? null)
-                                : null,
-                            stoppedDistro,
-                            currentFile: palette.open ? shownFile() : null,
-                            panels: palettePanels,
-                            books: paletteBook,
-                            actions: paletteActions,
-                        }}
-                    />
-                </Suspense>
-            )}
-        </div>
+                {entry.picker ? (
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            key={entry.picker.project.id}
+                            of={FolderPicker}
+                            props={{
+                                project: entry.picker.project,
+                                onPick: entry.picker.pick,
+                                onClose: entry.picker.close,
+                            }}
+                        />
+                    </Suspense>
+                ) : null}
+                {editing ? (
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            key={editing.id}
+                            of={EditProjectDialog}
+                            props={{
+                                project: editing,
+                                onMerged: (into: string, from: string) => forgetBooks([into, from]),
+                                onClose: () => setEditing(null),
+                            }}
+                        />
+                    </Suspense>
+                ) : null}
+                {helpOpen ? (
+                    <Suspense fallback={null}>
+                        <ShortcutsHelp onClose={() => setHelpOpen(false)} />
+                    </Suspense>
+                ) : null}
+                {settingsOpen === null ? null : (
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            of={SettingsDialog}
+                            props={{ open: settingsOpen, onOpenChange: setSettingsOpen }}
+                        />
+                    </Suspense>
+                )}
+                {palette.open === null ? null : (
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            of={CommandPalette}
+                            props={{
+                                open: palette.open,
+                                onOpenChange: (open) =>
+                                    setPalette((current) => ({ ...current, open })),
+                                mode: palette.mode,
+                                onModeChange: (mode) =>
+                                    setPalette((current) => ({ ...current, mode })),
+                                initialText: palette.text,
+                                projectName: project?.name ?? null,
+                                projectId: level > 0 ? (project?.id ?? null) : null,
+                                filesFolder: tiles?.panels.includes(filesPanel)
+                                    ? (folder?.id ?? null)
+                                    : null,
+                                stoppedDistro,
+                                currentFile: palette.open ? shownFile() : null,
+                                panels: palettePanels,
+                                books: paletteBook,
+                                actions: paletteActions,
+                            }}
+                        />
+                    </Suspense>
+                )}
+            </div>
+        </QuickNoteHost>
     );
 }
 

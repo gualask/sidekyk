@@ -18,6 +18,7 @@ import type { NoteLines } from '@/shared/notes/note-lines';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
 import { createAppQueryClient } from './query-client';
+import { QuickNoteProvider } from './quick-note';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
 import { ShowWindowProvider } from './show-window';
 import { TitleBarProvider } from './title-bar';
@@ -37,29 +38,31 @@ export function AppProviders({
         <QueryClientProvider client={queryClient}>
             <ShowWindowProvider value={runtime.showWindow}>
                 <TitleBarProvider value={runtime.titleBar}>
-                    <SettingsProvider value={runtime.settings}>
-                        <TranslationBridge>
-                            <ProjectsProvider value={runtime.projects}>
-                                <RepositoryProvider value={runtime.repository}>
-                                    <RepositorySettingsBridge>
-                                        <SidebarWidthsBridge>
-                                            <SearchProvider value={runtime.search}>
-                                                <NotesProvider value={runtime.notes}>
-                                                    <NotesSettingsBridge>
-                                                        <MoveTargetsBridge
-                                                            rank={runtime.search.rankNames}
-                                                        >
-                                                            <ToastsHost>{children}</ToastsHost>
-                                                        </MoveTargetsBridge>
-                                                    </NotesSettingsBridge>
-                                                </NotesProvider>
-                                            </SearchProvider>
-                                        </SidebarWidthsBridge>
-                                    </RepositorySettingsBridge>
-                                </RepositoryProvider>
-                            </ProjectsProvider>
-                        </TranslationBridge>
-                    </SettingsProvider>
+                    <QuickNoteProvider value={runtime.quickNote}>
+                        <SettingsProvider value={runtime.settings}>
+                            <TranslationBridge>
+                                <ProjectsProvider value={runtime.projects}>
+                                    <RepositoryProvider value={runtime.repository}>
+                                        <RepositorySettingsBridge>
+                                            <SidebarWidthsBridge>
+                                                <SearchProvider value={runtime.search}>
+                                                    <NotesProvider value={runtime.notes}>
+                                                        <NotesSettingsBridge>
+                                                            <MoveTargetsBridge
+                                                                rank={runtime.search.rankNames}
+                                                            >
+                                                                <ToastsHost>{children}</ToastsHost>
+                                                            </MoveTargetsBridge>
+                                                        </NotesSettingsBridge>
+                                                    </NotesProvider>
+                                                </SearchProvider>
+                                            </SidebarWidthsBridge>
+                                        </RepositorySettingsBridge>
+                                    </RepositoryProvider>
+                                </ProjectsProvider>
+                            </TranslationBridge>
+                        </SettingsProvider>
+                    </QuickNoteProvider>
                 </TitleBarProvider>
             </ShowWindowProvider>
         </QueryClientProvider>

@@ -116,6 +116,7 @@ pub(crate) fn run() {
         .manage(NotesStore::default())
         .manage(FirstShow::default())
         .manage(tauri_commands::capture::CaptureState::default())
+        .manage(tauri_commands::quick_note::QuickNoteState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
@@ -150,9 +151,11 @@ pub(crate) fn run() {
             Ok(())
         })
         // a page loaded again (a crashed webview) forgets a shortcut its predecessor was recording
+        // and a quick note it had open
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 shortcut::set_recording(webview.app_handle(), false);
+                tauri_commands::quick_note::forget(webview.app_handle());
             }
         })
         .on_window_event(hide_on_close)
@@ -196,6 +199,9 @@ pub(crate) fn run() {
             tauri_commands::notes::mark_note_image,
             tauri_commands::notes::remove_note_image,
             tauri_commands::notes::copy_note,
+            tauri_commands::quick_note::quick_note_shown,
+            tauri_commands::quick_note::close_quick_note,
+            tauri_commands::quick_note::quick_note_restored,
             tauri_commands::capture::can_capture,
             tauri_commands::capture::start_capture,
             tauri_commands::capture::add_capture,

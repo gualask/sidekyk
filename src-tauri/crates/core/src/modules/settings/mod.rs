@@ -1,5 +1,6 @@
 //! The user's settings: what they hold and their defaults, and the global shortcuts (the window's,
-//! capture's). Storing them and reaching the system belong to the layers around it.
+//! capture's, the quick note's). Storing them and reaching the system belong to the layers around
+//! it.
 
 mod contracts;
 #[cfg(any(target_os = "macos", windows))]

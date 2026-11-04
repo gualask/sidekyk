@@ -32,6 +32,8 @@ export interface Settings {
     globalShortcut: GlobalShortcut;
     /** The shortcut that captures an area of the screen. */
     captureShortcut: GlobalShortcut;
+    /** The shortcut that opens a quick note for the Inbox. */
+    noteShortcut: GlobalShortcut;
     /** The view a diff opens in. */
     diffView: DiffView;
     /** How a file that has a preview opens. */
@@ -48,13 +50,20 @@ export interface Settings {
     noteLines: NoteLines;
 }
 
-/** What a global shortcut does: shows and hides Sidekyk, or captures an area of the screen. */
-export type ShortcutAction = 'toggle' | 'capture';
+/**
+ * What a global shortcut does: shows and hides Sidekyk, captures an area of the screen, or opens a
+ * quick note for the Inbox.
+ */
+export type ShortcutAction = 'toggle' | 'capture' | 'note';
 
-/** Where each global shortcut stands; `capture` is null where capture is not built yet. */
+/**
+ * Where each global shortcut stands; `capture` and `note` are null where capture or the quick note
+ * is not built yet.
+ */
 export interface GlobalShortcutStatuses {
     toggle: GlobalShortcutStatus;
     capture: GlobalShortcutStatus | null;
+    note: GlobalShortcutStatus | null;
 }
 
 /** Where a global shortcut stands, as the backend registered it. */
@@ -70,7 +79,7 @@ export type GlobalShortcutStatus =
      * it: it does not work.
      */
     | { kind: 'refused'; keys: string }
-    /** The stored shortcut has the other's keys, which that one took first: it does not work. */
+    /** The stored shortcut has another's keys, which that one took first: it does not work. */
     | { kind: 'inUse'; keys: string }
     /** No global shortcut on this system: the plugin could not start. */
     | { kind: 'unavailable' }

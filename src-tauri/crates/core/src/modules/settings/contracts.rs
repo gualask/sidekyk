@@ -104,8 +104,13 @@ pub const DEFAULT_GLOBAL_SHORTCUT: &str = "Control+Alt+Space";
 /// keys too.
 pub const DEFAULT_CAPTURE_SHORTCUT: &str = "Control+Alt+KeyC";
 
+/// The shortcut that opens a quick note for the Inbox from any app, on by default; provisional
+/// keys too.
+pub const DEFAULT_NOTE_SHORTCUT: &str = "Control+Alt+KeyN";
+
 /// A global shortcut, from any app: the one that shows and hides the window (its default, below),
-/// or the one that captures an area of the screen. `keys` is its combination:
+/// the one that captures an area of the screen, or the one that opens a quick note. `keys` is its
+/// combination:
 /// modifiers (`Control`, `Alt`, `Shift`, `Super`, in this order), then a `KeyboardEvent.code`,
 /// joined by `+`, as `global-hotkey` parses it. Kept on Linux, which registers none of its own.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -135,6 +140,8 @@ pub struct Settings {
     /// The shortcut that shows and hides the window.
     pub global_shortcut: GlobalShortcut,
     pub capture_shortcut: GlobalShortcut,
+    /// The shortcut that opens a quick note for the Inbox.
+    pub note_shortcut: GlobalShortcut,
     pub diff_view: DiffView,
     pub file_view: FileView,
     pub diff_scrollbar: DiffScrollbar,
@@ -156,6 +163,10 @@ impl Default for Settings {
                 enabled: true,
                 keys: DEFAULT_CAPTURE_SHORTCUT.to_string(),
             },
+            note_shortcut: GlobalShortcut {
+                enabled: true,
+                keys: DEFAULT_NOTE_SHORTCUT.to_string(),
+            },
             diff_view: DiffView::default(),
             file_view: FileView::default(),
             diff_scrollbar: DiffScrollbar::default(),
@@ -167,11 +178,13 @@ impl Default for Settings {
     }
 }
 
-/// Where each global shortcut stands. `capture` is `None` where capture is not built yet.
+/// Where each global shortcut stands. `capture` and `note` are `None` where capture or the quick
+/// note is not built yet.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct GlobalShortcutStatuses {
     pub toggle: GlobalShortcutStatus,
     pub capture: Option<GlobalShortcutStatus>,
+    pub note: Option<GlobalShortcutStatus>,
 }
 
 /// Where a global shortcut stands, as registered. The frontend knows every platform's kinds;
@@ -191,7 +204,7 @@ pub enum GlobalShortcutStatus {
     /// holds it: it does not work.
     #[cfg(any(target_os = "macos", windows))]
     Refused { keys: String },
-    /// The stored shortcut has the other's keys, which that one took first: it does not work.
+    /// The stored shortcut has another's keys, which that one took first: it does not work.
     #[cfg(any(target_os = "macos", windows))]
     InUse { keys: String },
     /// No global shortcut on this system: the plugin could not start.
@@ -219,6 +232,10 @@ mod tests {
                 enabled: true,
                 keys: "Super+Shift+KeyX".to_string(),
             },
+            note_shortcut: GlobalShortcut {
+                enabled: false,
+                keys: "Super+Shift+KeyN".to_string(),
+            },
             diff_view: DiffView::File,
             file_view: FileView::Code,
             diff_scrollbar: DiffScrollbar::Wide,
@@ -232,6 +249,7 @@ mod tests {
             "theme": "light",
             "globalShortcut": { "enabled": false, "keys": "Super+Shift+KeyK" },
             "captureShortcut": { "enabled": true, "keys": "Super+Shift+KeyX" },
+            "noteShortcut": { "enabled": false, "keys": "Super+Shift+KeyN" },
             "diffView": "file",
             "fileView": "code",
             "diffScrollbar": "wide",
@@ -258,6 +276,10 @@ mod tests {
                 capture_shortcut: GlobalShortcut {
                     enabled: true,
                     keys: DEFAULT_CAPTURE_SHORTCUT.to_string(),
+                },
+                note_shortcut: GlobalShortcut {
+                    enabled: true,
+                    keys: DEFAULT_NOTE_SHORTCUT.to_string(),
                 },
                 diff_view: DiffView::Changes,
                 file_view: FileView::Preview,
@@ -329,10 +351,15 @@ mod tests {
         let statuses = GlobalShortcutStatuses {
             toggle: GlobalShortcutStatus::Off,
             capture: None,
+            note: Some(GlobalShortcutStatus::Off),
         };
         assert_eq!(
             serde_json::to_value(statuses).unwrap(),
-            serde_json::json!({ "toggle": { "kind": "off" }, "capture": null })
+            serde_json::json!({
+                "toggle": { "kind": "off" },
+                "capture": null,
+                "note": { "kind": "off" },
+            })
         );
     }
 

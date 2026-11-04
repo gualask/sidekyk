@@ -19,6 +19,7 @@ reason, numbers, sources. One fact in one file; the others point to it.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `note-images.md`: images in notes: in, thumbnails, copy, export, files.
   - `capture.md`: an area of the screen captured into a note: overlay, entries, per system.
+  - `quick-note.md`: a note for the Inbox from any app, the window shrunk to a field.
   - `background.md`: tray, global shortcuts, hidden window.
   - `languages.md`: English and Italian, catalogs, `i18n:check`.
 - `testing.md`: what the checks, fixtures and timing tests cover; the container fixture.

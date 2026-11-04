@@ -6,14 +6,15 @@ hidden.
 ## Behaviour
 
 - Tray (2026-10-24): it tells the app runs, nothing about projects. A click shows the window on
-  macOS and Windows, the right button opens the menu (Show, Capture where it is built, Quit, in
-  the UI's language; `capture.md`); on Linux every click opens the menu (appindicator reports no
+  macOS and Windows, the right button opens the menu (Show, Capture and New Note where they are
+  built, Quit, in the UI's language; `capture.md`, `quick-note.md`); on Linux every click opens the menu (appindicator reports no
   clicks). Closing the window hides it to the tray.
 - Global shortcut: shows the window when hidden, minimized or behind, hides it in front (on macOS
   the whole app). Default `⌃⌥Space`, provisional. On Linux the desktop's shortcut runs `sidekyk
-  --toggle`. A second one captures an area of the screen where capture is built (`capture.md`):
-  each has its own row in Settings, keys, switch and problem; neither may take the other's keys.
-  While a new one is typed, neither acts.
+  --toggle`. Where they are built, a second captures an area of the screen (`capture.md`) and a
+  third opens a quick note (`quick-note.md`): each has its own row in Settings, keys, switch and
+  problem; none may take another's keys (a problem names the one holding them). While a new one
+  is typed, none acts.
 - Hidden, minimized or covered: no git; on show only what may have changed is read
   (`projects.md`).
 - The window is created hidden and shown after the first paint.

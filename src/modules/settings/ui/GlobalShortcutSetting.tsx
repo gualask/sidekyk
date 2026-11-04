@@ -11,7 +11,7 @@ import {
     useShortcutRecording,
     useUpdateSettings,
 } from '../application/settings.queries';
-import type { GlobalShortcut, Settings, ShortcutAction } from '../model/settings.types';
+import type { GlobalShortcut, ShortcutAction } from '../model/settings.types';
 import {
     formatShortcut,
     neededModifiers,
@@ -20,27 +20,29 @@ import {
     shortcutFromEvent,
     shortcutHint,
 } from '../model/shortcut-keys';
-import { shortcutChangeError, shortcutProblem } from '../model/shortcut-problem';
+import { SHORTCUT_SETTING, shortcutChangeError, shortcutProblem } from '../model/shortcut-problem';
 
-/** The setting each shortcut is stored in. */
-const SETTING = {
-    toggle: 'globalShortcut',
-    capture: 'captureShortcut',
-} as const satisfies Record<ShortcutAction, keyof Settings>;
+/** Each shortcut's name in the settings. */
+const LABEL = {
+    toggle: 'shortcut.toggleLabel',
+    capture: 'shortcut.captureLabel',
+    note: 'shortcut.noteLabel',
+} as const satisfies Record<ShortcutAction, string>;
 
 /**
- * A global shortcut: the one that shows and hides Sidekyk, or the one that captures an area of
- * the screen, where capture is built. On macOS and Windows: a switch, and under it the field that
+ * A global shortcut: the one that shows and hides Sidekyk, or, where they are built, the one that
+ * captures an area of the screen or the one that opens a quick note. On macOS and Windows: a switch, and under it the field that
  * records a new combination, with what is wrong with it. On Linux the desktop's own shortcut runs
  * a command, which the setting gives to copy. Its changes and their failures are its own.
  */
 export function GlobalShortcutSetting({ action }: { action: ShortcutAction }) {
     const settings = useSettings().data;
     const update = useUpdateSettings();
-    const status = useGlobalShortcutStatus().data?.[action];
+    const statuses = useGlobalShortcutStatus().data;
+    const status = statuses?.[action];
     const id = useId();
     const i18n = useTranslation();
-    const field = SETTING[action];
+    const field = SHORTCUT_SETTING[action];
     const shortcut = settings[field];
 
     if (!status) return null;
@@ -55,8 +57,15 @@ export function GlobalShortcutSetting({ action }: { action: ShortcutAction }) {
     // the change that failed says why; otherwise what the shortcut registered has against it
     const warning =
         update.isError && update.variables
-            ? shortcutChangeError(action, update.error, update.variables[field].keys, MACOS, i18n)
-            : (shortcutProblem(action, status, MACOS, i18n)?.detail ?? null);
+            ? shortcutChangeError(
+                  action,
+                  update.error,
+                  update.variables[field].keys,
+                  statuses,
+                  MACOS,
+                  i18n,
+              )
+            : (shortcutProblem(action, statuses, MACOS, i18n)?.detail ?? null);
 
     return (
         <div className="py-2">
@@ -107,7 +116,7 @@ function Row({
     return (
         <div className="min-w-0 flex-1">
             <div id={id} className="font-semibold">
-                {t(action === 'toggle' ? 'shortcut.toggleLabel' : 'shortcut.captureLabel')}
+                {t(LABEL[action])}
             </div>
             <div className="mt-0.5 text-xs text-ui-text-muted">{description}</div>
         </div>

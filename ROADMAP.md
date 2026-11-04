@@ -41,13 +41,15 @@ Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two
 `.cflow/plans/capture.md`.
 
 Built: `docs/features/note-images.md` (images in notes, marks), `docs/features/capture.md`
-(capture on macOS).
+(capture on macOS), `docs/features/quick-note.md` (a note for the Inbox from any app, macOS).
 
 - [ ] Capture on Windows: Windows.Graphics.Capture (GDI as fallback) and a Win32 overlay, tried
       on a machine
 - [ ] Capture on Linux: X11 and wlroots with the overlay, `sidekyk --capture` from the
       desktop's shortcut; GNOME and KDE after trying ScreenCast's one frame
-- [ ] Quick capture of a note from a global shortcut with the window hidden (`docs/product.md`)
+- [ ] Quick note on Windows and Linux (`docs/features/quick-note.md`): the window's opacity
+      (layered window, GTK), the app in front given the focus back; Linux through
+      `sidekyk --note` from the desktop's shortcut
 
 ## Remote projects
 
@@ -73,6 +75,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - macOS, capture (`docs/features/capture.md`): over a full screen app and on another Space,
     two displays (the one under the pointer), the monthly "bypass the system private window
     picker" prompt, the permission kept across an update of a signed build
+  - macOS, quick note (`docs/features/quick-note.md`): on a second display, over a full screen
+    app and on another Space, Sidekyk itself in full screen, from minimized, no frame of the
+    other layout on the packaged app
   - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
     icon shows the window, `⌘W` hides and `⌘Q` quits, hidden while full screen (closed or by
     the shortcut) no black Space left, no blank frame at startup; without the Command Line

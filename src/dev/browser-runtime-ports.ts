@@ -2,8 +2,14 @@ import type { RuntimePorts } from '@/infrastructure/platform/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
 import type { FolderChoice, Opened, ProjectList } from '@/modules/projects';
 import type { FileContent, FolderKind, RepositoryChangedEvent } from '@/modules/repository';
-import type { GlobalShortcutStatuses, Settings, ShortcutAction } from '@/modules/settings';
+import {
+    type GlobalShortcutStatuses,
+    type Settings,
+    SHORTCUT_ACTIONS,
+    SHORTCUT_SETTING,
+} from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import type { QuickNotePhase } from '@/shared/platform/quick-note';
 import {
     type ProjectFolder,
     type ProjectInfo,
@@ -181,6 +187,7 @@ const TAKEN_SHORTCUTS = ['Shift+Super+Space'];
 
 const STORED_SHORTCUT = 'Control+Alt+Space';
 const STORED_CAPTURE_SHORTCUT = 'Control+Alt+KeyC';
+const STORED_NOTE_SHORTCUT = 'Control+Alt+KeyN';
 
 /** A native command's failure, as the backend sends it. */
 function failure(code: string) {
@@ -225,6 +232,8 @@ export interface BrowserRuntime {
      * the backend's.
      */
     writeFile: (name: string, path: string, text?: string) => void;
+    /** As the quick note's global shortcut: opens it, or closes it when open, as `Esc`. */
+    quickNote: () => void;
 }
 
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
@@ -276,6 +285,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         theme: 'dark',
         globalShortcut: { enabled: true, keys: STORED_SHORTCUT },
         captureShortcut: { enabled: true, keys: STORED_CAPTURE_SHORTCUT },
+        noteShortcut: { enabled: true, keys: STORED_NOTE_SHORTCUT },
         diffView: 'changes',
         fileView: 'preview',
         diffScrollbar: 'narrow',
@@ -291,6 +301,14 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             ? { kind: 'refused', keys: STORED_SHORTCUT }
             : { kind: 'active', keys: STORED_SHORTCUT, conflict: false },
         capture: { kind: 'active', keys: STORED_CAPTURE_SHORTCUT, conflict: false },
+        note: { kind: 'active', keys: STORED_NOTE_SHORTCUT, conflict: false },
+    };
+    // the quick note: a browser tab has no window to shrink, so the phases follow at once
+    const quickNoteListeners = new Set<(phase: QuickNotePhase) => void>();
+    let quickNoteOpen = false;
+    const quickNotePhase = (phase: QuickNotePhase) => {
+        quickNoteOpen = phase === 'open';
+        for (const listener of quickNoteListeners) listener(phase);
     };
     // the scenario's data belongs to its first project, and its folder, of the same id; any other
     // is clean
@@ -803,14 +821,16 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
             getSettings: async () => settings,
             // as the backend: a shortcut's settings unchanged change nothing, even refused
             setSettings: async (next) => {
-                const fields = { toggle: 'globalShortcut', capture: 'captureShortcut' } as const;
-                const other = { toggle: 'capture', capture: 'toggle' } as const;
-                for (const action of ['toggle', 'capture'] satisfies ShortcutAction[]) {
-                    const { enabled, keys } = next[fields[action]];
-                    const current = settings[fields[action]];
+                for (const action of SHORTCUT_ACTIONS) {
+                    const { enabled, keys } = next[SHORTCUT_SETTING[action]];
+                    const current = settings[SHORTCUT_SETTING[action]];
                     if (enabled === current.enabled && keys === current.keys) continue;
-                    const otherStatus = shortcutStatus[other[action]];
-                    const inUse = otherStatus?.kind === 'active' && otherStatus.keys === keys;
+                    const inUse = SHORTCUT_ACTIONS.some((other) => {
+                        const status = shortcutStatus[other];
+                        return (
+                            other !== action && status?.kind === 'active' && status.keys === keys
+                        );
+                    });
                     if (enabled && inUse) throw failure('shortcut_in_use');
                     if (enabled && taken.includes(keys)) throw failure('shortcut_taken');
                     shortcutStatus[action] = enabled
@@ -828,6 +848,17 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         },
         // a browser tab draws no window controls over the page
         titleBar: { overlaid: false, onOverlaidChange: () => () => undefined },
+        quickNote: {
+            onPhase: (listener) => {
+                quickNoteListeners.add(listener);
+                return () => quickNoteListeners.delete(listener);
+            },
+            shown: () => undefined,
+            close: () => {
+                if (quickNoteOpen) quickNotePhase('close');
+            },
+            restored: () => undefined,
+        },
         // the browser console already shows them
         reportError: () => undefined,
         showWindow: () => undefined,
@@ -838,6 +869,7 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         gitInit: (name) => setKind(name, 'repository'),
         gitRemove: (name) => setKind(name, 'plain'),
         writeFile,
+        quickNote: () => quickNotePhase(quickNoteOpen ? 'close' : 'open'),
         stopDistro: (name) => {
             const shown = shownOf(name);
             const distro = shown ? distroOf(shown.id) : null;

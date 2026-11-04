@@ -98,23 +98,29 @@ tauri-plugin-global-shortcut = "2.4.1"
 
 # Capture (`infrastructure/capture/`): ScreenCaptureKit reads the display (decided 2026-11-01),
 # AppKit and CoreAnimation show it frozen. Only `objc2-screen-capture-kit` is new; the rest is
-# in the tree through Tauri, with the features named here.
+# in the tree through Tauri, with the features named here. The quick note
+# (`infrastructure/window/`): the window's opacity and buttons, the app in front before it.
 [target.'cfg(target_os = "macos")'.dependencies]
 block2 = "0.6"
 dispatch2 = { version = "0.3", default-features = false, features = ["std"] }
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = [
   "std",
+  "libc",
+  "NSButton",
+  "NSControl",
   "NSCursor",
   "NSEvent",
   "NSFont",
   "NSFontDescriptor",
   "NSPanel",
   "NSResponder",
+  "NSRunningApplication",
   "NSScreen",
   "NSTrackingArea",
   "NSView",
   "NSWindow",
+  "NSWorkspace",
   "objc2-core-foundation",
   "objc2-quartz-core",
 ] }

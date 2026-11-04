@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
+use super::quick_note::{self, Then};
 use super::state::ProjectsState;
 use super::tray;
 
@@ -72,7 +73,11 @@ fn show_first(app: &AppHandle) -> bool {
 }
 
 /// Brings the window back, minimized, hidden or behind others; the first time, also at startup.
+/// A quick note open goes, the window staying in front with its layout.
 pub(crate) fn show_main_window(app: &AppHandle) {
+    if quick_note::close(app, Then::InFront) {
+        return;
+    }
     record_show(app);
     bring_back(app);
 }
@@ -91,8 +96,11 @@ fn record_show(app: &AppHandle) -> bool {
 }
 
 /// The global shortcut and `sidekyk --toggle`: the window in front hides; minimized, hidden or
-/// behind others, it comes back to the front.
+/// behind others, it comes back to the front. A quick note open gives way to the layout, in front.
 pub(crate) fn toggle_main_window(app: &AppHandle) {
+    if quick_note::close(app, Then::InFront) {
+        return;
+    }
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -109,19 +117,20 @@ pub(crate) fn toggle_main_window(app: &AppHandle) {
 /// macOS hides the whole app, so the app used before comes back to the front; a window hidden
 /// alone would leave Sidekyk active with nothing on screen.
 #[cfg(target_os = "macos")]
-fn hide_main_window(app: &AppHandle) {
+pub(crate) fn hide_main_window(app: &AppHandle) {
     let _ = app.hide();
 }
 
 /// Elsewhere the window hides and the system brings the next one to the front.
 #[cfg(not(target_os = "macos"))]
-fn hide_main_window(app: &AppHandle) {
+pub(crate) fn hide_main_window(app: &AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
     }
 }
 
-fn bring_back(app: &AppHandle) {
+/// Shows the window and gives it the focus, as it is: a quick note open stays.
+pub(crate) fn bring_back(app: &AppHandle) {
     // the app hidden by the shortcut shows again with its window
     #[cfg(target_os = "macos")]
     let _ = app.show();
@@ -133,9 +142,13 @@ fn bring_back(app: &AppHandle) {
 }
 
 /// Closing the window hides it while the tray can bring it back; quitting is in the tray's menu
-/// (and `⌘Q` on macOS). Without a tray, closing quits.
+/// (and `⌘Q` on macOS). Without a tray, closing quits. A quick note open only closes, as `Esc`.
 pub(crate) fn hide_on_close(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
+        if quick_note::close(window.app_handle(), Then::AsBefore) {
+            api.prevent_close();
+            return;
+        }
         if tray::is_up(window.app_handle()) {
             api.prevent_close();
             let _ = window.hide();

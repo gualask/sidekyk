@@ -24,10 +24,14 @@ export function fittingListsWidth(names: readonly string[], box: HTMLElement): n
     return Math.ceil(widest + LIST_ROW_EXTRA);
 }
 
+/** A note's text field wrapping its long lines or not. */
+export function wrapLines(field: HTMLTextAreaElement | null, lines: NoteLines) {
+    if (field) field.wrap = lines === 'wrap' ? 'soft' : 'off';
+}
+
 /** A note's text field wrapping its long lines or not, its height fitted to what it holds then. */
 export function fitLines(field: HTMLTextAreaElement | null, lines: NoteLines) {
-    if (!field) return;
-    field.wrap = lines === 'wrap' ? 'soft' : 'off';
+    wrapLines(field, lines);
     autosize(field);
 }
 

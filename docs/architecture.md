@@ -69,7 +69,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 - `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, the hidden window, tray, the
   CLI argument), `interfaces/tauri/` (commands, tray, window, `state.rs`: the project list and the
   `Repositories` it is read through; blocking work on `spawn_blocking`), and the app's own
-  infrastructure (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`).
+  infrastructure (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`,
+  `capture/`, `window/`: the window as a quick note).
 - `src-tauri/crates/core/` (`sidekyk-core`): no Tauri, which the compiler keeps out; the app runs
   all of it, the helper what reads a folder. Its items are `pub` for the app, so one the app stops
   using no longer warns.
