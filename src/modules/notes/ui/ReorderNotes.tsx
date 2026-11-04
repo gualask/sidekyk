@@ -2,9 +2,10 @@ import { IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { RichText, useTranslation } from '@/shared/i18n';
-import { altLabel } from '@/shared/platform/shortcut';
+import { withKeys } from '@/shared/platform/keys';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { InlineField } from '@/shared/ui/InlineField';
+import { KeyHint } from '@/shared/ui/KeyCaps';
 import { isField } from '@/shared/ui/keys';
 import type { NoteActions } from '../application/notes.queries';
 import { noteTitle, openNotes } from '../model/notes';
@@ -12,8 +13,8 @@ import type { NoteList, ProjectNotes } from '../model/notes.types';
 
 const ROW_HEIGHT = 34;
 /** The keys that move the note picked, as this system names them. */
-const UP = altLabel('↑');
-const DOWN = altLabel('↓');
+const UP = 'Alt+ArrowUp';
+const DOWN = 'Alt+ArrowDown';
 const GAP = 4;
 
 /**
@@ -109,13 +110,7 @@ export function ReorderNotes({
                     <RichText text={t('reorder.title')} parts={{ list: <b>{list.name}</b> }} />
                 </span>
                 <span className="text-[11.5px] text-ui-text-muted">
-                    <RichText
-                        text={t('reorder.hint')}
-                        parts={{
-                            up: <kbd className="kbd">{UP}</kbd>,
-                            down: <kbd className="kbd">{DOWN}</kbd>,
-                        }}
-                    />
+                    <KeyHint text={t('reorder.hint')} keys={{ up: UP, down: DOWN }} />
                 </span>
                 <span className="flex-1" />
                 <button type="button" className="btn-ghost-sm" onClick={onDone}>
@@ -145,7 +140,7 @@ export function ReorderNotes({
                                         type="button"
                                         className="btn-icon h-6 w-6"
                                         disabled={row.index === 0}
-                                        title={`${t('reorder.up')} (${UP})`}
+                                        title={withKeys(t('reorder.up'), UP)}
                                         aria-label={t('reorder.up')}
                                         onClick={() => move(note.id, row.index - 1)}
                                     >
@@ -183,7 +178,7 @@ export function ReorderNotes({
                                         type="button"
                                         className="btn-icon h-6 w-6"
                                         disabled={row.index === open.length - 1}
-                                        title={`${t('reorder.down')} (${DOWN})`}
+                                        title={withKeys(t('reorder.down'), DOWN)}
                                         aria-label={t('reorder.down')}
                                         onClick={() => move(note.id, row.index + 1)}
                                     >

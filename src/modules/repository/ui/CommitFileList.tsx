@@ -3,6 +3,7 @@ import type { UseQueryResult } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
+import { withKeys } from '@/shared/platform/keys';
 import { relativeTime } from '@/shared/time/relative-time';
 import { commitDate, shortSha } from '../model/commits';
 import type { Commit, CommitFiles, FileChange } from '../model/repository.types';
@@ -78,7 +79,7 @@ export function CommitFileList({
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"
-                    title={`${i18n.t('commit.back')} (Esc)`}
+                    title={withKeys(i18n.t('commit.back'), 'Escape')}
                     aria-label={i18n.t('commit.back')}
                     onClick={onBack}
                 >

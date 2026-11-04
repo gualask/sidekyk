@@ -7,7 +7,8 @@ import {
 } from '@tabler/icons-react';
 import { type RefObject, useEffect } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import { shortcutKey, shortcutLabel } from '@/shared/platform/shortcut';
+import { withKeys } from '@/shared/platform/keys';
+import { shortcutKey } from '@/shared/platform/shortcut';
 import { FIND_BAR_HEIGHT, FIND_BAR_INSET } from './diff-layout';
 
 const ICON_BUTTON = 'btn-icon h-[24px] w-[24px]';
@@ -77,7 +78,7 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title={`${t('find.previous')} (⇧↵)`}
+                title={withKeys(t('find.previous'), 'Shift+Enter')}
                 aria-label={t('find.previous')}
                 disabled={count === 0}
                 onClick={() => onStep(-1)}
@@ -87,7 +88,7 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title={`${t('find.next')} (↵)`}
+                title={withKeys(t('find.next'), 'Enter')}
                 aria-label={t('find.next')}
                 disabled={count === 0}
                 onClick={() => onStep(1)}
@@ -97,7 +98,7 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title={`${t('common.findInFiles')} (${shortcutLabel('F')})`}
+                title={withKeys(t('common.findInFiles'), 'Mod+F')}
                 aria-label={t('common.findInFiles')}
                 onClick={onFindInFiles}
             >
@@ -106,7 +107,7 @@ export function FindBar({
             <button
                 type="button"
                 className={ICON_BUTTON}
-                title={`${t('common.close')} (Esc)`}
+                title={withKeys(t('common.close'), 'Escape')}
                 aria-label={t('common.close')}
                 onClick={onClose}
             >

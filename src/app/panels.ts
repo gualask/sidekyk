@@ -133,9 +133,9 @@ export function tileBeside(
 export const SUMMARIES = summariesOf(PANELS);
 
 /** The panels as the shortcuts list them, with the keys that open them full screen. */
-export const PANEL_KEYS = PANELS.map((panel) => ({
+export const PANEL_KEYS = PANELS.map((panel, index) => ({
     title: panel.title,
-    shortcut: panelShortcut(panel),
+    shortcut: String(index + 1),
 }));
 
 export function panelById(id: string): PanelDefinition | undefined {

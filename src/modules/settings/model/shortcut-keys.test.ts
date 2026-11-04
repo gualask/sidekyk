@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from '@/shared/i18n';
-import {
-    formatShortcut,
-    neededModifiers,
-    pendingShortcut,
-    shortcutFromEvent,
-    shortcutHint,
-} from './shortcut-keys';
+import { neededModifiers, pendingShortcut, shortcutFromEvent, shortcutHint } from './shortcut-keys';
 
 const en = createTranslator('en', 'en');
 
@@ -52,24 +46,6 @@ describe('shortcutFromEvent', () => {
         expect(shortcutFromEvent(press('Backquote', { ctrl: true }))).toBeNull();
         expect(shortcutFromEvent(press('Escape', { ctrl: true }))).toBeNull();
         expect(shortcutFromEvent(press('F21', { ctrl: true }))).toBeNull();
-    });
-});
-
-describe('formatShortcut', () => {
-    it('writes macOS symbols together', () => {
-        expect(formatShortcut('Control+Alt+Space', true)).toBe('⌃⌥Space');
-        expect(formatShortcut('Shift+Super+KeyK', true)).toBe('⇧⌘K');
-        expect(formatShortcut('Super+ArrowUp', true)).toBe('⌘↑');
-    });
-
-    it('writes names joined by + elsewhere', () => {
-        expect(formatShortcut('Control+Alt+Space', false)).toBe('Ctrl+Alt+Space');
-        expect(formatShortcut('Super+Digit1', false)).toBe('Win+1');
-        expect(formatShortcut('Control+PageDown', false)).toBe('Ctrl+Page Down');
-    });
-
-    it('keeps a part it does not know as it is', () => {
-        expect(formatShortcut('Hyper+Backquote', false)).toBe('Hyper+Backquote');
     });
 });
 

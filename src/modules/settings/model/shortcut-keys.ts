@@ -1,4 +1,5 @@
 import type { Translator } from '@/shared/i18n';
+import { keysLabel, type ModifierName, modifierLabel } from '@/shared/platform/keys';
 
 /**
  * A global shortcut's combination, in the form the settings store it: modifiers in a fixed order,
@@ -8,35 +9,35 @@ import type { Translator } from '@/shared/i18n';
  * (`src-tauri/crates/core/src/modules/settings/shortcut_keys.rs`) and has the last word.
  */
 
-/** The modifiers, in the order a combination lists them, and how each platform writes them. */
+/** The modifiers, in the order a combination lists them (as `shared/platform/keys.ts` reads it). */
 const MODIFIERS = [
-    { name: 'Control', held: (e: KeyboardEventLike) => e.ctrlKey, mac: '⌃', other: 'Ctrl' },
-    { name: 'Alt', held: (e: KeyboardEventLike) => e.altKey, mac: '⌥', other: 'Alt' },
-    { name: 'Shift', held: (e: KeyboardEventLike) => e.shiftKey, mac: '⇧', other: 'Shift' },
-    { name: 'Super', held: (e: KeyboardEventLike) => e.metaKey, mac: '⌘', other: 'Win' },
-] as const;
+    { name: 'Control', held: (e: KeyboardEventLike) => e.ctrlKey },
+    { name: 'Alt', held: (e: KeyboardEventLike) => e.altKey },
+    { name: 'Shift', held: (e: KeyboardEventLike) => e.shiftKey },
+    { name: 'Super', held: (e: KeyboardEventLike) => e.metaKey },
+] as const satisfies readonly { name: ModifierName; held: unknown }[];
 
 type Modifier = (typeof MODIFIERS)[number];
 
 /** The modifiers one of which a shortcut needs, unless it ends with a function key. */
 const TAKES_NO_CHARACTER: readonly Modifier['name'][] = ['Control', 'Alt', 'Super'];
 
-/** Named keys a shortcut may end with, and how they read on macOS and elsewhere. */
-const NAMED_KEYS: Record<string, { mac: string; other: string }> = {
-    Space: { mac: 'Space', other: 'Space' },
-    Enter: { mac: '↩', other: 'Enter' },
-    Tab: { mac: '⇥', other: 'Tab' },
-    Backspace: { mac: '⌫', other: 'Backspace' },
-    Delete: { mac: '⌦', other: 'Delete' },
-    Home: { mac: '↖', other: 'Home' },
-    End: { mac: '↘', other: 'End' },
-    PageUp: { mac: '⇞', other: 'Page Up' },
-    PageDown: { mac: '⇟', other: 'Page Down' },
-    ArrowUp: { mac: '↑', other: '↑' },
-    ArrowDown: { mac: '↓', other: '↓' },
-    ArrowLeft: { mac: '←', other: '←' },
-    ArrowRight: { mac: '→', other: '→' },
-};
+/** Named keys a shortcut may end with; not `Escape`, which cancels typing one. */
+const NAMED_KEYS: readonly string[] = [
+    'Space',
+    'Enter',
+    'Tab',
+    'Backspace',
+    'Delete',
+    'Home',
+    'End',
+    'PageUp',
+    'PageDown',
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight',
+];
 
 /** The parts of a `KeyboardEvent` a combination is read from. */
 export interface KeyboardEventLike {
@@ -53,28 +54,14 @@ function isFunctionKey(code: string): boolean {
 }
 
 /**
- * How a key a shortcut may end with reads, or null for one it may not: letters, digits, function
- * keys and the named keys. Punctuation is left out: its code names the US layout's character,
- * which another layout prints elsewhere.
+ * Whether a shortcut may end with a key: letters, digits, function keys and the named keys.
+ * Punctuation is left out: its code names the US layout's character, which another layout prints
+ * elsewhere.
  */
-function keyLabel(code: string, mac: boolean): string | null {
-    const letter = /^Key([A-Z])$/.exec(code);
-    if (letter) return letter[1];
-    const digit = /^Digit([0-9])$/.exec(code);
-    if (digit) return digit[1];
-    if (isFunctionKey(code)) return code;
-    const named = NAMED_KEYS[code];
-    if (!named) return null;
-    return mac ? named.mac : named.other;
-}
-
-function modifierLabel(modifier: Modifier, mac: boolean): string {
-    return mac ? modifier.mac : modifier.other;
-}
-
-/** Parts as the platform joins them: `⌃⌥Space` on macOS, `Ctrl+Alt+Space` elsewhere. */
-function joinParts(parts: string[], mac: boolean): string {
-    return parts.join(mac ? '' : '+');
+function isShortcutKey(code: string): boolean {
+    return (
+        /^(?:Key[A-Z]|Digit[0-9])$/.test(code) || isFunctionKey(code) || NAMED_KEYS.includes(code)
+    );
 }
 
 /** Whether the key pressed is itself a modifier: a combination is still being held. */
@@ -88,7 +75,7 @@ function isModifierKey(code: string): boolean {
  * or `⌘`/`Win` (with `⇧` alone, it would take a character from every app).
  */
 export function shortcutFromEvent(event: KeyboardEventLike): string | null {
-    if (keyLabel(event.code, false) === null) return null;
+    if (!isShortcutKey(event.code)) return null;
     const held = MODIFIERS.filter((modifier) => modifier.held(event));
     const needsNone = isFunctionKey(event.code);
     if (!needsNone && !held.some((modifier) => TAKES_NO_CHARACTER.includes(modifier.name))) {
@@ -102,7 +89,7 @@ export type ShortcutHint = 'needsModifier' | 'unsupportedKey';
 
 export function shortcutHint(event: KeyboardEventLike): ShortcutHint | null {
     if (isModifierKey(event.code) || shortcutFromEvent(event)) return null;
-    if (keyLabel(event.code, false) === null) return 'unsupportedKey';
+    if (!isShortcutKey(event.code)) return 'unsupportedKey';
     return 'needsModifier';
 }
 
@@ -110,30 +97,16 @@ export function shortcutHint(event: KeyboardEventLike): ShortcutHint | null {
 export function pendingShortcut(event: KeyboardEventLike, mac: boolean): string | null {
     const held = MODIFIERS.filter((modifier) => modifier.held(event));
     if (held.length === 0) return null;
-    return joinParts([...held.map((modifier) => modifierLabel(modifier, mac)), '…'], mac);
+    return keysLabel([...held.map((modifier) => modifier.name), '…'].join('+'), mac);
 }
 
 /** The modifiers one of which a shortcut needs, as a sentence names them: `⌃, ⌥ or ⌘`. */
 export function neededModifiers(mac: boolean, i18n: Translator): string {
     const labels = MODIFIERS.filter((modifier) => TAKES_NO_CHARACTER.includes(modifier.name)).map(
-        (modifier) => modifierLabel(modifier, mac),
+        (modifier) => modifierLabel(modifier.name, mac),
     );
     return i18n.t('shortcut.either', {
         some: labels.slice(0, -1).join(', '),
         last: labels.at(-1) ?? '',
     });
-}
-
-/**
- * A combination as the platform writes it: `⌃⌥Space` on macOS, `Ctrl+Alt+Space` elsewhere. A
- * part it does not know reads as it is.
- */
-export function formatShortcut(keys: string, mac: boolean): string {
-    const parts = keys.split('+');
-    const key = parts.pop() ?? '';
-    const modifiers = parts.map((name) => {
-        const modifier = MODIFIERS.find((m) => m.name === name);
-        return modifier ? modifierLabel(modifier, mac) : name;
-    });
-    return joinParts([...modifiers, keyLabel(key, mac) ?? key], mac);
 }

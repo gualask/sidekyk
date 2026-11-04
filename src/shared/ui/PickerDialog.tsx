@@ -1,7 +1,8 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { Dialog } from '@base-ui/react/dialog';
 import type { ComponentProps, ReactNode, RefObject } from 'react';
-import { RichText, useTranslation } from '@/shared/i18n';
+import { useTranslation } from '@/shared/i18n';
+import { KeyHint } from './KeyCaps';
 
 /**
  * A dialog to pick something from a list, as the palette, Move and the folder to open are: over
@@ -86,19 +87,16 @@ export function PickerKeys({ enter, children = null }: { enter: string; children
     return (
         <div className="dialog-foot">
             <span>
-                <RichText
+                <KeyHint
                     text={t('common.keysChoose')}
-                    parts={{ up: <kbd className="kbd">↑</kbd>, down: <kbd className="kbd">↓</kbd> }}
+                    keys={{ up: 'ArrowUp', down: 'ArrowDown' }}
                 />
             </span>
             <span>
-                <RichText text={enter} parts={{ enter: <kbd className="kbd">↵</kbd> }} />
+                <KeyHint text={enter} keys={{ enter: 'Enter' }} />
             </span>
             <span>
-                <RichText
-                    text={t('common.escCloses')}
-                    parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                />
+                <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
             </span>
             {children}
         </div>

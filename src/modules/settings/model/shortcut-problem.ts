@@ -1,7 +1,7 @@
 import { errorMessage, hasErrorCode } from '@/shared/errors/app-error';
 import type { Translator } from '@/shared/i18n';
+import { keysLabel } from '@/shared/platform/keys';
 import type { GlobalShortcutStatuses, Settings, ShortcutAction } from './settings.types';
-import { formatShortcut } from './shortcut-keys';
 
 /** Every global shortcut, the window's first: the settings' rows and the top bar's problems. */
 export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = ['toggle', 'capture', 'note'];
@@ -36,7 +36,7 @@ const IN_USE_BY = {
 
 /** Why a shortcut does not work, in a sentence. */
 function takenMessage(keys: string, mac: boolean, i18n: Translator): string {
-    return i18n.t('shortcut.taken', { keys: formatShortcut(keys, mac) });
+    return i18n.t('shortcut.taken', { keys: keysLabel(keys, mac) });
 }
 
 /**
@@ -54,13 +54,13 @@ function inUseMessage(
         const status = statuses?.[other];
         return other !== action && status?.kind === 'active' && status.keys === keys;
     });
-    const shown = { keys: formatShortcut(keys, mac) };
+    const shown = { keys: keysLabel(keys, mac) };
     return holder ? i18n.t(IN_USE_BY[holder], shown) : i18n.t('shortcut.inUse', shown);
 }
 
 /** Why a shortcut registered may still not reach Sidekyk. */
 function conflictMessage(keys: string, mac: boolean, i18n: Translator): string {
-    return i18n.t('shortcut.conflict', { keys: formatShortcut(keys, mac) });
+    return i18n.t('shortcut.conflict', { keys: keysLabel(keys, mac) });
 }
 
 /** What is wrong with a global shortcut, for the top bar's problems; null when nothing is. */

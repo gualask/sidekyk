@@ -8,9 +8,10 @@ import type { CodeLines } from '@/shared/git/code-lines';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { FileView } from '@/shared/git/file-view';
-import { type Locale, type MessageKey, RichText, useTranslation } from '@/shared/i18n';
+import { type Locale, type MessageKey, useTranslation } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
-import { altLabel } from '@/shared/platform/shortcut';
+import { keysLabel, withKeys } from '@/shared/platform/keys';
+import { KeyHint } from '@/shared/ui/KeyCaps';
 import { useSettings, useUpdateSettings } from '../application/settings.queries';
 import type { Theme } from '../model/settings.types';
 import { AboutSetting } from './AboutSetting';
@@ -88,7 +89,7 @@ export function SettingsDialog({
                         </Dialog.Title>
                         <Dialog.Close
                             className="btn-icon h-7 w-7"
-                            title={`${t('common.close')} (Esc)`}
+                            title={withKeys(t('common.close'), 'Escape')}
                             aria-label={t('common.close')}
                         >
                             <IconX size={16} />
@@ -199,7 +200,7 @@ export function SettingsDialog({
                         <Setting
                             label={t('settings.lines.label')}
                             description={t('settings.noteLines.description', {
-                                key: altLabel('Z'),
+                                key: keysLabel('Alt+KeyZ'),
                             })}
                         >
                             {(labelId) => (
@@ -225,10 +226,7 @@ export function SettingsDialog({
                     <div className="dialog-foot">
                         <span>{t('settings.applyAtOnce')}</span>
                         <span>
-                            <RichText
-                                text={t('common.escCloses')}
-                                parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                            />
+                            <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
                         </span>
                     </div>
                 </Dialog.Popup>

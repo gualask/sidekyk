@@ -51,6 +51,9 @@ problems. Why semantic zoom: `../product.md`.
 - `⌘K` / `⌘F` the palette (`search.md`), `⌘,` settings, `⌘N` a new note: the project's Notes at
   levels 1 and 2, the Inbox at level 0.
 - `?` shows the shortcuts in a card, bottom right: sections with a title, two columns.
+- Keys read as each system's menus write them (2026-11-04): `⇧⌘Z` on macOS, `Ctrl+Shift+Z`
+  elsewhere. Enter is `↵` on macOS, Return's shape in Apple's help ("What are those symbols shown
+  in menus"); Esc, Tab, Space are words, clearer in a hint than `⎋` or `⇥`.
 
 ## How it is built
 
@@ -74,6 +77,9 @@ problems. Why semantic zoom: `../product.md`.
 - Keys: `app/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with
   `useWindowKeys`, and the workspace skips handled keys. The shortcuts card (`ShortcutsHelp`, lazy)
   is kept by hand. The wheel listener exists only while `⌘`/`Ctrl` is held.
+- Key names only in `shared/platform/keys.ts` (`keysLabel`, `withKeys`), from combinations as a
+  global shortcut is stored (`Shift+Enter`, `Mod+K`); key caps: `shared/ui/KeyCaps.tsx`. Catalog
+  texts take keys as placeholders (`{esc}`).
 - Tiles: `SideColumn` owns the column's width (`sidebarWidths.files`); a splitter's double click
   fits what tiles report (`PanelProps.tileFit`). Each tile keeps its place in the tree, so
   minimizing one never remounts the other; chips share `zoom-panel-*` names with their tiles for

@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { DiffView } from '@/shared/git/diff-view';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
+import { keysLabel } from '@/shared/platform/keys';
 import type { ProjectFolder } from '@/shared/projects/project-info';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
@@ -415,7 +416,9 @@ function Changes({
                                     uncolored={uncolored}
                                     badge={{
                                         label: i18n.t('changes.unchanged'),
-                                        title: i18n.t('changes.unchangedTitle'),
+                                        title: i18n.t('changes.unchangedTitle', {
+                                            esc: keysLabel('Escape'),
+                                        }),
                                     }}
                                     view={view}
                                     showIn={showInFiles(unchanged, () => null)}

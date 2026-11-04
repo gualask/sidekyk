@@ -1,12 +1,13 @@
 import { IconX } from '@tabler/icons-react';
 import { type MessageKey, useTranslation } from '@/shared/i18n';
+import { withKeys } from '@/shared/platform/keys';
 import { MACOS } from '@/shared/platform/macos';
-import { altLabel, shortcutLabel } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
+import { KeyCap } from '@/shared/ui/KeyCaps';
 import { isKeyTaken } from '@/shared/ui/keys';
 import { PANEL_KEYS } from './panels';
 
-/** A shortcut: what it does, and its keys, each its own key cap. */
+/** A shortcut: what it does, and its combinations (`shared/platform/keys.ts`), each a key cap. */
 interface Shortcut {
     label: MessageKey;
     keys: string[];
@@ -27,10 +28,10 @@ const SECTIONS: Section[] = [
         shortcuts: [
             {
                 label: 'shortcuts.zoom',
-                keys: ['↵', 'Esc'],
+                keys: ['Enter', 'Escape'],
                 also: MACOS ? 'shortcuts.zoomAlsoMac' : 'shortcuts.zoomAlso',
             },
-            { label: 'shortcuts.tiles', keys: ['←', '→'] },
+            { label: 'shortcuts.tiles', keys: ['ArrowLeft', 'ArrowRight'] },
             { label: 'shortcuts.list', keys: ['j', 'k'], also: 'shortcuts.listAlso' },
             'panels',
             { label: 'shortcuts.projects', keys: ['[', ']'] },
@@ -39,36 +40,43 @@ const SECTIONS: Section[] = [
     {
         title: 'shortcuts.section.find',
         shortcuts: [
-            { label: 'shortcuts.goTo', keys: [shortcutLabel('K')] },
-            { label: 'shortcuts.findInFile', keys: [shortcutLabel('F')] },
+            { label: 'shortcuts.goTo', keys: ['Mod+K'] },
+            { label: 'shortcuts.findInFile', keys: ['Mod+F'] },
             {
                 label: 'common.findInFiles',
-                keys: [shortcutLabel('F')],
+                keys: ['Mod+F'],
                 also: 'shortcuts.findInFilesAlso',
             },
-            { label: 'shortcuts.matches', keys: ['↵', '⇧↵'], also: 'shortcuts.matchesAlso' },
+            {
+                label: 'shortcuts.matches',
+                keys: ['Enter', 'Shift+Enter'],
+                also: 'shortcuts.matchesAlso',
+            },
         ],
     },
     {
         title: 'shortcuts.section.changes',
         shortcuts: [
             { label: 'shortcuts.changes', keys: ['n', 'p'] },
-            { label: 'shortcuts.tree', keys: ['←', '→', '↑', '↓', '↵'] },
+            {
+                label: 'shortcuts.tree',
+                keys: ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Enter'],
+            },
         ],
     },
     {
         title: 'panel.notes',
         shortcuts: [
-            { label: 'shortcuts.newNote', keys: [shortcutLabel('N')] },
-            { label: 'shortcuts.wrapNote', keys: [altLabel('Z')] },
-            { label: 'shortcuts.closeNote', keys: ['Esc', shortcutLabel('↵')] },
-            { label: 'shortcuts.reorderNotes', keys: [altLabel('↑'), altLabel('↓')] },
+            { label: 'shortcuts.newNote', keys: ['Mod+KeyN'] },
+            { label: 'shortcuts.wrapNote', keys: ['Alt+KeyZ'] },
+            { label: 'shortcuts.closeNote', keys: ['Escape', 'Mod+Enter'] },
+            { label: 'shortcuts.reorderNotes', keys: ['Alt+ArrowUp', 'Alt+ArrowDown'] },
         ],
     },
     {
         title: 'shortcuts.section.app',
         shortcuts: [
-            { label: 'shortcuts.settings', keys: [shortcutLabel(',')] },
+            { label: 'shortcuts.settings', keys: ['Mod+,'] },
             { label: 'shortcuts.help', keys: ['?'] },
         ],
     },
@@ -113,7 +121,7 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
                 <button
                     type="button"
                     className="btn-icon h-7 w-7"
-                    title={`${t('common.close')} (Esc)`}
+                    title={withKeys(t('common.close'), 'Escape')}
                     aria-label={t('common.close')}
                     onClick={onClose}
                 >
@@ -143,10 +151,8 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
                                         ) : null}
                                     </dt>
                                     <dd className="flex shrink-0 items-baseline gap-1">
-                                        {shortcut.keys.map((key) => (
-                                            <kbd key={key} className="kbd">
-                                                {key}
-                                            </kbd>
+                                        {shortcut.keys.map((keys) => (
+                                            <KeyCap key={keys} keys={keys} />
                                         ))}
                                     </dd>
                                 </div>

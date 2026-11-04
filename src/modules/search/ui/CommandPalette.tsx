@@ -12,9 +12,10 @@ import { useMemo, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { type MessageKey, type Translator, useTranslation } from '@/shared/i18n';
-import { shortcutLabel } from '@/shared/platform/shortcut';
+import { withKeys } from '@/shared/platform/keys';
 import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
+import { KeyCap } from '@/shared/ui/KeyCaps';
 import { PickerDialog, PickerKeys } from '@/shared/ui/PickerDialog';
 import {
     type ContentResults,
@@ -272,7 +273,7 @@ function Palette({
                         <button
                             key={choice.mode}
                             type="button"
-                            title={`${t(choice.label)} (${shortcutLabel(choice.key)})`}
+                            title={withKeys(t(choice.label), `Mod+${choice.key}`)}
                             aria-pressed={choice.mode === mode}
                             onClick={() => onModeChange(choice.mode)}
                             className={`h-6 rounded px-2 text-xs ${
@@ -498,7 +499,7 @@ function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' }> }) {
  */
 function hint(item: PaletteItem, t: Translator['t']) {
     if (item.kind === 'project') return <RemoteTag folder={item.folder} />;
-    if (item.kind === 'panel') return <kbd className="kbd">{item.shortcut}</kbd>;
+    if (item.kind === 'panel') return <KeyCap keys={item.shortcut} />;
     if (item.kind === 'note' || item.kind === 'list') return item.hint;
     if (item.kind !== 'file' || !item.mark) return null;
     return <span className={CHANGE_MARK_TONE[item.mark]}>{t(CHANGE_MARK_WORD[item.mark])}</span>;

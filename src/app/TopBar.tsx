@@ -3,9 +3,10 @@ import { lazy, Suspense } from 'react';
 import { ProjectFacts } from '@/modules/repository';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
-import { shortcutLabel } from '@/shared/platform/shortcut';
+import { withKeys } from '@/shared/platform/keys';
 import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
+import { KeyCap } from '@/shared/ui/KeyCaps';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { FolderMenu } from './FolderMenu';
 import { panelShortcut } from './panels';
@@ -166,7 +167,7 @@ export function TopBar({
                     onClick={onOpenPalette}
                 >
                     <IconSearch size={13} />
-                    <kbd className="kbd">{shortcutLabel('K')}</kbd>
+                    <KeyCap keys="Mod+K" />
                 </button>
                 {problems.length > 0 ? (
                     <Suspense fallback={null}>
@@ -176,7 +177,7 @@ export function TopBar({
                 <button
                     type="button"
                     className="btn-icon h-7 w-7"
-                    title={`${t('topBar.settings')} (${shortcutLabel(',')})`}
+                    title={withKeys(t('topBar.settings'), 'Mod+,')}
                     aria-label={t('topBar.settings')}
                     onClick={onOpenSettings}
                 >

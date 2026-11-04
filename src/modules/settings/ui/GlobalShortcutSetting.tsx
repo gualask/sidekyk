@@ -1,10 +1,12 @@
 import { Switch } from '@base-ui/react/switch';
 import { IconAlertTriangle } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
-import { RichText, type Translator, useTranslation } from '@/shared/i18n';
+import { type Translator, useTranslation } from '@/shared/i18n';
+import { keysLabel } from '@/shared/platform/keys';
 import { MACOS } from '@/shared/platform/macos';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { copyLabel, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
+import { KeyHint } from '@/shared/ui/KeyCaps';
 import {
     useGlobalShortcutStatus,
     useSettings,
@@ -13,7 +15,6 @@ import {
 } from '../application/settings.queries';
 import type { GlobalShortcut, ShortcutAction } from '../model/settings.types';
 import {
-    formatShortcut,
     neededModifiers,
     pendingShortcut,
     type ShortcutHint,
@@ -236,17 +237,12 @@ function ShortcutRecorder({
                     record(false);
                 }}
             >
-                {recording
-                    ? (pending ?? i18n.t('shortcut.pressKeys'))
-                    : formatShortcut(keys, MACOS)}
+                {recording ? (pending ?? i18n.t('shortcut.pressKeys')) : keysLabel(keys)}
             </button>
             {recording ? (
                 <p id={hintId} role="status" className="text-right text-xs text-ui-text-muted">
                     {hintText(hint, i18n)}{' '}
-                    <RichText
-                        text={i18n.t('shortcut.escCancels')}
-                        parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                    />
+                    <KeyHint text={i18n.t('shortcut.escCancels')} keys={{ esc: 'Escape' }} />
                 </p>
             ) : null}
         </div>

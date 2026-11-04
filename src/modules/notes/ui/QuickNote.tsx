@@ -1,6 +1,7 @@
 import { IconInbox } from '@tabler/icons-react';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { RichText, useTranslation } from '@/shared/i18n';
+import { useTranslation } from '@/shared/i18n';
+import { KeyHint } from '@/shared/ui/KeyCaps';
 import { useNoteActions, useNotes } from '../application/notes.queries';
 import { useNotesSettings } from '../application/notes-settings';
 import { INBOX_BOOK } from '../model/notes.types';
@@ -86,22 +87,13 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
                         {t('inbox.title')}
                     </span>
                     <span>
-                        <RichText
-                            text={t('quickNote.add')}
-                            parts={{ enter: <kbd className="kbd">↵</kbd> }}
-                        />
+                        <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
                     </span>
                     <span>
-                        <RichText
-                            text={t('quickNote.newLine')}
-                            parts={{ keys: <kbd className="kbd">⇧↵</kbd> }}
-                        />
+                        <KeyHint text={t('quickNote.newLine')} keys={{ keys: 'Shift+Enter' }} />
                     </span>
                     <span>
-                        <RichText
-                            text={t('common.escCloses')}
-                            parts={{ esc: <kbd className="kbd">Esc</kbd> }}
-                        />
+                        <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
                     </span>
                 </div>
             </section>

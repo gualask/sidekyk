@@ -1,10 +1,12 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { IconFolderCode, IconInbox, IconList, IconPlus, IconX } from '@tabler/icons-react';
 import { type RefObject, useMemo, useRef, useState } from 'react';
-import { RichText, type Translator, useTranslation } from '@/shared/i18n';
+import { type Translator, useTranslation } from '@/shared/i18n';
+import { keysLabel } from '@/shared/platform/keys';
 import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { useRanking } from '@/shared/ui/hooks/use-ranking';
+import { KeyHint } from '@/shared/ui/KeyCaps';
 import { PickerDialog, PickerField, PickerKeys } from '@/shared/ui/PickerDialog';
 import { useMoveTargets } from '../application/move-targets';
 import { useNotes } from '../application/notes.queries';
@@ -179,10 +181,7 @@ function MoveField({
             <PickerKeys enter={t('notes.moveEnter')}>
                 {subject.kind === 'note' && !state.chip ? (
                     <span>
-                        <RichText
-                            text={t('notes.moveComplete')}
-                            parts={{ tab: <kbd className="kbd">Tab</kbd> }}
-                        />
+                        <KeyHint text={t('notes.moveComplete')} keys={{ tab: 'Tab' }} />
                     </span>
                 ) : null}
             </PickerKeys>
@@ -255,10 +254,10 @@ function placeholder(
                 : 'notes.moveToProject',
         );
     }
-    if (chip.book === INBOX_BOOK) return t('notes.moveToInbox');
+    if (chip.book === INBOX_BOOK) return t('notes.moveToInbox', { enter: keysLabel('Enter') });
     // ↵ alone goes into the list the project opens on, unless the note is already there
     const alone = entered(subject, { chip, query: '' }, null, chipNotes);
     return chipNotes && alone
-        ? t('notes.moveToListOr', { list: openListOf(chipNotes).name })
+        ? t('notes.moveToListOr', { enter: keysLabel('Enter'), list: openListOf(chipNotes).name })
         : t('notes.moveToList');
 }
