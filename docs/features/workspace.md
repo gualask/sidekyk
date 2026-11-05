@@ -33,6 +33,10 @@ problems. Why semantic zoom: `../product.md`.
   says what it copies.
 - Toasts for passing events (bottom center, at most three; errors stay); lasting problems in the
   top bar, each with its fix.
+- A panel that breaks while rendering breaks alone (2026-11-05): in its place "This panel stopped
+  working", its error's message, Try again and Copy details; another project or folder tries it
+  again by itself. Anything else that breaks (top bar, level 0, dialogs) shows the same in the
+  whole window, with Reload: the page loads again, the backend and what it saved untouched.
 - Settings: a modal (`⌘,`), applied at once: theme (dark by default, no system following),
   language (`languages.md`), diff view and scrollbar width, long lines in code and in notes, copy
   template, how Markdown and SVG open (`previews.md`), global shortcut; at the end the version and
@@ -97,6 +101,14 @@ problems. Why semantic zoom: `../product.md`.
 - Toasts (`useShowToast`) only for failures nothing on screen waits for; Base UI's toaster loads
   with the first. A toast with an action (Undo) stays 6 s. Dialogs show their own errors. Problems
   (`app/problems.ts`) are derived from caches, never fetched.
+- Errors while rendering: `shared/ui/ErrorBoundary` (our own class, about 30 lines) around each
+  panel in `PanelTile` (reset by project and folder) and around the app in `App.tsx`;
+  `CrashNotice` shows them. A caught error goes to `window.reportError`, so it reaches the log as
+  an uncaught one does (`useReportUncaughtErrors`, or an error thrown out of a task where
+  `reportError` is missing). The window's notice takes the language the app chose from
+  `<html data-locale>`, else the system's, not from the providers, which may be what broke; a
+  crash before the first show still shows within the backend's 3 s deadline. Try again cannot
+  bring back a panel whose chunk failed to load (`React.lazy` keeps the failure): Reload does.
 
 ## Decisions
 

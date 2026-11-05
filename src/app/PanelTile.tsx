@@ -3,6 +3,8 @@ import { type CSSProperties, Suspense, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
+import { CrashNotice } from '@/shared/ui/CrashNotice';
+import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from './panels';
@@ -57,7 +59,8 @@ export function PanelTile({
     /** Selects the tile, which then takes the keys. */
     onSelect?: () => void;
 }) {
-    const { t } = useTranslation();
+    const i18n = useTranslation();
+    const { t } = i18n;
     const title = t(panel.title);
     // what a tooltip adds: the key that opens the panel, if one does
     const shortcut = panelShortcut(panel);
@@ -124,26 +127,40 @@ export function PanelTile({
                 <div ref={setHeader} className={`${HEADER} px-3 empty:hidden`} />
             )}
             <div className="relative min-h-0 flex-1">
-                <Suspense fallback={null}>
-                    <Preloaded
-                        // another folder of the project is another panel, which starts as left
-                        key={`${project.id}:${folder?.id ?? ''}`}
-                        of={panel.view}
-                        props={{
-                            project,
-                            folder,
-                            header,
-                            tileFit,
-                            target,
-                            place: onZoomIn ? 'tile' : 'full',
-                            selected,
-                            show,
-                            findInFiles,
-                            showFolder,
-                            zoomIn: onZoomIn ?? null,
-                        }}
-                    />
-                </Suspense>
+                {/* a panel that breaks breaks alone; another project or folder tries it again */}
+                <ErrorBoundary
+                    resetKey={`${project.id}:${folder?.id ?? ''}`}
+                    fallback={({ error, retry }) => (
+                        <CrashNotice
+                            i18n={i18n}
+                            title={i18n.t('crash.panel')}
+                            hint={i18n.t('crash.panelHint')}
+                            error={error}
+                            action={{ label: i18n.t('crash.retry'), run: retry }}
+                        />
+                    )}
+                >
+                    <Suspense fallback={null}>
+                        <Preloaded
+                            // another folder of the project is another panel, which starts as left
+                            key={`${project.id}:${folder?.id ?? ''}`}
+                            of={panel.view}
+                            props={{
+                                project,
+                                folder,
+                                header,
+                                tileFit,
+                                target,
+                                place: onZoomIn ? 'tile' : 'full',
+                                selected,
+                                show,
+                                findInFiles,
+                                showFolder,
+                                zoomIn: onZoomIn ?? null,
+                            }}
+                        />
+                    </Suspense>
+                </ErrorBoundary>
             </div>
         </section>
     );

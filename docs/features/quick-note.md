@@ -44,6 +44,11 @@ in `../../ROADMAP.md`). The Inbox: `notes.md`.
   that app is activated again (`NSRunningApplication`); hidden: `NSApp.hide`.
 - A page loaded again (a crashed webview) forgets the note: frame back, opaque (`forget`), so the
   window never stays unseen.
+- A page that never says it painted (2026-11-05: broken, its crash notice showing, or hung)
+  leaves the window opaque 1.5 s after the note opened or closed (`PAINT_DEADLINE`, its own
+  thread for that moment only): the page answers in 35-600 ms, and a window on screen and unseen
+  could not even show the crash notice's Reload. Each open or close has its own deadline, which
+  a later one or the page's answer makes moot.
 - The window's getters run before the state's lock: off the main thread a getter waits for it,
   which a press holding the lock on the main thread would never answer.
 - System parts in `infrastructure/window/` (opacity, traffic lights, the app in front); no new

@@ -86,8 +86,10 @@ function TranslationBridge({ children }: { children: ReactNode }) {
     useEffect(() => {
         if (unstored) change((current) => ({ ...current, language: locale }));
     }, [unstored, change, locale]);
+    // the page's language, and the one chosen, for the window's crash notice (`App.tsx`)
     useEffect(() => {
         document.documentElement.lang = locale;
+        document.documentElement.dataset.locale = locale;
     }, [locale]);
     return <TranslationProvider value={translator}>{children}</TranslationProvider>;
 }

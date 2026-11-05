@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeError } from './report-uncaught-errors';
+import { describeError } from './describe-error';
 
 describe('describeError', () => {
     it('keeps the name and the message ahead of the stack', () => {
