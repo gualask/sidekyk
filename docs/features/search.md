@@ -40,8 +40,8 @@ The palette is the only search; panels have no filter.
   word; at most 50. At level 0, `with_every_book` and `search_every_book`: each book's best 50
   merged, the Inbox's list left out, each match naming its `book`.
 - Level 0 in the frontend: `paletteRows` names books by `PaletteBook`; `openNotes(book, list,
-  note)` sends an Inbox note to `InboxColumn` (`reveal`), or activates the project and keeps the
-  target until its panels show (`useWaitingAsked`).
+  note)` sends an Inbox note to `InboxColumn` (`reveal`), or enters the project with a request to
+  its Notes, which waits until that panel mounts (`../architecture.md`, Panel requests).
 - `rank_names` (2026-10-23): plain names ranked as the palette's projects, for the Move dialog
   (`notes.md`).
 - `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through

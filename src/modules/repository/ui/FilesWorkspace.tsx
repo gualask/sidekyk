@@ -79,6 +79,7 @@ function Files({
     header,
     tileFit,
     target,
+    targetTaken,
     place,
     selected: hasKeys,
     show,
@@ -167,7 +168,7 @@ function Files({
 
     // a file asked for from Changes, at the hunk being read there; revealed again even when it is
     // the file shown already, as the keyboard may have left it
-    useShownTarget(target, (shown) => {
+    useShownTarget(target, targetTaken, (shown) => {
         openFile(shown.path, shown.hunk);
         reveal(shown.path);
         if (shown.find) find.open(shown.path, shown.find);

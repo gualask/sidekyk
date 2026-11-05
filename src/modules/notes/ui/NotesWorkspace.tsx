@@ -26,7 +26,14 @@ const LISTS_WIDTH = { initial: 200, min: 140 };
  * are on the left; in a tile the header's list name opens them. The cards of the open one fill the
  * rest. A new note (`⌘N`, the app's key) comes as a target.
  */
-export function NotesWorkspace({ project, header, target, place, selected: hasKeys }: PanelProps) {
+export function NotesWorkspace({
+    project,
+    header,
+    target,
+    targetTaken,
+    place,
+    selected: hasKeys,
+}: PanelProps) {
     const book = project.id;
     const { data: notes, error } = useNotes(book);
     const actions = useNoteActions(book);
@@ -55,9 +62,13 @@ export function NotesWorkspace({ project, header, target, place, selected: hasKe
     });
     // once the notes are read, as opening a list changes them
     const ready = notes !== undefined;
+    // once: the app forgets it then, so mounting again never applies it again
+    const take = useEffectEvent(targetTaken);
     useEffect(() => {
-        const shown = ready && target ? notesShownBy(target) : null;
+        if (!ready || !target) return;
+        const shown = notesShownBy(target);
         if (shown) showTarget(shown);
+        take(target);
     }, [target, ready]);
 
     const width = useSidebarWidth('notes', LISTS_WIDTH);

@@ -1,4 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+    lazy,
+    Suspense,
+    useCallback,
+    useEffect,
+    useEffectEvent,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import {
     INBOX_BOOK,
     InboxColumn,
@@ -47,7 +56,7 @@ import { Preloaded } from '@/shared/ui/Preloaded';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
-import { type Asked, askedOf, useWaitingAsked } from './asked';
+import { type Asked, taken, targetFor } from './asked';
 import { PanelTile } from './PanelTile';
 import {
     deepestLevel,
@@ -119,8 +128,12 @@ export function AppShell() {
     const [zoomLevel, setLevel] = useState<ZoomLevel>(0);
     // the panel full screen at level 2, and the tile selected at level 1
     const [shownPanel, setPanel] = useState(INITIAL_PANEL);
-    // what that panel was asked to show, such as a file picked in the palette
-    const [target, setTarget] = useState<Asked | null>(null);
+    // what a panel was asked to show (a file picked in the palette), until it takes it
+    const [request, setRequest] = useState<Asked | null>(null);
+    const targetTaken = useCallback(
+        (target: PanelTarget) => setRequest((current) => taken(current, target)),
+        [],
+    );
     const project = projects.data ? activeProject(projects.data) : null;
     // its folder on screen, which its panels of files read, and the ways into a project
     const entry = useProjectEntry(projects.data, project);
@@ -177,17 +190,21 @@ export function AppShell() {
     const inboxRevealed = useCallback(() => setInboxNote(null), []);
     // how the project lays out its tiles: which wait in the top bar, the side column's split
     const [layout, changeLayout] = useProjectLayout(project?.id ?? null);
-    // a project's note found at all projects, shown once that project's panels are (a folder's
-    // kind read): the panel back from the top bar within the zoom still running, not in a
+    // a panel asked for that waits in the top bar comes back to take its request (a note found
+    // at all projects, once its project's panels show): within the zoom still running, not in a
     // transition of its own, which would skip it
-    const waitForPanels = useWaitingAsked(
-        level > 0 && tiles ? (project?.id ?? null) : null,
-        (asked) => {
-            const tile = panelById(asked.panel);
-            if (tile && layout.minimized.includes(tile.id)) unminimize(tile);
-            setTarget(asked);
-        },
-    );
+    // once for each request: one never taken (its panel failed to read) leaves the tile free to
+    // go back to the top bar
+    const bringBack = useEffectEvent((tile: PanelDefinition) => unminimize(tile));
+    const broughtBack = useRef<Asked | null>(null);
+    const askedTile = request?.project === project?.id && level === 1 ? request?.panel : null;
+    const waiting = askedTile && layout.minimized.includes(askedTile) ? request : null;
+    useEffect(() => {
+        const tile = waiting ? panelById(waiting.panel) : undefined;
+        if (!tile || broughtBack.current === waiting) return;
+        broughtBack.current = waiting;
+        bringBack(tile);
+    }, [waiting]);
     // a tile minimized is not selected: the main one is, which is never minimized
     const selectedTile = tiles && layout.minimized.includes(panel.id) ? tiles.main : panel;
     // the window, created hidden, shows with the workspace laid out, not an empty shell, and in
@@ -213,22 +230,38 @@ export function AppShell() {
     const [editing, setEditing] = useState<ProjectInfo | null>(null);
     const forgetBooks = useForgetBooks();
 
+    /** A request to a panel of the project on screen, for its folder on screen. */
+    const askOf = (panelId: string, target: PanelTarget): Asked | null =>
+        project
+            ? { project: project.id, folder: folder?.id ?? null, panel: panelId, target }
+            : null;
+
     /**
      * Every change of level goes through here, so it animates the same way everywhere. A target
-     * asks the panel full screen to show something; any other move leaves the panels as they are.
+     * asks the panel full screen to show something, of the project on screen or of `of`, the one
+     * being entered; it goes with the level, so a tile being left never takes it. Any other move
+     * leaves the panels as they are, and forgets what was asked and not taken.
      */
-    const zoom = (next: ZoomLevel, nextPanel = panel, nextTarget: PanelTarget | null = null) => {
-        // back at all projects, a note that waited for its project is no longer asked for
-        if (next === 0) waitForPanels(null);
-        const asked = nextTarget && project ? askedOf(project, nextPanel.id, nextTarget) : null;
+    const zoom = (
+        next: ZoomLevel,
+        nextPanel = panel,
+        nextTarget: PanelTarget | null = null,
+        of: { project: string; folder: string | null } | null = null,
+    ) => {
+        const asked =
+            nextTarget === null
+                ? null
+                : of
+                  ? { ...of, panel: nextPanel.id, target: nextTarget }
+                  : askOf(nextPanel.id, nextTarget);
         if (next === level && nextPanel === panel) {
-            if (asked) setTarget(asked);
+            if (asked) setRequest(asked);
             return;
         }
         zoomTransition(() => {
             setLevel(next);
             setPanel(nextPanel);
-            setTarget(asked);
+            setRequest(asked);
         });
     };
 
@@ -258,7 +291,7 @@ export function AppShell() {
         }
         if (layout.minimized.includes(next.id)) restore(next);
         else setPanel(next);
-        setTarget(askedOf(project, next.id, nextTarget));
+        setRequest(askOf(next.id, nextTarget));
     };
 
     // one dialog at a time: the palette and the settings close each other. The palette's other
@@ -341,14 +374,8 @@ export function AppShell() {
             else if (level > 0 && book === project?.id) {
                 show(notesPanel.id, notesTarget(list, note));
             } else {
-                entry.enter(book, () => {
-                    waitForPanels({
-                        project: book,
-                        panel: notesPanel.id,
-                        target: notesTarget(list, note),
-                    });
-                    zoom(1, notesPanel);
-                });
+                const of = { project: book, folder: null };
+                entry.enter(book, () => zoom(1, notesPanel, notesTarget(list, note), of));
             }
         },
     };
@@ -467,7 +494,8 @@ export function AppShell() {
                             tiles={tiles}
                             level={level}
                             panel={level === 1 ? selectedTile : panel}
-                            target={target}
+                            request={request}
+                            targetTaken={targetTaken}
                             zoom={zoom}
                             select={setPanel}
                             layout={layout}
@@ -585,7 +613,8 @@ function Workspace({
     tiles,
     level,
     panel,
-    target,
+    request,
+    targetTaken,
     zoom,
     select,
     show,
@@ -616,7 +645,9 @@ function Workspace({
     level: ZoomLevel;
     /** Full screen at level 2 (and at level 1 with one panel), the selected tile at level 1. */
     panel: PanelDefinition;
-    target: Asked | null;
+    /** What a panel was asked to show, until it takes it. */
+    request: Asked | null;
+    targetTaken: PanelProps['targetTaken'];
     zoom: (level: ZoomLevel, panel?: PanelDefinition) => void;
     select: (panel: PanelDefinition) => void;
     show: PanelProps['show'];
@@ -639,7 +670,7 @@ function Workspace({
     onInboxNoteRevealed: () => void;
 }) {
     const targetOf = (id: string) =>
-        target?.project === project?.id && target?.panel === id ? target.target : null;
+        targetFor(request, { project: project?.id ?? null, folder: folder?.id ?? null, panel: id });
     // all projects: the Inbox, then the cards, which give way first in a narrow window
     if (!project || level === 0) {
         return (
@@ -675,6 +706,7 @@ function Workspace({
                     project={project}
                     folder={folder}
                     target={targetOf(panel.id)}
+                    targetTaken={targetTaken}
                     selected
                     show={show}
                     findInFiles={findInFiles}
@@ -693,6 +725,7 @@ function Workspace({
                 project={project}
                 folder={folder}
                 target={targetOf(main.id)}
+                targetTaken={targetTaken}
                 selected={main === panel}
                 show={show}
                 findInFiles={findInFiles}
@@ -713,6 +746,7 @@ function Workspace({
                             project={project}
                             folder={folder}
                             target={targetOf(tile.id)}
+                            targetTaken={targetTaken}
                             selected={tile === panel}
                             show={show}
                             findInFiles={findInFiles}

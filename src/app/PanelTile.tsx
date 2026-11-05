@@ -27,6 +27,7 @@ export function PanelTile({
     project,
     folder,
     target,
+    targetTaken,
     selected,
     show,
     findInFiles,
@@ -41,8 +42,9 @@ export function PanelTile({
     project: ProjectInfo;
     /** The project's folder on screen; null without folder. */
     folder: ProjectFolder | null;
-    /** What the panel is asked to show, if anything. */
+    /** What the panel is asked to show, if anything, until it takes it. */
     target: PanelTarget | null;
+    targetTaken: PanelProps['targetTaken'];
     /** The panel takes the keys: full screen, or the selected tile. */
     selected: boolean;
     show: PanelProps['show'];
@@ -151,6 +153,7 @@ export function PanelTile({
                                 header,
                                 tileFit,
                                 target,
+                                targetTaken,
                                 place: onZoomIn ? 'tile' : 'full',
                                 selected,
                                 show,

@@ -62,6 +62,7 @@ function Changes({
     folder,
     header,
     target,
+    targetTaken,
     place,
     selected: hasKeys,
     show,
@@ -114,7 +115,7 @@ function Changes({
     const commitFind = useCommitFileFind(viewed ? shownKey : null, findInFiles);
 
     // a file asked for from outside: the palette, Files
-    useShownTarget(target, (shown) => {
+    useShownTarget(target, targetTaken, (shown) => {
         const next = selectionOf(shown.path, selection);
         setSelection(next);
         commitView.leave();

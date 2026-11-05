@@ -31,8 +31,15 @@ export interface PanelProps {
      * other place.
      */
     tileFit: ((measure: (() => number) | null) => void) | null;
-    /** What to show, when the app asks for something; null leaves the panel as the user left it. */
+    /**
+     * What to show, when the app asks for something; null leaves the panel as the user left it.
+     * A request, not state: the panel writes what it asks into its own state, does its effects
+     * once, then says it took it (`targetTaken`), and the app forgets it
+     * (`docs/architecture.md`, Frontend).
+     */
     target: PanelTarget | null;
+    /** The target given was applied: it is not given again. */
+    targetTaken: (target: PanelTarget) => void;
     place: PanelPlace;
     /**
      * The panel takes the keys: full screen, or the selected tile. In a tile the arrows move among

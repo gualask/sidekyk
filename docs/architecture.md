@@ -52,9 +52,18 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   `shared` imports only `shared`; `@tauri-apps/*` only in `infrastructure/`.
 - Panels: `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, needs,
   optional `summary` and `tileMinWidth`. `PanelProps`: `project`, `header` (a portal), `tileFit`,
-  `target` (a request in the panel's terms), `place` (`tile`/`full`), `selected` (takes the keys),
-  `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and zoom; what must
-  survive lives in `useSessionState`.
+  `target` (a request in the panel's terms) and `targetTaken`, `place` (`tile`/`full`), `selected`
+  (takes the keys), `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and
+  zoom; what must survive lives in `useSessionState`.
+- Panel requests (2026-11-05): a target is a change to what a panel shows, never what it shows. Each
+  field is state, written once into its one owner (the selection, the find bar, the open list),
+  or an effect done once (open on a hunk, bring a note into view,
+  focus a field); then the panel calls `targetTaken` and `AppShell` forgets it, so a remount
+  (minimize and restore, zoom, another folder and back) never applies it again. A request is for
+  one panel of one project and folder (`app/asked.ts`); it waits while that panel mounts (a lazy
+  chunk, a project being entered, a tile in the top bar, which comes back for it); a zoom without
+  target drops it. Before, it stayed until the next zoom and every mount applied it again, over
+  the user's choice.
 - State: no client store; projects, snapshots, summaries, diffs, tree folders, notes and settings
   are TanStack Query caches, a project's keys starting with its id. Settings changed from the app
   go through `useChangeSettings`, each change from the settings as they are then. UI state: level
