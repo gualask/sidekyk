@@ -12,6 +12,7 @@ import {
     INBOX_BOOK,
     InboxColumn,
     loadRemoveProjectDialog,
+    NoteReferencesProvider,
     newNoteTarget,
     notesPanel,
     notesTarget,
@@ -57,6 +58,7 @@ import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { ZOOM_NAMES, zoomControlAt, zoomTransition } from '@/shared/ui/zoom-transition';
 import { type Asked, taken, targetFor } from './asked';
+import { useAppNoteReferences } from './note-references';
 import { PanelTile } from './PanelTile';
 import {
     deepestLevel,
@@ -354,6 +356,24 @@ export function AppShell() {
         },
     );
 
+    // a file a note names: in Files full screen, at its lines; in another folder of the project
+    // when only that one has it, which comes on screen first (asked which, when several do)
+    const noteReferences = useAppNoteReferences({
+        project: level > 0 ? project : null,
+        folder,
+        hasFiles: tiles?.panels.includes(filesPanel) ?? false,
+        openInFiles: (fileAsked, folderId, among) => {
+            if (!project) return;
+            if (folderId === null && among === null) {
+                zoom(2, filesPanel, fileAsked);
+                return;
+            }
+            // that folder on screen first; picked among several, whichever is
+            const of = { project: project.id, folder: folderId };
+            entry.enter(project.id, () => zoom(2, filesPanel, fileAsked, of), folderId, among);
+        },
+    });
+
     const paletteActions: PaletteActions = {
         openProject,
         openPanel: (id) => {
@@ -485,34 +505,39 @@ export function AppShell() {
                             {errorMessage(projects.error, i18n)}
                         </div>
                     ) : projects.data ? (
-                        <Workspace
-                            list={projects.data}
-                            zoomed={entry.zoomed}
-                            openProject={openProject}
-                            project={project}
-                            folder={folder}
-                            tiles={tiles}
-                            level={level}
-                            panel={level === 1 ? selectedTile : panel}
-                            request={request}
-                            targetTaken={targetTaken}
-                            zoom={zoom}
-                            select={setPanel}
-                            layout={layout}
-                            onSplit={(split) => changeLayout((current) => ({ ...current, split }))}
-                            onMinimize={minimize}
-                            show={show}
-                            findInFiles={findInFiles}
-                            showFolder={entry.showFolder}
-                            onEdit={setEditing}
-                            onRemove={setRemoving}
-                            asked={asked}
-                            onAskedTaken={takeAsked}
-                            focusInbox={focusInbox}
-                            onInboxFocused={inboxFocused}
-                            inboxNote={inboxNote}
-                            onInboxNoteRevealed={inboxRevealed}
-                        />
+                        // the notes' references: only the workspace shows notes
+                        <NoteReferencesProvider value={noteReferences}>
+                            <Workspace
+                                list={projects.data}
+                                zoomed={entry.zoomed}
+                                openProject={openProject}
+                                project={project}
+                                folder={folder}
+                                tiles={tiles}
+                                level={level}
+                                panel={level === 1 ? selectedTile : panel}
+                                request={request}
+                                targetTaken={targetTaken}
+                                zoom={zoom}
+                                select={setPanel}
+                                layout={layout}
+                                onSplit={(split) =>
+                                    changeLayout((current) => ({ ...current, split }))
+                                }
+                                onMinimize={minimize}
+                                show={show}
+                                findInFiles={findInFiles}
+                                showFolder={entry.showFolder}
+                                onEdit={setEditing}
+                                onRemove={setRemoving}
+                                asked={asked}
+                                onAskedTaken={takeAsked}
+                                focusInbox={focusInbox}
+                                onInboxFocused={inboxFocused}
+                                inboxNote={inboxNote}
+                                onInboxNoteRevealed={inboxRevealed}
+                            />
+                        </NoteReferencesProvider>
                     ) : null}
                 </main>
                 {removing ? (

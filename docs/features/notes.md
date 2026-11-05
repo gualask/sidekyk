@@ -1,7 +1,8 @@
 # Notes
 
 Cards in lists, per project and in the Inbox, stored in the app's data (built 2026-10-17). Images
-in notes: `note-images.md`. Sync: `../../.cflow/plans/notes-sync.md`.
+in notes: `note-images.md`; files and addresses in their text: `note-references.md`. Sync:
+`../../.cflow/plans/notes-sync.md`.
 
 ## Behaviour
 

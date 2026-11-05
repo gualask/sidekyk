@@ -3,6 +3,8 @@ export {
     type FolderFailure,
     useFolderFailures,
     useFolderKind,
+    useFoldersHolding,
+    useOpenUrl,
     useProjectKind,
     useReadFolderAgain,
     useRepositoryChangeSubscription,

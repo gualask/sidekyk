@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useRanking } from '@/shared/ui/hooks/use-ranking';
-import { useSearchPort } from './search.port';
+import { type SearchPort, useSearchPort } from './search.port';
 
 /**
  * The palette's matches for what is typed, ranked in the backend, with the query they answer.
@@ -29,4 +29,9 @@ export function useSearch(
 export function useNameRanking(query: string, names: readonly string[]) {
     const port = useSearchPort();
     return useRanking(port.rankNames, query, names);
+}
+
+/** How a folder's files are searched by name, a few: what a note's `@` suggests. */
+export function useFileSearch(): SearchPort['searchFiles'] {
+    return useSearchPort().searchFiles;
 }

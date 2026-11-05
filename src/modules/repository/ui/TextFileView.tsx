@@ -8,6 +8,7 @@ import { useFileContent } from '../application/repository.queries';
 import { textLines, textRows } from '../model/diff-rows';
 import { hasCodeAndPreview, previewKind } from '../model/preview';
 import { fileSides } from '../model/sides';
+import type { FileLines } from '../model/targets';
 import type { PreviewActions } from './MarkdownPreview';
 import { Notice, Pane, type PaneHeader } from './Pane';
 import { PreviewPane } from './PreviewPane';
@@ -30,6 +31,8 @@ export function TextFileView({
     view,
     onView,
     anchor = null,
+    openOnLine = null,
+    marked = null,
     openFile,
 }: {
     folderId: string;
@@ -48,13 +51,17 @@ export function TextFileView({
     onView: (view: FileView) => void;
     /** An element of the file for its preview to open on: a link's. */
     anchor?: string | null;
+    /** A line to open on, either view, as it mounts: the panel keys it to open on lines anew. */
+    openOnLine?: number | null;
+    /** Lines marked in the code: those a note names. */
+    marked?: FileLines | null;
     /** A file of the project a link of the preview leads to. */
     openFile: PreviewActions['openFile'];
 }) {
     const kind = previewKind(path);
     const previewed = kind === 'image' || (hasCodeAndPreview(path) && view === 'preview');
-    // the line to open the other view on, after a switch
-    const [line, setLine] = useState<number | null>(null);
+    // the line to open on, then the other view's, after a switch
+    const [line, setLine] = useState(openOnLine);
     const switchTo = (next: FileView, at: number | null) => {
         setLine(at);
         onView(next);
@@ -92,6 +99,7 @@ export function TextFileView({
             }
             finder={finder}
             openOnLine={line}
+            marked={marked}
         />
     );
 }
@@ -104,6 +112,7 @@ function CodeView({
     renderHeader,
     finder,
     openOnLine,
+    marked,
 }: {
     folderId: string;
     path: string;
@@ -111,6 +120,7 @@ function CodeView({
     renderHeader: (pane: PaneHeader) => ReactNode;
     finder: FileFinder;
     openOnLine: number | null;
+    marked: FileLines | null;
 }) {
     const i18n = useTranslation();
     const content = useFileContent(folderId, path);
@@ -130,6 +140,7 @@ function CodeView({
             widest={widest}
             openOn={null}
             openOnLine={openOnLine}
+            marked={marked}
             linesAbove={0}
             finder={finder}
             syntax={syntax}

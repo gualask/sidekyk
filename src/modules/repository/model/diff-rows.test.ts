@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseUnifiedDiff } from './diff-parser';
-import { diffRows, textLines, textRows, widestLine } from './diff-rows';
+import { diffRows, rowsOfLines, textLines, textRows, widestLine } from './diff-rows';
 
 const DIFF = `@@ -1,2 +1,2 @@
  keep
@@ -42,5 +42,14 @@ describe('diff rows', () => {
         const { rows, widest } = textRows(lines);
         expect(rows.every((row) => row.hunkIndex === -1)).toBe(true);
         expect(widest).toBe(10);
+    });
+
+    it('finds the rows of some lines of the file as it is now', () => {
+        const rows = diffRows(hunks);
+        // `keep` and `new` are lines 1 and 2 now; `old` is not in the file any more
+        expect(rowsOfLines(rows, { first: 1, last: 2 })).toEqual({ first: 1, last: 3 });
+        expect(rowsOfLines(rows, { first: 2, last: 2 })).toEqual({ first: 3, last: 3 });
+        expect(rowsOfLines(rows, { first: 5, last: 10 })).toEqual({ first: 6, last: 6 });
+        expect(rowsOfLines(rows, { first: 40, last: 41 })).toBeNull();
     });
 });

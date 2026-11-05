@@ -16,6 +16,7 @@ import { withKeys } from '@/shared/platform/keys';
 import { FolderPath } from '@/shared/projects/FolderPath';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { KeyCap } from '@/shared/ui/KeyCaps';
+import { MatchedText } from '@/shared/ui/MatchedText';
 import { PickerDialog, PickerKeys } from '@/shared/ui/PickerDialog';
 import {
     type ContentResults,
@@ -25,7 +26,6 @@ import {
 import { useSearch } from '../application/search.queries';
 import {
     contentRows,
-    highlightParts,
     type PaletteBook,
     type PaletteItem,
     type PalettePanel,
@@ -516,16 +516,10 @@ function Label({
     mono: boolean;
 }) {
     return (
-        <span className={`min-w-0 truncate ${mono ? 'font-mono text-[12.5px]' : ''}`}>
-            {highlightParts(text, highlights).map((part) =>
-                part.matched ? (
-                    <mark key={part.start} className="bg-transparent font-bold text-current">
-                        {part.text}
-                    </mark>
-                ) : (
-                    <span key={part.start}>{part.text}</span>
-                ),
-            )}
-        </span>
+        <MatchedText
+            text={text}
+            highlights={highlights}
+            className={`min-w-0 truncate ${mono ? 'font-mono text-[12.5px]' : ''}`}
+        />
     );
 }

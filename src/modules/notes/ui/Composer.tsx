@@ -7,14 +7,16 @@ import { type PendingImages, useCanCapture } from '../application/notes.queries'
 import { useNotesSettings } from '../application/notes-settings';
 import { autosize, fitLines, linesClass } from './notes-layout';
 import { useNoteDraft } from './use-note-draft';
+import { useReferenceField } from './use-reference-field';
 
 /**
  * The field on top of notes: `↵` adds the note, `⇧↵` breaks the line, a paste into the empty field
- * adds it at once; images as `useNoteDraft` says. `⌘N` (the app's key) brings the focus here, as
- * its placeholder says. Where the system captures, an icon at its right starts a capture, which
- * becomes a note of its own.
+ * adds it at once; images as `useNoteDraft` says, files and addresses as `useReferenceField`.
+ * `⌘N` (the app's key) brings the focus here, as its placeholder says. Where the system captures,
+ * an icon at its right starts a capture, which becomes a note of its own.
  */
 export function Composer({
+    book,
     focus,
     onFocused,
     placeholder,
@@ -25,6 +27,8 @@ export function Composer({
     dropInto,
     dropping,
 }: {
+    /** The book the notes go into, whose files it suggests after `@`. */
+    book: string;
     /** The field takes the focus (as it shows). */
     focus: boolean;
     onFocused: () => void;
@@ -53,6 +57,12 @@ export function Composer({
     const field = useRef<HTMLTextAreaElement>(null);
     const settings = useNotesSettings();
     const draft = useNoteDraft({ field, onAdd, pasted, dropInto, onCleared: autosize });
+    const references = useReferenceField({
+        book,
+        field,
+        text: draft.field.value,
+        onText: draft.setText,
+    });
     // long lines wrap or not as the setting says (`⌥Z` switches it), the height following
     useLayoutEffect(() => fitLines(field.current, settings.lines), [settings.lines]);
     useEffect(() => {
@@ -73,11 +83,16 @@ export function Composer({
                     canCapture ? 'pr-9' : 'pr-2.5'
                 } ${dropping ? 'border-ui-accent' : 'border-ui-border'} ${linesClass(settings.lines)}`}
                 {...draft.field}
+                {...references.field}
                 onChange={(event) => {
                     draft.field.onChange(event);
                     autosize(event.target);
                 }}
+                onKeyDown={(event) => {
+                    if (!references.keyDown(event)) draft.field.onKeyDown(event);
+                }}
             />
+            {references.layer}
             {canCapture ? (
                 <button
                     type="button"

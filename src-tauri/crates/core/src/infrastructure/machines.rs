@@ -232,6 +232,9 @@ mod tests {
         fn file_stamp(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<FileStamp> {
             unreachable!()
         }
+        fn tree_holds_now(&self, _: &RepositoryInfo, _: &str) -> anyhow::Result<bool> {
+            unreachable!()
+        }
         fn image(&self, _: &RepositoryInfo, _: &str, _: Option<&str>) -> anyhow::Result<Vec<u8>> {
             unreachable!()
         }

@@ -81,6 +81,8 @@ export function useNoteDraft({
 
     return {
         pending,
+        /** Puts a text in the field, as typing would: a suggestion picked. */
+        setText,
         /** Leaves images waiting out of the note. */
         dropPending: (images: PendingImages) => {
             release([images]);

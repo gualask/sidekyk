@@ -9,9 +9,10 @@ import type { FileFinder } from '../application/find';
 import { useRepositorySettings } from '../application/repository-settings';
 import { type CopySource, fileText } from '../model/copied';
 import type { DiffHunk } from '../model/diff-parser';
-import type { DiffRow } from '../model/diff-rows';
+import { type DiffRow, rowsOfLines } from '../model/diff-rows';
 import { type FindMatch, findMatches, matchFrom } from '../model/find';
 import type { FileSyntax } from '../model/syntax';
+import type { FileLines } from '../model/targets';
 import { useLineWrapper } from './code-wrap';
 import { DiffList, type HunkReader } from './DiffList';
 import { diffLayout, FIND_BAR_SPACE, rowAt } from './diff-layout';
@@ -81,6 +82,7 @@ export function Pane({
     widest,
     openOn,
     openOnLine = null,
+    marked = null,
     linesAbove,
     finder,
     syntax,
@@ -101,6 +103,8 @@ export function Pane({
     openOn: number | null;
     /** A file's line to open on instead, its preview's place. */
     openOnLine?: number | null;
+    /** A file's lines marked, by their numbers now: those a note names. */
+    marked?: FileLines | null;
     /** Lines left above that hunk, so it shows where it sits. */
     linesAbove: number;
     finder: FileFinder;
@@ -219,6 +223,7 @@ export function Pane({
         );
         return index < 0 ? null : index;
     }, [rows, openOnLine]);
+    const markedRows = useMemo(() => (marked ? rowsOfLines(rows, marked) : null), [rows, marked]);
     return (
         <div className="flex h-full flex-col">
             {header ? createPortal(renderHeader(pane), header) : null}
@@ -256,6 +261,7 @@ export function Pane({
                                 scrollElement={scrollElement}
                                 openOn={openOn}
                                 openOnRow={openOnRow}
+                                marked={markedRows}
                                 linesAbove={linesAbove}
                                 reader={reader}
                                 current={current}

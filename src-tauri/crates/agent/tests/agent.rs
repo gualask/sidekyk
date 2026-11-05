@@ -149,6 +149,8 @@ fn the_helper_answers_as_the_app_reads_directly() {
         agent.file_stamp(&info, "docs/logo.png").unwrap(),
         local.file_stamp(&info, "docs/logo.png").unwrap()
     );
+    assert!(agent.tree_holds_now(&info, "docs/logo.png").unwrap());
+    assert!(!agent.tree_holds_now(&info, "docs/gone.png").unwrap());
     // a side of an image's diff, by its object
     let out = Command::new("git")
         .args(["rev-parse", "HEAD:docs/logo.png"])

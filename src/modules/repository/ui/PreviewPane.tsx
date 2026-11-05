@@ -5,9 +5,7 @@ import { useTranslation } from '@/shared/i18n';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken } from '@/shared/ui/keys';
-import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import { useRepositoryPort } from '../application/repository.port';
-import { useMarkdownPreview } from '../application/repository.queries';
+import { useMarkdownPreview, useOpenUrl } from '../application/repository.queries';
 import { hasCodeAndPreview, previewKind } from '../model/preview';
 import { ImageView } from './ImageView';
 import type { PreviewActions, PreviewOpenOn, PreviewPlace } from './MarkdownPreview';
@@ -95,16 +93,11 @@ function MarkdownPane({
     openFile: PreviewActions['openFile'];
 }) {
     const i18n = useTranslation();
-    const port = useRepositoryPort();
-    const showToast = useShowToast();
+    const openUrl = useOpenUrl();
     const preview = useMarkdownPreview(folderId, path);
     const actions: PreviewActions = {
         openFile,
-        openUrl: (url) => {
-            port.openUrl(url).catch((error: unknown) =>
-                showToast(errorToast(i18n.t('preview.openFailed', { url }), error, i18n)),
-            );
-        },
+        openUrl,
     };
 
     if (preview.isPending) return <Notice>{i18n.t('view.loadingFile')}</Notice>;

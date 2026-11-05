@@ -46,6 +46,12 @@ interface FileMatch {
     highlights: Highlight[];
 }
 
+/** The files of a folder that matched best, and how many more did: what a note's `@` suggests. */
+export interface FileMatches {
+    files: FileMatch[];
+    more: number;
+}
+
 /** A list of notes of the project searched, or of any project at all projects. */
 interface ListMatch {
     /** Its book: its project's id. */

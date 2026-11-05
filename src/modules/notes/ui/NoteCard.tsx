@@ -9,8 +9,10 @@ import { onNoteFieldKey, useNotesSettings } from '../application/notes-settings'
 import { noteMeta } from '../model/notes';
 import type { Note } from '../model/notes.types';
 import { NoteImages } from './NoteImages';
+import { NoteText } from './NoteText';
 import { autosize, fitLines, linesClass } from './notes-layout';
 import { DROP_ATTRIBUTE } from './use-image-drops';
+import { useReferenceField } from './use-reference-field';
 
 /** How long typing pauses before the text is saved; closing the card saves at once. */
 const SAVE_DELAY_MS = 500;
@@ -98,22 +100,19 @@ export function NoteCard({
             ) : null}
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 {editing ? (
-                    <NoteEditor note={note} actions={actions} onClose={() => onEdit(false)} />
+                    <NoteEditor
+                        book={book}
+                        note={note}
+                        actions={actions}
+                        onClose={() => onEdit(false)}
+                    />
                 ) : (
-                    <button
-                        type="button"
-                        className={`line-clamp-4 min-w-0 cursor-text text-left text-[13px]/[1.5] break-words whitespace-pre-wrap focus-visible:outline-none ${
-                            done ? 'text-ui-text-muted' : 'text-ui-text-secondary'
-                        }`}
-                        title={t('notes.clickToEdit')}
-                        onClick={() => onEdit(true)}
-                    >
-                        {note.text === '' ? (
-                            <span className="text-ui-text-muted">{t('notes.addText')}</span>
-                        ) : (
-                            note.text
-                        )}
-                    </button>
+                    <NoteText
+                        book={book}
+                        text={note.text}
+                        done={done}
+                        onEdit={() => onEdit(true)}
+                    />
                 )}
                 <NoteImages
                     book={book}
@@ -197,12 +196,17 @@ function persist(actions: NoteActions, note: Note, saved: { current: string }, t
     void actions.setText(note.id, text);
 }
 
-/** A note's text being edited: saved as typing pauses and on close, which an empty text deletes. */
+/**
+ * A note's text being edited: saved as typing pauses and on close, which an empty text deletes;
+ * its files and addresses tinted, a file suggested after `@` (`useReferenceField`).
+ */
 function NoteEditor({
+    book,
     note,
     actions,
     onClose,
 }: {
+    book: string;
     note: Note;
     actions: NoteActions;
     onClose: () => void;
@@ -230,6 +234,13 @@ function NoteEditor({
         else save();
         onClose();
     };
+    const change = (value: string) => {
+        setText(value);
+        latest.current = value;
+        window.clearTimeout(timer.current);
+        timer.current = window.setTimeout(save, SAVE_DELAY_MS);
+    };
+    const references = useReferenceField({ book, field, text, onText: change });
     // a card scrolled out of the list unmounts: what was typed is kept
     const current = useRef(note);
     current.current = note;
@@ -250,32 +261,35 @@ function NoteEditor({
     }, []);
 
     return (
-        <textarea
-            ref={field}
-            value={text}
-            spellCheck={false}
-            aria-label={t('notes.text')}
-            className={`block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text outline-none ${linesClass(settings.lines)}`}
-            onChange={(event) => {
-                setText(event.target.value);
-                latest.current = event.target.value;
-                autosize(event.target);
-                window.clearTimeout(timer.current);
-                timer.current = window.setTimeout(save, SAVE_DELAY_MS);
-            }}
-            // `Esc` blurs a field (the workspace's keys), a click outside too
-            // the window losing the focus (⌘Tab to the agent's terminal) leaves the card open:
-            // the focus comes back to it
-            onBlur={() => {
-                if (document.hasFocus()) close();
-            }}
-            onKeyDown={(event) => {
-                if (onNoteFieldKey(event, settings)) return;
-                if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-                    event.preventDefault();
-                    event.currentTarget.blur();
-                }
-            }}
-        />
+        <>
+            <textarea
+                ref={field}
+                value={text}
+                spellCheck={false}
+                aria-label={t('notes.text')}
+                className={`block max-h-[60vh] w-full min-w-0 resize-none overflow-auto bg-transparent text-[13px]/[1.5] text-ui-text outline-none ${linesClass(settings.lines)}`}
+                {...references.field}
+                onChange={(event) => {
+                    change(event.target.value);
+                    autosize(event.target);
+                }}
+                // `Esc` blurs a field (the workspace's keys), a click outside too
+                // the window losing the focus (⌘Tab to the agent's terminal) leaves the card open:
+                // the focus comes back to it
+                onBlur={() => {
+                    references.field.onBlur();
+                    if (document.hasFocus()) close();
+                }}
+                onKeyDown={(event) => {
+                    if (references.keyDown(event)) return;
+                    if (onNoteFieldKey(event, settings)) return;
+                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                        event.preventDefault();
+                        event.currentTarget.blur();
+                    }
+                }}
+            />
+            {references.layer}
+        </>
     );
 }

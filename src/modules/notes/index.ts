@@ -1,4 +1,5 @@
 export { type MoveTargets, MoveTargetsProvider } from './application/move-targets';
+export { type NoteReferences, NoteReferencesProvider } from './application/note-references';
 export { type ImageDrop, type NotesPort, NotesProvider } from './application/notes.port';
 // `addFiles` for the browser fixtures too, which add a drop's files as the app does
 export { addFiles, useCaptures, useForgetBooks } from './application/notes.queries';

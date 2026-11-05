@@ -10,7 +10,9 @@ import {
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
+import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
+import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import { mergedActivity } from '../model/activity';
 import { changeTouches } from '../model/changed-paths';
 import { commitRequest } from '../model/commits';
@@ -653,6 +655,26 @@ export function useFolderFailures(): ReadonlyMap<string, FolderFailure> {
                 }),
             ),
         [failed],
+    );
+}
+
+/** Which folders of a project hold a file, `first` alone when it does (`foldersHolding`). */
+export function useFoldersHolding(): RepositoryPort['foldersHolding'] {
+    return useRepositoryPort().foldersHolding;
+}
+
+/** Opens a web or mail address in the browser; a failure says so in a toast. */
+export function useOpenUrl(): (url: string) => void {
+    const port = useRepositoryPort();
+    const showToast = useShowToast();
+    const i18n = useTranslation();
+    return useCallback(
+        (url: string) => {
+            port.openUrl(url).catch((error: unknown) =>
+                showToast(errorToast(i18n.t('common.openFailed', { name: url }), error, i18n)),
+            );
+        },
+        [port, showToast, i18n],
     );
 }
 

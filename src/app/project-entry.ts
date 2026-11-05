@@ -7,6 +7,8 @@ import { folderOnScreen, type ProjectInfo } from '@/shared/projects/project-info
 interface Picking {
     projectId: string;
     then: () => void;
+    /** The folders offered, by their ids; null for all. */
+    among: readonly string[] | null;
 }
 
 /**
@@ -15,6 +17,7 @@ interface Picking {
  * the one picked of each project for the session, else the project's only one, told to the
  * backend, which watches it. `enter` puts a project on screen, then does `then` (a zoom, a
  * target), on the folder given, else its only one; one of several asks which first (`picker`),
+ * only among the folders given if any (those holding a file a note names),
  * and `Esc` there leaves everything as it was. `select` puts a project on screen without entering
  * it: the card selected at all projects.
  */
@@ -30,11 +33,16 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
 
     const pick = (projectId: string, folderId: string) =>
         setPicked((current) => ({ ...current, [projectId]: folderId }));
-    const enter = (projectId: string, then: () => void, folderId: string | null = null) => {
+    const enter = (
+        projectId: string,
+        then: () => void,
+        folderId: string | null = null,
+        among: readonly string[] | null = null,
+    ) => {
         const next = list?.projects.find((p) => p.id === projectId);
         if (!next) return;
-        if (folderId === null && next.folders.length > 1) {
-            setPicking({ projectId, then });
+        if (folderId === null && (among !== null || next.folders.length > 1)) {
+            setPicking({ projectId, then, among });
             return;
         }
         if (folderId !== null) pick(projectId, folderId);
@@ -42,8 +50,14 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
         select(projectId);
         then();
     };
-    // the project asked about as the list has it now, which its folders may have changed
-    const asked = picking ? list?.projects.find((p) => p.id === picking.projectId) : undefined;
+    // the project asked about as the list has it now, which its folders may have changed, with
+    // the folders offered
+    const found = picking ? list?.projects.find((p) => p.id === picking.projectId) : undefined;
+    const among = picking?.among;
+    const asked =
+        found && among
+            ? { ...found, folders: found.folders.filter((f) => among.includes(f.id)) }
+            : found;
 
     return {
         folder,

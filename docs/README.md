@@ -18,6 +18,7 @@ reason, numbers, sources. One fact in one file; the others point to it.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `note-images.md`: images in notes: in, thumbnails, copy, export, files.
+  - `note-references.md`: files and addresses in a note's text, `@` suggesting files.
   - `capture.md`: an area of the screen captured into a note: overlay, entries, per system.
   - `quick-note.md`: a note for the Inbox from any app, the window shrunk to a field.
   - `background.md`: tray, global shortcuts, hidden window.

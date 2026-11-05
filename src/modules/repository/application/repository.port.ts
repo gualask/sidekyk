@@ -50,6 +50,12 @@ export interface RepositoryPort {
     getRecentFiles(folderId: string): Promise<RecentFiles>;
     /** A file of the tree, as the Files panel shows it. */
     getFileContent(folderId: string, path: string): Promise<FileContent>;
+    /**
+     * The folders of a project whose tree holds `path`: `first` alone when it does, else the
+     * others that do, in the project's order. None for a path moved, deleted or outside the tree;
+     * a folder readable only by starting its WSL distro is left out.
+     */
+    foldersHolding(projectId: string, first: string | null, path: string): Promise<string[]>;
     /** The size and last change of a file of the tree. */
     getFileStamp(folderId: string, path: string): Promise<FileStamp>;
     /** The size of a git object, a side of an image's diff. */

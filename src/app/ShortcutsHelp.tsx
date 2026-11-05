@@ -69,6 +69,7 @@ const SECTIONS: Section[] = [
         shortcuts: [
             { label: 'shortcuts.newNote', keys: ['Mod+KeyN'] },
             { label: 'shortcuts.wrapNote', keys: ['Alt+KeyZ'] },
+            { label: 'shortcuts.openReference', keys: ['Alt+Enter'] },
             { label: 'shortcuts.closeNote', keys: ['Escape', 'Mod+Enter'] },
             { label: 'shortcuts.reorderNotes', keys: ['Alt+ArrowUp', 'Alt+ArrowDown'] },
         ],

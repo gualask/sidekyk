@@ -56,8 +56,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   (takes the keys), `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and
   zoom; what must survive lives in `useSessionState`.
 - Panel requests (2026-11-05): a target is a change to what a panel shows, never what it shows. Each
-  field is state, written once into its one owner (the selection, the find bar, the open list),
-  or an effect done once (open on a hunk, bring a note into view,
+  field is state, written once into its one owner (the selection with its marked lines, the find
+  bar, the open list), or an effect done once (open on a hunk or lines, bring a note into view,
   focus a field); then the panel calls `targetTaken` and `AppShell` forgets it, so a remount
   (minimize and restore, zoom, another folder and back) never applies it again. A request is for
   one panel of one project and folder (`app/asked.ts`); it waits while that panel mounts (a lazy

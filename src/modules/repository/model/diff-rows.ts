@@ -72,3 +72,23 @@ export function textRows(lines: readonly DiffLine[]): { rows: DiffRow[]; widest:
         widest: widestOf(lines),
     };
 }
+
+/**
+ * The rows that hold a file's lines `first` to `last` as it is now, from the first at or past
+ * `first` to the last at or before `last`: lines a note names. Null when none of them is in the
+ * rows (the file is shorter now).
+ */
+export function rowsOfLines(
+    rows: readonly DiffRow[],
+    { first, last }: { first: number; last: number },
+): { first: number; last: number } | null {
+    let start = -1;
+    let end = -1;
+    rows.forEach((row, index) => {
+        const number = row.kind === 'line' ? row.line.newNumber : null;
+        if (number === null || number < first || number > last) return;
+        if (start < 0) start = index;
+        end = index;
+    });
+    return start < 0 ? null : { first: start, last: end };
+}

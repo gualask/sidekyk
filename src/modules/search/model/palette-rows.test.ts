@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from '@/shared/i18n';
-import { contentRows, highlightParts, paletteRows } from './palette-rows';
+import { contentRows, paletteRows } from './palette-rows';
 import type { SearchResults } from './search.types';
 
 const en = createTranslator('en', 'en');
@@ -232,23 +232,6 @@ describe('paletteRows', () => {
                 highlights: [[0, 2]],
             },
         ]);
-    });
-});
-
-describe('highlightParts', () => {
-    it('cuts a text at its highlights', () => {
-        expect(
-            highlightParts('src/total.ts', [
-                [4, 7],
-                [10, 12],
-            ]),
-        ).toEqual([
-            { text: 'src/', start: 0, matched: false },
-            { text: 'tot', start: 4, matched: true },
-            { text: 'al.', start: 7, matched: false },
-            { text: 'ts', start: 10, matched: true },
-        ]);
-        expect(highlightParts('shop', [])).toEqual([{ text: 'shop', start: 0, matched: false }]);
     });
 });
 

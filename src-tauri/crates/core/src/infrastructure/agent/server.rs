@@ -126,6 +126,11 @@ pub fn serve(
             Request::FileStamp { repository, path } => {
                 on_thread(Box::new(move |r| value(r.file_stamp(&repository, &path)?)));
             }
+            Request::TreeHoldsNow { repository, path } => {
+                on_thread(Box::new(move |r| {
+                    value(r.tree_holds_now(&repository, &path)?)
+                }));
+            }
             // bytes as they are, after their message: a failure is a reply as any other
             Request::Image {
                 repository,
@@ -261,6 +266,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::FileContent { .. } => "fileContent",
         Request::MarkdownPreview { .. } => "markdownPreview",
         Request::FileStamp { .. } => "fileStamp",
+        Request::TreeHoldsNow { .. } => "treeHoldsNow",
         Request::Image { .. } => "image",
         Request::BlobSize { .. } => "blobSize",
         Request::SyntaxColors { .. } => "syntaxColors",

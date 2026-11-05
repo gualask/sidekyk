@@ -201,6 +201,16 @@ impl LocalRepositories {
         }
     }
 
+    /// A folder's tree as it is on disk now: git's, or the walk of a folder without git.
+    fn read_tree(&self, info: &RepositoryInfo) -> anyhow::Result<FileTree> {
+        let backend = &*self.backend;
+        let root = Path::new(&info.root);
+        Ok(match folder::folder_kind(backend, root)? {
+            FolderKind::Repository => repository::load_file_tree(backend, info)?,
+            FolderKind::Plain => folder::load_folder_tree(backend, root),
+        })
+    }
+
     fn file_tree(&self, info: &RepositoryInfo) -> anyhow::Result<Arc<FileTree>> {
         let root = info.root.as_str();
         let cached = || lock(&self.trees).get(root).and_then(|c| c.tree.clone());
@@ -216,12 +226,7 @@ impl LocalRepositories {
                 .entry(root.to_string())
                 .or_default()
                 .changes;
-            let backend = &*self.backend;
-            let tree = match folder::folder_kind(backend, Path::new(root))? {
-                FolderKind::Repository => repository::load_file_tree(backend, info)?,
-                FolderKind::Plain => folder::load_folder_tree(backend, Path::new(root)),
-            };
-            let tree = Arc::new(tree);
+            let tree = Arc::new(self.read_tree(info)?);
             let mut trees = lock(&self.trees);
             let entry = trees.entry(root.to_string()).or_default();
             if entry.changes == before {
@@ -338,6 +343,10 @@ impl Repositories for LocalRepositories {
     fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp> {
         self.tree_holding(info, path)?;
         repository::load_file_stamp(&*self.backend, info, path)
+    }
+
+    fn tree_holds_now(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<bool> {
+        Ok(self.read_tree(info)?.contains_file(path))
     }
 
     fn image(

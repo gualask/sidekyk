@@ -16,7 +16,9 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 ## Notes
 
 - [ ] Optional Google Drive sync/backup (`.cflow/plans/notes-sync.md`)
-- [ ] Entities recognized while typing a note (`.cflow/plans/notes-entities.md`)
+- [ ] More entities in a note's text: a capture's markers, `#list` when adding, commit hashes
+      (`.cflow/plans/notes-entities.md`); files and addresses built
+      (`docs/features/note-references.md`)
 - [ ] Agents read a project's notes and captures over MCP, read-only (design open;
       `.cflow/plans/agents-mcp.md`)
 

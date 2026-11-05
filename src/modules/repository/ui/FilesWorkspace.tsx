@@ -23,8 +23,9 @@ import { useFileViewChoice, useLinkedAnchor } from '../application/view-choice';
 import { changeMarks, foldersAbove, treeMove, treeRows } from '../model/file-tree';
 import { recentMove, recentRows } from '../model/recent-files';
 import { selectionOf } from '../model/selection';
-import { fileTarget } from '../model/targets';
+import { type FileLines, fileTarget } from '../model/targets';
 import { ChangeDiffView } from './DiffView';
+import { LINES_ABOVE } from './diff-layout';
 import { FileHeader } from './FileHeader';
 import { FileTree } from './FileTree';
 import { RecentList } from './RecentList';
@@ -58,6 +59,11 @@ const FULL_KEYS = new Set([
     'ArrowRight',
     'Enter',
 ]);
+
+/** The line the viewer opens on for some lines: a few above them, as a change opens. */
+function openingLine({ first }: FileLines): number {
+    return Math.max(1, first - LINES_ABOVE);
+}
 
 /**
  * The Files panel: the project's files as a tree, or by their last change (Recent). The file shown
@@ -104,10 +110,14 @@ function Files({
         setSelection,
         change,
         path: file,
+        lines: marked,
     } = useSelectedFile(folderId, repository);
     const find = useFileFind(folderId, change?.path ?? file, findInFiles);
     // the hunk a file asked for from Changes opens on, until another file shows
     const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
+    // how many times lines were asked for: the viewer opens on the marked lines as it mounts, and
+    // again at each request
+    const [linesAsked, setLinesAsked] = useState(0);
     // how a file with a preview shows, and the element a link of one named in the file it leads to
     const fileView = useFileViewChoice();
     const linked = useLinkedAnchor(file);
@@ -148,8 +158,8 @@ function Files({
         if (file) reveal(file);
     }, [file]);
 
-    const openFile = (path: string, hunk: number | null = null) => {
-        setSelection((current) => selectionOf(path, current));
+    const openFile = (path: string, hunk: number | null = null, lines: FileLines | null = null) => {
+        setSelection((current) => selectionOf(path, current, lines));
         setOpenOn(hunk === null ? null : { file: path, hunk });
     };
     // a file picked shows beside the tree full screen; from a tile in Changes, or without git in
@@ -169,9 +179,10 @@ function Files({
     // a file asked for from Changes, at the hunk being read there; revealed again even when it is
     // the file shown already, as the keyboard may have left it
     useShownTarget(target, targetTaken, (shown) => {
-        openFile(shown.path, shown.hunk);
+        openFile(shown.path, shown.hunk, shown.lines);
         reveal(shown.path);
         if (shown.find) find.open(shown.path, shown.find);
+        if (shown.lines) setLinesAsked((count) => count + 1);
     });
 
     // before the workspace's keys, so `↵` opens what is selected instead of zooming; in a tile a
@@ -316,14 +327,18 @@ function Files({
     }
 
     // the change shown, a deleted file too though the tree does not have it; else the file
+    const lineShown = marked ? openingLine(marked) : null;
+    const opening = marked ? linesAsked : '';
     const viewer = change ? (
         <ChangeDiffView
-            key={`${change.area}:${change.path}`}
+            key={`${change.area}:${change.path}:${opening}`}
             folderId={folderId}
             file={change}
             snapshot={snapshot}
             view="file"
             openOn={openOn?.file === change.path ? openOn.hunk : null}
+            openOnLine={lineShown}
+            marked={marked}
             header={header}
             finder={find.finderFor(change.path)}
             renderHeader={(pane) => (
@@ -347,7 +362,7 @@ function Files({
         </div>
     ) : repository && !snapshot.isSuccess ? null : (
         <TextFileView
-            key={file}
+            key={`${file}:${opening}`}
             folderId={folderId}
             path={file}
             header={header}
@@ -355,6 +370,8 @@ function Files({
             view={fileView.view}
             onView={fileView.choose}
             anchor={linked.anchorFor(file)}
+            openOnLine={lineShown}
+            marked={marked}
             openFile={(path, anchor) => {
                 openFile(path);
                 linked.link(path, anchor);

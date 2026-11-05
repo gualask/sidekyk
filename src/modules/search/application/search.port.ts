@@ -1,5 +1,11 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
-import type { ContentEnd, ContentFile, SearchRequest, SearchResults } from '../model/search.types';
+import type {
+    ContentEnd,
+    ContentFile,
+    FileMatches,
+    SearchRequest,
+    SearchResults,
+} from '../model/search.types';
 
 /** The search's runtime boundary: the native backend, or a fixture in browser dev mode. */
 export interface SearchPort {
@@ -13,6 +19,11 @@ export interface SearchPort {
         query: string,
         onFiles: (files: ContentFile[]) => void,
     ): Promise<ContentEnd>;
+    /**
+     * The files of a folder that match `query` best, as the palette ranks them, a few: what a
+     * note's `@` suggests. None for an empty query.
+     */
+    searchFiles(folderId: string, query: string): Promise<FileMatches>;
     /** Stops the search in contents going on: the palette closed. */
     stopContentSearch(): Promise<void>;
     /**

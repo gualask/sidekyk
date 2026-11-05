@@ -87,6 +87,10 @@ pub enum Request {
         repository: RepositoryInfo,
         path: String,
     },
+    TreeHoldsNow {
+        repository: RepositoryInfo,
+        path: String,
+    },
     /// Answered with `Message::Bytes`.
     Image {
         repository: RepositoryInfo,

@@ -1,22 +1,28 @@
 import { changeOf, fileKey } from './file-groups';
 import type { ChangedFile } from './repository.types';
+import type { FileLines } from './targets';
 
 /**
  * The file shown of a project, one for both panels: the Changes list selects it, the tree reveals
  * it, the viewer shows it. A changed file of the list (the first while none is picked), or a file
  * of the tree by its path, a change while it is one. `back` is the changed file to go back to from
- * a file that did not change.
+ * a file that did not change; `lines`, those a note named, which Files marks until another file
+ * is picked.
  */
 export type Selection =
     | { kind: 'change'; key: string | null }
-    | { kind: 'path'; path: string; back: string | null };
+    | { kind: 'path'; path: string; back: string | null; lines: FileLines | null };
 
 export const FIRST_CHANGE: Selection = { kind: 'change', key: null };
 
-/** The selection after a panel asks for a file. */
-export function selectionOf(path: string, current: Selection): Selection {
+/** The selection after a panel asks for a file, and maybe some of its lines. */
+export function selectionOf(
+    path: string,
+    current: Selection,
+    lines: FileLines | null = null,
+): Selection {
     const back = current.kind === 'path' ? current.back : current.key;
-    return { kind: 'path', path, back };
+    return { kind: 'path', path, back, lines };
 }
 
 /**
@@ -27,11 +33,12 @@ export function selectionOf(path: string, current: Selection): Selection {
 export function selectedFile(
     selection: Selection,
     ordered: readonly ChangedFile[],
-): { change: ChangedFile | null; path: string | null } {
+): { change: ChangedFile | null; path: string | null; lines: FileLines | null } {
     if (selection.kind === 'path') {
         const change = changeOf(ordered, selection.path);
-        return { change, path: change?.kind === 'deleted' ? null : selection.path };
+        const path = change?.kind === 'deleted' ? null : selection.path;
+        return { change, path, lines: path === null ? null : selection.lines };
     }
     const change = ordered.find((file) => fileKey(file) === selection.key) ?? ordered[0] ?? null;
-    return { change, path: change && change.kind !== 'deleted' ? change.path : null };
+    return { change, path: change && change.kind !== 'deleted' ? change.path : null, lines: null };
 }

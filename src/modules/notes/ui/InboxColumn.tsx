@@ -95,6 +95,7 @@ export function InboxColumn({
                 {list ? (
                     <>
                         <Composer
+                            book={INBOX_BOOK}
                             focus={focusComposer}
                             onFocused={onComposerFocused}
                             placeholder={t('inbox.composer')}

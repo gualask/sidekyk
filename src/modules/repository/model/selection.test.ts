@@ -36,12 +36,17 @@ describe('selection', () => {
     });
 
     it('shows a path of the tree as a change while it is one', () => {
-        expect(selectedFile({ kind: 'path', path: 'b.ts', back: null }, ordered).change?.path).toBe(
-            'b.ts',
-        );
-        expect(selectedFile({ kind: 'path', path: 'README.md', back: null }, ordered)).toEqual({
+        const path = (name: string) => ({
+            kind: 'path' as const,
+            path: name,
+            back: null,
+            lines: null,
+        });
+        expect(selectedFile(path('b.ts'), ordered).change?.path).toBe('b.ts');
+        expect(selectedFile(path('README.md'), ordered)).toEqual({
             change: null,
             path: 'README.md',
+            lines: null,
         });
     });
 
@@ -51,6 +56,17 @@ describe('selection', () => {
             kind: 'path',
             path: 'y',
             back: 'unstaged:a.ts',
+            lines: null,
         });
+    });
+
+    it('keeps the lines a note named until another file is picked', () => {
+        const named = selectionOf('a.ts', FIRST_CHANGE, { first: 3, last: 5 });
+        expect(selectedFile(named, ordered).lines).toEqual({ first: 3, last: 5 });
+        expect(selectedFile(selectionOf('b.ts', named), ordered).lines).toBeNull();
+        expect(selectedFile({ kind: 'change', key: 'unstaged:b.ts' }, ordered).lines).toBeNull();
+        // a deleted file shows no lines
+        const gone = selectionOf('gone.ts', FIRST_CHANGE, { first: 1, last: 1 });
+        expect(selectedFile(gone, ordered).lines).toBeNull();
     });
 });

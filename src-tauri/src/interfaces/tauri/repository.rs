@@ -217,6 +217,22 @@ pub(crate) async fn get_file_content(
 }
 
 #[tauri::command]
+/// The folders of a project whose tree holds the file at `path`, a note names
+/// (`ProjectsState::folders_holding`).
+pub(crate) async fn folders_holding(
+    app: tauri::AppHandle,
+    project_id: String,
+    first: Option<String>,
+    path: String,
+) -> Result<Vec<String>, AppError> {
+    blocking("folders_holding", app, move |app| {
+        app.state::<ProjectsState>()
+            .folders_holding(&project_id, first.as_deref(), &path)
+    })
+    .await
+}
+
+#[tauri::command]
 /// The size and last change of a file of a project's tree: an image's URL carries it.
 pub(crate) async fn get_file_stamp(
     app: tauri::AppHandle,

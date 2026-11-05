@@ -100,6 +100,7 @@ export function NoteCards({
     return (
         <div ref={box} className="flex h-full min-w-0 flex-1 flex-col">
             <Composer
+                book={book}
                 focus={focusComposer}
                 onFocused={onComposerFocused}
                 placeholder={t('notes.composer', { list: list.name })}

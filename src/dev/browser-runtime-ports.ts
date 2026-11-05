@@ -30,7 +30,12 @@ import {
     REPOSITORY_IMAGES,
     VAULT_IMAGES,
 } from './fixture-files';
-import { fixtureContentSearch, fixtureRankNames, fixtureSearch } from './fixture-search';
+import {
+    fixtureContentSearch,
+    fixtureFileMatches,
+    fixtureRankNames,
+    fixtureSearch,
+} from './fixture-search';
 import { largeDiff, largeSnapshot } from './large.fixture-data';
 import { fixtureNotes } from './notes.fixture';
 import { localProject, wslProject } from './projects.fixture';
@@ -150,6 +155,8 @@ const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-p
  */
 const STOPPED_PROJECT = wslProject('Debian', '/home/dev/api', 'api');
 const GONE_PROJECT = wslProject('Arch', '/home/dev/dotfiles', 'dotfiles');
+/** As the backend's `NOTE_FILE_LIMIT`: the files a note's `@` gets at most. */
+const NOTE_FILE_LIMIT = 20;
 const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools');
 
 /** How long Sidekyk's helper takes to start in a distro, as the first read of a WSL project waits. */
@@ -757,11 +764,25 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 return tree(folderId).recent(Date.now(), fresh);
             },
             getFileContent: async (folderId, path) => contentOf(folderId, path),
-            // the fixtures' images, as Vite serves them; any other is missing
+            // as the backend: the folder on screen alone when it holds the file, else the others
+            foldersHolding: async (projectId, first, path) => {
+                const holds = (folderId: string) => {
+                    try {
+                        readableWithoutStarting(folderId);
+                        return tree(folderId).has(path);
+                    } catch {
+                        return false;
+                    }
+                };
+                if (first !== null && holds(first)) return [first];
+                const found = list.projects.find((p) => p.id === projectId);
+                if (!found) throw failure('project_not_found');
+                return found.folders.map((f) => f.id).filter((id) => id !== first && holds(id));
+            },
+            // a file of the tree; an image's size as the fixtures have it, as Vite serves it
             getFileStamp: async (folderId, path) => {
-                const image = imagesOf(folderId)[path];
-                if (!tree(folderId).has(path) || !image) throw failure('file_missing');
-                return { size: image.size, modified: 0 };
+                if (!tree(folderId).has(path)) throw failure('file_missing');
+                return { size: imagesOf(folderId)[path]?.size ?? 0, modified: 0 };
             },
             getBlobSize: async (folderId, blob) => {
                 readable(folderId);
@@ -813,6 +834,13 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 });
                 if (files.length > 0) onFiles(files);
                 return end;
+            },
+            searchFiles: async (folderId, query) => {
+                readableWithoutStarting(folderId);
+                const files = searchedFiles(folderId);
+                return query && files
+                    ? fixtureFileMatches(query, files, NOTE_FILE_LIMIT)
+                    : { files: [], more: 0 };
             },
             stopContentSearch: async () => undefined,
             rankNames: async (query, names) => fixtureRankNames(query, names),

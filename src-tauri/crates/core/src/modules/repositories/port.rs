@@ -78,6 +78,10 @@ pub trait Repositories: Send + Sync {
     /// The size and last change of a file of a project's tree.
     fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp>;
 
+    /// Whether a folder's tree holds `path` now, the tree read again and not kept: for a folder
+    /// not on screen, which no watcher keeps a cached tree of fresh.
+    fn tree_holds_now(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<bool>;
+
     /// An image's bytes whole (at most `MAX_IMAGE_BYTES`), for the viewer and the Markdown preview
     /// to show: the file of a project's tree at `path`, or the object `blob` (a side of the
     /// image's diff) when given, `path` then telling its type.

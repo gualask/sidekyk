@@ -26,6 +26,9 @@ export const FIND_BAR_SPACE = FIND_BAR_INSET + FIND_BAR_HEIGHT + FIND_BAR_INSET;
 export const LINE_CHROME_WIDTH =
     BRACKET_WIDTH + NUMBER_WIDTH + SIGN_WIDTH + TEXT_PADDING_LEFT + TEXT_PADDING_RIGHT;
 
+/** Lines left above what a viewer opens on (a change, lines a note names): where it sits. */
+export const LINES_ABOVE = 3;
+
 /** Rows `first` to `last` of the list. */
 export interface Span {
     first: number;

@@ -25,6 +25,8 @@ export const tauriRepository: RepositoryPort = {
     getDirectory: (folderId, path) => invoke('get_directory', { folderId, path }),
     getRecentFiles: (folderId) => invoke('get_recent_files', { folderId }),
     getFileContent: (folderId, path) => invoke('get_file_content', { folderId, path }),
+    foldersHolding: (projectId, first, path) =>
+        invoke('folders_holding', { projectId, first, path }),
     getFileStamp: (folderId, path) => invoke('get_file_stamp', { folderId, path }),
     getBlobSize: (folderId, blob) => invoke('get_blob_size', { folderId, blob }),
     // `project_file.rs`: the project and the path encoded whole, the id once before (an older one

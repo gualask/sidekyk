@@ -598,6 +598,11 @@ impl Repositories for AgentRepositories {
         self.call(Request::FileStamp { repository, path }, &nothing)
     }
 
+    fn tree_holds_now(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<bool> {
+        let (repository, path) = (info.clone(), path.to_string());
+        self.call(Request::TreeHoldsNow { repository, path }, &nothing)
+    }
+
     fn image(
         &self,
         info: &RepositoryInfo,

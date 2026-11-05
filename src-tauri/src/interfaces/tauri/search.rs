@@ -10,7 +10,8 @@ use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::modules::notes::{Book, NotesStore};
 use sidekyk_core::modules::search::{
-    self, search_every_book, search_notes, ContentEnd, ContentFile, SearchRequest, SearchResults,
+    self, search_every_book, search_notes, ContentEnd, ContentFile, FileMatches, SearchRequest,
+    SearchResults,
 };
 use sidekyk_core::shared::error::AppError;
 
@@ -68,6 +69,34 @@ pub(crate) async fn search_contents(
             // the page went away: nothing left to stop
             let _ = on_files.send(files);
         })
+    })
+    .await
+}
+
+/// At most this many files go back to a note's `@`: its menu shows a few.
+const NOTE_FILE_LIMIT: usize = 20;
+
+#[tauri::command]
+/// The files of a project's folder that match `query` best, as the palette ranks them: what a
+/// note's `@` suggests. Nothing for an empty query, nor while the folder's WSL distro is stopped.
+pub(crate) async fn search_files(
+    app: tauri::AppHandle,
+    folder_id: String,
+    query: String,
+) -> Result<FileMatches, AppError> {
+    on_folder("search_files", app, folder_id, move |on| {
+        if query.is_empty() {
+            return Ok(FileMatches::default());
+        }
+        on.readable_without_starting()?;
+        let mut found = on
+            .repositories
+            .search_files(on.info, &query)
+            .unwrap_or_default();
+        let cut = found.files.len().saturating_sub(NOTE_FILE_LIMIT);
+        found.files.truncate(NOTE_FILE_LIMIT);
+        found.more += cut as u32;
+        Ok(found)
     })
     .await
 }

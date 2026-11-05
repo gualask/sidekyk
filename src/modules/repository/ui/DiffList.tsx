@@ -84,6 +84,7 @@ export function DiffList({
     scrollElement,
     openOn,
     openOnRow = null,
+    marked = null,
     linesAbove,
     reader,
     current,
@@ -105,6 +106,8 @@ export function DiffList({
     openOn: number | null;
     /** A row to open on instead, at the top: a file's line its preview was read at. */
     openOnRow?: number | null;
+    /** Rows marked, as long as they are asked for: the lines a note names. */
+    marked?: Span | null;
     linesAbove: number;
     reader: RefObject<HunkReader | null>;
     /** The hunk gone to (`n`/`p`, the map, the one opened on): where the next step starts. */
@@ -361,6 +364,13 @@ export function DiffList({
                         ) : null}
                     </div>
                 ))}
+                {marked ? (
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute left-0 w-full border-l-2 border-ui-accent bg-ui-accent/10"
+                        style={spanBox(layout, marked)}
+                    />
+                ) : null}
                 {hoveredSpan ? (
                     // as a button would: what a click copies, lightly
                     <div

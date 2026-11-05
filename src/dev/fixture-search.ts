@@ -3,6 +3,7 @@ import type { ChangedFile } from '@/modules/repository';
 import type {
     ContentEnd,
     ContentFile,
+    FileMatches,
     Highlight,
     SearchRequest,
     SearchResults,
@@ -109,6 +110,19 @@ export function fixtureSearch(
         results.notes = results.notes.sort((a, b) => b.score - a.score).slice(0, NOTE_LIMIT);
     }
     if (!query || !files) return results;
+    const found = fixtureFileMatches(query, files, FILE_LIMIT);
+    results.files = found.files;
+    results.moreFiles = found.more;
+    return results;
+}
+
+/** As the backend's `search_files`: the files that match, at most `limit`, the others counted. */
+export function fixtureFileMatches(
+    query: string,
+    files: { paths: readonly string[]; changed: readonly ChangedFile[] },
+    limit: number,
+): FileMatches {
+    const found: FileMatches = { files: [], more: 0 };
     const marks = marksByPath(files.changed);
     // a deleted file is not in the tree, but Changes lists it
     const deleted = files.changed
@@ -117,14 +131,14 @@ export function fixtureSearch(
     for (const path of [...files.paths, ...deleted]) {
         const highlights = match(path, query);
         if (!highlights) continue;
-        if (results.files.length < FILE_LIMIT) {
+        if (found.files.length < limit) {
             const mark = marks.get(path) ?? null;
-            results.files.push({ path, mark, score: score(highlights), highlights });
+            found.files.push({ path, mark, score: score(highlights), highlights });
         } else {
-            results.moreFiles += 1;
+            found.more += 1;
         }
     }
-    return results;
+    return found;
 }
 
 /** As the backend's `rank_names`: the names that match, best first, equal ones in their order. */

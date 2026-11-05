@@ -18,18 +18,21 @@ import { diffRows, wholeFileRows, widestLine } from '../model/diff-rows';
 import type { ChangedFile, Commit, FileChange, UnifiedDiff } from '../model/repository.types';
 import { changeSides, commitSides } from '../model/sides';
 import type { FileSyntax } from '../model/syntax';
+import type { FileLines } from '../model/targets';
 import { wholeFile } from '../model/whole-file';
+import { LINES_ABOVE } from './diff-layout';
 import { FormattingNotice } from './FormattingNotice';
 import { Notice, Pane, type PaneHeader } from './Pane';
-
-/** Lines left above the change the whole file opens on, so it shows where it sits. */
-const LINES_ABOVE = 3;
 
 /** How a diff shows: only its changes or the whole file, opened on a hunk or on the first. */
 interface DiffShown {
     view: DiffView;
     /** The hunk to open on; the first if null. */
     openOn: number | null;
+    /** A file's line to open on instead, the whole file's. */
+    openOnLine?: number | null;
+    /** Lines marked, by their numbers now: those a note names. */
+    marked?: FileLines | null;
     /** The panel's header, where the open file goes (see `PanelProps`). */
     header: HTMLElement | null;
     renderHeader: (pane: PaneHeader) => ReactNode;
@@ -48,6 +51,8 @@ function DiffPane({
     formattingCheck,
     view,
     openOn,
+    openOnLine = null,
+    marked = null,
     header,
     renderHeader,
     finder,
@@ -92,6 +97,8 @@ function DiffPane({
             hunks={hunks}
             widest={widest}
             openOn={openOn}
+            openOnLine={openOnLine}
+            marked={marked}
             linesAbove={whole ? LINES_ABOVE : 0}
             finder={finder}
             syntax={syntax}

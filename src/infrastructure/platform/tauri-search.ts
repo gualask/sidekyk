@@ -11,6 +11,7 @@ export const tauriSearch: SearchPort = {
         channel.onmessage = onFiles;
         return invoke('search_contents', { folderId, query, onFiles: channel });
     },
+    searchFiles: (folderId, query) => invoke('search_files', { folderId, query }),
     stopContentSearch: () => invoke('stop_content_search'),
     rankNames: (query, names) => invoke('rank_names', { query, names }),
 };
