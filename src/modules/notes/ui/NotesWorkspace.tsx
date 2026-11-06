@@ -6,7 +6,7 @@ import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useExportNotes, useNoteActions, useNotes } from '../application/notes.queries';
-import type { MoveSubject } from '../model/move-dialog';
+import type { Moving } from '../model/destination';
 import { openListOf } from '../model/notes';
 import type { Note, NoteList } from '../model/notes.types';
 import { type NotesShown, notesShownBy } from '../model/targets';
@@ -46,7 +46,7 @@ export function NotesWorkspace({
     const [reveal, setReveal] = useState<string | null>(null);
     const revealed = useCallback(() => setReveal(null), []);
     // a note or a list in the Move dialog
-    const [moving, setMoving] = useState<MoveSubject | null>(null);
+    const [moving, setMoving] = useState<Moving | null>(null);
     const askMoveNote = (note: Note) => setMoving({ kind: 'note', book, note });
     const askMoveList = (list: NoteList) => setMoving({ kind: 'list', book, list });
 

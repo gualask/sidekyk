@@ -25,7 +25,7 @@ export function useSearch(
     });
 }
 
-/** The indexes of `names` matching `query`, best first, as the palette ranks names (`useRanking`). */
+/** `names` matching `query`, best first, as the palette ranks names (`useRanking`). */
 export function useNameRanking(query: string, names: readonly string[]) {
     const port = useSearchPort();
     return useRanking(port.rankNames, query, names);

@@ -29,11 +29,13 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   goes between the Inbox and projects, or to another list; a list to another project, whole, into
   its list of the same name if any. Suggestions are the books ranked as the palette ranks names (a
   name two books share shows its folder); `Tab` makes the one chosen a chip, whose lists come
-  next; Backspace on the empty field removes it; `↵` moves, with a project's chip and nothing
-  chosen into the list it opens on. Text that is not exactly a name gets a last row, never hidden:
-  "New project “…”" (without folder) or "New list “…”". A note's own project starts as the chip.
-  After a move a toast with Undo, which puts the note or list back where it was; a project made
-  for the move stays.
+  next; `↵` moves, with a project's chip and nothing chosen into the list it opens on; `Tab` on
+  a list makes it a second chip; Backspace on the empty field takes the last chip away; typing
+  over the Inbox's chip or a list's chooses again. Among a project's lists, text that is not
+  exactly a name gets a last row, never hidden: "New list “…”". No new project: a project is made
+  from its own flow. A note's own project starts as the chip. The quick note chooses its place
+  with the same field (`quick-note.md`). After a move a toast with Undo, which puts the note or
+  list back where it was.
 - A project merged into another brings its lists of notes (`project-folders.md`).
 - Found by `⌘K`, at level 0 across every book (`search.md`).
 
@@ -58,10 +60,11 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 - Moving (`move_note`, `move_list`): a note keeps its id and goes on top of the target's open
   notes (`ListTarget`: the open list, a list, a new one); done stays done, except into the Inbox.
   The book that takes is written first (`NotesStore::exchange`), so a failure leaves the notes in
-  both, never in neither. `unmove_note` and `unmove_list` undo. A move to a new project
-  (`BookTarget::NewProject`) makes it in the interface and removes it if the move fails.
-- Move dialog (`MoveDialog`, lazy, through `MoveHost`): Base UI's Autocomplete; its logic is pure
-  functions (`model/move-dialog.ts`, unit tested). The projects and the ranking (`rank_names`)
+  both, never in neither. `unmove_note` and `unmove_list` undo. The book moved to is a key, as
+  every command's.
+- Move dialog (`MoveDialog`, lazy, through `MoveHost`): the destination field (`DestinationField`
+  on Base UI's Autocomplete, `useDestination`), shared with the quick note; its logic is pure
+  functions (`model/destination.ts`, unit tested). The projects and the ranking (`rank_names`)
   come from the app through `MoveTargets`, so notes import neither projects nor search.
 - Limits and failures: a note at most 1 MiB (`note_too_long`); `note_missing`, `note_list_missing`;
   a broken file is skipped and logged, never removed; a change that changes nothing writes
@@ -86,3 +89,7 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 - Removing a project never leaves its notes on disk (2026-10-17).
 - Every book kept in memory once read (2026-10-24, the maintainer: memory over disk reads): about
   0.6 MB per 1,000 notes; no eviction and no index until a measure asks.
+- No project made from notes (2026-11-05, the maintainer; Move made one without folder since
+  2026-10-23): a project is made on purpose, from its card. Gone with it: a typo making a project,
+  and the project made then removed when its move failed. A new list stays: it is inside a
+  project that exists.

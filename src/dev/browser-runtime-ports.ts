@@ -440,15 +440,6 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
         checkBook: (book) => {
             if (book !== INBOX_BOOK) project(book);
         },
-        // as `ProjectList::add`: last, without folder, on screen only when none was
-        makeProject: (name) => {
-            const made: ProjectInfo = { id: newId(), name: name.trim(), folders: [] };
-            const active = list.active ?? made.id;
-            update({ ...list, projects: [...list.projects, made], active });
-            return made.id;
-        },
-        dropProject: removeProject,
-        projectsChanged: tellProjectsChanged,
     });
     // as the backend, the palette searches the notes of the project on screen, or at all projects
     // those of every book, the Inbox first

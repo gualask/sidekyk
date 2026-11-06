@@ -4,7 +4,7 @@ import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import { useCaptureMarks, useNoteActions, useNotes } from '../application/notes.queries';
-import type { MoveSubject } from '../model/move-dialog';
+import type { Moving } from '../model/destination';
 import { openNotes } from '../model/notes';
 import { INBOX_BOOK } from '../model/notes.types';
 import { CardRows } from './CardRows';
@@ -45,7 +45,7 @@ export function InboxColumn({
     const actions = useNoteActions(INBOX_BOOK);
     const { cardState, edit } = useCardStates(INBOX_BOOK);
     const { marks, end: endMarks } = useCaptureMarks();
-    const [moving, setMoving] = useState<MoveSubject | null>(null);
+    const [moving, setMoving] = useState<Moving | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
     const i18n = useTranslation();

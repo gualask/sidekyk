@@ -27,6 +27,10 @@ modules, so a canvas could be another layout later. Approved mock: `.local/mocks
   dropped: `Esc` to the cards is quicker, its counts went stale).
 - Long structured notes; a filter in Files; a dot on the tray for hidden changes (2026-10-14).
 - Comparing against the default branch or merge base (2026-10-14).
+- More references in a note's text (2026-11-05): a capture's markers (`A` is a word too, and the
+  letters are drawn in the image an agent reads), commit hashes (hex words, and only the recent
+  commits to open), `#list` (the quick note has a destination field instead), dates and reminders
+  (a task manager; a timer while idle).
 - Following the terminal (2026-10-16): no automatic switch to the project of the terminal used
   last. Every signal breaks on some axis: terminal APIs (an adapter per terminal, blind under tmux;
   built for one, dropped), agent hooks (not every agent), shell hooks (silent while the agent

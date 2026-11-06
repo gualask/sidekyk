@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useEffectEvent, useMemo } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import type { Move } from '../model/move-dialog';
+import type { Move } from '../model/destination';
 import { openNotes, positionAt, withNotes, withoutNote, withUpdated } from '../model/notes';
 import type {
     CaptureEvent,
@@ -285,9 +285,10 @@ export function useNoteActions(book: string) {
             place: (note: Note, list: string, index: number) => void place(note, list, index),
             /**
              * Moves a note to another book or list (the Move dialog); Undo puts it back in its
-             * book, list and place. The book it went to is read again when it shows.
+             * book, list and place. The book it went to is read again when it shows. `added`: a
+             * note just written into the Inbox for there (the quick note), as the toast says.
              */
-            moveNote: async (note: Note, { to, list, name }: Move) => {
+            moveNote: async (note: Note, { to, list, name }: Move, { added = false } = {}) => {
                 update((notes) => withoutNote(notes, note.id));
                 const moved = await send(t('notes.moveFailed'), () =>
                     port.moveNote(book, note.id, to, list),
@@ -296,7 +297,7 @@ export function useNoteActions(book: string) {
                 if (moved.to === book) update((notes) => withNotes(notes, [moved.note]));
                 forget(moved.to);
                 showToast({
-                    title: t('notes.moved', { name }),
+                    title: added ? t('notes.addedTo', { name }) : t('notes.moved', { name }),
                     action: {
                         label: t('notes.undo'),
                         run: () => {

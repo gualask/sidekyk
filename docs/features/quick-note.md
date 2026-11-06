@@ -1,8 +1,9 @@
 # Quick note
 
-A note for the Inbox written from any app: a global shortcut shrinks Sidekyk's window to a field,
-`↵` adds the note and the window goes back as it was (built 2026-11-04, macOS; Windows and Linux
-in `../../ROADMAP.md`). The Inbox: `notes.md`.
+A note written from any app, for the Inbox unless another place is chosen: a global shortcut
+shrinks Sidekyk's window to a field, `↵` adds the note and the window goes back as it was (built
+2026-11-04, macOS; Windows and Linux in `../../ROADMAP.md`; its destination 2026-11-05). The Inbox
+and the Move dialog: `notes.md`.
 
 ## Behaviour
 
@@ -10,15 +11,25 @@ in `../../ROADMAP.md`). The Inbox: `notes.md`.
   provisional; `background.md`) and the tray's New Note. Pressed again while the note is open,
   it closes it as `Esc`.
 - The window becomes the note: 560x168 pt, centered on the display under the pointer, a quarter
-  down, without its traffic lights. The field fills it (15 px); below it "Inbox" on the left and
-  the keys on the right (`↵` add, `⇧↵` new line, `Esc` close). The field keeps its height and
-  scrolls. In a window that cannot shrink (native full screen) the note is a 560 pt box in the
-  middle of the app's background, in Sidekyk's Space.
-- `↵` adds the note on top of the Inbox and closes. A paste into the empty field adds at once and
-  closes, as the Inbox's field does; images pasted or dropped after text wait below it as chips
-  until `↵`. `⌥Z` switches long lines as in any note field.
-- `Esc`, a click outside or the shortcut again close without adding; what was typed comes back
-  at the next note, for the session.
+  down, without its traffic lights. The field fills it (15 px); below it, on the left, where the
+  note goes, and the keys on the right (`↵` add, `⇧↵` new line, `Tab` where, `Esc` close). The
+  field keeps its height and scrolls. In a window that cannot shrink (native full screen) the
+  note is a 560 pt box in the middle of the app's background, in Sidekyk's Space.
+- Where it goes: the Move dialog's field (`notes.md`, Move), its chips starting as "Inbox". `Tab`
+  goes there (`⇧Tab` back); Backspace takes the last chip away, typing over "Inbox" or a list
+  chooses again, the suggestions open above it. A project becomes a chip, then one of its lists;
+  a project left without a list gets the one it opens on as its chip. A new list is offered as in
+  Move; no new project (`notes.md`, Decisions). `Esc` there puts the destination back as it was
+  and returns to the note.
+- In the destination `↵` on a suggestion chosen makes it a chip, as `Tab` (2026-11-05, the
+  maintainer: a choice is a choice, not the note sent); without one it adds the note, or with no
+  note written returns to it. `↵` in the note adds it and closes. A paste into the empty field
+  adds at once and closes, as the Inbox's field does; images pasted or dropped after text wait
+  below it as chips until `↵`. `⌥Z` switches long lines as in any note field.
+- The next note starts for the Inbox again. `Esc`, a click outside or the shortcut again close
+  without adding; what was typed and where it goes come back at the next note, for the session.
+  Closing ends a choice in progress, as leaving the field does (a field hidden with the focus
+  may never say it lost it).
 - Then the window goes back as it was: in front stays in front; on screen behind another app
   stays behind, and the app that was in front gets the focus back; hidden or minimized goes
   hidden (a minimized window is no longer in the Dock after a note).
@@ -31,7 +42,12 @@ in `../../ROADMAP.md`). The Inbox: `notes.md`.
 
 - One window, one WebView: the main window's own page switches between the note and the layout,
   kept mounted and hidden (`QuickNoteHost`, `notes/ui/QuickNote.tsx`). The note shares the Inbox
-  field's logic (`useNoteDraft`) and drops (`useColumnImages`).
+  field's logic (`useNoteDraft`) and drops (`useColumnImages`), and Move's destination field
+  (`DestinationField`, `useDestination`, `model/destination.ts`: subject `new`, `settled` when
+  the field is left).
+- A note goes into the Inbox, then where its chips say through the Inbox's `moveNote` with the
+  `Move` they make (`moveOf`): a list to make, the images and the toast with Undo are Move's,
+  the toast saying "Added to …". Undo and a failed move leave the note in the Inbox.
 - A hidden webview never paints, and a window shown before its page painted shows the frame
   before it. So the backend (`interfaces/tauri/quick_note.rs`) turns the window transparent
   (`NSWindow.alphaValue` 0), changes its frame and shows it, then tells the page (`quick-note`:
@@ -69,8 +85,13 @@ in `../../ROADMAP.md`). The Inbox: `notes.md`.
   the spot takes 250-320 ms and 200-300 MB, one kept ready ~90 MB (`capture.md`, Measures); the
   main one costs nothing more. Not the full window with the field focused: it would cover what
   the user was looking at.
-- Always the Inbox (2026-11-04, KISS): whatever comes to mind, sorted later; not the project last
-  on screen.
+- The Inbox unless chosen (2026-11-05, the maintainer; was always the Inbox, 2026-11-04): a note
+  whose place is known goes there without a later Move. Not the project last on screen. The
+  destination is a second field below the note, not chips inside it nor `#list` in its text:
+  writing comes first and the Inbox costs no key; the field is Move's own, one way to choose a
+  place everywhere.
+- Added to the Inbox, then moved (2026-11-05): no second path for new lists, images and
+  failures; the cost is one write more (about 5 ms).
 - The field alone, no header nor bordered box (2026-11-04, mock A over B, which repeated the
   Inbox's header in a box inside a box). Fixed height: notes are short, and a growing window
   resizes at each line. No capture icon: capture has its own shortcut.

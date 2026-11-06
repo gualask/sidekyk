@@ -27,7 +27,7 @@ export function FolderPicker({
     const input = useRef<HTMLInputElement>(null);
     const [query, setQuery] = useState('');
     const names = useMemo(() => project.folders.map(folderName), [project.folders]);
-    const order = useNameRanking(query, names);
+    const { order, pending } = useNameRanking(query, names);
     const folders = order ? order.map((index) => project.folders[index]) : project.folders;
     return (
         <PickerDialog
@@ -49,6 +49,7 @@ export function FolderPicker({
                 autoHighlight="always"
             >
                 <PickerField
+                    pending={pending}
                     ref={input}
                     aria-label={t('projects.pickFilter')}
                     placeholder={t('projects.pickFilter')}

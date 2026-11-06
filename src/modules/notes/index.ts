@@ -14,7 +14,6 @@ export {
     sourceImage,
 } from './model/notes';
 export {
-    type BookTarget,
     type CaptureEvent,
     type DeletedList,
     type ImageTarget,

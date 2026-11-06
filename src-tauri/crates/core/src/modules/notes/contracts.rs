@@ -27,15 +27,6 @@ impl Book {
     }
 }
 
-/// Where a move puts its notes, as the frontend names it: a book, or a project made for them,
-/// without folder.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase", tag = "kind")]
-pub enum BookTarget {
-    Book { book: String },
-    NewProject { name: String },
-}
-
 /// The list of its book a moved note goes to.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
@@ -252,8 +243,7 @@ pub struct DeletedList {
     pub notes: Vec<Note>,
 }
 
-/// A note moved, as it is now, and the book it went to: one a project was made for has an id the
-/// frontend did not know.
+/// A note moved, as it is now, and the book it went to.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MovedNote {
@@ -393,20 +383,7 @@ mod tests {
     }
 
     #[test]
-    fn move_targets_read_as_the_frontend_sends_them() {
-        let target = |json| serde_json::from_value::<BookTarget>(json).unwrap();
-        assert_eq!(
-            target(serde_json::json!({ "kind": "book", "book": "inbox" })),
-            BookTarget::Book {
-                book: INBOX_BOOK.into()
-            }
-        );
-        assert_eq!(
-            target(serde_json::json!({ "kind": "newProject", "name": "Casa" })),
-            BookTarget::NewProject {
-                name: "Casa".into()
-            }
-        );
+    fn list_targets_read_as_the_frontend_sends_them() {
         let list = |json| serde_json::from_value::<ListTarget>(json).unwrap();
         assert_eq!(
             list(serde_json::json!({ "kind": "open" })),

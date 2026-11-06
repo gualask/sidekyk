@@ -42,8 +42,11 @@ The palette is the only search; panels have no filter.
 - Level 0 in the frontend: `paletteRows` names books by `PaletteBook`; `openNotes(book, list,
   note)` sends an Inbox note to `InboxColumn` (`reveal`), or enters the project with a request to
   its Notes, which waits until that panel mounts (`../architecture.md`, Panel requests).
-- `rank_names` (2026-10-23): plain names ranked as the palette's projects, for the Move dialog
-  (`notes.md`).
+- `rank_names` (2026-10-23): plain names ranked as the palette's projects, for the Move dialog,
+  the quick note's destination (`notes.md`) and the folder dialog. `useRanking` keeps the previous
+  ranking while the next comes (the list does not jump), names compared by content; until the
+  ranking of what is typed comes (`pending`), `↵` in the picker does nothing (`PickerField`), so
+  it never acts on rows about to change (2026-11-05).
 - `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
   `open_file` (no links, no git), up to 8 threads, binary skipped at the first NUL, UTF-16 by BOM,
   the first 2 MiB per file. Literal, smart case, 2 characters at least, 2,000 lines at most, long

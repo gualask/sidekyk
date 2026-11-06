@@ -1,6 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
-    BookTarget,
     CaptureEvent,
     DeletedList,
     ImageTarget,
@@ -51,11 +50,11 @@ export interface NotesPort {
      * Moves a note to another book, or another list of its own, keeping its id: on top of the
      * list's open notes; done stays done, but in the Inbox.
      */
-    moveNote(from: string, id: string, to: BookTarget, list: ListTarget): Promise<MovedNote>;
+    moveNote(from: string, id: string, to: string, list: ListTarget): Promise<MovedNote>;
     /** Puts a moved note back in `home` as `original` was, and takes it out of `at` (undo). */
     unmoveNote(at: string, original: Note, home: string): Promise<Note>;
     /** Moves a list with its notes to another project: into its list of the same name, else last. */
-    moveList(from: string, list: string, to: BookTarget): Promise<MovedList>;
+    moveList(from: string, list: string, to: string): Promise<MovedList>;
     /** Brings a moved list back where it was, with its notes (undo). */
     unmoveList(moved: MovedList): Promise<void>;
     /** A new list, last, and open. */

@@ -85,5 +85,4 @@ hashes): `../../ROADMAP.md`, Notes.
   and a diff hides most of it.
 - Suggestions from the folder on screen, its paths relative to it (2026-11-05): what the agent
   working there reads.
-- No way yet to say "not a reference": a tint does nothing until clicked; decided once tried
-  (`../../.cflow/plans/notes-entities.md`).
+- No way yet to say "not a reference": a tint does nothing until clicked; decided once tried.

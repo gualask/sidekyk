@@ -9,9 +9,6 @@
  */
 export const INBOX_BOOK = 'inbox';
 
-/** Where a move puts its notes: a book, or a project made for them, without folder. */
-export type BookTarget = { kind: 'book'; book: string } | { kind: 'newProject'; name: string };
-
 /** The list of its book a moved note goes to: the open one (the Inbox's only one), or a new one. */
 export type ListTarget =
     | { kind: 'open' }
@@ -109,7 +106,7 @@ export interface DeletedList {
     notes: Note[];
 }
 
-/** A note moved, as it is now, and the book it went to (a project made for it included). */
+/** A note moved, as it is now, and the book it went to. */
 export interface MovedNote {
     to: string;
     note: Note;

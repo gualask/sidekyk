@@ -1,6 +1,5 @@
 import {
     addFiles,
-    type BookTarget,
     type CaptureEvent,
     type DeletedList,
     type ImageDrop,
@@ -244,23 +243,14 @@ function largeBook(): Book {
  * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
  * each book starts as `initial` says (the scenario's project with the mock's notes, the Inbox with
  * a few in `review` and `clean`, the project without folder with its topic's, any other book with
- * none). `checkBook`
- * refuses a book the backend would not know. A move to a new project makes it with `makeProject`
- * (its id back), takes it away with `dropProject` when the move fails, and says the projects
- * changed (`projectsChanged`) when it is done.
+ * none). `checkBook` refuses a book the backend would not know.
  */
 export function fixtureNotes({
     initial,
     checkBook,
-    makeProject,
-    dropProject,
-    projectsChanged,
 }: {
     initial: (book: string) => 'review' | 'large' | 'inbox' | 'topic' | 'empty';
     checkBook: (book: string) => void;
-    makeProject: (name: string) => string;
-    dropProject: (id: string) => void;
-    projectsChanged: () => void;
 }): NotesPort & {
     peek: (book: string) => ProjectNotes;
     drop: (book: string) => void;
@@ -324,19 +314,6 @@ export function fixtureNotes({
         const added = { id: newId(), name: target.name.trim() };
         b.lists.push(added);
         return added.id;
-    };
-    /** Runs a move into the book `to` names; a project made for it goes when the move fails. */
-    const into = <T>(to: BookTarget, run: (key: string) => T): T => {
-        if (to.kind === 'book') return run(to.book);
-        const made = makeProject(to.name);
-        try {
-            const moved = run(made);
-            projectsChanged();
-            return moved;
-        } catch (error) {
-            dropProject(made);
-            throw error;
-        }
     };
     /** Takes a book's list out with its notes; the last list stays. */
     const takeList = (b: Book, id: string): DeletedList => {
@@ -453,24 +430,23 @@ export function fixtureNotes({
             note(b, id);
             takeOut(b, id);
         },
-        moveNote: async (from, id, to, target) =>
-            into(to, (key) => {
-                const inbox = key === INBOX_BOOK;
-                if (inbox && target.kind !== 'open') throw failure('unknown');
-                const source = book(from);
-                const dest = book(key);
-                const moved = note(source, id);
-                const listId = targetList(dest, target);
-                const placed: Note = {
-                    ...moved,
-                    list: listId,
-                    position: positionAt(openNotes(dest.notes, listId), id, 0),
-                    done: inbox ? null : moved.done,
-                };
-                takeOut(source, id);
-                replace(dest, placed);
-                return { to: key, note: { ...placed } };
-            }),
+        moveNote: async (from, id, key, target) => {
+            const inbox = key === INBOX_BOOK;
+            if (inbox && target.kind !== 'open') throw failure('unknown');
+            const source = book(from);
+            const dest = book(key);
+            const moved = note(source, id);
+            const listId = targetList(dest, target);
+            const placed: Note = {
+                ...moved,
+                list: listId,
+                position: positionAt(openNotes(dest.notes, listId), id, 0),
+                done: inbox ? null : moved.done,
+            };
+            takeOut(source, id);
+            replace(dest, placed);
+            return { to: key, note: { ...placed } };
+        },
         unmoveNote: async (at, original, home) => {
             const back = book(home);
             list(back, original.list);
@@ -478,31 +454,30 @@ export function fixtureNotes({
             replace(back, original);
             return { ...original };
         },
-        moveList: async (from, listId, to) =>
-            into(to, (key) => {
-                const source = projectBook(from);
-                const dest = projectBook(key);
-                const left = takeList(source, listId);
-                const name = left.list.name.toLowerCase();
-                const same = dest.lists.find((l) => l.name.toLowerCase() === name);
-                const taker = same ?? { id: newId(), name: left.list.name };
-                if (!same) dest.lists.push(taker);
-                let bottom = openNotes(dest.notes, taker.id).at(-1)?.position ?? -1;
-                const notes = [...left.notes].sort((a, b) => a.position - b.position);
-                for (const moved of notes) {
-                    if (moved.done === null) bottom += 1;
-                    const position = moved.done === null ? bottom : moved.position;
-                    replace(dest, { ...moved, list: taker.id, position });
-                }
-                const result: MovedList = {
-                    from,
-                    to: key,
-                    left,
-                    into: taker.id,
-                    joined: same !== undefined,
-                };
-                return result;
-            }),
+        moveList: async (from, listId, key) => {
+            const source = projectBook(from);
+            const dest = projectBook(key);
+            const left = takeList(source, listId);
+            const name = left.list.name.toLowerCase();
+            const same = dest.lists.find((l) => l.name.toLowerCase() === name);
+            const taker = same ?? { id: newId(), name: left.list.name };
+            if (!same) dest.lists.push(taker);
+            let bottom = openNotes(dest.notes, taker.id).at(-1)?.position ?? -1;
+            const notes = [...left.notes].sort((a, b) => a.position - b.position);
+            for (const moved of notes) {
+                if (moved.done === null) bottom += 1;
+                const position = moved.done === null ? bottom : moved.position;
+                replace(dest, { ...moved, list: taker.id, position });
+            }
+            const result: MovedList = {
+                from,
+                to: key,
+                left,
+                into: taker.id,
+                joined: same !== undefined,
+            };
+            return result;
+        },
         unmoveList: async (moved) => {
             const source = projectBook(moved.from);
             const dest = projectBook(moved.to);

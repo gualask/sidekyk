@@ -81,6 +81,10 @@ export function useNoteDraft({
 
     return {
         pending,
+        /** Whether there is a note to add: text, or images waiting. */
+        written: text.trim() !== '' || pending.length > 0,
+        /** Adds the note as `↵` in the field does, from elsewhere (the quick note's destination). */
+        submit: () => void add(text, pending),
         /** Puts a text in the field, as typing would: a suggestion picked. */
         setText,
         /** Leaves images waiting out of the note. */

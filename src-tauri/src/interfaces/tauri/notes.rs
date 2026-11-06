@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
@@ -15,13 +15,11 @@ use crate::infrastructure::notes_files::{
 };
 use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
 use sidekyk_core::modules::notes::{
-    as_png, image_file, prepare, to_markdown, Book, BookTarget, DeletedList, ImageTarget,
-    ListTarget, Mark, MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes,
-    EXPORT_IMAGES, INBOX_BOOK, MAX_IMAGE_BYTES,
+    as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
+    MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes, EXPORT_IMAGES,
+    INBOX_BOOK, MAX_IMAGE_BYTES,
 };
-use sidekyk_core::modules::projects::{
-    Location, Project, ProjectsChangedEvent, PROJECTS_CHANGED_EVENT,
-};
+use sidekyk_core::modules::projects::{Location, Project};
 use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
 use sidekyk_core::shared::sync::lock;
 use sidekyk_core::shared::url::percent_decoded;
@@ -65,51 +63,6 @@ pub(super) async fn with_notes<T: Send + 'static>(
         work(store, files, &book_of(app, &book)?)
     })
     .await
-}
-
-/// Runs a move into the book `to` names. A project made for it, without folder, goes again when
-/// the move fails, with what was written for it; when the move is done the frontend is told the
-/// list changed.
-fn into_target<T>(
-    app: &tauri::AppHandle,
-    store: &NotesStore,
-    files: &NotesFiles,
-    to: BookTarget,
-    run: impl FnOnce(&Book) -> anyhow::Result<T>,
-) -> anyhow::Result<T> {
-    let name = match to {
-        BookTarget::Book { book } => return run(&book_of(app, &book)?),
-        BookTarget::NewProject { name } => name,
-    };
-    let projects = app.state::<ProjectsState>();
-    let moved = into_new_project(
-        || {
-            let (project, _) = projects.update_with(app, |list| list.add(&name, Vec::new()))?;
-            Ok(project_book(&project))
-        },
-        run,
-        |book| {
-            store.delete_book(files, book)?;
-            projects.update(app, |list| list.remove(book.key()))?;
-            Ok(())
-        },
-    )?;
-    let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
-    Ok(moved)
-}
-
-/// Runs `run` into a book `make` makes for it; `unmake` takes the book away when `run` fails.
-fn into_new_project<T>(
-    make: impl FnOnce() -> anyhow::Result<Book>,
-    run: impl FnOnce(&Book) -> anyhow::Result<T>,
-    unmake: impl FnOnce(&Book) -> anyhow::Result<()>,
-) -> anyhow::Result<T> {
-    let book = make()?;
-    run(&book).inspect_err(|_| {
-        if let Err(error) = unmake(&book) {
-            tracing::warn!(error = %format!("{error:#}"), "a project made for a move stays");
-        }
-    })
 }
 
 #[tauri::command]
@@ -423,20 +376,17 @@ pub(crate) async fn delete_note(
 }
 
 #[tauri::command]
-/// Moves a note to another book, or another list of its own, keeping its id; `to` may be a
-/// project made for it.
+/// Moves a note to another book, or another list of its own, keeping its id.
 pub(crate) async fn move_note(
     app: tauri::AppHandle,
     from: String,
     id: String,
-    to: BookTarget,
+    to: String,
     list: ListTarget,
 ) -> Result<MovedNote, AppError> {
     with_store("move_note", app, move |app, store, files| {
-        let from = book_of(app, &from)?;
-        into_target(app, store, files, to, |to| {
-            store.move_note(files, &from, &id, to, list)
-        })
+        let (from, to) = (book_of(app, &from)?, book_of(app, &to)?);
+        store.move_note(files, &from, &id, &to, list)
     })
     .await
 }
@@ -457,19 +407,16 @@ pub(crate) async fn unmove_note(
 }
 
 #[tauri::command]
-/// Moves a list with its notes to another project, which may be made for it; what comes back
-/// undoes it.
+/// Moves a list with its notes to another project; what comes back undoes it.
 pub(crate) async fn move_list(
     app: tauri::AppHandle,
     from: String,
     list: String,
-    to: BookTarget,
+    to: String,
 ) -> Result<MovedList, AppError> {
     with_store("move_list", app, move |app, store, files| {
-        let from = book_of(app, &from)?;
-        into_target(app, store, files, to, |to| {
-            store.move_list(files, &from, &list, to)
-        })
+        let (from, to) = (book_of(app, &from)?, book_of(app, &to)?);
+        store.move_list(files, &from, &list, &to)
     })
     .await
 }
@@ -638,8 +585,6 @@ pub(crate) async fn export_notes(
 
 #[cfg(test)]
 mod tests {
-    use std::cell::Cell;
-
     use super::*;
 
     #[test]
@@ -663,29 +608,6 @@ mod tests {
         assert!(marking(b"{}").is_err());
     }
 
-    fn casa() -> anyhow::Result<Book> {
-        Ok(Book::Project {
-            id: "0123456789abcdef".into(),
-            name: "Casa".into(),
-        })
-    }
-
-    #[test]
-    fn a_project_made_for_a_move_goes_when_the_move_fails() {
-        let unmade = Cell::new(false);
-        let failed = into_new_project(
-            casa,
-            |_| anyhow::bail!("disk full") as anyhow::Result<()>,
-            |book| {
-                assert_eq!(book.key(), "0123456789abcdef");
-                unmade.set(true);
-                Ok(())
-            },
-        );
-        assert!(failed.is_err());
-        assert!(unmade.get());
-    }
-
     #[test]
     fn a_copy_is_the_text_then_a_line_per_image() {
         let images = ["/n/a.png".to_string(), "/n/b.jpg".to_string()];
@@ -707,15 +629,5 @@ mod tests {
             "/mnt/c/Users/me/AppData/notes/shop-3f9a2c/00112233445566ff.png"
         );
         assert!(under_linux_root("/mnt/c", root, Path::new("/elsewhere/a.png")).is_err());
-    }
-
-    #[test]
-    fn a_project_made_for_a_move_stays_when_it_is_done() {
-        let moved = into_new_project(
-            casa,
-            |book| Ok(book.key().to_string()),
-            |_| unreachable!("the move was done"),
-        );
-        assert_eq!(moved.unwrap(), "0123456789abcdef");
     }
 }

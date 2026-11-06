@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import type { NoteActions } from '../application/notes.queries';
-import type { MoveSubject } from '../model/move-dialog';
+import type { Moving } from '../model/destination';
 
 const MoveDialog = lazy(() =>
     import('./MoveDialog').then((module) => ({ default: module.MoveDialog })),
@@ -12,7 +12,7 @@ export function MoveHost({
     actions,
     onClose,
 }: {
-    moving: MoveSubject | null;
+    moving: Moving | null;
     actions: NoteActions;
     onClose: () => void;
 }) {

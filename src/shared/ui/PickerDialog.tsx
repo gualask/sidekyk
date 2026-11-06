@@ -58,23 +58,40 @@ export function PickerDialog({
 }
 
 /**
- * A picker's field, in an Autocomplete under the title: a box holding what comes `before` the
- * text (a chip), then the text.
+ * A picker's field, in an Autocomplete: a box holding what comes `before` the text (chips), then
+ * the text. The box is what a popup of suggestions is placed by. Under a dialog's title by
+ * default; `place` sets its margins elsewhere. While `pending` (the suggestions do not answer
+ * what is typed yet: `useRanking`) `↵` does nothing, so it never acts on a list about to change.
  */
 export function PickerField({
     before = null,
+    place = 'mx-4 mt-3 mb-2',
+    pending = false,
+    onKeyDown,
     ...input
-}: { before?: ReactNode } & ComponentProps<typeof Autocomplete.Input>) {
+}: { before?: ReactNode; place?: string; pending?: boolean } & ComponentProps<
+    typeof Autocomplete.Input
+>) {
     return (
-        <div className="mx-4 mt-3 mb-2 flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface-subtle px-2 focus-within:border-ui-accent">
+        <Autocomplete.InputGroup
+            className={`${place} flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface-subtle px-2 focus-within:border-ui-accent`}
+        >
             {before}
             <Autocomplete.Input
                 spellCheck={false}
                 autoComplete="off"
                 className="h-9 min-w-0 flex-1 border-0 bg-transparent text-[13.5px] text-ui-text outline-none placeholder:text-ui-text-muted"
                 {...input}
+                onKeyDown={(event) => {
+                    if (pending && event.key === 'Enter') {
+                        event.preventDefault();
+                        event.preventBaseUIHandler();
+                        return;
+                    }
+                    onKeyDown?.(event);
+                }}
             />
-        </div>
+        </Autocomplete.InputGroup>
     );
 }
 
