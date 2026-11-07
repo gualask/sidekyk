@@ -41,11 +41,11 @@ The UI in English and Italian: the frontend's text, and what the backend writes 
 
 ## Decisions
 
-- Own code over a library (2026-10-20). Compared on npm that day: i18next 26.5 (13.5 kB gzip; its
+- Own code over a library. Compared on npm that day: i18next 26.5 (13.5 kB gzip; its
   CLI for unused keys 86 dependencies, 16 MB), Lingui 6.10 (macros need Babel in the Vite 8 build,
   107 dependencies), react-intl 12.1, Paraglide 2.29 (215 MB of dependencies), Fluent
   (`@fluent/react` last released 2023-08). For two languages and ~330 strings none adds what we
   need; the check gives unused-key safety. Pattern from Fyler, English as source.
-- `navigator.languages` over a Rust locale crate (2026-10-20): WKWebView reports the system's
+- `navigator.languages` over a Rust locale crate: WKWebView reports the system's
   languages inside an `.app` with or without `CFBundleLocalizations` (a Swift harness). WebKitGTK
   and WebView2: to try (`ROADMAP.md`).

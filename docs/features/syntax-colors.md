@@ -7,8 +7,8 @@ Both sides of a diff, and any file shown, colored from their whole versions.
 - One Dark / One Light (Zed's `one.json`, from Atom's One, MIT) as `--ui-syntax-*` tokens. Unknown
   files stay in the text's color, as in Zed and VS Code.
 - A Markdown file's fenced code takes its language's tones (two-face's grammar embeds them), its
-  plain words the text's color (`markup.raw.code-fence`, not a string's `markup.raw`;
-  2026-10-25), in the code and in the preview's code blocks (`previews.md`).
+  plain words the text's color (`markup.raw.code-fence`, not a string's `markup.raw`), in the
+  code and in the preview's code blocks (`previews.md`).
 - Limits: 1 MiB per version ("No colors" in the header); lines past 4,000 bytes keep the text's
   color (a minified line: 4,000 B 29 ms, 32,000 B 1.9 s); coloring stops after 2 s.
 
@@ -36,7 +36,7 @@ Both sides of a diff, and any file shown, colored from their whole versions.
 - Measured: Zed's largest source file (885 KiB, 23,205 lines) 0.64 s, a kept block 0.4 ms, one line
   edited 8-9 ms.
 
-## Decisions (2026-10-18)
+## Decisions
 
 - `syntect` 5.3 (oniguruma) with `two-face` (bat's ~220 grammars), one engine for every language.
   Tree-sitter is 4-10x faster (Zed's `editor.rs`, 13,291 lines: 74 vs 344 ms) but a grammar crate

@@ -1,7 +1,7 @@
 # Note references
 
 Files of the project and web addresses in a note's text, recognized as it is typed; `@` suggests
-the files (built 2026-11-05). Notes: `notes.md`. Left (a capture's markers, `#list`, commit
+the files. Notes: `notes.md`. Left (a capture's markers, `#list`, commit
 hashes): `../../ROADMAP.md`, Notes.
 
 ## Behaviour
@@ -24,7 +24,7 @@ hashes): `../../ROADMAP.md`, Notes.
 - A card shows them in the accent's color, underlined under the pointer, the tooltip saying where
   each leads. A click opens it; a click elsewhere edits the note. While editing they are tinted;
   `⌘`-click (Ctrl elsewhere) opens one, `⌥↵` (Alt+Enter) the one at the caret, from the keyboard
-  (2026-11-05; in the Shortcuts help).
+  (in the Shortcuts help).
 - `@` and a letter list the folder's files ranked as the palette ranks them, at most 8, under the
   `@` (above it where there is no room): the name, its folder muted, the letters typed in bold.
   `↑`/`↓` move, `↵` or `Tab` put `@path ` in place of what was typed, a click picks, `Esc` closes
@@ -76,13 +76,13 @@ hashes): `../../ROADMAP.md`, Notes.
 
 ## Decisions
 
-- References stay in the text, `@` included (2026-11-05): a note pasted into an agent's prompt
+- References stay in the text, `@` included: a note pasted into an agent's prompt
   names the files as the agent reads them.
-- A file gone is not shown dimmed (2026-11-05): that would check every reference of every card
+- A file gone is not shown dimmed: that would check every reference of every card
   shown, again at every change. It is checked on a click; the maintainer asked for no tracking
   of moves, only no failure.
-- Files full screen, not Changes (2026-11-05): the lines a note names are the file's as it is now,
+- Files full screen, not Changes: the lines a note names are the file's as it is now,
   and a diff hides most of it.
-- Suggestions from the folder on screen, its paths relative to it (2026-11-05): what the agent
+- Suggestions from the folder on screen, its paths relative to it: what the agent
   working there reads.
 - No way yet to say "not a reference": a tint does nothing until clicked; decided once tried.

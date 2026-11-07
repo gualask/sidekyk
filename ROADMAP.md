@@ -68,7 +68,7 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 
 - [ ] Signed builds and self-update (as in Fyler; `.cflow/plans/release.md`), built by a release
       workflow on a `v*` tag that runs `ci.yml` first; update check at startup or on demand only.
-      macOS: one universal `.dmg` (`--target universal-apple-darwin`; 2026-10-29: Intel Macs too,
+      macOS: one universal `.dmg` (`--target universal-apple-darwin`: Intel Macs too,
       which stop at macOS 26, at no runtime cost, since only the native slice loads)
 - [ ] Verify on the packaged app and other systems:
   - macOS, capture (`docs/features/capture.md`): over a full screen app and on another Space,
@@ -110,7 +110,7 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 ## Performance review
 
 No measuring code in the app: a question below is measured with a temporary setup when it
-becomes a problem (decided 2026-10-21).
+becomes a problem.
 
 - [ ] Hidden window: keep the WebView (instant show) or destroy it (memory)
 - [ ] Prefetch neighbouring diffs, if switching shows a wait

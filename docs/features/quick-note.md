@@ -1,8 +1,8 @@
 # Quick note
 
 A note written from any app, for the Inbox unless another place is chosen: a global shortcut
-shrinks Sidekyk's window to a field, `↵` adds the note and the window goes back as it was (built
-2026-11-04, macOS; Windows and Linux in `../../ROADMAP.md`; its destination 2026-11-05). The Inbox
+shrinks Sidekyk's window to a field, `↵` adds the note and the window goes back as it was (macOS;
+Windows and Linux in `../../ROADMAP.md`). The Inbox
 and the Move dialog: `notes.md`.
 
 ## Behaviour
@@ -21,8 +21,8 @@ and the Move dialog: `notes.md`.
   a project left without a list gets the one it opens on as its chip. A new list is offered as in
   Move; no new project (`notes.md`, Decisions). `Esc` there puts the destination back as it was
   and returns to the note.
-- In the destination `↵` on a suggestion chosen makes it a chip, as `Tab` (2026-11-05, the
-  maintainer: a choice is a choice, not the note sent); without one it adds the note, or with no
+- In the destination `↵` on a suggestion chosen makes it a chip, as `Tab` (the maintainer:
+  a choice is a choice, not the note sent); without one it adds the note, or with no
   note written returns to it. `↵` in the note adds it and closes. A paste into the empty field
   adds at once and closes, as the Inbox's field does; images pasted or dropped after text wait
   below it as chips until `↵`. `⌥Z` switches long lines as in any note field.
@@ -60,7 +60,7 @@ and the Move dialog: `notes.md`.
   that app is activated again (`NSRunningApplication`); hidden: `NSApp.hide`.
 - A page loaded again (a crashed webview) forgets the note: frame back, opaque (`forget`), so the
   window never stays unseen.
-- A page that never says it painted (2026-11-05: broken, its crash notice showing, or hung)
+- A page that never says it painted (broken, its crash notice showing, or hung)
   leaves the window opaque 1.5 s after the note opened or closed (`PAINT_DEADLINE`, its own
   thread for that moment only): the page answers in 35-600 ms, and a window on screen and unseen
   could not even show the crash notice's Reload. Each open or close has its own deadline, which
@@ -81,22 +81,22 @@ and the Move dialog: `notes.md`.
 
 ## Decisions
 
-- The main window's WebView, not a second window (2026-11-04, the maintainer): a WebView made on
+- The main window's WebView, not a second window (the maintainer): a WebView made on
   the spot takes 250-320 ms and 200-300 MB, one kept ready ~90 MB (`capture.md`, Measures); the
   main one costs nothing more. Not the full window with the field focused: it would cover what
   the user was looking at.
-- The Inbox unless chosen (2026-11-05, the maintainer; was always the Inbox, 2026-11-04): a note
+- The Inbox unless chosen (the maintainer): a note
   whose place is known goes there without a later Move. Not the project last on screen. The
   destination is a second field below the note, not chips inside it nor `#list` in its text:
   writing comes first and the Inbox costs no key; the field is Move's own, one way to choose a
   place everywhere.
-- Added to the Inbox, then moved (2026-11-05): no second path for new lists, images and
+- Added to the Inbox, then moved: no second path for new lists, images and
   failures; the cost is one write more (about 5 ms).
-- The field alone, no header nor bordered box (2026-11-04, mock A over B, which repeated the
-  Inbox's header in a box inside a box). Fixed height: notes are short, and a growing window
+- The field alone, no header nor bordered box: a header would repeat the Inbox's, a box
+  inside a box. Fixed height: notes are short, and a growing window
   resizes at each line. No capture icon: capture has its own shortcut.
 - The draft kept on `Esc` and a click outside: a click by mistake loses nothing.
-- Minimized: the system's animation accepted (2026-11-04): only the first note after a manual
+- Minimized: the system's animation accepted: only the first note after a manual
   minimize, no public API skips it.
-- Native full screen: the box centered in Sidekyk's Space (2026-11-04), over leaving full screen
+- Native full screen: the box centered in Sidekyk's Space, over leaving full screen
   (about a second each way) or showing the full window (moves the user off their project).

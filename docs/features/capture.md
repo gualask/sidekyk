@@ -27,7 +27,7 @@ An area of the screen captured from any app becomes a new note, its marks open a
 - Then Sidekyk shows: the crop is a new note on top of the open list of the project last on
   screen, hidden or not, or of the Inbox when none was open. Its marks open, the editor naming
   where it went ("In shop"). Done keeps it, marked or not, and opens the note for its text;
-  Cancel or `Esc` discards the capture: the note goes, with Undo (2026-11-01, the maintainer).
+  Cancel or `Esc` discards the capture: the note goes, with Undo (the maintainer).
 - Without the Screen Recording permission, nothing freezes: macOS asks once, and the app's toast
   says capture needs it, with "Open Settings" (Privacy & Security › Screen Recording). macOS
   adds Sidekyk to that list by itself. A failure is a toast too.
@@ -73,7 +73,7 @@ An area of the screen captured from any app becomes a new note, its marks open a
 
 ## Decisions
 
-- Our own overlay, native per system (2026-11-01, the maintainer: one UX on every system, felt
+- Our own overlay, native per system (the maintainer: one UX on every system, felt
   native, no system shortcut to remember; KISS, more on felt need). Not the system's tool: each
   differs, Windows' new protocol answers packaged (MSIX) apps only and none yet, the old one is
   deprecated and leaves the snip on the clipboard, KDE's portal has no region, GNOME's
@@ -83,17 +83,17 @@ An area of the screen captured from any app becomes a new note, its marks open a
   obsoletes, and pulls dozens of crates on Linux. One direct path per system; only
   `objc2-screen-capture-kit` is new, the rest is in the tree through Tauri.
 - macOS 14 at least (`bundle.macOS.minimumSystemVersion`): `SCScreenshotManager`.
-- A capture always makes a new note (2026-11-01); paste and drop add to one.
-- It lands in the project last on screen, hidden or not (2026-11-01): an agent's bug captured
+- A capture always makes a new note; paste and drop add to one.
+- It lands in the project last on screen, hidden or not: an agent's bug captured
   in the browser belongs to its project.
-- The capture shortcut on by default, as the window's (2026-11-01).
-- An area adjusted, then confirmed, and remembered (2026-11-01, the maintainer, replacing "the
-  release captures"): one step more per capture, but a precise area, and the same spot again,
-  as an agent fixes what was captured, is one key. Remembered for the session only, until a
+- The capture shortcut on by default, as the window's.
+- An area adjusted, then confirmed, and remembered (the maintainer), not captured on release:
+  one step more per capture, but a precise area, and the same spot again, as an agent fixes what
+  was captured, is one key. Remembered for the session only, until a
   need for more.
-- Sidekyk always left out of the frame (2026-11-01, the maintainer): a capture is nearly always
+- Sidekyk always left out of the frame (the maintainer): a capture is nearly always
   of something else, and started from Sidekyk its window would cover it. Sidekyk's own UI: the
   system's screenshot to the clipboard (`⌃⇧⌘4`) pasted into a note. No setting for it.
-- No Move in the marks editor (2026-11-01, KISS): it names where the note went, and after Done
+- No Move in the marks editor (KISS): it names where the note went, and after Done
   the note is open with Move… in its ⋯; a move meanwhile would leave the editor saving to the
   old place.

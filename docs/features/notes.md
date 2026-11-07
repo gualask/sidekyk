@@ -1,6 +1,6 @@
 # Notes
 
-Cards in lists, per project and in the Inbox, stored in the app's data (built 2026-10-17). Images
+Cards in lists, per project and in the Inbox, stored in the app's data. Images
 in notes: `note-images.md`; files and addresses in their text: `note-references.md`. Sync:
 `../../.cflow/plans/notes-sync.md`.
 
@@ -25,12 +25,12 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   a typed position for long jumps; `⌥↑`/`⌥↓`). Done cards stay by when done.
 - Export a project's notes to Markdown from the panel's ⋯, never inside a repository. Removing a
   project with notes asks: export then remove, or delete; nothing stays on disk.
-- Inbox (2026-10-23): whatever comes to mind, to sort later; a column at level 0 left of the
+- Inbox: whatever comes to mind, to sort later; a column at level 0 left of the
   projects. Not a project: no row, level 1, folder, removal or rename. The field on top
   (`⌘N` at level 0), newest first. Its notes are edited, copied, moved or deleted; no lists, done
   or order.
   From any app: the quick note (`quick-note.md`).
-- Move (2026-10-23): one dialog from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). A note
+- Move: one dialog from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). A note
   goes between the Inbox and projects, or to another list; a list to another project, whole, into
   its list of the same name if any. Suggestions are the books ranked as the palette ranks names (a
   name two books share shows its folder); `Tab` makes the one chosen a chip, whose lists come
@@ -46,7 +46,7 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 
 ## How it is built
 
-- Books (2026-10-23): the notes of a project or of the Inbox. On the wire a string, the project's
+- Books: the notes of a project or of the Inbox. On the wire a string, the project's
   id or `inbox` (`INBOX_BOOK`, never a project id), made a `Book` (`Inbox | Project { id, name }`)
   in the interface. The Inbox has one list, never shown; the store refuses on it what only
   projects have (lists, done, order): programming errors, not user-facing codes.
@@ -88,15 +88,15 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   again, and before a removal, never from an earlier count.
 - Measured (release, ~470-character notes): 1,000 notes read 26 ms, a change 5 ms (mostly
   `sync_all`); every book kept (2026-10-24, 1,000 / 9,000 / 30,000 notes): 0.65 / 6.2 / 18.6 MB,
-  every book read (once a session: the palette's first search at all projects) 23 / 280 / 1,030 ms, a project switch 0.01-0.05 ms (was 2.2-11.3 ms).
+  every book read (once a session: the palette's first search at all projects) 23 / 280 /
+  1,030 ms, a project switch 0.01-0.05 ms (2.2-11.3 ms reading the book from disk).
 
 ## Decisions
 
-- One file per note (2026-10-17): a change writes one file, a sync conflict is one note.
-- Removing a project never leaves its notes on disk (2026-10-17).
-- Every book kept in memory once read (2026-10-24, the maintainer: memory over disk reads): about
+- One file per note: a change writes one file, a sync conflict is one note.
+- Removing a project never leaves its notes on disk.
+- Every book kept in memory once read (the maintainer: memory over disk reads): about
   0.6 MB per 1,000 notes; no eviction and no index until a measure asks.
-- No project made from notes (2026-11-05, the maintainer; Move made one without folder since
-  2026-10-23): a project is made on purpose, from its own flow. Gone with it: a typo making a project,
-  and the project made then removed when its move failed. A new list stays: it is inside a
-  project that exists.
+- No project made from notes (the maintainer): a project is made on purpose, from its own
+  flow; a typo never makes one, nor a failed move leaves one to remove. A new list is made: it is
+  inside a project that exists.

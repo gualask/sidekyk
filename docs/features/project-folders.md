@@ -5,11 +5,11 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
 
 ## Behaviour
 
-- One on screen (2026-11-02): Changes and Files show the folder on screen; Notes the project's.
+- One on screen: Changes and Files show the folder on screen; Notes the project's.
   With several, the breadcrumb gains a step, `All projects / Shop / api ▾`: its menu lists the
   folders, each with its branch and changes (read when it opens, never starting a stopped WSL
   distro), the one on screen checked; a pick shows it at the same zoom; "Edit folders…" last.
-- Entering a project of several folders asks which (2026-11-03): its row (click, `↵`), the
+- Entering a project of several folders asks which: its row (click, `↵`), the
   palette, a note found in it or `[`/`]` at a project's panels open a dialog, "Open shop", a
   field to narrow them (ranked as the palette ranks names), a row per folder: name
   and place, branch, files changed, lines, in columns (the breadcrumb's menu has the same,
@@ -33,14 +33,14 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
 - A folder without git picked first in New project, with repositories right inside it (a parent of
   api and web): "Projects holds 4 repositories: api, billing, docs (in Docs), …", and what it
   becomes: One project (its repositories no project has, the default), A project each ("Create 2
-  projects", the name taken from each), Just the folder. Before, such a folder became a project
-  without git, no Changes, nothing said.
+  projects", the name taken from each), Just the folder. Taken silently, it would be a project
+  without git: no Changes, nothing said.
 - `sidekyk <parent>` of the same kind opens New project on it at level 0 instead of adding a
   project without git.
 
 ## How it is built
 
-- Folder ids (2026-11-02): `ProjectFolder { id, …Location }`, made once (`new_id`), kept when the
+- Folder ids: `ProjectFolder { id, …Location }`, made once (`new_id`), kept when the
   folder moves (Locate…) or its project merges. Every repository command, the
   `project-file:` URL and `repository-changed` (version 5, `folderId`) name the folder, so each
   repository has its own cache: back to a folder is instant. A folder stored without id was its
@@ -73,24 +73,24 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
 
 ## Decisions
 
-- Several folders in one project (2026-11-02): the notes. A product split in repositories has
+- Several folders in one project: the notes. A product split in repositories has
   notes of the whole (a flow across api and web), and a global capture lands in the project on
   screen; one project per repository would split them. Lists stay the topics inside it (a list per
   repository if wanted), not another level of notes.
-- One on screen, not sections (2026-11-02): switching costs `Esc` and a click, two diffs are read
+- One on screen, not sections: switching costs `Esc` and a click, two diffs are read
   one after the other anyway, and sections with summed views would make every file a folder and a
   path in every module. As Zed's git panel, one repository at a time with a picker; VS Code shows
   them all, or one in its single repository mode
   (code.visualstudio.com/docs/sourcecontrol/repos-remotes).
-- No level between all projects and a project (2026-11-02): it would repeat the row and Notes and
+- No level between all projects and a project: it would repeat the row and Notes and
   make the depth differ per project; the menu tells which repository changed. Again if projects of
   5+ repositories outgrow it.
-- Asked at each entering, not the last shown (2026-11-03): entering one knows which repository it
+- Asked at each entering, not the last shown: entering one knows which repository it
   is for, and nobody remembers which was shown last, so restoring it entered the wrong one. A
   dialog, not a menu under the row nor rows under it: one place for every entry (row,
   palette, keys), room for each folder's place and facts, the row unchanged. The order fixed, not
   the last used first, so the keys stay the same.
-- A parent of repositories asks (2026-11-02): VS Code finds repositories one level below the
+- A parent of repositories asks: VS Code finds repositories one level below the
   folder opened by default (its `git.repositoryScanMaxDepth` setting, 1), Zed at any depth; taken
   silently as a folder without git it showed no changes.
 - `⌘K` searches the files of the folder on screen: across folders it needs a file as folder and

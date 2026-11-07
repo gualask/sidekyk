@@ -44,7 +44,8 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 
 ## Docs
 
-- In English, for people and coding agents: terse facts, decisions with their date and reason, measures, sources; no narrative, nothing the code already says.
+- In English, for people and coding agents: terse facts, decisions with their reason, measures, sources; no narrative, nothing the code already says.
+- The current state, not a changelog: no dates, no "was X", no "tried then dropped"; a changed design rewrites its bullets in place and drops the decision it replaces. History is git's.
 - One file per area, about 500-1,200 words (`docs/README.md` lists them and says where things go): neither one file that explains a bit of everything nor a tree of small files. One fact in one file; the others point to it.
 - `ROADMAP.md` holds only what is left, by theme, not a timeline; `**After:**` marks a technical dependency. A built item leaves it, and its plan, for `docs/features/` in the same commit.
 - Plans and specs are local, not versioned: `.cflow/plans/`, `.cflow/specs/`. A plan wholly built is deleted.

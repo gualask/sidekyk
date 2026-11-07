@@ -1,7 +1,7 @@
 # Previews
 
-Files shown as they read in the viewer: Markdown, SVG, images (built 2026-10-25), a changed
-image's two sides (2026-11-01). Nothing a file holds runs, nothing leaves the machine.
+Files shown as they read in the viewer: Markdown, SVG, images, a changed
+image's two sides. Nothing a file holds runs, nothing leaves the machine.
 
 ## Behaviour
 
@@ -69,7 +69,7 @@ image's two sides (2026-11-01). Nothing a file holds runs, nothing leaves the ma
 - Measured (release, M4): parse plus JSON of Zed's `all-settings.md` (144 KB) 2.9 ms; a 2 MiB
   file 37 ms, 41 MB peak, 5 MB of JSON; a README 0.05 ms (`.local/markdown-renderers/`).
 
-## Decisions (2026-10-25)
+## Decisions
 
 - `pulldown-cmark` over `comrak` (3x slower, twice the memory: 37 ms and 29 MB against 11.6 ms and
   13 MB on 2 MiB) once the frontend renders a tree: comrak's safe HTML writer goes unused.
@@ -89,8 +89,8 @@ image's two sides (2026-11-01). Nothing a file holds runs, nothing leaves the ma
 - Bare URLs as text: pulldown-cmark has no GFM autolink literal; no detection of our own until
   READMEs read badly without it.
 - A changed file's Preview shows the working tree, nothing marked; rendered diffs later.
-- Image sides by object id, not by area (`:path`, `HEAD:path`) with the id as a cache key
-  (2026-11-01): the index can change between the snapshot and the load, and a URL would then
+- Image sides by object id, not by area (`:path`, `HEAD:path`) with the id as a cache key:
+  the index can change between the snapshot and the load, and a URL would then
   cache bytes it does not name. No swipe or onion skin, which no editor has.
 
 ## Sources

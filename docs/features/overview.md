@@ -41,10 +41,10 @@ project is: `projects.md`; the levels: `workspace.md`.
 
 ## Decisions
 
-- Projects not on screen not watched (2026-10-13): level 0 reads summaries when it shows (~65 ms,
+- Projects not on screen not watched: level 0 reads summaries when it shows (~65 ms,
   0.4 s CPU for ten repositories). A watcher per project is cheap on FSEvents and Windows, but on
   inotify a watch per folder (`../architecture.md`, Watching).
-- On show only what may have changed (2026-10-14): the project marked while hidden, anything older
+- On show only what may have changed: the project marked while hidden, anything older
   than 30 s. The review loop (`⌘Tab` every 5-30 s) reading ten projects each time is ~140 s CPU an
   hour; 30 s caps it at ~50 s, another agent's count at most one turn stale.
 - Rows for projects, cards for notes (the maintainer): projects as cards read as a wall of text,

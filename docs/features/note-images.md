@@ -1,7 +1,7 @@
 # Images in notes
 
 A note holds text and, below it, images: pasted or dropped, shown as thumbnails, copied out as
-paths for an agent, marked with letters and arrows (built 2026-11-01). The notes themselves:
+paths for an agent, marked with letters and arrows. The notes themselves:
 `notes.md`. What comes next on images (capture): `../../.cflow/plans/capture.md`.
 
 ## Behaviour
@@ -82,7 +82,7 @@ paths for an agent, marked with letters and arrows (built 2026-11-01). The notes
 
 ## Decisions
 
-- Thumbnails made in Rust with `image` (2026-11-01, the maintainer; `.local/note-thumbnails/`):
+- Thumbnails made in Rust with `image` (the maintainer; `.local/note-thumbnails/`):
   10 cards showing 5K screenshots whole hold 1.1 GB in WebContent. A canvas in one step skips
   pixels (text unreadable); by halving it peaks ~250 MB in WebContent and ~195 MB in the GPU
   process and keeps part. `image`: a 5K screenshot in 115 ms, 84 MB peak, the same on every
@@ -90,12 +90,12 @@ paths for an agent, marked with letters and arrows (built 2026-11-01). The notes
   (12 MP: 26 ms, 5 MB against 88 ms, 64 MB) is in maintenance mode and our JPEGs are rare: later,
   if photos matter.
 - Thumbnails PNG, not JPEG: a window's screenshot has a transparent shadow.
-- Images below the text, not inside it (2026-11-01): no rich editor; a note stays plain text.
-- A copy gives paths, not image bytes (2026-11-01, the maintainer): one copy serves an agent in a
+- Images below the text, not inside it: no rich editor; a note stays plain text.
+- A copy gives paths, not image bytes (the maintainer): one copy serves an agent in a
   terminal; "Copy image" serves a colleague.
-- Marks (2026-11-01, KISS: more on felt need): one object, one color; no rectangle, highlight,
+- Marks (KISS: more on felt need): one object, one color; no rectangle, highlight,
   blur or crop. A secret, if ever, an opaque box: pixelated text can be recovered.
-- A marked image drawn in the webview, not in Rust (2026-11-01): the editor's code and font, so
+- A marked image drawn in the webview, not in Rust: the editor's code and font, so
   what is copied is what was seen. WKWebView, `.local/note-thumbnails/` (`mode=flatten`):
   2560x1664 in 130-210 ms, 5K in 400-600 ms with a transient peak of ~310 MB in WebContent and
   ~250 MB in the GPU process; once, on Done.

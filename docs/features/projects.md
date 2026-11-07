@@ -6,9 +6,9 @@ shows them: `overview.md`.
 
 ## Behaviour
 
-- New project (2026-10-23): the button over the projects at level 0 opens one dialog for everyone: Name and
+- New project: the button over the projects at level 0 opens one dialog for everyone: Name and
   Folders (optional; "None" until Add folder…), Create disabled while the name is blank. A folder
-  inside a repository becomes the repository's root, any other is taken as it is (2026-10-24); the
+  inside a repository becomes the repository's root, any other is taken as it is; the
   first one's name fills an empty name. Another project's folder is said under them, with Open; a
   folder above repositories asks what it becomes (`project-folders.md`). Create opens the new
   project at level 1.
@@ -17,7 +17,7 @@ shows them: `overview.md`.
   (`notes.md`).
 - `sidekyk <folder>` opens the project of that folder, showing it, adding one named after it if
   none; a folder above repositories opens New project on it instead.
-- What a folder is (2026-10-24): a repository when a `.git` (folder, or file for worktrees and
+- What a folder is: a repository when a `.git` (folder, or file for worktrees and
   submodules) is at its root, else a folder without git. Never stored: `git init` or `.git`
   removed changes the panels while the app runs (`workspace.md`).
 - Top bar facts: branch, ahead/behind, changed files and lines against HEAD (`1.2k changed +1.2k
@@ -61,15 +61,15 @@ shows them: `overview.md`.
 
 ## Decisions
 
-- One container, the project (2026-10-22): not global notes beside projects (two navigations, two
+- One container, the project: not global notes beside projects (two navigations, two
   places for a note); lists are topics inside it, the Inbox the one place outside. Panels come
   from what a project has, never from a template the user picks. One folder first, the model
-  shaped for several (VS Code's multi-root workspace) so stored projects change once; several
-  built 2026-11-02 (`project-folders.md`).
-- Id made once and kept (2026-10-22; made from the location 2026-10-18): a project without folder
+  shaped for several (VS Code's multi-root workspace) so stored projects change once; several:
+  `project-folders.md`.
+- Id made once and kept, not made from the location: a project without folder
   has no location, one with several no single one. A folder is one project's, found by place;
   stored ids stay, nothing migrated.
-- Locate… onto another project's folder refused (2026-10-22), not a merge: it changes a folder
+- Locate… onto another project's folder refused, not a merge: it changes a folder
   only.
-- Kind by its own query, not from the summary (2026-10-24): at level 1 the summary comes with the
+- Kind by its own query, not from the summary: at level 1 the summary comes with the
   snapshot, so reading it first would run `git status` twice.

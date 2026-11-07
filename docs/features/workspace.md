@@ -9,9 +9,9 @@ problems. Why semantic zoom: `../product.md`.
   panels as tiles, 2 one panel full screen; View Transitions, 320 ms. The breadcrumb (All projects
   / project / panel; with several folders the one on screen after the project,
   `project-folders.md`) in the top bar is the only "where am I".
-- Start (2026-10-23): level 0, the project shown last selected; `sidekyk <folder>` opens its
+- Start: level 0, the project shown last selected; `sidekyk <folder>` opens its
   project at level 1. A project of several folders asks which on entering (`project-folders.md`).
-- Panels from the project (2026-10-23, 2026-10-24, 2026-11-02): a repository has Changes, Files
+- Panels from the project: a repository has Changes, Files
   and Notes; a folder without git Notes (the main tile) and Files beside, whose file picked opens
   Files full screen (`files.md`); no folder, Notes only, shown at level 1 as full screen and with
   no level 2 (`↵`, zooming in and `1`-`9` do nothing). The top
@@ -19,12 +19,12 @@ problems. Why semantic zoom: `../product.md`.
   shown. A stopped WSL distro: `wsl.md`. Until the kind is read, nothing is drawn.
 - Level 0 in a narrow window: the projects' rows give way first, down to 320 px, then the Inbox
   down to 320 px; the window's least width (760 px) fits both.
-- Tiles, the only level 1 layout (tabs dropped 2026-10-13): the main tile on the left keeps 560 px;
+- Tiles, the only level 1 layout (no tabs): the main tile on the left keeps 560 px;
   the others in the side column (Files above Notes), which gives way first. The column has one width, the
   tree's (as VS Code's sidebar), at least the widest tile shown (Files 160 px, Notes 320 px). Its
   splitter's double click fits; the one between Files and Notes evens them. Files and Notes
   minimize to chips in the top bar; each project keeps its tiles.
-- Sidebars resize alike (2026-10-17): Changes' list (200 px min, 288 default), Files' tree, Notes'
+- Sidebars resize alike: Changes' list (200 px min, 288 default), Files' tree, Notes'
   lists, the Inbox (320 px min, 40% of the window until dragged). Double click fits what it shows,
   again goes back; the content beside keeps 240 px; one width per sidebar, in a tile and full
   screen.
@@ -33,7 +33,7 @@ problems. Why semantic zoom: `../product.md`.
   says what it copies.
 - Toasts for passing events (bottom center, at most three; errors stay); lasting problems in the
   top bar, each with its fix.
-- A panel that breaks while rendering breaks alone (2026-11-05): in its place "This panel stopped
+- A panel that breaks while rendering breaks alone: in its place "This panel stopped
   working", its error's message, Try again and Copy details; another project or folder tries it
   again by itself. Anything else that breaks (top bar, level 0, dialogs) shows the same in the
   whole window, with Reload: the page loads again, the backend and what it saved untouched.
@@ -41,7 +41,7 @@ problems. Why semantic zoom: `../product.md`.
   language (`languages.md`), diff view and scrollbar width, long lines in code and in notes, copy
   template, how Markdown and SVG open (`previews.md`), global shortcut; at the end the version and
   Show log, which selects this session's log in the system's file manager, the previous one beside
-  it (`tauri-plugin-opener`'s reveal). Not in the tray (2026-10-31): a page broken once still
+  it (`tauri-plugin-opener`'s reveal). Not in the tray: a page broken once still
   shows it after a restart, the previous session kept; one broken at every start leaves the
   folder (`../testing.md`).
 
@@ -55,7 +55,7 @@ problems. Why semantic zoom: `../product.md`.
 - `⌘K` / `⌘F` the palette (`search.md`), `⌘,` settings, `⌘N` a new note: the project's Notes at
   levels 1 and 2, the Inbox at level 0.
 - `?` shows the shortcuts in a card, bottom right: sections with a title, two columns.
-- Keys read as each system's menus write them (2026-11-04): `⇧⌘Z` on macOS, `Ctrl+Shift+Z`
+- Keys read as each system's menus write them: `⇧⌘Z` on macOS, `Ctrl+Shift+Z`
   elsewhere. Enter is `↵` on macOS, Return's shape in Apple's help ("What are those symbols shown
   in menus"); Esc, Tab, Space are words, clearer in a hint than `⎋` or `⇥`.
 
@@ -67,7 +67,7 @@ problems. Why semantic zoom: `../product.md`.
   project, so a switch leaves it behind. Level 0 composes `InboxColumn` and `ProjectsOverview`,
   both in the first chunk. Panel chunks start loading in `main.tsx`, before the first render. A
   `preloadable` part, shown by `Preloaded`, renders at once once loaded, so a transition never
-  captures an empty frame. `Preloaded` is one component at module level (2026-10-31): a factory
+  captures an empty frame. `Preloaded` is one component at module level: a factory
   defining one fails Biome's `noComponentHookFactories` (React's `component-hook-factories`).
 - Start at level 1: the backend keeps what the folder argument opened (`ProjectsState::opened`:
   a project and its folder, or a folder above repositories to ask about, `project-folders.md`) and says the list
@@ -92,10 +92,10 @@ problems. Why semantic zoom: `../product.md`.
 - Sidebar widths: one setting (`sidebarWidths`: `changes`, `files`, `notes`, `inbox`) through
   `shared/ui/sidebar-width.ts`; a drag stores the width the layout allowed.
 - Settings in effect: one copy in memory (`AppliedSettings`), read at startup, written on each
-  change. `set_settings` applies only what differs (2026-10-21): theme and language set again only
+  change. `set_settings` applies only what differs: theme and language set again only
   when changed, the shortcut only when not registered as asked; a dragged sidebar only writes the
   file.
-- Pickers (the palette, Move, the folder to open, 2026-11-03): one shell, field and row of keys
+- Pickers (the palette, Move, the folder to open): one shell, field and row of keys
   (`shared/ui/PickerDialog.tsx`), rows `.pick-row`, names ranked by `useRanking`; each keeps its
   own list and keys.
 - Toasts (`useShowToast`) only for failures nothing on screen waits for; Base UI's toaster loads
@@ -112,13 +112,13 @@ problems. Why semantic zoom: `../product.md`.
 
 ## Decisions
 
-- Base UI (`@base-ui/react`, pinned to an exact version, 2026-10-12) for palette, menus,
+- Base UI (`@base-ui/react`, pinned to an exact version) for palette, menus,
   selects, tooltips, toasts: maintained, headless, virtualizes with `@tanstack/react-virtual`.
   Compared (kB gzip, palette/tooltip): Base UI 42/34, Radix+cmdk 19.5/21 (Radix slowing, cmdk
   not virtualized), Headless UI 54/none, Ariakit 38/35 (0.x), Ark 48/25, React Aria 56/22.
   CSS-only tooltips cannot flip. Never in the first paint chunk.
-- Panel icon in a tile, not its title (2026-10-17): the title repeated what the panel shows.
-- Notes the main tile of a folder without git (2026-11-02; Files since 2026-10-24): its uses are a
+- Panel icon in a tile, not its title: the title repeated what the panel shows.
+- Notes the main tile of a folder without git, not Files: its uses are a
   topic with its material, a folder of documents or images, notes with captures; the files are
   looked up, a key away. A file picked in the tree opens Files full screen, not in the main tile in
   place of the notes (one meaning per tile, no new part) nor in a wider column (as wide as the

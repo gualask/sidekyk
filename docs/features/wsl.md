@@ -1,7 +1,7 @@
 # WSL projects
 
-A folder in a WSL distro, read by Sidekyk's helper inside the distro (built 2026-10-18; not tried
-on Windows yet, `ROADMAP.md`). Containers will reuse the helper
+A folder in a WSL distro, read by Sidekyk's helper inside the distro (not tried on
+Windows yet, `ROADMAP.md`). Containers will reuse the helper
 (`../../.cflow/plans/remote-projects.md`).
 
 ## Behaviour
@@ -11,7 +11,7 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 - `WSL: Ubuntu` after the name, on its row at level 0 as in the top bar, as VS Code's remote
   indicator: a Windows and a WSL clone of one repository are
   otherwise two `shop`s.
-- A stopped distro starts only from its project's Start button (2026-10-24), whatever way the
+- A stopped distro starts only from its project's Start button, whatever way the
   project is opened (its row, `↵`, `[`/`]`, a note found). Its row: "Ubuntu is not running." Level 1:
   Notes, and a Start panel as the main tile ("Start Ubuntu", then "Starting Ubuntu…"; no key)
   until the folder's panels take its place. Palette: no files; `⌘F` says the distro is not
@@ -51,7 +51,7 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 - Protocol (`infrastructure/agent/`): frames of a u32 LE length and a JSON envelope `{ id, … }`,
   several in flight; one request per method of the `Repositories` port; a reply's value is raw
   JSON, read once as the caller's type; an image's bytes follow a `Bytes` message as a raw frame,
-  not base64 (2026-10-25); a search in contents streams its files, then its reply;
+  not base64; a search in contents streams its files, then its reply;
   changes come unasked; cancel is a message; over 64 MiB is a broken stream; failures keep their
   code. Each request on a thread of its own, except what depends on order: stop, visibility,
   forgetting projects, a content search's turn. Visibility is not waited for: a change missed
@@ -71,14 +71,14 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 
 ## Decisions
 
-- A helper in the distro (2026-10-18), as Zed's `remote_server` and VS Code Server, not
+- A helper in the distro, as Zed's `remote_server` and VS Code Server, not
   `\\wsl.localhost`: `ReadDirectoryChangesW` is not supported there (Everything's author,
   Syncthing), Microsoft advises against working across the two file systems, and Windows git
   refuses a repository the Linux user owns until `safe.directory`. Not `wsl.exe git` per call: a
   start each time and no watcher.
-- Split by module, not by `RepositoryBackend` call (2026-10-18): content search and syntax read
+- Split by module, not by `RepositoryBackend` call: content search and syntax read
   whole files, which would cross the pipe.
-- Identity typed, not the `\\wsl.localhost` path (2026-10-18): two forms to parse, two distros with
+- Identity typed, not the `\\wsl.localhost` path: two forms to parse, two distros with
   one path collide, and code treating it as a folder starts the distro (Zed drops such workspaces
   from its history).
 - Shipped, not downloaded: one small static binary, offline and behind proxies; Zed and VS Code
@@ -86,9 +86,9 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 - JSON over protobuf (a second schema) or a binary serde format (a dependency), 2026-10-18: a real
   2 MiB diff +3.0% bytes, encode 2.5 ms, decode 2.4 ms; under the 20 ms threshold. To measure again
   through `wsl.exe`.
-- 10 min idle (2026-10-18, the maintainer): a pause or level 0 never waits for a new helper; Zed
+- 10 min idle (the maintainer): a pause or level 0 never waits for a new helper; Zed
   10 min after a disconnect, VS Code 5 min, opt-in.
-- A distro starts only when asked (2026-10-24, the maintainer): one rule for every way in, not by
+- A distro starts only when asked (the maintainer): one rule for every way in, not by
   intent, else `[`/`]` would start every distro it passes; one click to work in a stopped one. Zed
   and VS Code start it on opening.
 

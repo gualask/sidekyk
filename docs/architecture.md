@@ -55,15 +55,14 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   `target` (a request in the panel's terms) and `targetTaken`, `place` (`tile`/`full`), `selected`
   (takes the keys), `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and
   zoom; what must survive lives in `useSessionState`.
-- Panel requests (2026-11-05): a target is a change to what a panel shows, never what it shows. Each
+- Panel requests: a target is a change to what a panel shows, never what it shows. Each
   field is state, written once into its one owner (the selection with its marked lines, the find
   bar, the open list), or an effect done once (open on a hunk or lines, bring a note into view,
   focus a field); then the panel calls `targetTaken` and `AppShell` forgets it, so a remount
   (minimize and restore, zoom, another folder and back) never applies it again. A request is for
   one panel of one project and folder (`app/asked.ts`); it waits while that panel mounts (a lazy
   chunk, a project being entered, a tile in the top bar, which comes back for it); a zoom without
-  target drops it. Before, it stayed until the next zoom and every mount applied it again, over
-  the user's choice.
+  target drops it. Kept as state, every mount would apply it again, over the user's choice.
 - State: no client store; projects, snapshots, summaries, diffs, tree folders, notes and settings
   are TanStack Query caches, a project's keys starting with its id. Settings changed from the app
   go through `useChangeSettings`, each change from the settings as they are then. UI state: level
@@ -109,7 +108,7 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
 - `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
   a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
-- Paths after `--` are literal (2026-10-31): `--literal-pathspecs` on diff, diff-tree and the
+- Paths after `--` are literal: `--literal-pathspecs` on diff, diff-tree and the
   snapshot's numstats, else `[id].tsx` also matched `i.tsx` and a file's diff held both. Not
   `GIT_LITERAL_PATHSPECS` for every command: `check-ignore` refuses it.
 - Bounded (`limits.rs`): status 8 MiB, numstat 4 MiB, diff 2 MiB, ls-files 32 MiB, `check-ignore`
@@ -119,7 +118,7 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 ### Watching
 
 - macOS and Windows: one recursive watch of the root (and of the git dir when outside it).
-- Linux (2026-10-21; the app and the helper): inotify watches one folder at a time, and notify's
+- Linux (the app and the helper): inotify watches one folder at a time, and notify's
   recursive watch took every folder, `node_modules/` included, and gave up the project at the first
   failure (`max_user_watches`); fanotify needs `CAP_SYS_ADMIN`. So, as VS Code
   (`@parcel/watcher`) and Zed, `folders.rs` watches each folder git does not ignore
@@ -128,7 +127,7 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   change is told; one created while hidden when the window shows. A `.gitignore` changed: every
   folder looked at again. At the system's limit the watches stay, one `warn`, no more asked
   (8,192 before Linux 5.11, then 1% of RAM within 8,192-1,048,576).
-- Reports (2026-10-31): while an agent writes, the debouncer gives ~8 batches a second (its next
+- Reports: while an agent writes, the debouncer gives ~8 batches a second (its next
   deadline is the oldest pending path's last event + 250 ms), each a `check-ignore` and a snapshot
   (~165 ms CPU). `REPORT_INTERVAL` (1 s, `watcher.rs`, a thread per watch): the first batch after a
   quiet second at once, the next ones joined and told when the second ends; no timer while idle;
@@ -136,17 +135,17 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   writes in 3.7 s 5.8 → 1.4 s, one every 0.5 s for 20 s 8.4 → 4.4 s, one every 1.5 s even; first
   change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last 1.7 s late), not
   the debouncer's timeout at 1 s (the first in 1.4 s), not 5 s (too stale to watch an agent).
-- A folder without git (2026-10-24): no git dir; `FolderChanges` drops what the walk's rules hide
+- A folder without git: no git dir; `FolderChanges` drops what the walk's rules hide
   (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
   global excludes included); on Linux `folders.rs` keeps those folders out too. An ignore file
   changed: rules read again.
 - Kind: a batch with `<root>/.git` that no longer matches the watch restarts it as the other kind
   on its own thread and tells `kind_changed`, also while hidden (rare, no git).
-- A repository inside the root (2026-10-29: a submodule, a clone, Claude Code's
+- A repository inside the root (a submodule, a clone, Claude Code's
   `.claude/worktrees/` unless ignored): `git status` shows its folder, never its files, yet
   `check-ignore` calls them visible. `ignored.rs` drops paths under a folder holding a `.git` (the
   disk asked once per folder of a batch, +1 ms on 5,000 paths), as Linux by not watching them.
-- Events the system dropped (2026-10-29: `IN_Q_OVERFLOW`, `MustScanSubDirs`): notify's pathless
+- Events the system dropped (`IN_Q_OVERFLOW`, `MustScanSubDirs`): notify's pathless
   event, which the debouncer drops, goes as `Changed::Unknown`: git dir and any path may have
   changed, folders rescanned on Linux, the project marked if hidden. Windows: notify 8.2.1 loses
   both forms (a 0-byte completion; `ERROR_NOTIFY_ENUM_DIR`, which also ends the watch), 9.0.0-rc.5

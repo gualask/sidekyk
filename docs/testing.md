@@ -17,14 +17,14 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
 - Helper (`crates/agent/tests`): the `sidekyk-agent` binary started as the app starts it, its
   answers compared with direct reads; failures keep their code; changes, and one missed while
   hidden, come through.
-- Test dependencies (2026-10-24): `happy-dom` over `jsdom` (7 dependencies against 20, faster) and
+- Test dependencies: `happy-dom` over `jsdom` (7 dependencies against 20, faster) and
   over Vitest's browser mode (Playwright's browsers on every machine and run); no
   `@testing-library/react`: its `renderHook` is a few lines on `act`, and it brings
   `@testing-library/dom` (2.5 MB, 8 dependencies).
 
 ## CI
 
-On demand only (Actions, Run workflow; 2026-10-18): the checks run on the Mac day to day, every
+On demand only (Actions, Run workflow): the checks run on the Mac day to day, every
 platform before a release. Actions pinned to a commit, the version in a comment.
 
 - `ci.yml`: the frontend checks and rustfmt on Linux; clippy and `cargo test` on Linux, macOS and
@@ -73,7 +73,7 @@ in-memory ports. UI changes are checked there, light and dark.
   (`src/dev/fixture-files/`); their previews are the backend parser's, written to
   `previews.json` by the Rust test `fixture_previews`, which fails while it is out of date
   (`SIDEKYK_UPDATE_FIXTURES=1 cargo test --manifest-path src-tauri/Cargo.toml -p sidekyk-core
-  fixture_previews` writes it again; 2026-10-25, over a second parser in TypeScript). New
+  fixture_previews` writes it again; not a second parser in TypeScript). New
   project picks the scenario's repository and a folder without git in turn.
 - `&open=<name>` starts as `sidekyk <folder>`. In the console: `sidekykDev.openFolder('<name>')`
   (the project, else one made), `gitInit('<name>')` and `gitRemove('<name>')` (told as the
@@ -134,12 +134,11 @@ scripts/container-fixture.sh down     # removes fixture and repository (--colima
 
 - `test`: `cargo test -p sidekyk-core -p sidekyk-agent` on Linux git and inotify, the Linux half of
   `ci.yml` without CI. Sources mounted read-only, crates from the Mac's `~/.cargo/registry`, builds
-  in `src-tauri/target/linux` (262 MB). First build 39 s, then 8 s; from a stopped VM ~2 min
-  (2026-10-21).
+  in `src-tauri/target/linux` (262 MB). First build 39 s, then 8 s; from a stopped VM ~2 min.
 - `helper`: `crates/agent/tests/container.rs` with the real Linux helper (the one `test` built, or
   `build.yml`'s static `sidekyk-agent-linux-arm64`), installed in `~/.sidekyk-server/` through
   `docker exec -i`, then read, watched (an edit inside, a write under ignored `build/`), told the
   window hid and showed, a folder without git read and watched (its `.ignore`, `git init` as a
   change of kind), closed once idle.
 - Never a bind mount: with Colima's virtiofs a write on the Mac to a bind-mounted folder gives no
-  inotify event inside (2026-10-18); a repository edited on the Mac is the local case anyway.
+  inotify event inside; a repository edited on the Mac is the local case anyway.

@@ -5,25 +5,24 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 ## Behaviour
 
 - Files grouped as changes, new files, staged, with line counts; `↑`/`↓` or `j`/`k` move. Read
-  again when files or refs change on disk; the open diff only when the change touches its file
-  (2026-10-21).
+  again when files or refs change on disk; the open diff only when the change touches its file.
 - Viewer: "Changes | Full file" (default in settings). Changes: unified diff, notices for binary
   and cut. Full file: the diff with full context, cut into git's three-line hunks (20 ms on a
   13,291-line file).
 - Copy with a click (line, hunk, selection) through the user's `{row}`/`{text}` template (default
   `path:lines` and a `diff` block).
-- Scrollbar as a map (2026-10-17): a mark per hunk where its changed lines are, in the gutter's
+- Scrollbar as a map: a mark per hunk where its changed lines are, in the gutter's
   colors, under a translucent thumb as VS Code's. A mark has 12 px of click room at least
   (overlapping ones join), a click on the track centers there; the map widens under the pointer
   (12→36 px, wide 20→48). `diffScrollbar` narrow (12 px) or wide (20 px). Native scrollbars hidden
   (`scrollbar-width` cannot hide one axis), so a thin horizontal bar of ours shows while lines run
   past the edge.
-- Long lines (2026-10-19): scroll sideways (default, as VS Code and Zed) or wrap, setting
+- Long lines: scroll sideways (default, as VS Code and Zed) or wrap, setting
   `codeLines`, in every viewer. Wrapped by Zed's rule: before a word after a space or before a
   character not of a word; a longer word cut at the edge; no row starts with a character drawn with
   the one before (accents, joiners, flags); following rows at the line's indentation (none past
   half the row); a copy has no break added. A new width keeps the top row in place.
-- `n`/`p` (2026-10-17): next or previous change across the files of the list (or of the commit);
+- `n`/`p`: next or previous change across the files of the list (or of the commit);
   past the last, the next file opens on its first; a word at either end.
 - Recent commits (VS Code's graph, first parents, 50); a commit's files replace the list until
   `×`/`Esc`.
@@ -31,7 +30,7 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   `Esc`); `⌘F` in the bar or its icon opens the palette's search in contents with its text. Top
   right as VS Code's find widget; the match read is never under it.
 - Syntax colors on both sides: `syntax-colors.md`.
-- Formatting (2026-10-26): when changed lines differ only in whitespace or line endings, a strip
+- Formatting: when changed lines differ only in whitespace or line endings, a strip
   pinned above the diff says so: "Only formatting changed" or "6 of 8 changed lines differ only in
   formatting" (a commit's file too). On those lines spaces (`•`), tabs (`→`, Zed's glyphs) and the
   line end (`CRLF`, `LF`) are drawn. "Check all changes", working tree only, counts them over every
@@ -72,7 +71,7 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 - Formatting: the parser pairs, in each block of removed then added lines of equal counts, the
   n-th with the n-th, and compares them skipping git's whitespace (`sameButWhitespace`, no
   copies); counts are lines added plus removed, as numstat's. 2 MiB diff (the viewer's limit),
-  every line changed: parse 3.1 → 8.3 ms in JavaScriptCore (2026-10-26); a usual diff,
+  every line changed: parse 3.1 → 8.3 ms in JavaScriptCore; a usual diff,
   microseconds. Glyphs and labels are generated text (`::before`) over the characters: a copy and
   the columns are unchanged. "Check all changes": `git diff --numstat -z --ignore-all-space`,
   unstaged and `--cached` together (`get_changes_ignoring_whitespace`), against the snapshot's
@@ -86,19 +85,19 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 
 ## Decisions
 
-- Against HEAD, not the default branch or merge base (2026-10-14), as VS Code and Zed.
-- Summary counts without a numstat against HEAD of every path (2026-10-31): a path not staged
+- Against HEAD, not the default branch or merge base, as VS Code and Zed.
+- Summary counts without a numstat against HEAD of every path: a path not staged
   counts against HEAD as unstaged, so only staged paths are diffed against HEAD. Zed's clone, M4,
   CPU per snapshot: 20 files edited 225 → 152 ms, 300 edited 422 → 254 ms, 10 of 20 staged and
   edited again 222 → 200 ms; 300 staged and edited again 543 → 558 ms, wall time even (168 →
   170 ms) since `--name-status` (14 ms) lets both staged diffs run at once (`.local/snapshot-cost/`).
   The summary alone (level 0) keeps status plus one numstat against HEAD, its cheapest.
-- Map: marks under a translucent thumb, not strong colors (2026-10-17: too loud); nothing marks the
+- Map: marks under a translucent thumb, not strong colors (too loud); nothing marks the
   change gone to, no tooltip (too much).
-- Long lines a setting only, no shortcut (2026-10-19): VS Code's `⌥Z` and Zed's `⌘K Z` are per
+- Long lines a setting only, no shortcut: VS Code's `⌥Z` and Zed's `⌘K Z` are per
   editor. Breaks in JS rather than CSS `pre-wrap`: a height known before rendering keeps the list
   virtualized and the map exact.
-- Formatting (2026-10-26): one kind, spaces and line ends together. Told, never hidden: Zed and
+- Formatting: one kind, spaces and line ends together. Told, never hidden: Zed and
   VS Code normalize line endings before diffing and VS Code's `diffEditor.ignoreTrimWhitespace` is
   on by default, right for an editor, wrong for a review before a commit. No mark in the list: a `-w` numstat per snapshot is +30% CPU, +47% with 300 files
   reformatted (`.local/format-cost/`). Paired in TS, not Rust as planned: the diff is parsed there

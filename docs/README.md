@@ -1,7 +1,8 @@
 # Docs
 
-For people and coding agents working on Sidekyk. Terse: facts, decisions with their date and
-reason, numbers, sources. One fact in one file; the others point to it.
+For people and coding agents working on Sidekyk. Terse: facts, decisions with their reason,
+numbers, sources; the current state, not a changelog (no dates, no history). One fact in one file;
+the others point to it.
 
 - `product.md`: what Sidekyk is for, guardrails, layout, what is not taken, out of scope.
 - `architecture.md`: data flow, frontend and backend maps, layer rules, git, watching, logs.
@@ -34,5 +35,5 @@ reason, numbers, sources. One fact in one file; the others point to it.
 - To do: one line in `ROADMAP.md`, with a link to its plan when it has one.
 - Built: the item leaves `ROADMAP.md`; what it does and why goes into `features/`, in the same
   commit, and leaves the plan. A plan wholly built is deleted.
-- A decision states its date and reason; facts about other tools cite their source.
+- A decision states its reason; facts about other tools cite their source.
 - Paths in `docs/` are relative to the file; `AGENTS.md` and `ROADMAP.md` are at the root.

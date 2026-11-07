@@ -5,7 +5,7 @@ hidden.
 
 ## Behaviour
 
-- Tray (2026-10-24): it tells the app runs, nothing about projects. A click shows the window on
+- Tray: it tells the app runs, nothing about projects. A click shows the window on
   macOS and Windows, the right button opens the menu (Show, Capture and New Note where they are
   built, Quit, in the UI's language; `capture.md`, `quick-note.md`); on Linux every click opens the menu (appindicator reports no
   clicks). Closing the window hides it to the tray.
@@ -36,11 +36,11 @@ hidden.
 
 ## Decisions
 
-- Global shortcut (2026-10-15): `global-hotkey` (Carbon `RegisterEventHotKey`, `RegisterHotKey`),
+- Global shortcut: `global-hotkey` (Carbon `RegisterEventHotKey`, `RegisterHotKey`),
   idle until pressed, no permission. Not `handy-keys` (sees every key, Accessibility permission)
   nor `livesplit-hotkey`. Its X11 backend wakes every 50 ms and Wayland has none, hence `--toggle`
   on Linux (single instance).
-- A plain tray (2026-10-24): no change count, no dot for hidden changes (always on while an agent
-  works, 2026-10-14).
+- A plain tray: no change count, no dot for hidden changes (always on while an agent
+  works).
 - Open: the default shortcut (`⌃⌥Space` is "next input source" with two input sources; `⌥Space` is
   Raycast's and Alfred's).
