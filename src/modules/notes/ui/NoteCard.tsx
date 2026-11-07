@@ -87,7 +87,7 @@ export function NoteCard({
 
     return (
         <article
-            className={`group/card relative flex items-start gap-2.5 rounded-[9px] border py-2 pr-1.5 pl-2.5 ${
+            className={`group/card relative flex items-start gap-2.5 rounded-[9px] border py-2 pr-2 pl-2.5 ${
                 editing || dropping ? ACTIVE : LOOK
             } ${flash ? 'note-flash' : ''}`}
             aria-label={t('notes.note')}
@@ -135,62 +135,70 @@ export function NoteCard({
                         if (kept) onEdit(true);
                     }}
                 />
-                <div className="text-[11.5px] text-ui-text-muted">
-                    {noteMeta(note, Date.now(), i18n)}
-                </div>
-            </div>
-            <div className={`-mt-0.5 -mr-0.5 flex shrink-0 items-start ${editing ? '' : ACTIONS}`}>
-                <button
-                    type="button"
-                    className="btn-icon h-6 w-6"
-                    title={copyTitle}
-                    aria-label={copyTitle}
-                    onClick={onCopy}
-                >
-                    <CopyIcon copied={copied} />
-                </button>
-                <Menu.Root>
-                    <Menu.Trigger
-                        className="btn-icon h-6 w-6 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
-                        title={t('common.more')}
-                        aria-label={t('notes.moreForNote')}
+                {/* when it was written, and its buttons at the end: the text keeps the card's width */}
+                <div className="flex min-h-4 items-center justify-between gap-2">
+                    <div className="min-w-0 truncate text-[11.5px] text-ui-text-muted">
+                        {noteMeta(note, Date.now(), i18n)}
+                    </div>
+                    <div
+                        className={`-my-1 -mr-1 flex shrink-0 items-center ${editing ? '' : ACTIONS}`}
                     >
-                        <IconDots size={14} />
-                    </Menu.Trigger>
-                    <Menu.Portal>
-                        <Menu.Positioner sideOffset={4} align="end">
-                            <Menu.Popup className="menu-popup w-[200px]">
-                                {order ? (
-                                    <>
-                                        {order.top ? null : (
-                                            <Menu.Item
-                                                className="menu-item"
-                                                onClick={order.moveToTop}
-                                            >
-                                                {t('notes.moveToTop')}
-                                            </Menu.Item>
-                                        )}
-                                        <Menu.Item className="menu-item" onClick={order.reorder}>
-                                            {t('notes.reorder')}
+                        <button
+                            type="button"
+                            className="btn-icon h-6 w-6"
+                            title={copyTitle}
+                            aria-label={copyTitle}
+                            onClick={onCopy}
+                        >
+                            <CopyIcon copied={copied} />
+                        </button>
+                        <Menu.Root>
+                            <Menu.Trigger
+                                className="btn-icon h-6 w-6 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
+                                title={t('common.more')}
+                                aria-label={t('notes.moreForNote')}
+                            >
+                                <IconDots size={14} />
+                            </Menu.Trigger>
+                            <Menu.Portal>
+                                <Menu.Positioner sideOffset={4} align="end">
+                                    <Menu.Popup className="menu-popup w-[200px]">
+                                        {order ? (
+                                            <>
+                                                {order.top ? null : (
+                                                    <Menu.Item
+                                                        className="menu-item"
+                                                        onClick={order.moveToTop}
+                                                    >
+                                                        {t('notes.moveToTop')}
+                                                    </Menu.Item>
+                                                )}
+                                                <Menu.Item
+                                                    className="menu-item"
+                                                    onClick={order.reorder}
+                                                >
+                                                    {t('notes.reorder')}
+                                                </Menu.Item>
+                                                <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
+                                            </>
+                                        ) : null}
+                                        <Menu.Item className="menu-item" onClick={onMove}>
+                                            {t('notes.move')}
                                         </Menu.Item>
                                         <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
-                                    </>
-                                ) : null}
-                                <Menu.Item className="menu-item" onClick={onMove}>
-                                    {t('notes.move')}
-                                </Menu.Item>
-                                <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
-                                <Menu.Item
-                                    className="menu-item danger"
-                                    onClick={() => void actions.remove(note)}
-                                >
-                                    <IconTrash size={14} />
-                                    {t('notes.delete')}
-                                </Menu.Item>
-                            </Menu.Popup>
-                        </Menu.Positioner>
-                    </Menu.Portal>
-                </Menu.Root>
+                                        <Menu.Item
+                                            className="menu-item danger"
+                                            onClick={() => void actions.remove(note)}
+                                        >
+                                            <IconTrash size={14} />
+                                            {t('notes.delete')}
+                                        </Menu.Item>
+                                    </Menu.Popup>
+                                </Menu.Positioner>
+                            </Menu.Portal>
+                        </Menu.Root>
+                    </div>
+                </div>
             </div>
         </article>
     );

@@ -8,8 +8,9 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 
 - Cards, not documents: plain text and images below it (`note-images.md`), the user's order (new
   on top), marked done when used; done cards fold into "Done (n)". Actions on the card, never in
-  its text: done circle left, copy and ⋯ right, shown under the pointer or the focus (move to
-  top, reorder, Move…, delete; move and delete undoable).
+  its text: done circle left; copy and ⋯ at the end of the line with its time, shown under the
+  pointer or the focus, so the text takes the card's width (move to top, reorder, Move…, delete;
+  move and delete undoable).
 - A card is filled (`--ui-surface-raised`, a step off the panel) with a soft shadow, no border;
   under the pointer a step further (`--ui-surface-raised-hover`) and its shadow deeper, since a
   click edits it. Edited, or with an image dragged over it, it has an accent border. The same
