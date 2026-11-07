@@ -249,7 +249,7 @@ impl WslRepositories {
         }
     }
 
-    /// Whether `distro` can be read without starting it, as the projects' cards are: a helper runs
+    /// Whether `distro` can be read without starting it, as the projects' rows are: a helper runs
     /// there, or the distro does. Otherwise `distro_stopped`, or `distro_missing`.
     pub fn readable_without_starting(&self, distro: &str) -> anyhow::Result<()> {
         if self.of(distro).is_running() {
@@ -266,7 +266,7 @@ impl WslRepositories {
         }
     }
 
-    /// `distro_state`, listed once for the cards of one distro shown together.
+    /// `distro_state`, listed once for the rows of one distro shown together.
     fn state(&self, distro: &str) -> anyhow::Result<DistroState> {
         let key = distro.to_ascii_lowercase();
         if let Some((at, state)) = lock(&self.states).get(&key) {

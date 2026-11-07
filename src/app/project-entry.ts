@@ -19,7 +19,7 @@ interface Picking {
  * target), on the folder given, else its only one; one of several asks which first (`picker`),
  * only among the folders given if any (those holding a file a note names),
  * and `Esc` there leaves everything as it was. `select` puts a project on screen without entering
- * it: the card selected at all projects.
+ * it: the row selected at all projects.
  */
 export function useProjectEntry(list: ProjectList | undefined, project: ProjectInfo | null) {
     const [picked, setPicked] = useState<Readonly<Record<string, string>>>({});
@@ -27,7 +27,7 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
     useFolderOnScreen(folder?.id ?? null);
     const select = useActivateProject();
     const [picking, setPicking] = useState<Picking | null>(null);
-    // the project being entered, whose card the zoom grows from while the list catches up
+    // the project being entered, whose row the zoom grows from while the list catches up
     const [entering, setEntering] = useState<string | null>(null);
     if (entering !== null && list?.active === entering) setEntering(null);
 
@@ -67,7 +67,7 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
         },
         enter,
         select,
-        /** The project whose card the zoom grows from, and back into. */
+        /** The project whose row the zoom grows from, and back into. */
         zoomed: entering ?? list?.active ?? null,
         /** The folder of a project of several asked for, while it is. */
         picker:

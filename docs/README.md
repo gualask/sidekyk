@@ -7,7 +7,9 @@ reason, numbers, sources. One fact in one file; the others point to it.
 - `architecture.md`: data flow, frontend and backend maps, layer rules, git, watching, logs.
 - `features/`: one file per area as built: behaviour, how it is built, decisions.
   - `workspace.md`: levels, tiles and sidebars, keys, settings, toasts and problems.
-  - `projects.md`: identity, folders and their kind, level 0 cards, moved folders.
+  - `projects.md`: identity, folders and their kind, new/edit/remove, moved folders.
+  - `overview.md`: level 0, the projects' rows: what each says, the week of commits, when they
+    are read.
   - `project-folders.md`: several folders in a project, one on screen; merging projects; a folder
     above repositories.
   - `wsl.md`: WSL projects and the helper (protocol, lifecycle, shipping).

@@ -8,10 +8,11 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 
 - A folder under `\\wsl.localhost\<distro>\` or `\\wsl$\<distro>\` (folder picker, Locate…, command
   line) makes a WSL project, read in its distro, never through Windows' view of its files.
-- `WSL: Ubuntu` before the folder on the card and after the name in the top bar, as VS Code's
-  remote indicator: a Windows and a WSL clone of one repository are otherwise two `shop`s.
+- `WSL: Ubuntu` after the name, on its row at level 0 as in the top bar, as VS Code's remote
+  indicator: a Windows and a WSL clone of one repository are
+  otherwise two `shop`s.
 - A stopped distro starts only from its project's Start button (2026-10-24), whatever way the
-  project is opened (card, `↵`, `[`/`]`, a note found). Card: "Ubuntu is not running." Level 1:
+  project is opened (its row, `↵`, `[`/`]`, a note found). Its row: "Ubuntu is not running." Level 1:
   Notes, and a Start panel as the main tile ("Start Ubuntu", then "Starting Ubuntu…"; no key)
   until the folder's panels take its place. Palette: no files; `⌘F` says the distro is not
   running. A distro already running opens at once, "Starting Ubuntu…" while its helper starts. One
@@ -35,7 +36,7 @@ on Windows yet, `ROADMAP.md`). Containers will reuse the helper
 - Distro state: `wsl.exe --list --running --quiet` and `--list --quiet`, names only (the columns of
   `--list --verbose` are in Windows' language); `WSL_UTF8=1`, UTF-16LE read too. Checked before a
   summary when no helper runs: `distro_stopped`, `distro_missing`, kept 5 s for the distro's other
-  cards. A helper that cannot start or a `wsl.exe` that does not answer is `helper_failed`, never
+  rows. A helper that cannot start or a `wsl.exe` that does not answer is `helper_failed`, never
   `distro_missing` (which offers Remove).
 - Helper (`crates/agent`, `sidekyk-agent`, over `crates/core`): `repository`, `search` and `syntax`
   run there (git, files, the watcher and its filter, the palette's ranking of files), so only

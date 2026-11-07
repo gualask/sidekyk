@@ -504,18 +504,12 @@ export function fixtureNotes({
             putList(b, deleted);
             return snapshot(b);
         },
-        // as the backend's `NoteBook::summary`
-        notesSummary: async (key) => {
+        // as the backend's `NoteBook::count`
+        countNotes: async (key) => {
             const { notes } = book(key);
             const open = notes.filter((n) => n.done === null).length;
-            const edited = notes.map((n) => n.edited);
-            return {
-                open,
-                done: notes.length - open,
-                lastEdited: edited.length ? Math.max(...edited) : null,
-            };
+            return { open, done: notes.length - open };
         },
-        countNotes: async (key) => book(key).notes.length,
         // as if saved where the dialog first offers
         exportNotes: async (projectId) => {
             projectBook(projectId);

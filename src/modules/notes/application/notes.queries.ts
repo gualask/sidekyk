@@ -17,13 +17,13 @@ import { changeQueue } from './change-queue';
 import { type NotesPort, useNotesPort } from './notes.port';
 
 /**
- * Where a book's notes are cached, and below the same key what is told of them (a project card's
- * summary, the count before a removal): one family, so reading a book's notes again, or
+ * Where a book's notes are cached, and below the same key what is told of them (the open ones on
+ * its row, the count before a removal): one family, so reading a book's notes again, or
  * forgetting them, takes all of it.
  */
 export const notesKey = (book: string) => ['notes', book] as const;
-const summaryKey = (book: string) => [...notesKey(book), 'summary'] as const;
 const countKey = (book: string) => [...notesKey(book), 'count'] as const;
+const openKey = (book: string) => [...notesKey(book), 'open'] as const;
 
 /**
  * Images on their way to a note: pasted (`previews` shows them) or dropped (their `names`). `add`
@@ -108,7 +108,7 @@ export function useNoteActions(book: string) {
                 notes: notes.notes.map((note) => (note.id === id ? { ...note, ...fields } : note)),
             }));
         const updated = (notes: Note[]) => update((all) => withUpdated(all, notes));
-        /** Another book changed by a move: read again when it shows, its summary too. */
+        /** Another book changed by a move: read again when it shows, its row's count too. */
         const forget = (other: string) => {
             if (other !== book) void client.invalidateQueries({ queryKey: notesKey(other) });
         };
@@ -135,8 +135,8 @@ export function useNoteActions(book: string) {
                 const answer = await queue.run(call);
                 if (answer.kind === 'apply') shown(answer.value);
                 else if (answer.kind === 'reread') reread();
-                // the card's summary is read again when it shows
-                void client.invalidateQueries({ queryKey: summaryKey(book) });
+                // the row's count of open notes is read again when it shows
+                void client.invalidateQueries({ queryKey: openKey(book) });
                 return answer.value;
             } catch (error) {
                 showToast(errorToast(what, error, i18n));
@@ -410,26 +410,32 @@ export function useExportNotes(projectId: string) {
     }, [projectId, port, showToast, i18n]);
 }
 
-/** How many notes a book has, counted each time it is asked: notes just written count. */
+/**
+ * How many notes a book has, open and done, counted each time it is asked and never shown from
+ * an earlier count: what removing its project would delete, notes just written included.
+ */
 export function useNotesCount(book: string) {
     const port = useNotesPort();
     return useQuery({
         queryKey: countKey(book),
-        queryFn: () => port.countNotes(book),
+        queryFn: async () => {
+            const { open, done } = await port.countNotes(book);
+            return open + done;
+        },
         gcTime: 0,
         staleTime: 0,
     });
 }
 
 /**
- * What a book tells of its notes (a project's card), read each time all projects shows (the
- * backend keeps it in memory once read).
+ * How many of a book's notes are open (a project's row), read again each time the row shows; the
+ * last count shows meanwhile (the backend keeps the notes in memory once read).
  */
-export function useNotesSummary(book: string) {
+export function useOpenNotes(book: string) {
     const port = useNotesPort();
     return useQuery({
-        queryKey: summaryKey(book),
-        queryFn: () => port.notesSummary(book),
+        queryKey: openKey(book),
+        queryFn: async () => (await port.countNotes(book)).open,
         staleTime: 0,
     });
 }
@@ -506,7 +512,7 @@ export function useCaptures(book: () => string, onAdded: (book: string, note: No
             client.setQueryData<ProjectNotes>(notesKey(into), (notes) =>
                 notes ? withNotes(notes, [note]) : notes,
             );
-            void client.invalidateQueries({ queryKey: summaryKey(into) });
+            void client.invalidateQueries({ queryKey: openKey(into) });
             // a capture's note holds its one image
             const [image] = note.images;
             if (image) {

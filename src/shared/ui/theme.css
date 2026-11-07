@@ -4,6 +4,9 @@
     --ui-surface: #ffffff;
     --ui-surface-subtle: #f8fafc;
     --ui-surface-hover: #f1f5f9;
+    /* a card on a panel (a note): a step off the panel, set apart by its fill alone */
+    --ui-surface-raised: #f1f4f8;
+    --ui-surface-raised-hover: #e8edf3;
     --ui-border: #e2e8f0;
     --ui-border-hover: #cbd5e1;
     --ui-text: #0f172a;
@@ -90,6 +93,8 @@
         --ui-surface: #2c2f3a;
         --ui-surface-subtle: #30333f;
         --ui-surface-hover: #383c49;
+        --ui-surface-raised: #363a47;
+        --ui-surface-raised-hover: #3e4251;
         --ui-border: rgba(255, 255, 255, 0.1);
         --ui-border-hover: rgba(255, 255, 255, 0.2);
         --ui-text: #f4f6fb;
@@ -154,6 +159,8 @@
     --color-ui-surface: var(--ui-surface);
     --color-ui-surface-subtle: var(--ui-surface-subtle);
     --color-ui-surface-hover: var(--ui-surface-hover);
+    --color-ui-surface-raised: var(--ui-surface-raised);
+    --color-ui-surface-raised-hover: var(--ui-surface-raised-hover);
     --color-ui-border: var(--ui-border);
     --color-ui-border-hover: var(--ui-border-hover);
     --color-ui-text: var(--ui-text);

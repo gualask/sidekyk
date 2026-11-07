@@ -96,7 +96,7 @@ pub fn search_notes(
 
 /// The lists and notes of every book that match, best first: the lists of the projects (the
 /// Inbox's one is never shown), and the best `NOTE_LIMIT` notes of all. Equal scores: open notes
-/// before done ones, then the books' order (the Inbox first, then the projects as their cards),
+/// before done ones, then the books' order (the Inbox first, then the projects as their rows),
 /// then each book's own.
 pub fn search_every_book(query: &str, books: &[BookNotes]) -> (Vec<ListMatch>, Vec<NoteMatch>) {
     let mut lists = Vec::new();

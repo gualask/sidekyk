@@ -1,36 +1,25 @@
 # Projects
 
 A project is a name, its notes and none, one or several folders, each a repository or a folder
-without git, one on screen (`project-folders.md`). Several projects, one on screen.
+without git, one on screen (`project-folders.md`). Several projects, one on screen; how level 0
+shows them: `overview.md`.
 
 ## Behaviour
 
-- New project (2026-10-23): the last card at level 0 opens one dialog for everyone: Name and
+- New project (2026-10-23): the button over the projects at level 0 opens one dialog for everyone: Name and
   Folders (optional; "None" until Add folder…), Create disabled while the name is blank. A folder
   inside a repository becomes the repository's root, any other is taken as it is (2026-10-24); the
   first one's name fills an empty name. Another project's folder is said under them, with Open; a
   folder above repositories asks what it becomes (`project-folders.md`). Create opens the new
   project at level 1.
-- Edit from the card's ⋯: name and folders (`project-folders.md`); two projects may share a name.
-  Remove from the card's ⋯: the folder is untouched, the notes are exported or deleted first
+- Edit from the row's ⋯: name and folders (`project-folders.md`); two projects may share a name.
+  Remove from the row's ⋯: the folder is untouched, the notes are exported or deleted first
   (`notes.md`).
 - `sidekyk <folder>` opens the project of that folder, showing it, adding one named after it if
   none; a folder above repositories opens New project on it instead.
 - What a folder is (2026-10-24): a repository when a `.git` (folder, or file for worktrees and
   submodules) is at its root, else a folder without git. Never stored: `git init` or `.git`
   removed changes the panels while the app runs (`workspace.md`).
-- Level 0 card, three groups set apart by space, on `surface-subtle` (no border, 2026-10-18):
-  - name and under it the branch (ahead/behind kept), or for a folder without git the folder, cut
-    at its start; WSL's tag first (`wsl.md`); the folder in the tooltip;
-  - three boxes: files changed, lines (`+54 −27`), notes waiting; muted at 0, so projects at work
-    stand out; counts kept short (`10k+`, `+999k −999k`) to fit 266 px;
-  - a well of one height: the week of commits, "No commits in 7 days", or why the folder cannot
-    be read.
-  Without folder or without git: boxes "waiting" and "done", the well "Last change yesterday"
-  (`Intl.RelativeTimeFormat`) or "No notes yet".
-- Week of commits: a bar per local day, today and the six before, as tall as the lines changed that
-  day (scaled to the project's busiest), added green below, removed red above; `Last 7 days +2.9k
-  −1.3k` over it, a tooltip per day. Work not committed is in the boxes.
 - Top bar facts: branch, ahead/behind, changed files and lines against HEAD (`1.2k changed +1.2k
   −340`), or "clean".
 - A folder moved or deleted: problem `repository_missing` with Locate… (the project follows the
@@ -57,7 +46,7 @@ without git, one on screen (`project-folders.md`). Several projects, one on scre
   fails; no `.git`, the folder itself and no git runs (on macOS without the Command Line Tools
   `/usr/bin/git` asks to install them).
 - Kind (`get_folder_kind`, `folder::folder_kind`, no git): `repository_missing` for a folder gone,
-  else whether `.git` is at the root. One query for cards and level 1 (`useFolderKind`); a kind that
+  else whether `.git` is at the root. One query for the rows and level 1 (`useFolderKind`); a kind that
   cannot be read counts as a repository, its panels and problems telling why. A change of kind
   comes from the watcher (`kind_changed`) and resets the folder's queries.
 - Dialogs (`NewProjectDialog` in the overview, `EditProjectDialog` from the app, lazy):
@@ -69,16 +58,6 @@ without git, one on screen (`project-folders.md`). Several projects, one on scre
   folder's id and place, the frontend reads the folder again (`useReadFolderAgain`).
 - Without folder: no folder to name, never routed, watched or summarized. A folder without git is routed and watched, never
   asked for a snapshot, summary, diff or commits.
-- Only the folder on screen of the project on screen is watched (`changes.md`). The others show a summary (`load_summary`:
-  status + numstat vs HEAD, new files counted not read, 52 ms on Zed's clone), read when level 0
-  shows, and on show only if older than 30 s; inactive caches expire (`gcTime`).
-- Card parts: each panel's summary fills `lead`, `facts` or `body` (`SummaryPart`); Changes all
-  three, Notes `facts` (and `body` when `repository` is false, `PanelSummaryProps`), Files `lead`
-  for a folder without git (`FilesSummary`). Only the project's panels' summaries show.
-- Week of commits (`get_commit_activity`): `git log --since=@<local midnight 6 days ago>
-  --no-merges --shortstat -n 501 HEAD`, `LC_ALL=C`, at most 500 commits and 256 KiB, summed by
-  local day in the frontend (`activityDays`). Keyed by HEAD and first day, outside the repository's
-  keys: changes on disk leave it alone. 80 ms here (68 commits), 0.5 s on Zed's clone (129).
 
 ## Decisions
 
@@ -94,9 +73,3 @@ without git, one on screen (`project-folders.md`). Several projects, one on scre
   only.
 - Kind by its own query, not from the summary (2026-10-24): at level 1 the summary comes with the
   snapshot, so reading it first would run `git status` twice.
-- Projects not on screen not watched (2026-10-13): level 0 reads summaries when it shows (~65 ms,
-  0.4 s CPU for ten repositories). A watcher per project is cheap on FSEvents and Windows, but on
-  inotify a watch per folder (`../architecture.md`, Watching).
-- On show only what may have changed (2026-10-14): the project marked while hidden, anything older
-  than 30 s. The review loop (`⌘Tab` every 5-30 s) reading ten projects each time is ~140 s CPU an
-  hour; 30 s caps it at ~50 s, another agent's count at most one turn stale.

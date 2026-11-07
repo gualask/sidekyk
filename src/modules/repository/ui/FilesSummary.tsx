@@ -2,7 +2,7 @@ import type { PanelSummaryProps } from '@/shared/panels/panel';
 import { FolderPath } from '@/shared/projects/FolderPath';
 
 /**
- * What Files tells about a project on its card at all projects: the folder under its name, where
+ * What Files tells about a project on its row at all projects: the folder under its name, where
  * a repository shows its branch. Nothing for a repository, whose branch says more.
  */
 export function FilesSummary({ folder, part, repository }: PanelSummaryProps) {

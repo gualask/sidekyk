@@ -58,7 +58,7 @@ pub(super) async fn on_folder<T: Send + 'static>(
 
 #[tauri::command]
 /// Whether a folder of a project is a repository or a folder without git. No git runs, so the
-/// cards ask it at once; `start` starts a stopped WSL distro that holds it: the project's Start
+/// rows ask it at once; `start` starts a stopped WSL distro that holds it: the project's Start
 /// button, and nothing else, asks for that.
 pub(crate) async fn get_folder_kind(
     app: tauri::AppHandle,
@@ -93,7 +93,7 @@ pub(crate) async fn get_repository_summary(
     folder_id: String,
 ) -> Result<RepositorySummary, AppError> {
     on_folder("get_repository_summary", app, folder_id, |on| {
-        // the cards never start a stopped WSL distro
+        // the rows never start a stopped WSL distro
         on.readable_without_starting()?;
         on.repositories.summary(on.info)
     })

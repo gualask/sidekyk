@@ -23,36 +23,29 @@ const NewProjectDialog = lazy(() =>
     import('./NewProjectDialog').then((module) => ({ default: module.NewProjectDialog })),
 );
 
-const GRID_KEYS: Record<string, 'left' | 'right' | 'up' | 'down'> = {
-    ArrowLeft: 'left',
-    ArrowRight: 'right',
-    ArrowUp: 'up',
-    ArrowDown: 'down',
-};
+/** The project on screen: a bar on the row's left edge, where one comes back from. */
+const CURRENT =
+    'before:absolute before:inset-y-2.5 before:left-0 before:w-[3px] before:rounded-full before:bg-ui-accent';
 
-/**
- * Moves the focus among the cards (and "New project") with the arrows, row by row as the grid
- * lays them out.
- */
-function moveInGrid(event: KeyboardEvent<HTMLElement>) {
-    const direction = GRID_KEYS[event.key];
-    if (!direction || event.metaKey || event.ctrlKey || event.altKey) return;
-    const cells = [...event.currentTarget.querySelectorAll<HTMLElement>('[data-grid-cell]')];
-    const at = cells.indexOf(document.activeElement as HTMLElement);
+const LIST_KEYS: Record<string, 1 | -1> = { ArrowDown: 1, ArrowUp: -1 };
+
+/** Moves the focus among the rows with the arrows. */
+function moveInList(event: KeyboardEvent<HTMLElement>) {
+    const step = LIST_KEYS[event.key];
+    if (!step || event.metaKey || event.ctrlKey || event.altKey) return;
+    const rows = [...event.currentTarget.querySelectorAll<HTMLElement>('[data-list-row]')];
+    const at = rows.indexOf(document.activeElement as HTMLElement);
     if (at < 0) return;
-    const columns = cells.filter((cell) => cell.offsetTop === cells[0].offsetTop).length;
-    const step = { left: -1, right: 1, up: -columns, down: columns }[direction];
-    const next = cells[at + step];
     event.preventDefault();
-    next?.focus();
+    rows[at + step]?.focus();
 }
 
 /**
- * Level 0: one card per project, doubling as the project switcher, the "+ New project" card last
- * (alone without projects), which opens the New project dialog; a card's ⋯ edits (name, folders)
- * or removes. It opens with the focus on the project on screen, so `↵` goes back to it and the
- * arrows start from it. It fills the room beside it down to one column of
- * cards: what is beside gives way then.
+ * Level 0 beside the Inbox: a header with New project, which opens the New project dialog, then
+ * a row per project on the window's background, set apart by a line, doubling as the project
+ * switcher; a row's ⋯ edits (name, folders) or removes. It opens with the focus on the project on
+ * screen, so `↵` goes back to it and the arrows start from it. It gives way first in a narrow
+ * window.
  */
 export function ProjectsOverview({
     list,
@@ -65,7 +58,7 @@ export function ProjectsOverview({
     onAskedTaken,
 }: {
     list: ProjectList;
-    /** The project whose card the zoom to its panels grows from, and back into. */
+    /** The project whose row the zoom to its panels grows from, and back into. */
     zoomed: string | null;
     /** A project was picked or made: the app shows it, asking first which folder of several. */
     onOpen: (projectId: string) => void;
@@ -73,7 +66,7 @@ export function ProjectsOverview({
     onEdit: (project: ProjectInfo) => void;
     /** A project's removal asked for: the app asks what to do with what it holds, then removes. */
     onRemove: (project: ProjectInfo) => void;
-    /** What the panels tell about a project, below its name, part by part. */
+    /** What the panels tell about a project on its row, part by part. */
     summary: (project: ProjectInfo, part: SummaryPart) => ReactNode;
     /** A folder given on the command line to ask about: the New project dialog opens on it. */
     asked: FolderChoice | null;
@@ -88,48 +81,52 @@ export function ProjectsOverview({
         setCreating({ picked: asked });
         onAskedTaken();
     }, [asked, onAskedTaken]);
-    const grid = useRef<HTMLDivElement>(null);
+    const rows = useRef<HTMLUListElement>(null);
 
     useEffect(() => {
-        grid.current?.querySelector<HTMLElement>('[data-current-card]')?.focus();
+        rows.current?.querySelector<HTMLElement>('[data-current-row]')?.focus();
     }, []);
 
     return (
         <section
             aria-label={t('common.allProjects')}
-            // a card's least width, the grid's column and the least the overview takes with its
-            // padding
-            className="h-full min-w-[calc(var(--card-min)+2rem)] flex-1 overflow-auto p-4 [--card-min:300px]"
+            className="h-full min-w-80 flex-1 overflow-auto px-4 pb-4"
         >
-            <div
-                ref={grid}
-                className="grid grid-cols-[repeat(auto-fill,minmax(var(--card-min),1fr))] gap-4"
-                onKeyDown={moveInGrid}
-            >
-                {list.projects.map((project) => (
-                    <ProjectCard
-                        key={project.id}
-                        project={project}
-                        selected={project.id === list.active}
-                        zoomed={project.id === zoomed}
-                        onOpen={() => onOpen(project.id)}
-                        onEdit={() => onEdit(project)}
-                        onRemove={() => onRemove(project)}
-                        summary={(part) => summary(project, part)}
-                    />
-                ))}
-                <button
-                    type="button"
-                    data-grid-cell
-                    className="flex min-h-44 flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-ui-border p-4 text-center text-ui-text-muted transition-colors hover:border-ui-border-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-accent"
-                    onClick={() => setCreating({ picked: null })}
-                >
-                    <span className="flex items-center gap-2 text-sm">
-                        <IconPlus size={16} />
+            <div className="max-w-3xl">
+                <header className="flex items-center justify-between gap-3 pt-3.5 pb-2">
+                    <h2 className="text-[15px] font-bold">{t('projects.title')}</h2>
+                    <button
+                        type="button"
+                        className="btn-ghost-sm"
+                        title={t('projects.newHint')}
+                        onClick={() => setCreating({ picked: null })}
+                    >
+                        <IconPlus size={14} />
                         {t('projects.new')}
-                    </span>
-                    <span className="text-xs">{t('projects.newHint')}</span>
-                </button>
+                    </button>
+                </header>
+                {list.projects.length === 0 ? (
+                    <p className="text-xs text-ui-text-muted">{t('projects.newHint')}</p>
+                ) : null}
+                <ul
+                    ref={rows}
+                    className="divide-y divide-ui-border border-y border-ui-border"
+                    onKeyDown={moveInList}
+                >
+                    {list.projects.map((project) => (
+                        <li key={project.id}>
+                            <ProjectRow
+                                project={project}
+                                selected={project.id === list.active}
+                                zoomed={project.id === zoomed}
+                                onOpen={() => onOpen(project.id)}
+                                onEdit={() => onEdit(project)}
+                                onRemove={() => onRemove(project)}
+                                summary={(part) => summary(project, part)}
+                            />
+                        </li>
+                    ))}
+                </ul>
             </div>
             {creating ? (
                 <Suspense fallback={null}>
@@ -145,7 +142,12 @@ export function ProjectsOverview({
     );
 }
 
-function ProjectCard({
+/**
+ * A project: its avatar, its name and the line under it, then the week of commits at the row's
+ * end. Tinted under the pointer; the project on screen marked by an accent bar on its left
+ * edge.
+ */
+function ProjectRow({
     project,
     selected,
     zoomed,
@@ -156,7 +158,7 @@ function ProjectCard({
 }: {
     project: ProjectInfo;
     selected: boolean;
-    /** The zoom to the project's panels grows from this card, or back into it. */
+    /** The zoom to the project's panels grows from this row, or back into it. */
     zoomed: boolean;
     onOpen: () => void;
     onEdit: () => void;
@@ -169,40 +171,37 @@ function ProjectCard({
         <article
             data-zoom
             style={zoomed ? { viewTransitionName: ZOOM_NAMES.project } : undefined}
-            className={`relative flex flex-col gap-4 rounded-xl border bg-ui-surface p-4 shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-colors ${
-                selected
-                    ? 'border-ui-accent shadow-[0_0_0_3px_var(--ui-accent-soft),0_8px_24px_var(--ui-shadow-soft)]'
-                    : 'border-ui-border hover:border-ui-border-hover'
+            className={`group relative flex min-h-14 items-center gap-3 px-2 py-2 transition-colors hover:bg-ui-surface-hover ${
+                selected ? CURRENT : ''
             }`}
         >
-            <div className="flex min-w-0 items-center gap-2.5 pr-8">
-                <ProjectAvatar project={project} className="h-8 w-8 text-sm" />
-                <div className="min-w-0 flex-1">
-                    {/* the whole card opens the project; its menu stays a button of its own */}
+            <ProjectAvatar project={project} className="h-8 w-8 text-sm" />
+            <div className="min-w-0 flex-1">
+                {/* the name, cut before the machine it is on, which tells two `shop`s apart */}
+                <div className="flex min-w-0 items-center gap-2">
+                    {/* the whole row opens the project; its menu stays a button of its own */}
                     <button
                         type="button"
-                        data-grid-cell
+                        data-list-row
                         data-zoom-in
-                        data-current-card={selected ? '' : undefined}
-                        className="block max-w-full truncate text-left text-[15px] font-bold after:absolute after:inset-0 after:rounded-xl focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:outline-offset-2 focus-visible:after:outline-ui-accent"
-                        // its overlay covers the card: the folder shows wherever the pointer rests
+                        data-current-row={selected ? '' : undefined}
+                        className="block min-w-0 truncate text-left text-sm font-semibold after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ui-accent"
+                        // its overlay covers the row: the folder shows wherever the pointer rests
                         title={folder ? placeName(folder) : undefined}
                         onClick={onOpen}
                     >
                         {project.name}
                     </button>
-                    <div className="flex min-w-0 items-center gap-1.5">
-                        <RemoteTag folder={folder} className="h-4 px-1.5 text-[11px]" />
-                        {summary('lead')}
-                    </div>
+                    <RemoteTag folder={folder} className="h-4 px-1.5 text-[11px]" />
                 </div>
+                {/* empty while the summaries load, and for a project without folder */}
+                <div className="flex min-w-0 items-center empty:hidden">{summary('lead')}</div>
             </div>
-            {/* empty while the summaries load, or when none has a number */}
-            <div className="flex gap-1.5 empty:hidden">{summary('facts')}</div>
-            {summary('body')}
+            {/* one width, so that the rows' ends line up */}
+            <div className="w-32 shrink-0">{summary('end')}</div>
             <Menu.Root>
                 <Menu.Trigger
-                    className="btn-icon absolute top-2 right-2 h-7 w-7 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text"
+                    className="btn-icon relative h-7 w-7 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text data-popup-open:opacity-100"
                     title={t('common.more')}
                     aria-label={t('projects.moreFor', { name: project.name })}
                 >

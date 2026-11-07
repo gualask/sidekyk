@@ -16,7 +16,7 @@ hidden.
   problem; none may take another's keys (a problem names the one holding them). While a new one
   is typed, none acts.
 - Hidden, minimized or covered: no git; on show only what may have changed is read
-  (`projects.md`).
+  (`overview.md`).
 - The window is created hidden and shown after the first paint.
 
 ## How it is built

@@ -60,20 +60,18 @@ export interface PanelProps {
 }
 
 /**
- * The parts of a project's card at all projects, top to bottom: lines of its own under the
- * project's folder, one row of numbers that every panel adds to, then what fills the rest.
+ * The parts of a project's row at all projects: the line under its name, and what ends the row.
  */
-export type SummaryPart = 'lead' | 'facts' | 'body';
+export type SummaryPart = 'lead' | 'end';
 
 /**
- * What a panel's summary gets: the project of the card it is on, and the part to show. The card
- * shows each summary once per part, so a summary shows nothing in the parts it has nothing for;
- * in `facts` it shows items of a row.
+ * What a panel's summary gets: the project of the row it is on, and the part to show. The row
+ * shows each summary once per part, so a summary shows nothing in the parts it has nothing for.
  */
 export interface PanelSummaryProps {
     project: ProjectInfo;
     /**
-     * The project's one folder, whose summary the card shows; null without folder, and with
+     * The project's one folder, whose summary the row shows; null without folder, and with
      * several (their summaries are the project's folders').
      */
     folder: ProjectFolder | null;
@@ -105,8 +103,8 @@ export interface PanelDefinition {
      */
     view: Preloadable<PanelProps>;
     /**
-     * What the panel tells about a project on its card at all projects (level 0), if anything.
-     * A chunk of its own, loaded with level 0; it fetches only what the card shows.
+     * What the panel tells about a project on its row at all projects (level 0), if anything.
+     * A chunk of its own, loaded with level 0; it fetches only what the row shows.
      */
     summary?: Preloadable<PanelSummaryProps>;
 }

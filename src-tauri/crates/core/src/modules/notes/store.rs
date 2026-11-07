@@ -28,7 +28,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use super::book::{NoteBook, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
     Book, DeletedList, ImageKind, ImageTarget, ListTarget, Mark, MarkedImage, MovedList, MovedNote,
-    Note, NoteImage, NoteList, NotesSummary, ProjectNotes, SourceImage, StoredLists, StoredNote,
+    Note, NoteImage, NoteList, NotesCount, ProjectNotes, SourceImage, StoredLists, StoredNote,
     StoredProject, StoredState, STORED_VERSION,
 };
 use super::images::{
@@ -531,14 +531,9 @@ impl NotesStore {
         self.with_book(storage, book, NoteBook::snapshot)
     }
 
-    /// What a book tells of its notes: a project's card at all projects.
-    pub fn summary(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<NotesSummary> {
-        self.with_book(storage, book, NoteBook::summary)
-    }
-
     /// How many notes a book has, open and done.
-    pub fn count(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<usize> {
-        self.with_book(storage, book, |notes| notes.notes.len())
+    pub fn count(&self, storage: &dyn NotesStorage, book: &Book) -> anyhow::Result<NotesCount> {
+        self.with_book(storage, book, NoteBook::count)
     }
 
     /// Deletes a project's notes, its folder with them: the project goes. The Inbox stays.
@@ -1271,22 +1266,21 @@ pub mod tests {
     fn every_book_read_stays_in_memory() {
         let storage = two_books_on_disk();
         let store = NotesStore::default();
-        // the cards read every book
+        // every book read once
         for book in [shop(), docs()] {
-            assert_eq!(store.summary(&storage, &book).unwrap().open, 1);
+            assert_eq!(store.count(&storage, &book).unwrap().open, 1);
         }
         assert!(storage.reads() > 0);
-        // a project switch, its card, an export, the palette: no file read again
+        // a project switch, an export, the palette, a removal's count: no file read again
         store.notes(&storage, &shop()).unwrap();
         store.notes(&storage, &docs()).unwrap();
-        store.summary(&storage, &shop()).unwrap();
         store.with_notes(&storage, &shop(), |_, _| ()).unwrap();
-        assert_eq!(store.count(&storage, &docs()).unwrap(), 1);
+        assert_eq!(store.count(&storage, &docs()).unwrap().open, 1);
         assert_eq!(storage.reads(), 0);
     }
 
     #[test]
-    fn a_summary_comes_from_the_notes_changed() {
+    fn a_count_comes_from_the_notes_changed() {
         let storage = two_books_on_disk();
         let store = NotesStore::default();
         let list = store.notes(&storage, &shop()).unwrap().open_list;
@@ -1294,8 +1288,7 @@ pub mod tests {
             .add_note(&storage, &shop(), &list, "b".into())
             .unwrap();
         store.notes(&storage, &docs()).unwrap();
-        assert_eq!(store.summary(&storage, &shop()).unwrap().open, 2);
-        assert_eq!(store.count(&storage, &shop()).unwrap(), 2);
+        assert_eq!(store.count(&storage, &shop()).unwrap().open, 2);
     }
 
     #[test]
@@ -1368,18 +1361,19 @@ pub mod tests {
         store
             .add_note(&storage, &shop(), &list, "b".into())
             .unwrap();
-        assert_eq!(store.count(&storage, &shop()).unwrap(), 2);
+        assert_eq!(store.count(&storage, &shop()).unwrap().open, 2);
         assert_eq!(
             store
                 .count(&storage, &project("/dev/other", "other"))
-                .unwrap(),
+                .unwrap()
+                .open,
             0
         );
 
         store.delete_book(&storage, &shop()).unwrap();
         assert!(storage.names().is_empty());
         // gone from memory too
-        assert_eq!(store.count(&storage, &shop()).unwrap(), 0);
+        assert_eq!(store.count(&storage, &shop()).unwrap().open, 0);
         // added again, it starts with none
         assert!(store.notes(&storage, &shop()).unwrap().notes.is_empty());
     }
@@ -1785,7 +1779,7 @@ pub mod tests {
             texts(&store, &storage, &docs(), &merged.lists[2].id),
             ["flow"]
         );
-        assert_eq!(store.count(&storage, &shop()).unwrap(), 0);
+        assert_eq!(store.count(&storage, &shop()).unwrap().open, 0);
     }
 
     #[test]

@@ -8,11 +8,15 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 
 - Cards, not documents: plain text and images below it (`note-images.md`), the user's order (new
   on top), marked done when used; done cards fold into "Done (n)". Actions on the card, never in
-  its text: done circle left, copy and ⋯ right (move to top, reorder, Move…, delete; move and
-  delete undoable).
+  its text: done circle left, copy and ⋯ right, shown under the pointer or the focus (move to
+  top, reorder, Move…, delete; move and delete undoable).
+- A card is filled (`--ui-surface-raised`, a step off the panel) with a soft shadow, no border;
+  under the pointer a step further (`--ui-surface-raised-hover`) and its shadow deeper, since a
+  click edits it. Edited, or with an image dragged over it, it has an accent border. The same
+  card in a project's Notes and in the Inbox.
 - Edit in place: four lines shown, all when clicked; `Esc`, `⌘↵` or a click outside closes; an
   empty card goes (Undo). Long lines wrap or scroll (setting `noteLines`, `⌥Z` in a note).
-- The field on top adds to the open list: `↵` adds, `⇧↵` a new line, a paste into the empty field
+- The field on top ("Write or paste a note…", the same in the Inbox) adds to the open list: `↵` adds, `⇧↵` a new line, a paste into the empty field
   adds at once; `⌘N` focuses it.
 - Lists by topic: on the left full screen, a menu from the header in a tile. Double click renames;
   a list's ⋯: Rename, Move to project…, Delete (with its notes, Undo; the last list only renames).
@@ -22,8 +26,9 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 - Export a project's notes to Markdown from the panel's ⋯, never inside a repository. Removing a
   project with notes asks: export then remove, or delete; nothing stays on disk.
 - Inbox (2026-10-23): whatever comes to mind, to sort later; a column at level 0 left of the
-  cards. Not a project: no card, level 1, folder, removal or rename. The field on top (`⌘N` at
-  level 0), newest first. Its notes are edited, copied, moved or deleted; no lists, done or order.
+  projects. Not a project: no row, level 1, folder, removal or rename. The field on top
+  (`⌘N` at level 0), newest first. Its notes are edited, copied, moved or deleted; no lists, done
+  or order.
   From any app: the quick note (`quick-note.md`).
 - Move (2026-10-23): one dialog from a note's ⋯ (Move…) and a list's ⋯ (Move to project…). A note
   goes between the Inbox and projects, or to another list; a list to another project, whole, into
@@ -51,8 +56,9 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   edited, done, images), and its images' files. A move takes the middle of its neighbours'
   positions, renumbering only when no room is left. Ids are 16 hex digits, the only names let
   through to files.
-- Every book read stays in memory (`NotesStore::books`, one lock) until quit or removal: the cards
-  read every book at start, so files are read once per session. A change writes at once only the
+- Every book read stays in memory (`NotesStore::books`, one lock) until quit or removal: a book is
+  read the first time it is asked for (its project's Notes; the palette at all projects reads them
+  all), so files are read once per session. A change writes at once only the
   files it touched (written beside, `sync_all`, renamed over); a failed write drops that book,
   read again at the next call. Safe because only the app writes there (single instance, every
   change through the store); a sync must write through it too. Until its first change a book's
@@ -77,11 +83,12 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   `useNotes` reads a book once (`['notes', book]`, never stale: only the app writes);
   `useNoteActions` changes the cache at once, then sends the change after those before it
   (`ChangeQueue`, per book); only the last answer is shown, a skipped or failed one rereads the
-  notes. A card saves 500 ms after typing stops and on close. A book's summary and count are
-  cached under its key and made stale by every change.
+  notes. A card saves 500 ms after typing stops and on close. A book's count (`count_notes`:
+  open and done) is asked by a project's row, its open notes shown from the last count while read
+  again, and before a removal, never from an earlier count.
 - Measured (release, ~470-character notes): 1,000 notes read 26 ms, a change 5 ms (mostly
   `sync_all`); every book kept (2026-10-24, 1,000 / 9,000 / 30,000 notes): 0.65 / 6.2 / 18.6 MB,
-  the cards at start 23 / 280 / 1,030 ms, a project switch 0.01-0.05 ms (was 2.2-11.3 ms).
+  every book read (once a session: the palette's first search at all projects) 23 / 280 / 1,030 ms, a project switch 0.01-0.05 ms (was 2.2-11.3 ms).
 
 ## Decisions
 
@@ -90,6 +97,6 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
 - Every book kept in memory once read (2026-10-24, the maintainer: memory over disk reads): about
   0.6 MB per 1,000 notes; no eviction and no index until a measure asks.
 - No project made from notes (2026-11-05, the maintainer; Move made one without folder since
-  2026-10-23): a project is made on purpose, from its card. Gone with it: a typo making a project,
+  2026-10-23): a project is made on purpose, from its own flow. Gone with it: a typo making a project,
   and the project made then removed when its move failed. A new list stays: it is inside a
   project that exists.

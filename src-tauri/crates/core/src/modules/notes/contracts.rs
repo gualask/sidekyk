@@ -222,15 +222,12 @@ pub struct ProjectNotes {
     pub open_list: String,
 }
 
-/// What a book tells of its notes: a project's card at all projects.
-#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NotesSummary {
+/// How many notes a book has: the open ones on a project's row, all of them before its removal.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct NotesCount {
     /// The notes not done.
     pub open: u32,
     pub done: u32,
-    /// When the newest change to a note's text was, `None` without notes.
-    pub last_edited: Option<u64>,
 }
 
 /// A list deleted with its notes, handed back to bring them all back (undo).
@@ -305,6 +302,14 @@ pub(super) struct StoredState {
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_count_uses_the_frontend_field_names() {
+        assert_eq!(
+            serde_json::to_value(NotesCount { open: 2, done: 1 }).unwrap(),
+            serde_json::json!({ "open": 2, "done": 1 })
+        );
+    }
+
     fn note() -> Note {
         Note {
             id: "0123456789abcdef".into(),
@@ -366,19 +371,6 @@ mod tests {
         assert_eq!(
             serde_json::from_value::<DeletedList>(json).unwrap(),
             deleted
-        );
-    }
-
-    #[test]
-    fn a_summary_uses_the_frontend_field_names() {
-        let summary = NotesSummary {
-            open: 2,
-            done: 1,
-            last_edited: Some(5),
-        };
-        assert_eq!(
-            serde_json::to_value(summary).unwrap(),
-            serde_json::json!({ "open": 2, "done": 1, "lastEdited": 5 })
         );
     }
 

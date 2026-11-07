@@ -40,7 +40,7 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 
 - `app/`: composition root: providers, shell (top bar, levels, tiles), keys and zoom gestures,
   panels (`panels.ts`), problems.
-- `modules/`: `projects` (list, level 0 cards, dialogs), `repository` (Changes and Files, the
+- `modules/`: `projects` (list, level 0 rows, dialogs), `repository` (Changes and Files, the
   folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`),
   `notes`, `search` (the palette; ranking and reading are the backend's), `settings`. Each panel
   module one lazy chunk.

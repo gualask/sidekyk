@@ -2,7 +2,7 @@
 //! touched, and `NotesStore` writes them.
 
 use super::contracts::{
-    DeletedList, ListTarget, Note, NoteImage, NoteList, NotesSummary, ProjectNotes,
+    DeletedList, ListTarget, Note, NoteImage, NoteList, NotesCount, ProjectNotes,
 };
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 use crate::shared::id::is_id;
@@ -56,8 +56,7 @@ fn checked_name(name: &str) -> anyhow::Result<String> {
 /// A note's first line, as a row shows it, is cut past this many characters.
 const TITLE_CHARS: usize = 160;
 
-/// A note's first line that is not blank, cut to fit a row: what names it (the palette, a
-/// project's card).
+/// A note's first line that is not blank, cut to fit a row: what names it in the palette.
 pub fn note_title(text: &str) -> String {
     let line = text
         .lines()
@@ -125,14 +124,12 @@ impl NoteBook {
         (book, touched)
     }
 
-    /// What a project's card tells of its notes: how many wait, how many are done, and when the
-    /// last was written.
-    pub(super) fn summary(&self) -> NotesSummary {
+    /// How many of its notes are open, how many done.
+    pub(super) fn count(&self) -> NotesCount {
         let open = self.notes.iter().filter(|n| n.done.is_none()).count() as u32;
-        NotesSummary {
+        NotesCount {
             open,
             done: self.notes.len() as u32 - open,
-            last_edited: self.notes.iter().map(|n| n.edited).max(),
         }
     }
 
@@ -630,6 +627,15 @@ mod tests {
     }
 
     #[test]
+    fn a_count_tells_open_and_done_notes_apart() {
+        assert_eq!(book().count(), NotesCount::default());
+        let mut book = with_notes(&["a", "b"]);
+        book.add(id(9), RELEASE, "c".into(), 9).unwrap();
+        book.set_done(&id_of(&book, "a"), true, 10).unwrap();
+        assert_eq!(book.count(), NotesCount { open: 2, done: 1 });
+    }
+
+    #[test]
     fn a_project_without_lists_gets_one_and_strays_join_it() {
         let stray = Note {
             id: id(1),
@@ -829,23 +835,6 @@ mod tests {
         assert_eq!(book.open_list, id(5));
         assert!(book.add_list(id(6), "   ").is_err());
         assert_eq!(book.rename_list(&id(5), "Arch").unwrap().0.name, "Arch");
-    }
-
-    #[test]
-    fn a_summary_counts_open_and_done_notes_and_tells_the_last_edit() {
-        assert_eq!(book().summary(), NotesSummary::default());
-        let mut book = with_notes(&["a", "b"]);
-        book.add(id(9), RELEASE, "c".into(), 9).unwrap();
-        book.set_done(&id_of(&book, "a"), true, 10).unwrap();
-        book.set_text(&id_of(&book, "b"), "B".into(), 12).unwrap();
-        assert_eq!(
-            book.summary(),
-            NotesSummary {
-                open: 2,
-                done: 1,
-                last_edited: Some(12)
-            }
-        );
     }
 
     #[test]

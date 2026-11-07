@@ -20,7 +20,7 @@ The palette is the only search; panels have no filter.
   unfolded, its tile back from the top bar.
 - At level 0: a note's row says "{list} in {project}" or "Inbox", a list's its project. At most 50
   notes, the best of every book; equal scores open before done, then the Inbox's, then the
-  projects' in the cards' order. `↵` on a project's note or list opens that project at level 1 on
+  projects' in the rows' order. `↵` on a project's note or list opens that project at level 1 on
   Notes, starting no distro; on an Inbox note level 0 stays and its column scrolls to it.
 - In contents: results streamed, the open file first; `↵` opens the file with the find bar at the
   line.

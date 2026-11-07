@@ -55,7 +55,6 @@ export const tauriNotes: NotesPort = {
     deleteList: (book, id) => invoke('delete_note_list', { book, id }),
     restoreList: (book, deleted) => invoke('restore_note_list', { book, deleted }),
     openList: (book, id) => invoke('open_note_list', { book, id }),
-    notesSummary: (book) => invoke('notes_summary', { book }),
     countNotes: (book) => invoke('count_notes', { book }),
     exportNotes: (projectId) => invoke('export_notes', { projectId }),
     // the bytes cross raw, as the body; the book and the target as headers (`notes.rs`, `pasted`)

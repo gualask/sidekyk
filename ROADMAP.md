@@ -93,7 +93,7 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
     runs View Transitions
   - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
     log; a new folder's files told, an ignored folder silent); a WSL folder without git through
-    the real `wsl.exe` (its card without starting the distro, "Starting …" on opening it)
+    the real `wsl.exe` (its row without starting the distro, "Starting …" on opening it)
   - Linux and Windows: images in the viewer through `project-file:` (WebView2's
     `http://project-file.localhost`), a preview's link opened in the browser; WebKitGTK and AVIF
   - Linux and Windows, images in notes (`docs/features/note-images.md`): a screenshot and a file
@@ -106,16 +106,6 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - Linux and Windows: tray icon and menu; a never-shown window's page loads and calls back;
     the window's visibility (`docs/testing.md`, Trying it on Windows and Linux; WebView2 may
     need its controller told); `prefers-color-scheme` follows the window theme
-
-## Later
-
-To evaluate once the app is complete, when its evolution is discussed.
-
-- [ ] Notes as a folder of Markdown files in two-way sync, outside repositories: an alternative
-      to Drive sync (`.cflow/plans/notes-sync.md`)
-- [ ] PDF in the file viewer, decided with projects without git, where documents live: VS Code
-      and Zed have none, and in a repository an agent edits a PDF rarely changes. Candidate:
-      `pdfium-render` rendering in Rust (2026-11-01; `.cflow/plans/previews.md`, PDF)
 
 ## Performance review
 

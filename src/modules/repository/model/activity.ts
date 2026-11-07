@@ -1,6 +1,6 @@
 import type { CommitActivity } from './repository.types';
 
-/** The days of a card's chart: today and the six before it. */
+/** The days of a row's week: today and the six before it. */
 export const ACTIVITY_DAYS = 7;
 
 /** A day of work: the lines its commits added and removed. */

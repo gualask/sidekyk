@@ -10,7 +10,7 @@ import type {
     Note,
     NoteImage,
     NoteList,
-    NotesSummary,
+    NotesCount,
     ProjectNotes,
 } from '../model/notes.types';
 
@@ -65,10 +65,8 @@ export interface NotesPort {
     restoreList(book: string, deleted: DeletedList): Promise<ProjectNotes>;
     /** Remembers the list open, for the next time the book shows. */
     openList(book: string, id: string): Promise<void>;
-    /** What a book tells of its notes: a project's card at all projects. */
-    notesSummary(book: string): Promise<NotesSummary>;
-    /** How many notes a book has, open and done: what removing a project would delete. */
-    countNotes(book: string): Promise<number>;
+    /** How many notes a book has, open and done. */
+    countNotes(book: string): Promise<NotesCount>;
     /** Asks where to save a project's notes as Markdown and saves them; the path, or null. */
     exportNotes(projectId: string): Promise<string | null>;
     /** Adds an image pasted (its bytes) to a note, or to a new one on top of a list. */

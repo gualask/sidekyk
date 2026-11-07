@@ -160,7 +160,7 @@ pub struct FileChange {
     pub new_blob: Option<String>,
 }
 
-/// A repository at a glance: its card, the breadcrumb. Cheap enough to
+/// A repository at a glance: its row, the breadcrumb. Cheap enough to
 /// load for every project on screen (`git status` and one numstat against HEAD).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

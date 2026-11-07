@@ -2,7 +2,7 @@ import { flushSync } from 'react-dom';
 
 /**
  * The elements a zoom carries from one level to the next, as `view-transition-name`s: the
- * project (its card at all projects, its panels below), and each panel (its tile, or full
+ * project (its row at all projects, its panels below), and each panel (its tile, or full
  * screen). One element at a time has each name.
  */
 export const ZOOM_NAMES = {
@@ -11,8 +11,9 @@ export const ZOOM_NAMES = {
 };
 
 /**
- * The control that zooms in on what is under the pointer: an element marked `data-zoom` (a card,
- * a tile) holds one marked `data-zoom-in` (the card's name, the tile's zoom button). `⌘`+scroll
+ * The control that zooms in on what is under the pointer: an element marked `data-zoom` (a
+ * project's row, a panel's tile) holds one marked `data-zoom-in` (the project's name, the panel's
+ * zoom button). `⌘`+scroll
  * presses it, so the zoom takes the same path as a click.
  */
 export function zoomControlAt(target: EventTarget | null): HTMLElement | null {

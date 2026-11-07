@@ -5,7 +5,7 @@ problems. Why semantic zoom: `../product.md`.
 
 ## Behaviour
 
-- Levels: 0 all projects (the Inbox, `notes.md`, and the cards, `projects.md`), 1 a project's
+- Levels: 0 all projects (the Inbox, `notes.md`, and the projects' rows, `overview.md`), 1 a project's
   panels as tiles, 2 one panel full screen; View Transitions, 320 ms. The breadcrumb (All projects
   / project / panel; with several folders the one on screen after the project,
   `project-folders.md`) in the top bar is the only "where am I".
@@ -17,7 +17,7 @@ problems. Why semantic zoom: `../product.md`.
   no level 2 (`↵`, zooming in and `1`-`9` do nothing). The top
   bar's facts only for a repository. `git init` or `.git` removed switches the panels at the level
   shown. A stopped WSL distro: `wsl.md`. Until the kind is read, nothing is drawn.
-- Level 0 in a narrow window: the cards give way first, down to one column (300 px), then the Inbox
+- Level 0 in a narrow window: the projects' rows give way first, down to 320 px, then the Inbox
   down to 320 px; the window's least width (760 px) fits both.
 - Tiles, the only level 1 layout (tabs dropped 2026-10-13): the main tile on the left keeps 560 px;
   the others in the side column (Files above Notes), which gives way first. The column has one width, the
@@ -75,7 +75,7 @@ problems. Why semantic zoom: `../product.md`.
   before is not missed.
 - Panels (`app/panels.ts`): each says what it needs (`PanelDefinition.needs`: Changes a repository,
   Files a folder, Notes nothing); `projectTiles(kind)` gives a project's panels in their keys'
-  order, the main tile (the first, Notes without git), its card's summaries and what opens full
+  order, the main tile (the first, Notes without git), its row's summaries and what opens full
   screen. A tile's panel can open itself full screen (`PanelProps.zoomIn`). A panel asked for that the project
   lacks gives way to its main one.
 - Keys: `app/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with

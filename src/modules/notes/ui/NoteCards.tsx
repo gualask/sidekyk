@@ -103,7 +103,7 @@ export function NoteCards({
                 book={book}
                 focus={focusComposer}
                 onFocused={onComposerFocused}
-                placeholder={t('notes.composer', { list: list.name })}
+                placeholder={t('notes.composer')}
                 label={t('notes.newNoteIn', { list: list.name })}
                 hint={empty ? t('notes.composerHint') : null}
                 {...images.composer}

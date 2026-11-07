@@ -14,6 +14,18 @@ import { autosize, fitLines, linesClass } from './notes-layout';
 import { DROP_ATTRIBUTE } from './use-image-drops';
 import { useReferenceField } from './use-reference-field';
 
+/**
+ * A card: its fill sets it apart from the panel, no border; its border lit while edited or files
+ * are dragged over it.
+ */
+/** At rest; under the pointer a step lighter, its shadow a little deeper: it can be clicked. */
+const LOOK =
+    'border-transparent bg-ui-surface-raised shadow-[0_1px_2px_var(--ui-shadow-soft)] transition-[background-color,box-shadow] duration-150 hover:bg-ui-surface-raised-hover hover:shadow-[0_2px_8px_var(--ui-shadow-soft)]';
+const ACTIVE = 'border-ui-accent bg-ui-surface-raised';
+/** Its buttons: shown while the pointer or the focus is on it, or its menu is open. */
+const ACTIONS =
+    'opacity-0 group-focus-within/card:opacity-100 group-hover/card:opacity-100 has-data-popup-open:opacity-100';
+
 /** How long typing pauses before the text is saved; closing the card saves at once. */
 const SAVE_DELAY_MS = 500;
 
@@ -75,10 +87,8 @@ export function NoteCard({
 
     return (
         <article
-            className={`group/card relative flex items-start gap-2.5 rounded-[9px] border bg-ui-surface-subtle py-2 pr-1.5 pl-2.5 ${
-                editing || dropping
-                    ? 'border-ui-accent'
-                    : 'border-ui-border hover:border-ui-border-hover'
+            className={`group/card relative flex items-start gap-2.5 rounded-[9px] border py-2 pr-1.5 pl-2.5 ${
+                editing || dropping ? ACTIVE : LOOK
             } ${flash ? 'note-flash' : ''}`}
             aria-label={t('notes.note')}
             {...{ [DROP_ATTRIBUTE]: note.id }}
@@ -129,7 +139,7 @@ export function NoteCard({
                     {noteMeta(note, Date.now(), i18n)}
                 </div>
             </div>
-            <div className="-mt-0.5 -mr-0.5 flex shrink-0 items-start">
+            <div className={`-mt-0.5 -mr-0.5 flex shrink-0 items-start ${editing ? '' : ACTIONS}`}>
                 <button
                     type="button"
                     className="btn-icon h-6 w-6"

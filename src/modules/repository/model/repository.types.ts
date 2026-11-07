@@ -66,7 +66,7 @@ interface ChangeTotals {
     deletions: number;
 }
 
-/** A repository at a glance: its card, the breadcrumb. */
+/** A repository at a glance: its row, the breadcrumb. */
 export interface RepositorySummary {
     branch: BranchStatus;
     totals: ChangeTotals;

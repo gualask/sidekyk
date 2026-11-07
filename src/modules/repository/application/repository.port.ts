@@ -29,7 +29,7 @@ import type {
 export interface RepositoryPort {
     /**
      * Whether a folder of a project is a repository or a folder without git: no git runs. `start`
-     * starts a stopped WSL distro holding it, as opening the project does; the cards never do.
+     * starts a stopped WSL distro holding it, as opening the project does; the rows never do.
      */
     getFolderKind(folderId: string, start: boolean): Promise<FolderKind>;
     getSnapshot(folderId: string): Promise<RepositorySnapshot>;

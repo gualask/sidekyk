@@ -16,7 +16,7 @@ use crate::infrastructure::notes_files::{
 use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
-    MovedList, MovedNote, Note, NoteList, NotesStore, NotesSummary, ProjectNotes, EXPORT_IMAGES,
+    MovedList, MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes, EXPORT_IMAGES,
     INBOX_BOOK, MAX_IMAGE_BYTES,
 };
 use sidekyk_core::modules::projects::{Location, Project};
@@ -497,22 +497,14 @@ pub(crate) async fn open_note_list(
 }
 
 #[tauri::command]
-/// What a book tells of its notes: a project's card at all projects.
-pub(crate) async fn notes_summary(
+/// How many notes a book has, open and done: the open ones on a project's row, all of them what
+/// removing it would delete.
+pub(crate) async fn count_notes(
     app: tauri::AppHandle,
     book: String,
-) -> Result<NotesSummary, AppError> {
-    with_notes("notes_summary", app, book, |store, files, book| {
-        store.summary(files, book)
-    })
-    .await
-}
-
-#[tauri::command]
-/// How many notes a book has, open and done: what removing a project would delete.
-pub(crate) async fn count_notes(app: tauri::AppHandle, book: String) -> Result<u32, AppError> {
+) -> Result<NotesCount, AppError> {
     with_notes("count_notes", app, book, |store, files, book| {
-        Ok(store.count(files, book)? as u32)
+        store.count(files, book)
     })
     .await
 }

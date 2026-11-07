@@ -125,11 +125,9 @@ export interface MovedList {
     joined: boolean;
 }
 
-/** What a book tells of its notes: a project's card at all projects. */
-export interface NotesSummary {
+/** How many notes a book has: the open ones on a project's row, all of them before its removal. */
+export interface NotesCount {
     /** The notes not done. */
     open: number;
     done: number;
-    /** When the newest change to a note's text was, null without notes. */
-    lastEdited: number | null;
 }

@@ -50,7 +50,7 @@ impl Machines {
     }
 
     /// Whether the repository at `location` can be read without starting what holds it, as the
-    /// projects' cards are: a WSL distro that does not run is not started.
+    /// projects' rows are: a WSL distro that does not run is not started.
     pub fn readable_without_starting(&self, location: &Location) -> anyhow::Result<()> {
         match location {
             Location::Local { .. } => Ok(()),

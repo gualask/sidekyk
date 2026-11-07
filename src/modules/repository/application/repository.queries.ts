@@ -148,7 +148,7 @@ const commitKeys = {
 
 /**
  * How old a read may be when the window or level 0 shows again, before it is read once more
- * (decided with its cases in docs/features/projects.md). The project on screen is read at once
+ * (decided with its cases in docs/features/overview.md). The project on screen is read at once
  * when its watcher saw a change while the window was hidden.
  */
 const READ_AGAIN_AFTER_MS = 30_000;
@@ -165,7 +165,7 @@ function isOld({ state }: { state: QueryState<unknown> }): boolean {
 
 /**
  * What a folder of a project is, for the panels it has: `null` without folder, `waiting` until read.
- * No git runs, so it answers at once. Never starts a stopped WSL distro, for a card or for the
+ * No git runs, so it answers at once. Never starts a stopped WSL distro, for a row or for the
  * project opened: `stopped` says so, and `useStartFolder` starts it. A kind that cannot be read
  * otherwise counts as a repository, as every folder did before: its panels and the problems tell
  * why.
@@ -223,7 +223,7 @@ function useFolderKinds(
 }
 
 /**
- * What a project's folders are, together, for its card's panels: a repository when one of them
+ * What a project's folders are, together, for its row's panels: a repository when one of them
  * is, else without git; `null` without folders, `waiting` until each is read. Never starts a
  * stopped WSL distro.
  */
@@ -239,7 +239,7 @@ export function useProjectKind(
 }
 
 /**
- * The summaries of a project's repositories among its folders, for its card: each read again as
+ * The summaries of a project's repositories among its folders, for its row: each read again as
  * it shows unless read in the last 30 s, never starting a stopped WSL distro. A folder without
  * git has none, and one whose kind is not read yet none yet.
  */
@@ -293,11 +293,11 @@ export function useSnapshotOf(): (folderId: string) => RepositorySnapshot | unde
 /**
  * A repository at a glance, for every project on screen. `fromSnapshot` says the Changes panel
  * shows it: its snapshot then brings the summary, and the summary is never fetched on its own.
- * `freshOnShow` reads it again each time the component shows, as the cards of all projects do,
+ * `freshOnShow` reads it again each time the component shows, as the rows of all projects do,
  * unless it was read in the last 30 s.
  *
  * A summary is kept until something says it changed: the watcher, for the folder on screen; the
- * window coming back, when an agent may have worked on any project meanwhile; or the cards of all
+ * window coming back, when an agent may have worked on any project meanwhile; or the rows of all
  * projects showing. The other projects are not watched: nothing runs for them while nobody looks.
  */
 export function useRepositorySummary(

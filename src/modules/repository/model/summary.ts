@@ -1,7 +1,7 @@
 import type { Translator } from '@/shared/i18n';
 import type { RepositorySummary } from './repository.types';
 
-/** What changed in one repository or several together: the counts a card shows. */
+/** What changed in one repository or several together: the counts a row shows. */
 export type ChangedTotals = Pick<RepositorySummary, 'totals' | 'truncated'>;
 
 /** What changed in several repositories, together: a project's of several folders. */

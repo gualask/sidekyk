@@ -1,7 +1,7 @@
 # Project folders
 
 A project follows none, one or several folders (a product in repositories: api, web, ops), one on
-screen at a time; its notes are the project's. Identity, kind and cards: `projects.md`.
+screen at a time; its notes are the project's. Identity and kind: `projects.md`; rows: `overview.md`.
 
 ## Behaviour
 
@@ -9,7 +9,7 @@ screen at a time; its notes are the project's. Identity, kind and cards: `projec
   With several, the breadcrumb gains a step, `All projects / Shop / api ▾`: its menu lists the
   folders, each with its branch and changes (read when it opens, never starting a stopped WSL
   distro), the one on screen checked; a pick shows it at the same zoom; "Edit folders…" last.
-- Entering a project of several folders asks which (2026-11-03): its card (click, `↵`), the
+- Entering a project of several folders asks which (2026-11-03): its row (click, `↵`), the
   palette, a note found in it or `[`/`]` at a project's panels open a dialog, "Open shop", a
   field to narrow them (ranked as the palette ranks names), a row per folder: name
   and place, branch, files changed, lines, in columns (the breadcrumb's menu has the same,
@@ -18,10 +18,10 @@ screen at a time; its notes are the project's. Identity, kind and cards: `projec
   (`sidekyk <folder>`), and so does a project of one folder.
 - Changes clean while another repository of the project has changes: "web: 3 files changed →"
   under "Nothing to review", a click shows it. Read once as it shows, no watcher.
-- Level 0 card of several folders: their names under the project's (the branch and changes of
-  each in the tooltip), the changes of its repositories added up, their commits in one week. A
-  repository that cannot be read is left out there: the top bar tells why.
-- Edit (the card's ⋯, or "Edit folders…"): name and folders. A folder added or removed changes the
+- Level 0 row of several folders: their names under the project's (the branch and changes of
+  each in the tooltip), the lines not committed in its repositories added up beside them, their
+  commits in one week. A repository that cannot be read is left out there: the top bar tells why.
+- Edit (the row's ⋯, or "Edit folders…"): name and folders. A folder added or removed changes the
   project at once, as VS Code's "Add Folder to Workspace" (the folder untouched, the notes kept);
   the name waits for Save. The folders are on one machine (this one, or one WSL distro;
   `folder_elsewhere`), none the same as another, inside or holding one (`folder_overlaps`).
@@ -56,7 +56,7 @@ screen at a time; its notes are the project's. Identity, kind and cards: `projec
   a project. `useFolderOnScreen` tells the folder to the backend, in order
   (`show_project_folder`, `null` for none), which keeps it in memory (`ProjectsState::on_screen`):
   the folder watched (`watch_on_screen` compares its id and place) and the one `⌘K` searches.
-  Others are read when their menu, card or hint shows, as level 0 reads the projects not on
+  Others are read when their menu, row or hint shows, as level 0 reads the projects not on
   screen. A project of several folders none picked (its folder removed) shows level 0.
 - Repositories inside (`folder::repositories_inside`, through the helper too,
   `RepositoriesInside`): a folder without git's subfolders with a `.git` at their root, links not
@@ -65,7 +65,7 @@ screen at a time; its notes are the project's. Identity, kind and cards: `projec
 - Command line: `open_folder` answers `Opened::Project` (with the folder) or `Opened::Choice`, taken once
   (`take_opened`); the app passes the choice to the overview, which opens `NewProjectDialog` on it.
 - Frontend: `PanelProps.folder` (the one shown) and `showFolder`; `useProjectKind` (a project of
-  several folders has a repository's panels on its card when one is), `useRepositorySummaries`,
+  several folders has a repository's panels on its row when one is), `useRepositorySummaries`,
   `useCommitActivities` (`mergedActivity`), `summedTotals`; `FolderMenu` and `FolderPicker` (lazy,
   preloaded when idle) in `app/`; `FolderFacts` gives a row's cells, empty while read, so the
   columns (`FOLDER_COLUMNS`) hold. The panel is keyed by project and folder: another folder is
@@ -82,13 +82,13 @@ screen at a time; its notes are the project's. Identity, kind and cards: `projec
   path in every module. As Zed's git panel, one repository at a time with a picker; VS Code shows
   them all, or one in its single repository mode
   (code.visualstudio.com/docs/sourcecontrol/repos-remotes).
-- No level between all projects and a project (2026-11-02): it would repeat the card and Notes and
+- No level between all projects and a project (2026-11-02): it would repeat the row and Notes and
   make the depth differ per project; the menu tells which repository changed. Again if projects of
   5+ repositories outgrow it.
 - Asked at each entering, not the last shown (2026-11-03): entering one knows which repository it
   is for, and nobody remembers which was shown last, so restoring it entered the wrong one. A
-  dialog, not a menu under the card nor rows on the card: one place for every entry (card,
-  palette, keys), room for each folder's place and facts, the card unchanged. The order fixed, not
+  dialog, not a menu under the row nor rows under it: one place for every entry (row,
+  palette, keys), room for each folder's place and facts, the row unchanged. The order fixed, not
   the last used first, so the keys stay the same.
 - A parent of repositories asks (2026-11-02): VS Code finds repositories one level below the
   folder opened by default (its `git.repositoryScanMaxDepth` setting, 1), Zed at any depth; taken

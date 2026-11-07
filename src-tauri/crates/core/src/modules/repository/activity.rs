@@ -1,5 +1,5 @@
 //! How many lines the branch on screen changed, commit by commit, since a time: the week of work
-//! on a project's card. Read when the card shows, never in the background.
+//! on a project's row. Read when the row shows, never in the background.
 
 use super::contracts::{CommitActivity, CommittedLines, RepositoryInfo};
 use super::open::existing_root;

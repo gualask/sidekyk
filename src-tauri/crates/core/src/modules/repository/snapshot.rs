@@ -363,7 +363,7 @@ pub fn load_snapshot(
     })
 }
 
-/// The summary alone, for a project shown only as its card or its avatar: `git status` and the
+/// The summary alone, for a project shown only as its row or its avatar: `git status` and the
 /// numstat against HEAD, run together; no new file is read.
 pub fn load_summary(
     backend: &dyn RepositoryBackend,

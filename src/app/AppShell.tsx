@@ -115,7 +115,7 @@ const PALETTE_UNOPENED: PaletteState = { open: null, mode: 'names', text: '' };
 const closePalette = (palette: PaletteState): PaletteState =>
     palette.open ? { ...palette, open: false } : palette;
 
-/** A project and its panels, at level 1 or full screen: the zoom carries it to and from its card. */
+/** A project and its panels, at level 1 or full screen: the zoom carries it to and from its row. */
 const PROJECT_ZOOM = { viewTransitionName: ZOOM_NAMES.project };
 
 /** Level 1: the project's tiles, zoomed as the project. */
@@ -228,7 +228,7 @@ export function AppShell() {
     // a project to remove, once asked what to do with its notes
     const [removing, setRemoving] = useState<ProjectInfo | null>(null);
     const { mutate: removeProject } = useRemoveProject();
-    // a project whose name and folders change: from its card, or from its folders in the top bar
+    // a project whose name and folders change: from its row, or from its folders in the top bar
     const [editing, setEditing] = useState<ProjectInfo | null>(null);
     const forgetBooks = useForgetBooks();
 
@@ -425,7 +425,7 @@ export function AppShell() {
 
     useWorkspaceKeys({
         list: projects.data,
-        // at all projects the card selected; below, the project's panels, a folder asked for
+        // at all projects the row selected; below, the project's panels, a folder asked for
         switchProject: (projectId) =>
             level === 0 ? entry.select(projectId) : openProject(projectId),
         zoomIn,
@@ -658,7 +658,7 @@ function Workspace({
     onInboxNoteRevealed,
 }: {
     list: ProjectList;
-    /** The project whose card the zoom grows from. */
+    /** The project whose row the zoom grows from. */
     zoomed: string | null;
     /** Shows a project's panels, asking first which folder of several. */
     openProject: (projectId: string) => void;
@@ -696,7 +696,7 @@ function Workspace({
 }) {
     const targetOf = (id: string) =>
         targetFor(request, { project: project?.id ?? null, folder: folder?.id ?? null, panel: id });
-    // all projects: the Inbox, then the cards, which give way first in a narrow window
+    // all projects: the Inbox, then the projects' rows, which give way first in a narrow window
     if (!project || level === 0) {
         return (
             <div className="flex h-full">
@@ -714,8 +714,8 @@ function Workspace({
                     onRemove={onRemove}
                     asked={asked}
                     onAskedTaken={onAskedTaken}
-                    summary={(card, part) => (
-                        <CardSummaries project={card} folder={onlyFolder(card)} part={part} />
+                    summary={(row, part) => (
+                        <RowSummaries project={row} folder={onlyFolder(row)} part={part} />
                     )}
                 />
             </div>
@@ -790,10 +790,10 @@ function Workspace({
 }
 
 /**
- * What a project's panels tell on its card at all projects, from what its folder is: nothing until
- * that is read, which the cards ask without starting a WSL distro.
+ * What a project's panels tell on its row at all projects, from what its folder is: nothing until
+ * that is read, which the rows ask without starting a WSL distro.
  */
-function CardSummaries({
+function RowSummaries({
     project,
     folder,
     part,

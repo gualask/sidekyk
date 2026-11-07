@@ -18,7 +18,7 @@ import { useRevealedNote } from './use-revealed-note';
 
 /**
  * The column's width until first dragged, a share of the window, and the least it takes: the
- * cards beside it give way first (`ProjectsOverview`).
+ * projects' rows beside it give way first (`ProjectsOverview`).
  */
 const INBOX_WIDTH = { initial: '40%', min: 320 };
 
@@ -98,7 +98,7 @@ export function InboxColumn({
                             book={INBOX_BOOK}
                             focus={focusComposer}
                             onFocused={onComposerFocused}
-                            placeholder={t('inbox.composer')}
+                            placeholder={t('notes.composer')}
                             label={t('inbox.newNote')}
                             hint={shown.length === 0 ? t('inbox.empty') : null}
                             {...images.composer}

@@ -43,12 +43,12 @@ export function sideMinWidth(panels: readonly PanelDefinition[]): number {
  * level 1 shows it as full screen does and there is no level 2.
  */
 export interface ProjectTiles {
-    /** In the order of their shortcuts, as the palette and the card list them. */
+    /** In the order of their shortcuts, as the palette and the row list them. */
     panels: readonly PanelDefinition[];
     main: PanelDefinition;
     /** Empty when the project has one panel. */
     side: readonly PanelDefinition[];
-    /** The panels saying something on the project's card at all projects. */
+    /** The panels saying something on the project's row at all projects. */
     summaries: readonly PanelSummary[];
     /** The panels that open full screen (level 2), by key or from the palette: none without tiles. */
     fullScreen: readonly PanelDefinition[];
