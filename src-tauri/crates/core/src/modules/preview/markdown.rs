@@ -229,18 +229,31 @@ impl<'a> Reader<'_, 'a> {
                 alert: kind.map(alert),
                 blocks: self.blocks(children),
             },
-            Tag::CodeBlock(kind) => Block::Code {
-                line,
-                language: match kind {
+            Tag::CodeBlock(kind) => {
+                let language = match kind {
                     CodeBlockKind::Fenced(info) => info
                         .split_whitespace()
                         .next()
                         .map(|word| word.trim_matches(['{', '}', '.']).to_string())
                         .filter(|language| !language.is_empty()),
                     CodeBlockKind::Indented => None,
-                },
-                lines: self.code_lines(&children),
-            },
+                };
+                if language
+                    .as_deref()
+                    .is_some_and(|language| language.eq_ignore_ascii_case("mermaid"))
+                {
+                    Block::Diagram {
+                        line,
+                        source: code_text(&children),
+                    }
+                } else {
+                    Block::Code {
+                        line,
+                        language,
+                        lines: self.code_lines(&children),
+                    }
+                }
+            }
             Tag::List(start) => Block::List {
                 line,
                 start,
@@ -486,6 +499,21 @@ fn is_line_break(html: &str) -> bool {
 }
 
 /// What a line of text reads, without its marks: a heading's id and an image's description.
+/// A code block's text as CommonMark reads it: its text events joined, the fence's indentation
+/// already left out.
+fn code_text(children: &[Node]) -> String {
+    children
+        .iter()
+        .filter_map(|child| match child {
+            Node::Leaf {
+                event: Event::Text(text),
+                ..
+            } => Some(text.as_ref()),
+            _ => None,
+        })
+        .collect()
+}
+
 fn plain_text(content: &[Inline]) -> String {
     let mut text = String::new();
     for inline in content {
@@ -659,6 +687,21 @@ mod tests {
                     text: "    indented\r".into(),
                     from: 4,
                 }],
+            }
+        );
+    }
+
+    #[test]
+    fn a_mermaid_block_is_a_diagram_with_its_source() {
+        let blocks = parse("- item\n\n  ```Mermaid title\n  flowchart TD\n    A --> B\n  ```\n");
+        let Block::List { items, .. } = &blocks[0] else {
+            panic!("{blocks:?}")
+        };
+        assert_eq!(
+            items[0].blocks[1],
+            Block::Diagram {
+                line: 3,
+                source: "flowchart TD\n  A --> B\n".into(),
             }
         );
     }

@@ -38,6 +38,7 @@ export const tauriRepository: RepositoryPort = {
                 : `v=${source.stamp.modified}-${source.stamp.size}`
         }`,
     getMarkdownPreview: (folderId, path) => invoke('get_markdown_preview', { folderId, path }),
+    renderDiagram: (request) => invoke('render_diagram', { request }),
     openUrl: (url) => invoke('open_url', { url }),
     getSyntaxColors: (folderId, request) => invoke('get_syntax_colors', { folderId, request }),
     onRepositoryChanged: (listener) =>

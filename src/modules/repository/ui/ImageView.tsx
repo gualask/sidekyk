@@ -1,11 +1,10 @@
 import { IconFileOff, IconPhotoOff } from '@tabler/icons-react';
 import { type ReactNode, useState } from 'react';
-import { errorMessage } from '@/shared/errors/app-error';
 import { fileSize } from '@/shared/format/file-size';
 import { useTranslation } from '@/shared/i18n';
 import { useImageSource } from '../application/repository.queries';
 import { MAX_IMAGE_BYTES } from '../model/preview';
-import { Notice } from './Pane';
+import { ErrorText, Notice } from './Pane';
 
 /**
  * An image of the project in place of the binary notice: centered, scaled down to fit, never up,
@@ -41,7 +40,7 @@ export function ImageView({
 
     if (image.isPending) return notice(i18n.t('view.loadingFile'));
     if (image.isError) {
-        return notice(<span className="text-ui-danger">{errorMessage(image.error, i18n)}</span>);
+        return notice(<ErrorText error={image.error} />);
     }
     if (image.tooLarge) {
         return notice(

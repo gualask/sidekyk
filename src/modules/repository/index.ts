@@ -19,6 +19,8 @@ export {
     type CommitFileDiffRequest,
     type CommitFiles,
     type CommitRequest,
+    type Diagram,
+    type DiagramRequest,
     type Directory,
     type FileChange,
     type FileContent,

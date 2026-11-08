@@ -18,6 +18,7 @@ the others point to it.
   - `syntax-colors.md`
   - `files.md`: tree, file view, folders without git, the shared selection.
   - `previews.md`: Markdown, SVG and images as they read; links, images loaded from the app.
+  - `diagrams.md`: Mermaid diagrams in the preview: colors, font, zoom, merman.
   - `search.md`: palette, by name, notes, in contents.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `note-images.md`: images in notes: in, thumbnails, copy, export, files.

@@ -68,12 +68,14 @@ in-memory ports. UI changes are checked there, light and dark.
   whose helper takes 1.5 s to start), `clean`, `no-repo`, `large`, `problems` (a missing
   repository; WSL projects stopped, gone or without git; `api`'s distro stopped shows its Start
   panel). `review` and `clean` have `Vault`, a folder without git (Markdown, an `.ignore`;
-  `guide.md` holds every construct the preview shows, an image and an SVG beside it); `review`'s
-  `README.md` is changed, for its Preview. The Vault and the shop's Markdown are files
-  (`src/dev/fixture-files/`); their previews are the backend parser's, written to
-  `previews.json` by the Rust test `fixture_previews`, which fails while it is out of date
+  `guide.md` holds every construct the preview shows, a Mermaid block among them, an image and an
+  SVG beside it, `architecture.mmd` a diagram of its own); `review`'s `README.md` is changed, for
+  its Preview. The Vault and the shop's Markdown are files (`src/dev/fixture-files/`); their
+  previews are the backend parser's, written to `previews.json` by the Rust test
+  `fixture_previews`, their diagrams the backend's renderer's in both themes, written to
+  `diagrams.json` by `fixture_diagrams`. Each fails while its file is out of date
   (`SIDEKYK_UPDATE_FIXTURES=1 cargo test --manifest-path src-tauri/Cargo.toml -p sidekyk-core
-  fixture_previews` writes it again; not a second parser in TypeScript). New
+  fixture_` writes both again; not a second parser or renderer in TypeScript). New
   project picks the scenario's repository and a folder without git in turn.
 - `&open=<name>` starts as `sidekyk <folder>`. In the console: `sidekykDev.openFolder('<name>')`
   (the project, else one made), `gitInit('<name>')` and `gitRemove('<name>')` (told as the

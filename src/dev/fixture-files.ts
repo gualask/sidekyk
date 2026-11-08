@@ -1,4 +1,5 @@
-import type { MarkdownDocument } from '@/modules/repository';
+import type { Diagram, DiagramRequest, MarkdownDocument } from '@/modules/repository';
+import drawn from './fixture-files/diagrams.json';
 import made from './fixture-files/previews.json';
 
 /**
@@ -17,7 +18,7 @@ interface Made {
 const MADE = made as unknown as Made;
 
 const TEXTS = import.meta.glob<string>(
-    ['./fixture-files/**/*.{md,svg}', './fixture-files/vault/.ignore'],
+    ['./fixture-files/**/*.{md,mmd,svg}', './fixture-files/vault/.ignore'],
     { query: '?raw', import: 'default', eager: true },
 );
 
@@ -94,6 +95,33 @@ export function fixturePreview(text: string): MarkdownDocument | null {
         if (textAt(file) === text) return preview;
     }
     return null;
+}
+
+/**
+ * The fixtures' diagrams as the backend draws them (`diagrams.json`, written by the Rust test
+ * `fixture_diagrams`), in each theme, by their source; the font each carries is stored once, in
+ * `styles`, its place in the SVG written `{{style:<index>}}`.
+ */
+interface Drawn {
+    styles: string[];
+    themes: Record<'light' | 'dark', Record<string, Diagram>>;
+}
+
+const DRAWN = drawn as unknown as Drawn;
+
+/** A diagram the fixtures hold, as the backend draws it in the theme asked for. */
+export function fixtureDiagram({ source, colors }: DiagramRequest): Diagram {
+    const diagram = DRAWN.themes[colors.dark ? 'dark' : 'light'][source];
+    if (!diagram) return { kind: 'invalid', detail: 'Not drawn in the fixtures (diagrams.json)' };
+    return diagram.kind === 'drawn'
+        ? {
+              ...diagram,
+              svg: diagram.svg.replace(
+                  /\{\{style:(\d+)\}\}/,
+                  (_, index: string) => DRAWN.styles[Number(index)] ?? '',
+              ),
+          }
+        : diagram;
 }
 
 /** The later version of a file of a project (`edits/<project>/<path>`), if the fixtures have one. */

@@ -1,6 +1,5 @@
 import { lazy, type ReactNode, type RefObject, Suspense, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -9,10 +8,14 @@ import { useMarkdownPreview, useOpenUrl } from '../application/repository.querie
 import { hasCodeAndPreview, previewKind } from '../model/preview';
 import { ImageView } from './ImageView';
 import type { PreviewActions, PreviewOpenOn, PreviewPlace } from './MarkdownPreview';
-import { Notice } from './Pane';
+import { ErrorText, Notice } from './Pane';
 
 // the renderer and its blocks load with the first preview, not with the panel
 const MarkdownPreview = lazy(() => import('./MarkdownPreview'));
+// a diagram's view too, with the first diagram file (a Markdown preview loads it with its blocks)
+const DiagramPane = lazy(() =>
+    import('./Diagram').then((module) => ({ default: module.DiagramPane })),
+);
 
 /** What a preview gives the header of the panel it is in. */
 export interface PreviewHeader {
@@ -22,8 +25,8 @@ export interface PreviewHeader {
 
 /**
  * A file of the project as it reads, in a panel: the header's content (`renderHeader`), then a
- * Markdown file's preview, read again as the file changes, or an image. `⌘F` looks through its
- * code instead (`onFind`, with the line on screen): the preview has no find of its own.
+ * Markdown file's preview, read again as the file changes, a Mermaid file's diagram, or an image.
+ * `⌘F` looks through its code instead (`onFind`, with the line on screen): the preview has no find of its own.
  */
 export function PreviewPane({
     folderId,
@@ -71,6 +74,10 @@ export function PreviewPane({
                     place={place}
                     openFile={openFile}
                 />
+            ) : previewKind(path) === 'diagram' ? (
+                <Suspense fallback={null}>
+                    <DiagramPane folderId={folderId} path={path} />
+                </Suspense>
             ) : (
                 <ImageView folderId={folderId} path={path} />
             )}
@@ -104,7 +111,7 @@ function MarkdownPane({
     if (preview.isError) {
         return (
             <Notice>
-                <span className="text-ui-danger">{errorMessage(preview.error, i18n)}</span>
+                <ErrorText error={preview.error} />
             </Notice>
         );
     }

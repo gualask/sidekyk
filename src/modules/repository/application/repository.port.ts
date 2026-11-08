@@ -5,6 +5,8 @@ import type {
     CommitFileDiffRequest,
     CommitFiles,
     CommitRequest,
+    Diagram,
+    DiagramRequest,
     Directory,
     FileContent,
     FileDiffRequest,
@@ -71,6 +73,11 @@ export interface RepositoryPort {
      * tree; null when it is not text (binary, a link, a submodule).
      */
     getMarkdownPreview(folderId: string, path: string): Promise<MarkdownDocument | null>;
+    /**
+     * A Mermaid diagram drawn in the app's colors: a Markdown block's or a `.mmd` file's source,
+     * which the frontend already has.
+     */
+    renderDiagram(request: DiagramRequest): Promise<Diagram>;
     /**
      * A web or mail address a file shown links to, in the system's browser or mail app; the
      * backend refuses any other scheme.

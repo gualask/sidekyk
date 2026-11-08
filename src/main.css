@@ -2,6 +2,24 @@
 @import "./shared/ui/theme.css";
 @import "./shared/ui/primitives.css";
 
+/* The app's font, Plus Jakarta Sans (SIL OFL 1.1): every weight of each style. The same files
+   the backend measures a diagram's labels with and cuts into its SVG (`modules/diagram/fonts.rs`
+   in the core), so a diagram's text is the page's. */
+@font-face {
+    font-family: "Plus Jakarta Sans";
+    font-style: normal;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("../assets/fonts/PlusJakartaSans-wght.ttf") format("truetype");
+}
+@font-face {
+    font-family: "Plus Jakarta Sans";
+    font-style: italic;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("../assets/fonts/PlusJakartaSans-Italic-wght.ttf") format("truetype");
+}
+
 @layer base {
     :where(*) {
         scrollbar-width: thin;
@@ -31,7 +49,7 @@
 }
 
 body {
-    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
     font-variant-ligatures: none;
     background-color: var(--ui-bg);
     color: var(--ui-text);

@@ -2,6 +2,7 @@
 //! through the ports they declare.
 
 pub mod capture;
+pub mod diagram;
 pub mod folder;
 pub mod notes;
 pub mod preview;

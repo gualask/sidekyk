@@ -1,7 +1,8 @@
 # Previews
 
 Files shown as they read in the viewer: Markdown, SVG, images, a changed
-image's two sides. Nothing a file holds runs, nothing leaves the machine.
+image's two sides. Nothing a file holds runs, nothing leaves the machine. Mermaid diagrams, in a
+Markdown file or their own: `diagrams.md`.
 
 ## Behaviour
 
@@ -9,7 +10,7 @@ image's two sides. Nothing a file holds runs, nothing leaves the machine.
   viewer's header, as "Changes | Full file" for a diff. Images (`.png`, `.jpg`, `.jpeg`, `.gif`,
   `.webp`, `.bmp`, `.ico`): the image in place of the binary notice, pixel size and file size
   below it, at most 16 MB. AVIF left out until WebKitGTK's support is checked.
-- Opens as Settings say ("Open Markdown and SVG as", Preview by default); the header's choice
+- Opens as Settings say ("Open Markdown, SVG and diagrams as", Preview by default); the header's choice
   holds for the panel's files while the app runs and the setting stays. A changed file with a
   preview: "Changes | Full file | Preview", Preview showing the working tree's version, nothing
   marked; a deleted file has none.
@@ -38,7 +39,8 @@ image's two sides. Nothing a file holds runs, nothing leaves the machine.
 ## How it is built
 
 - `modules/preview/` (core, pure): `parse_markdown` turns pulldown-cmark's events and byte ranges
-  into blocks with their file line (`contracts.rs`), nested at most 48 deep (deeper tags left out,
+  into blocks with their file line (`contracts.rs`; a ` ```mermaid ` block is a `diagram`,
+  `diagrams.md`), nested at most 48 deep (deeper tags left out,
   their text kept). Targets resolved there (`targets.rs`): anchors, files of the tree, missing
   paths, web, `data:image/`; never above the root. Code lines carry the file's whole line and
   where the code starts, so `lineCheck` and the colors are the file's.

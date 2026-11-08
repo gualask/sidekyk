@@ -49,6 +49,13 @@ pub enum Block {
         language: Option<String>,
         lines: Vec<CodeLine>,
     },
+    /// A ` ```mermaid ` block: its source as CommonMark reads it, the fence's indentation left
+    /// out, which the preview draws (`modules/diagram`). The fence's lines have no colors of their
+    /// own, so a source that never draws shows as this text.
+    Diagram {
+        line: u32,
+        source: String,
+    },
     Table {
         line: u32,
         align: Vec<Align>,
@@ -218,6 +225,10 @@ mod tests {
                     alert: Some(Alert::Note),
                     blocks: vec![],
                 },
+                Block::Diagram {
+                    line: 10,
+                    source: "pie\n".into(),
+                },
             ],
             truncated: false,
         };
@@ -248,7 +259,8 @@ mod tests {
                         "kind": "code", "line": 5, "language": "rust",
                         "lines": [{ "number": 6, "text": "  fn main() {}", "from": 2 }]
                     },
-                    { "kind": "quote", "line": 8, "alert": "note", "blocks": [] }
+                    { "kind": "quote", "line": 8, "alert": "note", "blocks": [] },
+                    { "kind": "diagram", "line": 10, "source": "pie\n" }
                 ],
                 "truncated": false
             })

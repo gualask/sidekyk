@@ -1,9 +1,11 @@
 import type { MarkdownAlign, MarkdownBlock, MarkdownInline } from './repository.types';
 
 /** What a file shows as it reads, beside its text: by its extension, as the backend knows it. */
-export type PreviewKind = 'markdown' | 'svg' | 'image';
+export type PreviewKind = 'markdown' | 'svg' | 'diagram' | 'image';
 
 const MARKDOWN = new Set(['md', 'markdown', 'mdown', 'mkd', 'mkdn']);
+/** A Mermaid diagram's own file. */
+const DIAGRAMS = new Set(['mmd', 'mermaid']);
 /** Those WKWebView, WebKitGTK and WebView2 all decode; SVG is text, and has its code too. */
 const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico']);
 
@@ -18,6 +20,7 @@ export function previewKind(path: string): PreviewKind | null {
     const extension = name.slice(dot + 1).toLowerCase();
     if (MARKDOWN.has(extension)) return 'markdown';
     if (extension === 'svg') return 'svg';
+    if (DIAGRAMS.has(extension)) return 'diagram';
     return IMAGES.has(extension) ? 'image' : null;
 }
 
@@ -34,7 +37,7 @@ export function isImage(path: string): boolean {
 /** Whether a file shows both as it reads and as its text: the switch "Code | Preview". */
 export function hasCodeAndPreview(path: string): boolean {
     const kind = previewKind(path);
-    return kind === 'markdown' || kind === 'svg';
+    return kind === 'markdown' || kind === 'svg' || kind === 'diagram';
 }
 
 /**
@@ -88,6 +91,26 @@ export function blockAtLine(blocks: readonly MarkdownBlock[], line: number): num
         if (block.kind !== 'footnotes' && block.line <= line) found = index;
     });
     return found;
+}
+
+/** A Markdown file's diagrams in the order they read, nested ones too: a diagram's place among them. */
+export function diagramBlocks(
+    blocks: readonly MarkdownBlock[],
+): Extract<MarkdownBlock, { kind: 'diagram' }>[] {
+    return blocks.flatMap((block) => {
+        switch (block.kind) {
+            case 'diagram':
+                return [block];
+            case 'quote':
+                return diagramBlocks(block.blocks);
+            case 'list':
+                return block.items.flatMap((item) => diagramBlocks(item.blocks));
+            case 'footnotes':
+                return block.notes.flatMap((note) => diagramBlocks(note.blocks));
+            default:
+                return [];
+        }
+    });
 }
 
 /** The footnote's element id, and that of each reference to it. */

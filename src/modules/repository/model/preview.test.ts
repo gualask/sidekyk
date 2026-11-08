@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     blockAtLine,
     blocksById,
+    diagramBlocks,
     footnoteId,
     footnoteRefId,
     hasCodeAndPreview,
@@ -95,5 +96,38 @@ describe('previews', () => {
         ]);
         expect(table.rows[0].key).toBe('row:0');
         expect(table.rows[0].cells[1].content).toEqual([]);
+    });
+});
+
+describe('diagrams', () => {
+    it('are Mermaid files', () => {
+        expect(previewKind('docs/flow.mmd')).toBe('diagram');
+        expect(previewKind('docs/flow.MERMAID')).toBe('diagram');
+        expect(hasCodeAndPreview('docs/flow.mmd')).toBe(true);
+    });
+
+    it('are found in the order they read, nested ones too', () => {
+        const first: MarkdownBlock = { kind: 'diagram', line: 1, source: 'pie' };
+        const nested: MarkdownBlock = { kind: 'diagram', line: 4, source: 'flowchart TD' };
+        const last: MarkdownBlock = { kind: 'diagram', line: 9, source: 'gitGraph' };
+        const blocks: MarkdownBlock[] = [
+            first,
+            {
+                kind: 'list',
+                line: 3,
+                start: null,
+                items: [
+                    {
+                        line: 3,
+                        task: null,
+                        blocks: [{ kind: 'quote', line: 4, alert: null, blocks: [nested] }],
+                    },
+                ],
+            },
+            { kind: 'code', line: 6, language: 'mermaid', lines: [] },
+            last,
+        ];
+        expect(diagramBlocks(blocks)).toEqual([first, nested, last]);
+        expect(diagramBlocks(blocks)[1]).toBe(nested);
     });
 });

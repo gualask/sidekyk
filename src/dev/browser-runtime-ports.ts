@@ -26,6 +26,7 @@ import {
 import {
     editedText,
     FIXTURE_BLOBS,
+    fixtureDiagram,
     fixturePreview,
     REPOSITORY_IMAGES,
     VAULT_IMAGES,
@@ -789,6 +790,8 @@ export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
                 const content = contentOf(folderId, path);
                 return content.kind === 'text' ? fixturePreview(content.text) : null;
             },
+            // as the backend draws the fixtures' diagrams (`fixture-files/diagrams.json`)
+            renderDiagram: async (request) => fixtureDiagram(request),
             // a browser tab opens it in another, as the system's browser would
             openUrl: async (url) => {
                 window.open(url, '_blank', 'noopener,noreferrer');

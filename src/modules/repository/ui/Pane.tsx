@@ -1,5 +1,6 @@
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { type CopyState, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
@@ -19,6 +20,12 @@ import { diffLayout, FIND_BAR_SPACE, rowAt } from './diff-layout';
 import { FindBar } from './FindBar';
 import { ChangeMap, SideScrollbar } from './ScrollMap';
 import { useScrollbars } from './scrollbars';
+
+/** A read that failed, as a notice says it. */
+export function ErrorText({ error }: { error: unknown }) {
+    const i18n = useTranslation();
+    return <span className="text-ui-danger">{errorMessage(error, i18n)}</span>;
+}
 
 /** What the viewer says instead of, or after, the lines: loading, a failure, a cut. */
 export function Notice({ children }: { children: ReactNode }) {

@@ -38,6 +38,8 @@ const NAMED_KEYS: Record<string, { mac: string; other: string }> = {
     ArrowDown: { mac: '↓', other: '↓' },
     ArrowLeft: { mac: '←', other: '←' },
     ArrowRight: { mac: '→', other: '→' },
+    // zoom in: `+` on most layouts, the key `=` with `⇧` on a US one
+    Equal: { mac: '+', other: '+' },
 };
 
 export function modifierLabel(name: ModifierName, mac = MACOS): string {

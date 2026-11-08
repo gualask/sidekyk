@@ -27,14 +27,6 @@ has. Built: `docs/features/project-folders.md` (several folders, one on screen).
 - [ ] Search inside documents (PDF, Office): text extraction, likely an index; decide with measures
       (`.cflow/plans/project-folders.md`)
 
-## Previews
-
-`.cflow/plans/previews.md`.
-
-Built: `docs/features/previews.md` (Markdown, SVG, images, a changed image's two sides).
-
-- [ ] Mermaid diagrams in the Markdown preview (nice to have)
-
 ## Capture
 
 `.cflow/plans/capture.md`.
@@ -94,6 +86,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
     log; a new folder's files told, an ignored folder silent); a WSL folder without git through
     the real `wsl.exe` (its row without starting the distro, "Starting …" on opening it)
+  - Linux and Windows, Mermaid diagrams (`docs/features/diagrams.md`): labels whole in WebKitGTK
+    and WebView2 (the font embedded in an SVG shown as an image, HTML labels in
+    `foreignObject`), sharp when zoomed, a pinch zooms the diagram and not the page
   - Linux and Windows: images in the viewer through `project-file:` (WebView2's
     `http://project-file.localhost`), a preview's link opened in the browser; WebKitGTK and AVIF
   - Linux and Windows, images in notes (`docs/features/note-images.md`): a screenshot and a file

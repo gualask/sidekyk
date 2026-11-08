@@ -32,6 +32,14 @@ export function greet(name: string): string {
 }
 ```
 
+```mermaid
+flowchart LR
+    Agent[Agent edits a file] --> Ignored{Ignored by git?}
+    Ignored -- yes --> Quiet[Nothing happens]
+    Ignored -- no --> Review[The change on screen]
+    Review --> Note[A note for the agent]
+```
+
 > A quote, as plain as it gets.
 
 > [!NOTE]

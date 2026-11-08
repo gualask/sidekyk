@@ -1,7 +1,6 @@
 import { IconFileOff } from '@tabler/icons-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { type ReactNode, useMemo } from 'react';
-import { errorMessage } from '@/shared/errors/app-error';
 import type { DiffView } from '@/shared/git/diff-view';
 import { useTranslation } from '@/shared/i18n';
 import type { FileFinder } from '../application/find';
@@ -22,7 +21,7 @@ import type { FileLines } from '../model/targets';
 import { wholeFile } from '../model/whole-file';
 import { LINES_ABOVE } from './diff-layout';
 import { FormattingNotice } from './FormattingNotice';
-import { Notice, Pane, type PaneHeader } from './Pane';
+import { ErrorText, Notice, Pane, type PaneHeader } from './Pane';
 
 /** How a diff shows: only its changes or the whole file, opened on a hunk or on the first. */
 interface DiffShown {
@@ -117,7 +116,7 @@ function DiffPane({
             {diff.isPending ? <Notice>{i18n.t('view.loadingDiff')}</Notice> : null}
             {diff.isError ? (
                 <Notice>
-                    <span className="text-ui-danger">{errorMessage(diff.error, i18n)}</span>
+                    <ErrorText error={diff.error} />
                 </Notice>
             ) : null}
             {parsed?.binary ? (

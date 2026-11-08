@@ -7,6 +7,7 @@
 mod blocking;
 pub(crate) mod capture;
 pub(crate) mod diagnostics;
+pub(crate) mod diagram;
 pub(crate) mod links;
 pub(crate) mod note_image;
 pub(crate) mod notes;

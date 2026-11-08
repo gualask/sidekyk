@@ -193,6 +193,7 @@ pub(crate) fn run() {
             tauri_commands::repository::get_file_stamp,
             tauri_commands::repository::get_blob_size,
             tauri_commands::links::open_url,
+            tauri_commands::diagram::render_diagram,
             tauri_commands::repository::get_syntax_colors,
             tauri_commands::notes::get_notes,
             tauri_commands::notes::add_note,

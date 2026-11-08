@@ -1,0 +1,8 @@
+sequenceDiagram
+    participant Agent
+    participant Disk
+    participant Sidekyk
+    Agent->>Disk: writes guide.md
+    Disk-->>Sidekyk: watcher event
+    Sidekyk->>Disk: reads the file
+    Note over Sidekyk: preview drawn again

@@ -1,0 +1,24 @@
+{
+    "background": "--ui-surface-subtle",
+    "node": "--ui-surface",
+    "nodeBorder": "--ui-border-hover",
+    "cluster": "--ui-surface-raised",
+    "clusterBorder": "--ui-border",
+    "text": "--ui-text",
+    "line": "--ui-text-muted",
+    "note": "--ui-warning-soft",
+    "noteBorder": "--ui-warning",
+    "noteText": "--ui-warning-soft-text",
+    "accent": "--ui-accent",
+    "accentSoft": "--ui-accent-soft",
+    "onDark": "--ui-accent-on-solid",
+    "onLight": "--ui-warning-on-solid",
+    "series": [
+        "--ui-series-1",
+        "--ui-series-2",
+        "--ui-series-3",
+        "--ui-series-4",
+        "--ui-series-5",
+        "--ui-series-6"
+    ]
+}

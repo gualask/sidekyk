@@ -8,7 +8,7 @@ import {
     useQuery,
     useQueryClient,
 } from '@tanstack/react-query';
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
@@ -24,6 +24,8 @@ import type {
     Commit,
     CommitFileDiffRequest,
     CommitRequest,
+    Diagram,
+    DiagramColors,
     Directory,
     FileDiffRequest,
     FolderKind,
@@ -475,6 +477,31 @@ export function useMarkdownPreview(folderId: string, path: string) {
         queryFn: () => port.getMarkdownPreview(folderId, path),
     });
 }
+
+/**
+ * What a Mermaid diagram's source shows, drawn in `colors`: the diagram, else the last one drawn
+ * while the source does not read (an agent halfway through writing it), with why it does not.
+ * Outside the repositories' keys: the same source and colors draw the same diagram, so it is never
+ * drawn again, and a change on disk changes the source instead.
+ */
+export function useShownDiagram(source: string, colors: DiagramColors) {
+    const port = useRepositoryPort();
+    const query = useQuery({
+        queryKey: ['diagram', colors, source],
+        queryFn: () => port.renderDiagram({ source, colors }),
+        staleTime: Number.POSITIVE_INFINITY,
+    });
+    const drawn = query.data?.kind === 'drawn' ? query.data : null;
+    const [kept, setKept] = useState<DrawnDiagram | null>(null);
+    if (drawn !== null && drawn !== kept) setKept(drawn);
+    return {
+        drawn: drawn ?? kept,
+        invalid: query.data?.kind === 'invalid' ? query.data : null,
+        error: query.isError ? query.error : null,
+    };
+}
+
+type DrawnDiagram = Extract<Diagram, { kind: 'drawn' }>;
 
 /**
  * The last commits of the branch on screen, read only while `open`: the section is closed until

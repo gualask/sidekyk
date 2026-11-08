@@ -228,6 +228,47 @@ export type FileContent =
  * A Markdown file as its preview shows it (`src-tauri/crates/core/src/modules/preview/`): its
  * blocks, the footnotes last. Every block carries the file's line it starts on, from 1.
  */
+/** A Mermaid diagram to draw, in the app's colors (`modules/diagram` in the backend). */
+export interface DiagramRequest {
+    source: string;
+    colors: DiagramColors;
+}
+
+/**
+ * The app's colors a diagram is drawn in, each a `--ui-*` token's value as the page has it
+ * (`#rrggbb`, `rgb()`, `rgba()`); a translucent one is laid over `background`.
+ */
+export interface DiagramColors {
+    dark: boolean;
+    background: string;
+    node: string;
+    nodeBorder: string;
+    /** A group of nodes (a subgraph, a composite state). */
+    cluster: string;
+    clusterBorder: string;
+    text: string;
+    /** Edges and arrows. */
+    line: string;
+    note: string;
+    noteBorder: string;
+    noteText: string;
+    accent: string;
+    accentSoft: string;
+    /** Text on a series color: the light one on a dark color, the dark one on a light color. */
+    onDark: string;
+    onLight: string;
+    /** A mind map's branches, a pie's slices, git branches, in turn. */
+    series: string[];
+}
+
+/**
+ * A diagram drawn: an SVG that holds its font and runs nothing, shown as an image, its size in CSS
+ * pixels. Or a source Mermaid does not read, `detail` in Mermaid's words.
+ */
+export type Diagram =
+    | { kind: 'drawn'; svg: string; width: number; height: number }
+    | { kind: 'invalid'; detail: string | null };
+
 export interface MarkdownDocument {
     blocks: MarkdownBlock[];
     /** Larger than 2 MiB: its first part only. */
@@ -244,6 +285,11 @@ export type MarkdownBlock =
     /** `start`: an ordered list's first number; null for bullets. */
     | { kind: 'list'; line: number; start: number | null; items: MarkdownListItem[] }
     | { kind: 'code'; line: number; language: string | null; lines: MarkdownCodeLine[] }
+    /**
+     * A ` ```mermaid ` block: its source as CommonMark reads it, which the preview draws; it has no
+     * colors of its own, so a source that never draws shows as this text.
+     */
+    | { kind: 'diagram'; line: number; source: string }
     | {
           kind: 'table';
           line: number;

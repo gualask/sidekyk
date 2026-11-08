@@ -27,6 +27,7 @@ import type { DiffLine } from '../model/diff-parser';
 import {
     blockAtLine,
     blocksById,
+    diagramBlocks,
     footnoteId,
     footnoteRefId,
     kindKeys,
@@ -42,6 +43,7 @@ import type {
 } from '../model/repository.types';
 import { fileSides } from '../model/sides';
 import { blocksOf, type LineSpans, textParts } from '../model/syntax';
+import { DiagramBlock, DiagramView } from './Diagram';
 import { TONE_CLASS } from './syntax-tones';
 
 /** Where a preview is read: its first line on screen, for the code to open on. */
@@ -70,7 +72,11 @@ interface Context {
     actions: PreviewActions;
     goTo: (id: string) => void;
     wrap: boolean;
+    /** Opens a diagram over the preview. */
+    openDiagram: (block: DiagramBlockOf) => void;
 }
+
+type DiagramBlockOf = Extract<MarkdownBlock, { kind: 'diagram' }>;
 
 const PreviewContext = createContext<Context | null>(null);
 
@@ -90,6 +96,8 @@ function estimate(block: MarkdownBlock): number {
     switch (block.kind) {
         case 'code':
             return 40 + block.lines.length * 20;
+        case 'diagram':
+            return 240;
         case 'list':
             return 12 + block.items.length * 26;
         case 'table':
@@ -183,35 +191,71 @@ export default function MarkdownPreview({
         },
     }));
 
+    // the diagram open over the preview, by its place among the file's diagrams, so it is drawn
+    // from the document as the file changes; and what had the focus, which gets it back after
+    const diagrams = useMemo(() => diagramBlocks(blocks), [blocks]);
+    const [zoomed, setZoomed] = useState<number | null>(null);
+    const focusBack = useRef<HTMLElement | null>(null);
+    const zoomedSource = zoomed === null ? null : (diagrams[zoomed]?.source ?? null);
+    // the file no longer has it: closed
+    if (zoomed !== null && zoomedSource === null) setZoomed(null);
+    const openDiagram = (block: DiagramBlockOf) => {
+        const place = diagrams.indexOf(block);
+        if (place < 0) return;
+        if (window.document.activeElement instanceof HTMLElement) {
+            focusBack.current = window.document.activeElement;
+        }
+        setZoomed(place);
+    };
+    const closeZoom = () => {
+        setZoomed(null);
+        focusBack.current?.focus();
+        focusBack.current = null;
+    };
+
     // every block on screen renders again with the list anyway: nothing to keep from one to the next
-    const context: Context = { folderId, path, actions, goTo, wrap: codeLines === 'wrap' };
+    const context: Context = {
+        folderId,
+        path,
+        actions,
+        goTo,
+        wrap: codeLines === 'wrap',
+        openDiagram,
+    };
 
     return (
         <PreviewContext.Provider value={context}>
-            <div
-                ref={scroll}
-                className="h-full overflow-y-auto bg-ui-surface-subtle [overflow-anchor:none]"
-            >
-                <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
-                    {virtualizer.getVirtualItems().map((item) => (
-                        <div
-                            key={item.key}
-                            ref={virtualizer.measureElement}
-                            data-index={item.index}
-                            className="absolute top-0 left-0 w-full px-8"
-                            style={{ transform: `translateY(${item.start}px)` }}
-                        >
-                            <div className="mx-auto max-w-[860px] pb-4 text-[14.5px] leading-[1.65] text-ui-text">
-                                <Block block={blocks[item.index]} />
+            <div className="relative h-full">
+                <div
+                    ref={scroll}
+                    className="h-full overflow-y-auto bg-ui-surface-subtle [overflow-anchor:none]"
+                >
+                    <div className="relative w-full" style={{ height: virtualizer.getTotalSize() }}>
+                        {virtualizer.getVirtualItems().map((item) => (
+                            <div
+                                key={item.key}
+                                ref={virtualizer.measureElement}
+                                data-index={item.index}
+                                className="absolute top-0 left-0 w-full px-8"
+                                style={{ transform: `translateY(${item.start}px)` }}
+                            >
+                                <div className="mx-auto max-w-[860px] pb-4 text-[14.5px] leading-[1.65] text-ui-text">
+                                    <Block block={blocks[item.index]} />
+                                </div>
                             </div>
-                        </div>
-                    ))}
+                        ))}
+                    </div>
+                    {document.truncated ? (
+                        <p className="pb-16 text-center text-sm text-ui-text-muted">
+                            {i18n.t('view.fileCut')}
+                        </p>
+                    ) : null}
                 </div>
-                {document.truncated ? (
-                    <p className="pb-16 text-center text-sm text-ui-text-muted">
-                        {i18n.t('view.fileCut')}
-                    </p>
-                ) : null}
+                {zoomedSource === null ? null : (
+                    <div className="absolute inset-0 z-10">
+                        <DiagramView source={zoomedSource} onClose={closeZoom} />
+                    </div>
+                )}
             </div>
         </PreviewContext.Provider>
     );
@@ -321,6 +365,8 @@ function Block({ block }: { block: MarkdownBlock }) {
         }
         case 'code':
             return <CodeBlock lines={block.lines} />;
+        case 'diagram':
+            return <MermaidBlock block={block} />;
         case 'table': {
             const table = tableCells(block.head, block.rows, block.align);
             return (
@@ -418,9 +464,39 @@ function BackLinks({ number, references }: { number: number; references: number 
     );
 }
 
+/** A ` ```mermaid ` block: its diagram, which opens over the preview; its source while it never drew. */
+function MermaidBlock({ block }: { block: DiagramBlockOf }) {
+    const { openDiagram } = usePreview();
+    return (
+        <DiagramBlock
+            source={block.source}
+            code={
+                <CodeFrame>
+                    <code>{block.source}</code>
+                </CodeFrame>
+            }
+            onOpen={() => openDiagram(block)}
+        />
+    );
+}
+
+/** The frame of a block of code: wrapped as the settings say, or scrolled sideways. */
+function CodeFrame({ children }: { children: ReactNode }) {
+    const { wrap } = usePreview();
+    return (
+        <pre
+            className={`rounded-lg bg-ui-surface px-4 py-3 font-mono text-[12.5px] leading-5 text-ui-syntax-text ${
+                wrap ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto'
+            }`}
+        >
+            {children}
+        </pre>
+    );
+}
+
 /** A code block: the file's own lines, colored as the file is, from where the code starts. */
 function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
-    const { folderId, path, wrap } = usePreview();
+    const { folderId, path } = usePreview();
     const sides = useMemo(() => fileSides(path), [path]);
     const asLines = useMemo<DiffLine[]>(
         () =>
@@ -436,11 +512,7 @@ function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
     const colorBlocks = useMemo(() => blocksOf(asLines, sides), [asLines, sides]);
     const colors = useSyntaxColors(folderId, sides, colorBlocks);
     return (
-        <pre
-            className={`rounded-lg bg-ui-surface px-4 py-3 font-mono text-[12.5px] leading-5 text-ui-syntax-text ${
-                wrap ? 'whitespace-pre-wrap break-all' : 'overflow-x-auto'
-            }`}
-        >
+        <CodeFrame>
             <code>
                 {asLines.map((line, index) => (
                     <div key={line.id} className="min-h-5">
@@ -452,7 +524,7 @@ function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
                     </div>
                 ))}
             </code>
-        </pre>
+        </CodeFrame>
     );
 }
 

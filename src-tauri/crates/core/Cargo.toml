@@ -40,6 +40,17 @@ pulldown-cmark = { version = "0.13", default-features = false }
 # ~450 MB over two WebKit processes, and the same code on every system;
 # `.local/note-thumbnails/`, docs/features/notes.md).
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
+# Mermaid diagrams in the preview, drawn in Rust and shown as an image (2026-11-08, over mermaid.js
+# in the webview: 0.5-37 ms against 60-740 ms on the page's thread, 2 MB against 86-409 MB of
+# WebContent; `.local/mermaid-renderers/`, docs/features/diagrams.md). Pinned: its API changes
+# between minor versions. No ELK (EPL-2.0); `native-fonts` measures labels with the app's font.
+merman = { version = "=0.9.3", default-features = false, features = ["all-diagrams", "complete-svg", "native-fonts"] }
+# A diagram's font cut to its characters (Google's port of HarfBuzz's subsetter, variations
+# kept), so the page, the labels' measure and the SVG share one font file: 0.2-1.2 ms, 25-55 KB
+# of style against 137 KB for the woff2 whole (2026-11-08, over `subsetter`, made for PDFs only,
+# and `fontcull`, a fork of the same code with C++ for woff2). Pinned, as merman.
+skera = "=0.9.0"
+read-fonts = { version = "0.46", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 tempfile.workspace = true

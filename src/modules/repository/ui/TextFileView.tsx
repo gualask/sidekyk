@@ -1,6 +1,5 @@
 import { IconFileOff, IconFolder, IconLink } from '@tabler/icons-react';
 import { type ReactNode, useMemo, useState } from 'react';
-import { errorMessage } from '@/shared/errors/app-error';
 import type { FileView } from '@/shared/git/file-view';
 import { RichText, useTranslation } from '@/shared/i18n';
 import type { FileFinder } from '../application/find';
@@ -10,7 +9,7 @@ import { hasCodeAndPreview, previewKind } from '../model/preview';
 import { fileSides } from '../model/sides';
 import type { FileLines } from '../model/targets';
 import type { PreviewActions } from './MarkdownPreview';
-import { Notice, Pane, type PaneHeader } from './Pane';
+import { ErrorText, Notice, Pane, type PaneHeader } from './Pane';
 import { PreviewPane } from './PreviewPane';
 import { FILE_VIEWS, type ViewSwitch } from './view-options';
 
@@ -148,7 +147,7 @@ function CodeView({
             {content.isPending ? <Notice>{i18n.t('view.loadingFile')}</Notice> : null}
             {content.isError ? (
                 <Notice>
-                    <span className="text-ui-danger">{errorMessage(content.error, i18n)}</span>
+                    <ErrorText error={content.error} />
                 </Notice>
             ) : null}
             {text && rows.length === 0 ? <Notice>{i18n.t('view.empty')}</Notice> : null}

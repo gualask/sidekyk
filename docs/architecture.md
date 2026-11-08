@@ -105,7 +105,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - `modules/folder/`: a folder without git: kind, `resolve_folder`, tree, `FolderChanges`,
     `always_hidden`.
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
-    `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure).
+    `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure), `diagram`
+    (Mermaid to an SVG with merman, pure).
   - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
     output size and a time), `watcher.rs` (notify), `agent/`, `linux_helper.rs`, `wsl.rs`,
     `machines.rs` (`features/wsl.md`).
