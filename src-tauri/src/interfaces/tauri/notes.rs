@@ -10,9 +10,8 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::texts;
-use crate::infrastructure::notes_files::{
-    create_chosen_folder, read_image_file, resolved_path, write_chosen_file, NotesFiles,
-};
+use crate::infrastructure::files::write_whole;
+use crate::infrastructure::notes_files::{read_image_file, resolved_path, NotesFiles};
 use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
@@ -553,7 +552,7 @@ pub(crate) async fn export_notes(
             to_markdown(&project.name, lists, notes, &texts.export)
         })?;
         if images.is_empty() {
-            write_chosen_file(&path, markdown.as_bytes())?;
+            write_whole(&path, markdown.as_bytes())?;
             return Ok(Some(path.to_string_lossy().into_owned()));
         }
         // a folder: the name chosen names the Markdown file in it too
@@ -562,12 +561,11 @@ pub(crate) async fn export_notes(
             |name| name.to_string_lossy().into_owned(),
         );
         let folder = path.join(EXPORT_IMAGES);
-        create_chosen_folder(&folder)?;
-        write_chosen_file(&path.join(format!("{name}.md")), markdown.as_bytes())?;
+        write_whole(&path.join(format!("{name}.md")), markdown.as_bytes())?;
         for image in &images {
             // one at a time: an export holds one image in memory at most
             if let Some((_, bytes)) = store.image(files, &book, image)? {
-                write_chosen_file(&folder.join(image), &bytes)?;
+                write_whole(&folder.join(image), &bytes)?;
             }
         }
         Ok(Some(path.to_string_lossy().into_owned()))

@@ -34,20 +34,20 @@ platform before a release. Actions pinned to a commit, the version in a comment.
   warns). Linux jobs build the static helper first (musl, `musl-gcc` for its C; x64, and arm64 on
   an arm64 runner for the container fixture); the x64 one goes into the installer's resources
   (`tauri build --config src-tauri/tauri.helper.conf.json`). Other builds have no helper: WSL
-  projects fail with `helper_failed`. Its `debug` input builds `tauri build --debug` instead
-  (`sidekyk-windows-x64-debug`): the development log and the WebView's devtools, unoptimized, so
-  for behaviour, never timings; same identifier, so it installs over the release.
+  projects fail with `helper_failed`.
 
 ## Trying it on Windows and Linux
 
 What the Mac cannot show (ROADMAP, Verify on the packaged app), tried by hand; the log comes back
 for reading.
 
-- Builds: Windows from `build.yml` (its `debug` input for the development log, CI above); Linux
-  has none in CI, so on the Linux machine from a clone, with Tauri's prerequisites
-  (WebKitGTK 4.1 and the rest, Tauri's docs, Prerequisites): `pnpm install`, then `pnpm tauri
-  build --debug` (the same development log, installer under `src-tauri/target/debug/bundle/`) or
-  `pnpm tauri:dev`.
+- Builds: on Windows the installer from `build.yml` (a release with the helper: the app as a
+  user gets it, WSL projects included, CI above), or on the machine from a clone; Linux has
+  none in CI. From a clone, with Tauri's prerequisites (Tauri's docs, Prerequisites; WebKitGTK
+  4.1 and the rest on Linux): `pnpm install`, then `pnpm tauri:dev`, or `pnpm tauri build
+  --debug` for the installed app (installer under `src-tauri/target/debug/bundle/`). Both write
+  the development log and have the WebView's devtools, unoptimized, so for behaviour, never
+  timings; neither has the helper, so WSL projects fail there.
 - Logs: Settings, Show log; by hand `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's

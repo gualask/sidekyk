@@ -57,10 +57,16 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   edited, done, images), and its images' files. A move takes the middle of its neighbours'
   positions, renumbering only when no room is left. Ids are 16 hex digits, the only names let
   through to files.
+- Each file says its form's `version` (`STORED_VERSION`): a change older versions would not keep
+  whole (a field added: they write the note again without it) raises it. A book with a note or
+  `lists.json` that does not read, or of a newer version, is refused (`notes_unreadable`, shown
+  where its notes go): never written, not read again that session. A `state.json` that does not
+  read opens the first list; a `project.json` that does not read leaves its folder to no project,
+  untouched.
 - Every book read stays in memory (`NotesStore::books`, one lock) until quit or removal: a book is
   read the first time it is asked for (its project's Notes; the palette at all projects reads them
   all), so files are read once per session. A change writes at once only the
-  files it touched (written beside, `sync_all`, renamed over); a failed write drops that book,
+  files it touched, whole (`write_whole`, `../architecture.md`); a failed write drops that book,
   read again at the next call. Safe because only the app writes there (single instance, every
   change through the store); a sync must write through it too. Until its first change a book's
   first list has a fixed id, so the frontend's survives a failed write.

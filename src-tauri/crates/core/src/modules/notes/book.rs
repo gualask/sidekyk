@@ -91,9 +91,9 @@ fn checked_note(note: &Note) -> anyhow::Result<()> {
 }
 
 impl NoteBook {
-    /// A book's notes as read, made consistent: at least one list (a new one, `first_list`,
-    /// when none was read), every note in a list that exists (else in the first), an open list
-    /// that exists. What it had to mend is touched, so the next write stores it.
+    /// A book's notes as read whole, made consistent: at least one list (a new one,
+    /// `first_list`, when none is stored), every note in a list that exists (else in the first),
+    /// an open list that exists. What it had to mend is touched, so the next write stores it.
     pub(super) fn mended(
         mut lists: Vec<NoteList>,
         mut notes: Vec<Note>,
@@ -101,8 +101,6 @@ impl NoteBook {
         first_list: impl FnOnce() -> NoteList,
     ) -> (Self, Vec<Touched>) {
         let mut touched = Vec::new();
-        let mut seen = std::collections::HashSet::new();
-        lists.retain(|l| is_id(&l.id) && seen.insert(l.id.clone()));
         if lists.is_empty() {
             lists.push(first_list());
             touched.push(Touched::Lists);

@@ -123,10 +123,12 @@ pub(crate) fn init(dir: &Path) {
     }
 
     log_panics();
+    let webview = tauri::webview_version().unwrap_or_else(|error| format!("unknown ({error})"));
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),
         os = std::env::consts::OS,
         arch = std::env::consts::ARCH,
+        %webview,
         "Sidekyk started"
     );
 }
@@ -145,7 +147,8 @@ fn open_session_file(dir: &Path) -> io::Result<File> {
     File::create(current)
 }
 
-/// Records panics in the log, then lets the default hook print them as before.
+/// Records panics in the log with their backtrace (function names in a release, which strips
+/// line tables), then lets the default hook print them as before.
 fn log_panics() {
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
@@ -159,7 +162,8 @@ fn log_panics() {
             .map(|s| (*s).to_owned())
             .or_else(|| info.payload().downcast_ref::<String>().cloned())
             .unwrap_or_default();
-        tracing::error!(%location, %payload, "panic");
+        let backtrace = std::backtrace::Backtrace::force_capture();
+        tracing::error!(%location, %payload, %backtrace, "panic");
         default_hook(info);
     }));
 }

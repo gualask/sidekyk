@@ -3,9 +3,11 @@
 //! (`sidekyk_core::infrastructure`).
 
 pub(crate) mod capture;
+pub(crate) mod files;
 pub(crate) mod logging;
 pub(crate) mod notes_files;
 pub(crate) mod settings_store;
+pub(crate) mod stored_json;
 #[cfg(target_os = "macos")]
 pub(crate) mod system_shortcuts;
 pub(crate) mod window;

@@ -24,6 +24,7 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     note_list_missing: 'error.noteListMissing',
     note_missing: 'error.noteMissing',
     note_too_long: 'error.noteTooLong',
+    notes_unreadable: 'error.notesUnreadable',
     path_outside_repository: 'error.pathOutsideRepository',
     project_not_found: 'error.projectNotFound',
     repository_missing: 'error.repositoryMissing',

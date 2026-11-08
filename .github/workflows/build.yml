@@ -4,11 +4,6 @@ name: Build
 
 on:
   workflow_dispatch:
-    inputs:
-      debug:
-        description: "Debug build: every git call, batch and command in sidekyk-dev.log, devtools"
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -81,12 +76,12 @@ jobs:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
       # only this build ships the helper: any other (cargo test, clippy, tauri dev) builds without it
-      - run: pnpm tauri build ${{ inputs.debug && '--debug' || '' }} --config src-tauri/tauri.helper.conf.json
+      - run: pnpm tauri build --config src-tauri/tauri.helper.conf.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: sidekyk-windows-x64${{ inputs.debug && '-debug' || '' }}
+          name: sidekyk-windows-x64
           path: |
-            src-tauri/target/${{ inputs.debug && 'debug' || 'release' }}/bundle/nsis/*.exe
-            src-tauri/target/${{ inputs.debug && 'debug' || 'release' }}/bundle/msi/*.msi
+            src-tauri/target/release/bundle/nsis/*.exe
+            src-tauri/target/release/bundle/msi/*.msi
           if-no-files-found: error
           retention-days: 14

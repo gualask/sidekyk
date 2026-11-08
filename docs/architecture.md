@@ -77,8 +77,21 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 - `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, the hidden window, tray, the
   CLI argument), `interfaces/tauri/` (commands, tray, window, `state.rs`: the project list and the
   `Repositories` it is read through; blocking work on `spawn_blocking`), and the app's own
-  infrastructure (`settings_store.rs`, `notes_files.rs`, `logging.rs`, `system_shortcuts.rs`,
-  `capture/`, `window/`: the window as a quick note).
+  infrastructure (`settings_store.rs`, `stored_json.rs`, `notes_files.rs`, `files.rs`, `logging.rs`,
+  `system_shortcuts.rs`, `capture/`, `window/`: the window as a quick note).
+- Files the app writes (notes, settings and projects, an export) go through `files.rs`'s
+  `write_whole`: beside the file, `sync_all`, renamed over, so a crash or a full disk leaves the
+  previous file, never half of one. Reads are bounded (`read_within`, the notes' too).
+- Settings and projects: one `settings.json` in app data (`settings`, `projects`), read at startup
+  for what reads (`stored_json.rs`): a value that does not (a typo, another version's) takes its
+  default, the values beside it still read; a project that does not is left out. Each change
+  writes the file whole under one lock, storing only what changed since it was read: a value or a
+  project not read, or one this version does not know, stays as stored, so an older version run
+  on the same data (a development build, a downgrade) loses nothing of a newer one's. A file whose
+  text does not read is set aside as `settings.unreadable.json` (one, replaced) and the app starts
+  from the defaults; one the disk does not give (a lock, a permission) or that cannot be set aside
+  is never written over that session. No store plugin: tauri-plugin-store 2.5.0 saves with a plain
+  `fs::write` and starts empty on a file it cannot read, written over at the next save.
 - `src-tauri/crates/core/` (`sidekyk-core`): no Tauri, which the compiler keeps out; the app runs
   all of it, the helper what reads a folder. Its items are `pub` for the app, so one the app stops
   using no longer warns.
@@ -155,7 +168,11 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 
 `tracing` to the app's log dir (one file per session, the previous kept, a size cap). Dev builds:
 every git call, batch and command duration, also on stderr. The level applies to the app, the core
-and the helper's lines (target `helper`). Release compiles out below `info` (+144 KiB): startup,
-project opened, the window's visibility, failures, panics, frontend errors (50 per session).
+and the helper's lines (target `helper`). Release compiles out below `info` (+144 KiB): startup
+(version, OS, architecture, the WebView's version), each page load (a second for one webview: it
+crashed and reloaded), project opened, the window's visibility, failures, panics with their
+backtrace (function names only in a release, which strips line tables), frontend errors (50 per
+session). Crash dumps are the system's (macOS's crash reports, Windows Error Reporting), not
+the app's.
 Hot-path events are `debug`. A command's failure is logged once until that command succeeds
 (`blocking.rs`): a read failing on every refresh writes one line, not one a second.

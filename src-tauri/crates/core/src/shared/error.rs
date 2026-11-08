@@ -38,6 +38,8 @@ pub enum UserFacingErrorCode {
     NoteListMissing,
     NoteMissing,
     NoteTooLong,
+    /// A book's notes do not read, or a newer version of Sidekyk wrote them: never written over.
+    NotesUnreadable,
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
@@ -68,6 +70,7 @@ impl UserFacingErrorCode {
             Self::NoteListMissing => "note_list_missing",
             Self::NoteMissing => "note_missing",
             Self::NoteTooLong => "note_too_long",
+            Self::NotesUnreadable => "notes_unreadable",
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
@@ -101,6 +104,7 @@ impl UserFacingErrorCode {
         Self::NoteListMissing,
         Self::NoteMissing,
         Self::NoteTooLong,
+        Self::NotesUnreadable,
         Self::PathOutsideRepository,
         Self::ProjectNotFound,
         Self::RepositoryMissing,
@@ -256,6 +260,7 @@ mod tests {
             (UserFacingErrorCode::NoteListMissing, "note_list_missing"),
             (UserFacingErrorCode::NoteMissing, "note_missing"),
             (UserFacingErrorCode::NoteTooLong, "note_too_long"),
+            (UserFacingErrorCode::NotesUnreadable, "notes_unreadable"),
             (
                 UserFacingErrorCode::PathOutsideRepository,
                 "path_outside_repository",

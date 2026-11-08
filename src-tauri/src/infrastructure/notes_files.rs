@@ -1,13 +1,15 @@
 //! Notes as files under the app's data folder (`<app data>/notes/<folder>/<file>`).
 
 use std::fs;
-use std::io::{ErrorKind, Read, Write};
+use std::io::{ErrorKind, Read};
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
 use sidekyk_core::modules::notes::NotesStorage;
 use sidekyk_core::shared::error::{user_facing, UserFacingErrorCode};
+
+use super::files::{read_within, write_whole, TEMP_SUFFIX};
 
 /// A path as the file system names it, links resolved; a file not written yet, by its folder; as
 /// given when neither exists.
@@ -42,19 +44,6 @@ pub(crate) fn read_image_file(path: &Path, limit: u64) -> anyhow::Result<Vec<u8>
     }
     Ok(bytes)
 }
-
-/// Makes a folder the user chose, with the folders above it, such as notes exported with images.
-pub(crate) fn create_chosen_folder(path: &Path) -> anyhow::Result<()> {
-    fs::create_dir_all(path).with_context(|| format!("creating {}", path.display()))
-}
-
-/// Writes a file the user chose, such as notes exported, whole.
-pub(crate) fn write_chosen_file(path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
-    fs::write(path, bytes).with_context(|| format!("writing {}", path.display()))
-}
-
-/// What a write writes before it renames over the file.
-const TEMP_SUFFIX: &str = ".tmp";
 
 pub(crate) struct NotesFiles {
     dir: PathBuf,
@@ -126,39 +115,11 @@ impl NotesStorage for NotesFiles {
     }
 
     fn read(&self, folder: &str, file: &str, limit: u64) -> anyhow::Result<Option<Vec<u8>>> {
-        let path = self.path(folder, Some(file))?;
-        let opened = match fs::File::open(&path) {
-            Ok(opened) => opened,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(None),
-            Err(error) => return Err(error).with_context(|| format!("opening {}", path.display())),
-        };
-        let mut bytes = Vec::new();
-        opened
-            .take(limit + 1)
-            .read_to_end(&mut bytes)
-            .with_context(|| format!("reading {}", path.display()))?;
-        anyhow::ensure!(
-            bytes.len() as u64 <= limit,
-            "{} is longer than {limit} bytes",
-            path.display()
-        );
-        Ok(Some(bytes))
+        read_within(&self.path(folder, Some(file))?, limit)
     }
 
-    /// Writes next to the file, flushed to the disk, then renames over it: renaming within a
-    /// folder replaces a file whole, on every system.
     fn write(&self, folder: &str, file: &str, bytes: &[u8]) -> anyhow::Result<()> {
-        let path = self.path(folder, Some(file))?;
-        let temp = self.path(folder, Some(&format!("{file}{TEMP_SUFFIX}")))?;
-        fs::create_dir_all(self.path(folder, None)?)
-            .with_context(|| format!("creating the folder of {}", path.display()))?;
-        let mut out =
-            fs::File::create(&temp).with_context(|| format!("creating {}", temp.display()))?;
-        out.write_all(bytes)
-            .and_then(|()| out.sync_all())
-            .with_context(|| format!("writing {}", temp.display()))?;
-        drop(out);
-        fs::rename(&temp, &path).with_context(|| format!("replacing {}", path.display()))
+        write_whole(&self.path(folder, Some(file))?, bytes)
     }
 
     fn remove_folder(&self, folder: &str) -> anyhow::Result<()> {

@@ -9,8 +9,9 @@ use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
+use crate::infrastructure::logging;
 use crate::infrastructure::notes_files::NotesFiles;
-use crate::infrastructure::{logging, settings_store};
+use crate::infrastructure::settings_store::{self, SettingsFile};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
@@ -112,7 +113,6 @@ pub(crate) fn run() {
                 )
             },
         )
-        .plugin(tauri_plugin_store::Builder::default().build())
         .manage(NotesStore::default())
         .manage(FirstShow::default())
         .manage(tauri_commands::capture::CaptureState::default())
@@ -121,7 +121,9 @@ pub(crate) fn run() {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
             }
-            app.manage(NotesFiles::new(&app.path().app_data_dir()?));
+            let data = app.path().app_data_dir()?;
+            app.manage(SettingsFile::open(&data));
+            app.manage(NotesFiles::new(&data));
             // the Linux helper WSL distros run, among the installer's resources on Windows
             // (`tauri.helper.conf.json`, the installer build only)
             let helper = app
@@ -151,9 +153,10 @@ pub(crate) fn run() {
             Ok(())
         })
         // a page loaded again (a crashed webview) forgets a shortcut its predecessor was recording
-        // and a quick note it had open
+        // and a quick note it had open; logged, so a second load of a webview tells a crash
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
+                tracing::info!(webview = webview.label(), "page loading");
                 shortcut::set_recording(webview.app_handle(), false);
                 tauri_commands::quick_note::forget(webview.app_handle());
             }

@@ -27,6 +27,7 @@
     "error.noteListMissing": "Quella lista di note non c'è più.",
     "error.noteMissing": "Quella nota non c'è più.",
     "error.noteTooLong": "Quella nota è troppo lunga: una nota contiene al massimo 1 MB di testo.",
+    "error.notesUnreadable": "Queste note non si leggono: un loro file è danneggiato o l'ha scritto una versione più recente di Sidekyk. Sidekyk le lascia come sono; il log indica il file.",
     "error.pathOutsideRepository": "Quel percorso è fuori dalla cartella del progetto.",
     "error.projectNotFound": "Quel progetto non è più in Sidekyk.",
     "error.repositoryMissing": "La cartella di questo progetto è stata spostata o eliminata. Individua la nuova cartella dall'avviso nella barra in alto, oppure rimuovi il progetto.",

@@ -25,6 +25,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use anyhow::Context;
+
 use super::book::{NoteBook, Touched, MAX_NOTE_BYTES};
 use super::contracts::{
     Book, DeletedList, ImageKind, ImageTarget, ListTarget, Mark, MarkedImage, MovedList, MovedNote,
@@ -36,6 +38,7 @@ use super::images::{
     MAX_IMAGE_BYTES,
 };
 use super::ports::NotesStorage;
+use crate::shared::error::{rebuilt, user_facing_code, UserFacingError, UserFacingErrorCode};
 use crate::shared::id::{is_id, new_id};
 use crate::shared::sync::lock;
 
@@ -146,22 +149,86 @@ fn new_list_id(book: &NoteBook) -> String {
     id
 }
 
-fn parse<T: serde::de::DeserializeOwned>(
+/// A stored file's form, which says the version it is in.
+trait Stored: serde::de::DeserializeOwned {
+    fn version(&self) -> u8;
+}
+
+impl Stored for StoredNote {
+    fn version(&self) -> u8 {
+        self.version
+    }
+}
+
+impl Stored for StoredLists {
+    fn version(&self) -> u8 {
+        self.version
+    }
+}
+
+impl Stored for StoredState {
+    fn version(&self) -> u8 {
+        self.version
+    }
+}
+
+/// The project a folder's notes belong to, from its `project.json`, written once with the folder.
+/// One that does not read leaves the folder to no project, untouched: its notes are not shown,
+/// and the project's next note goes to a new folder.
+fn project_of(storage: &dyn NotesStorage, folder: &str) -> Option<StoredProject> {
+    let read = || -> anyhow::Result<Option<StoredProject>> {
+        let Some(bytes) = storage.read(folder, PROJECT_FILE, OTHER_FILE_LIMIT)? else {
+            return Ok(None);
+        };
+        Ok(Some(serde_json::from_slice(&bytes)?))
+    };
+    read().unwrap_or_else(|error| {
+        tracing::error!(folder, error = %format!("{error:#}"), "notes of no project: its file does not read");
+        None
+    })
+}
+
+/// Why a book is refused, as the user is told: `NotesUnreadable`.
+fn refusal(cause: anyhow::Error) -> anyhow::Error {
+    cause.context(UserFacingError::new(UserFacingErrorCode::NotesUnreadable))
+}
+
+/// A file of a book; none when it is not there. One whose text does not read, or that a newer
+/// version wrote (a form this one may not keep whole), refuses the book: `NotesUnreadable`.
+fn read_stored<T: Stored>(
     storage: &dyn NotesStorage,
     folder: &str,
     file: &str,
     limit: u64,
-) -> Option<T> {
-    let bytes = match storage.read(folder, file, limit) {
-        Ok(bytes) => bytes?,
-        Err(error) => {
-            tracing::warn!(folder, file, error = %format!("{error:#}"), "could not read notes");
-            return None;
-        }
+) -> anyhow::Result<Option<T>> {
+    let Some(bytes) = storage.read(folder, file, limit)? else {
+        return Ok(None);
     };
-    serde_json::from_slice(&bytes)
-        .inspect_err(|error| tracing::warn!(folder, file, %error, "could not read notes"))
-        .ok()
+    let stored: T = serde_json::from_slice(&bytes)
+        .with_context(|| format!("reading {folder}/{file}"))
+        .map_err(refusal)?;
+    if stored.version() > STORED_VERSION {
+        return Err(refusal(anyhow::anyhow!(
+            "{folder}/{file} is of version {}, this one reads up to {STORED_VERSION}",
+            stored.version()
+        )));
+    }
+    Ok(Some(stored))
+}
+
+/// The lists of `lists.json`: each with an id, none twice, else the book is refused.
+fn checked_lists(folder: &str, lists: Vec<NoteList>) -> anyhow::Result<Vec<NoteList>> {
+    let mut seen = HashSet::new();
+    if let Some(list) = lists
+        .iter()
+        .find(|l| !is_id(&l.id) || !seen.insert(l.id.as_str()))
+    {
+        return Err(refusal(anyhow::anyhow!(
+            "{folder}/{LISTS_FILE}: the list {:?} again or with no id",
+            list.id
+        )));
+    }
+    Ok(lists)
 }
 
 fn write_json(
@@ -198,6 +265,9 @@ pub struct NotesStore {
     books: Mutex<HashMap<String, KeptBook>>,
     /// The name of a book's first list, `FIRST_LIST_NAME` until named.
     first_list_name: Mutex<Option<&'static str>>,
+    /// The books refused this session (`NotesUnreadable`), by key, with why: each refused once,
+    /// not read again at every look (the palette's, at each key).
+    refused: Mutex<HashMap<String, String>>,
     /// The books whose images of no note were removed this session, by key: once, at the first
     /// read, so an undo of this session finds its files.
     swept: Mutex<HashSet<String>>,
@@ -220,9 +290,7 @@ impl NotesStore {
             names.sort_unstable();
             let mut found = HashMap::new();
             for folder in names {
-                let Some(stored) =
-                    parse::<StoredProject>(storage, &folder, PROJECT_FILE, OTHER_FILE_LIMIT)
-                else {
+                let Some(stored) = project_of(storage, &folder) else {
                     continue;
                 };
                 if found.contains_key(&stored.id) {
@@ -255,28 +323,33 @@ impl NotesStore {
         let mut lists = Vec::new();
         let mut notes = Vec::new();
         let mut open_list = None;
-        // a note that cannot be read may have images: none is removed then
-        let mut broken = false;
         let mut images = Vec::new();
         if let Some(folder) = folder.as_deref() {
             for file in storage.files(folder)? {
                 if file == LISTS_FILE {
                     if let Some(stored) =
-                        parse::<StoredLists>(storage, folder, &file, OTHER_FILE_LIMIT)
+                        read_stored::<StoredLists>(storage, folder, &file, OTHER_FILE_LIMIT)?
                     {
-                        lists = stored.lists;
+                        lists = checked_lists(folder, stored.lists)?;
                     }
                 } else if file == STATE_FILE {
-                    open_list = parse::<StoredState>(storage, folder, &file, OTHER_FILE_LIMIT)
+                    // this machine's alone, written again as another list opens: one that does
+                    // not read opens the first list
+                    open_list = read_stored::<StoredState>(storage, folder, &file, OTHER_FILE_LIMIT)
+                        .unwrap_or_else(|error| {
+                            tracing::warn!(folder, error = %format!("{error:#}"), "the list open not read");
+                            None
+                        })
                         .and_then(|s| s.open_list);
                 } else if let Some(id) = file.strip_suffix(".json").filter(|id| is_id(id)) {
-                    match parse::<StoredNote>(storage, folder, &file, NOTE_FILE_LIMIT) {
+                    if let Some(stored) =
+                        read_stored::<StoredNote>(storage, folder, &file, NOTE_FILE_LIMIT)?
+                    {
                         // the file's name is the note's id
-                        Some(stored) => notes.push(Note {
+                        notes.push(Note {
                             id: id.into(),
                             ..stored.note
-                        }),
-                        None => broken = true,
+                        });
                     }
                 } else if image_of_file(&file).is_some() {
                     images.push(file);
@@ -290,7 +363,7 @@ impl NotesStore {
         };
         let (notes, pending) = NoteBook::mended(lists, notes, open_list, first_list);
         if let Some(folder) = folder.as_deref() {
-            if lock(&self.swept).insert(book.key().into()) && !broken {
+            if lock(&self.swept).insert(book.key().into()) {
                 sweep(storage, folder, &notes.notes, &images);
             }
         }
@@ -314,7 +387,25 @@ impl NotesStore {
         book: &Book,
     ) -> anyhow::Result<&'a mut KeptBook> {
         if !books.contains_key(book.key()) {
-            books.insert(book.key().into(), self.load(storage, book)?);
+            if let Some(refusal) = lock(&self.refused).get(book.key()) {
+                return Err(rebuilt(Some(UserFacingErrorCode::NotesUnreadable), refusal));
+            }
+            match self.load(storage, book) {
+                Ok(kept) => {
+                    books.insert(book.key().into(), kept);
+                }
+                Err(error) => {
+                    if user_facing_code(&error) == Some(UserFacingErrorCode::NotesUnreadable) {
+                        tracing::warn!(
+                            book = book.key(),
+                            error = %format!("{error:#}"),
+                            "notes refused: not read again nor written this session"
+                        );
+                        lock(&self.refused).insert(book.key().into(), format!("{error:#}"));
+                    }
+                    return Err(error);
+                }
+            }
         }
         Ok(books.get_mut(book.key()).expect("just read"))
     }
@@ -547,6 +638,7 @@ impl NotesStore {
             found.remove(book.key());
         }
         books.remove(book.key());
+        lock(&self.refused).remove(book.key());
         Ok(())
     }
 
@@ -1132,7 +1224,7 @@ pub mod tests {
             files,
             [note_file(&note.id).as_str(), LISTS_FILE, PROJECT_FILE]
         );
-        let project: StoredProject = parse(&storage, folder, PROJECT_FILE, 1024).unwrap();
+        let project = project_of(&storage, folder).unwrap();
         assert_eq!(project.id, SHOP);
     }
 
@@ -1233,8 +1325,8 @@ pub mod tests {
         assert_eq!(store.notes(&storage, &shop()).unwrap().notes[0].text, "a");
     }
 
-    #[test]
-    fn a_broken_note_is_skipped() {
+    /// A book with a note written, and its folder.
+    fn book_with_a_note() -> (MemoryStorage, String) {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
         let list = store.notes(&storage, &shop()).unwrap().open_list;
@@ -1242,11 +1334,70 @@ pub mod tests {
             .add_note(&storage, &shop(), &list, "a".into())
             .unwrap();
         let folder = storage.folders().unwrap().remove(0);
-        storage
-            .write(&folder, "0123456789abcdef.json", b"{ not json")
-            .unwrap();
+        (storage, folder)
+    }
 
+    fn refused(result: anyhow::Result<impl std::fmt::Debug>) -> bool {
+        user_facing_code(&result.unwrap_err()) == Some(UserFacingErrorCode::NotesUnreadable)
+    }
+
+    #[test]
+    fn a_book_with_a_file_that_does_not_read_is_refused_and_never_written() {
+        for (file, text) in [
+            ("0123456789abcdef.json", &b"{ not json"[..]),
+            (LISTS_FILE, b"{ \"version\": 1, \"lists\": [ {"),
+            (
+                LISTS_FILE,
+                br#"{ "version": 1, "lists": [{ "id": "x", "name": "Bugs" }] }"#,
+            ),
+        ] {
+            let (storage, folder) = book_with_a_note();
+            storage.write(&folder, file, text).unwrap();
+            let before = lock(&storage.files).clone();
+            let store = NotesStore::default();
+            assert!(refused(store.notes(&storage, &shop())), "{file}");
+            assert!(refused(store.add_note(
+                &storage,
+                &shop(),
+                FIRST_LIST_ID,
+                "b".into()
+            )));
+            assert_eq!(*lock(&storage.files), before, "{file}");
+        }
+    }
+
+    #[test]
+    fn a_book_a_newer_version_wrote_is_refused() {
+        let (storage, folder) = book_with_a_note();
+        let note = storage
+            .names()
+            .into_iter()
+            .find(|(_, file)| is_id(file.trim_end_matches(".json")))
+            .unwrap()
+            .1;
+        let mut json: serde_json::Value =
+            serde_json::from_slice(&storage.read(&folder, &note, 1 << 20).unwrap().unwrap())
+                .unwrap();
+        json["version"] = (STORED_VERSION + 1).into();
+        json["pinned"] = true.into();
+        storage
+            .write(&folder, &note, &serde_json::to_vec(&json).unwrap())
+            .unwrap();
+        let store = NotesStore::default();
+        assert!(refused(store.notes(&storage, &shop())));
+        // refused once: not read again at the next look, nor by the palette
+        storage.reads();
+        assert!(refused(store.count(&storage, &shop())));
+        store.with_every_book(&storage, &[shop()], |found| assert!(found.is_empty()));
+        assert_eq!(storage.reads(), 0);
+    }
+
+    #[test]
+    fn a_list_open_that_does_not_read_opens_the_first() {
+        let (storage, folder) = book_with_a_note();
+        storage.write(&folder, STATE_FILE, b"{ broken").unwrap();
         let notes = NotesStore::default().notes(&storage, &shop()).unwrap();
+        assert_eq!(notes.open_list, FIRST_LIST_ID);
         assert_eq!(notes.notes.len(), 1);
     }
 
@@ -1946,7 +2097,7 @@ pub mod tests {
     }
 
     #[test]
-    fn a_note_that_cannot_be_read_keeps_every_image() {
+    fn a_book_refused_keeps_every_image() {
         let storage = MemoryStorage::default();
         let store = NotesStore::default();
         let general = store.notes(&storage, &shop()).unwrap().open_list;
@@ -1962,7 +2113,7 @@ pub mod tests {
         storage
             .write(&folder, &note_file(&note.id), b"{ broken")
             .unwrap();
-        NotesStore::default().notes(&storage, &shop()).unwrap();
+        assert!(refused(NotesStore::default().notes(&storage, &shop())));
         assert_eq!(files_of(&storage, &note.images[0]).len(), 2);
     }
 
