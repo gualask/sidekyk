@@ -11,7 +11,11 @@ repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
 - [ ] Waiting for notify 9 stable (9.0.0-rc.7 on 2026-10-31), with its `notify-debouncer-mini`
       (0.8): installed as soon as it is out, before anything else; on Windows the system's
       dropped events become a rescan (notify-rs#964; `docs/architecture.md`, Watching)
-- [ ] Real app icon and tray glyph (today Tabler's `git-compare`)
+- [ ] Liquid Glass icon for macOS 26 and later: an Icon Composer `.icon` in `bundle.icon`, which
+      the bundler compiles with `actool` into `Assets.car` (`icon.icns` stays the fallback). Needs
+      Xcode 26, not the Command Line Tools; under the Node CLI `actool` crashes
+      (tauri-apps/tauri#15315, fix in #15991): wait for it, or commit a compiled `Assets.car`
+      (`docs/features/background.md`, App icon)
 
 ## Notes
 

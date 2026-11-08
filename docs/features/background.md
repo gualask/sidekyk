@@ -21,8 +21,18 @@ hidden.
 
 ## How it is built
 
-- Tray: macOS template glyph (`icons/tray-template.png`); on Linux without appindicator its panic
-  is caught and closing quits. +235 KiB on the binary.
+- App icon: one source, `icons/source/icon.svg`: the mark (two spiral arms making an S, full
+  strokes with no thin trails, so it holds at 16 px) on macOS's body, an opaque superellipse of
+  824 px on the 1024 grid. `pnpm tauri icon src-tauri/icons/source/icon.svg` makes every
+  platform's files; its `android/` and `ios/` folders are not kept. macOS 26 and later show it
+  whole, unlike a bare mark, which they put in a grey tile (checked on macOS 27.2 with
+  `NSWorkspace`'s icon of a test bundle). No Liquid Glass `.icon` yet (`ROADMAP.md`).
+  `generate_context!` and `include_image!` read the files at compile time and Cargo does not
+  track them: after new icons, touch `bootstrap/mod.rs` and `interfaces/tauri/tray.rs`.
+- Tray: on macOS a template glyph, `icons/tray-template.png`: 18 pt drawn at 36 px, the mark's
+  two arms thickened, from `icons/source/tray.svg` (`pnpm tauri icon … -p 36 -o <dir>`, its
+  `36x36.png`); elsewhere the app icon in color. On Linux without appindicator its panic is
+  caught and closing quits. +235 KiB on the binary.
 - Visibility: the page reports `visibilitychange` (`set_window_visible`; WKWebView follows
   occlusion). While hidden a watcher batch only marks the project; showing returns it, and the
   frontend reads it and anything on screen older than 30 s.
