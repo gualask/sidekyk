@@ -1,9 +1,12 @@
-//! The main window as a quick note: its opacity and its buttons, and the app that was in front
-//! before it, which each system reaches its own way. When the window shows, resizes and hides is
-//! the interface's (`interfaces/tauri/quick_note.rs`).
+//! The main window as each system shows and hides it: macOS hides the whole app and brings the
+//! window back from the Dock, elsewhere the window alone hides. The window as a quick note: its
+//! opacity and its buttons, and the app that was in front before it. When the window shows,
+//! resizes and hides is the session's (`desktop/window.rs`, `desktop/quick_note.rs`).
 
 #[cfg(target_os = "macos")]
 mod macos;
+
+use tauri::{AppHandle, Manager, RunEvent};
 
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{activate, front_app, set_buttons_hidden, set_opacity, AppId};
@@ -11,7 +14,52 @@ pub(crate) use macos::{activate, front_app, set_buttons_hidden, set_opacity, App
 /// Whether the quick note is built on this system: its global shortcut and tray item.
 pub(crate) const QUICK_NOTE_BUILT: bool = cfg!(target_os = "macos");
 
-// Not built elsewhere yet: nothing starts a quick note there, so these are never reached.
+/// Hides Sidekyk. macOS hides the whole app, so the app used before comes back to the front; a
+/// window hidden alone would leave Sidekyk active with nothing on screen.
+#[cfg(target_os = "macos")]
+pub(crate) fn hide(app: &AppHandle) {
+    let _ = app.hide();
+}
+
+/// Elsewhere the window hides and the system brings the next one to the front.
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn hide(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+/// Shows the window and gives it the focus, minimized, hidden or behind others; on macOS the app
+/// `hide` hid shows again with it.
+pub(crate) fn bring_back(app: &AppHandle) {
+    #[cfg(target_os = "macos")]
+    let _ = app.show();
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
+/// Whether the system asks for the window back: on macOS, a click on the Dock's icon while no
+/// window shows. Elsewhere the tray's menu, or launching the app again, does.
+#[cfg(target_os = "macos")]
+pub(crate) fn asks_for_window(event: &RunEvent) -> bool {
+    matches!(
+        event,
+        RunEvent::Reopen {
+            has_visible_windows: false,
+            ..
+        }
+    )
+}
+
+#[cfg(not(target_os = "macos"))]
+pub(crate) fn asks_for_window(_event: &RunEvent) -> bool {
+    false
+}
+
+// The quick note is not built elsewhere yet: nothing starts one there, so these are never reached.
 
 #[cfg(not(target_os = "macos"))]
 #[derive(Clone, Copy, Debug)]

@@ -151,7 +151,9 @@ impl RepositoryBackend for LocalRepositoryBackend {
     fn read_entry(&self, root: &Path, path: &Path, limit: usize) -> Option<WorktreeEntry> {
         let (full, meta) = inside(root, path)?;
         if meta.is_symlink() {
-            return std::fs::read_link(&full).ok().map(WorktreeEntry::Link);
+            return std::fs::read_link(&full)
+                .ok()
+                .map(|target| WorktreeEntry::Link(link_target(&target)));
         }
         if meta.is_dir() {
             return Some(WorktreeEntry::Folder);
@@ -261,6 +263,16 @@ impl RepositoryBackend for LocalRepositoryBackend {
     fn real_path(&self, path: &Path) -> Option<PathBuf> {
         std::fs::symlink_metadata(path).ok()?;
         std::path::absolute(path).ok()
+    }
+}
+
+/// A link's target as git stores it, with `/` between names: Windows writes `\`.
+fn link_target(target: &Path) -> String {
+    let text = target.to_string_lossy();
+    if cfg!(windows) {
+        text.replace('\\', "/")
+    } else {
+        text.into_owned()
     }
 }
 

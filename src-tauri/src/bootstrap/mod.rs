@@ -10,14 +10,14 @@ use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
 
-use crate::infrastructure::logging;
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::settings_store::{self, SettingsFile};
+use crate::infrastructure::tray::TrayActions;
+use crate::infrastructure::{global_shortcuts, logging, tray};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
 use crate::interfaces::tauri::state::Launch;
-use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
@@ -183,12 +183,16 @@ pub(crate) fn run() {
             // before the windows, whose pages may change the settings as they load; applied below
             app.manage(AppliedSettings::new(settings.clone()));
             // before the windows: their pages reach the shortcut's state as they load
-            shortcut::start(app.handle(), &settings);
+            global_shortcuts::start(app.handle(), &settings, shortcut::pressed, TOGGLE_FLAG);
             create_windows(app.handle(), settings.theme)?;
             show_by_deadline(app.handle());
             // before the tray, which starts in the language returned
             let texts = apply_language(app.handle(), settings.language);
-            tray::start(app.handle(), texts);
+            let actions = TrayActions {
+                item: tauri_commands::tray::chosen,
+                click: tauri_commands::tray::clicked,
+            };
+            tray::start(app.handle(), texts.tray(), actions);
             let args: Vec<String> = std::env::args().collect();
             if let Some(folder) = folder_argument(&args) {
                 open_or_log(app.handle(), folder);
@@ -200,7 +204,7 @@ pub(crate) fn run() {
         .on_page_load(|webview, payload| {
             if payload.event() == PageLoadEvent::Started {
                 tracing::info!(webview = webview.label(), "page loading");
-                shortcut::set_recording(webview.app_handle(), false);
+                global_shortcuts::set_recording(webview.app_handle(), false);
                 tauri_commands::quick_note::forget(webview.app_handle());
             }
         })

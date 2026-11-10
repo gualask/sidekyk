@@ -142,7 +142,8 @@ pub enum WorktreeEntry {
         /// The file is longer than `head`.
         truncated: bool,
     },
-    Link(PathBuf),
+    /// A link, by its target as git stores it: `/` between names on every system.
+    Link(String),
     Folder,
 }
 

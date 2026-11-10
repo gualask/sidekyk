@@ -17,7 +17,6 @@ use tauri::{
     WebviewWindow,
 };
 
-use super::window::{bring_back, hide_main_window};
 use crate::infrastructure::window::{self as system, AppId};
 use sidekyk_core::shared::sync::lock;
 
@@ -119,7 +118,7 @@ fn open(app: &AppHandle) {
     };
     drop(stage);
     // shown at once, transparent: its page paints only once on screen
-    bring_back(app);
+    system::bring_back(app);
     tell(app, Phase::Open);
     opaque_by_deadline(app, opened);
 }
@@ -143,7 +142,7 @@ pub(crate) fn close(app: &AppHandle, then: Then) -> bool {
                 tracing::debug!("the app in front before the quick note did not come back");
             }
         }
-        Back::Hidden => hide_main_window(app),
+        Back::Hidden => system::hide(app),
     }
     let closed = Instant::now();
     *stage = Stage::Restoring(closed);

@@ -291,9 +291,7 @@ pub fn load_file_content(
                 }
             }
         }
-        WorktreeEntry::Link(target) => FileContent::Link {
-            target: link_target(&target),
-        },
+        WorktreeEntry::Link(target) => FileContent::Link { target },
         WorktreeEntry::Folder => FileContent::Folder,
     })
 }
@@ -329,16 +327,6 @@ pub fn load_image(
         Some(WorktreeEntry::Link(_) | WorktreeEntry::Folder) | None => {
             Err(user_facing(UserFacingErrorCode::FileMissing))
         }
-    }
-}
-
-/// A link's target as git stores it, with `/` between names.
-fn link_target(target: &Path) -> String {
-    let text = target.to_string_lossy();
-    if cfg!(windows) {
-        text.replace('\\', "/")
-    } else {
-        text.into_owned()
     }
 }
 

@@ -82,8 +82,10 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   machine's reader, through the helper with `SIDEKYK_AGENT=local`), `interfaces/tauri/`
   (commands, tray, window, `state.rs`: what a launch opened, the palette's search, the folders
   holding a file; blocking work on `spawn_blocking`), and the app's own
-  infrastructure (`settings_store.rs`, `stored_json.rs`, `notes_files.rs`, `files.rs`, `logging.rs`,
-  `system_shortcuts.rs`, `capture/`, `window/`: the window as a quick note).
+  infrastructure, every system `#[cfg]` of the crate (`settings_store.rs`, `stored_json.rs`,
+  `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs`, `global_shortcuts/`, `capture/`,
+  `window/`: hiding and bringing back the window, the window as a quick note); what a tray item,
+  a click or a shortcut press does reaches it as a callback from `bootstrap/`.
 - Files the app writes (notes, settings and projects, an export) go through `files.rs`'s
   `write_whole`: beside the file, `sync_all`, renamed over, so a crash or a full disk leaves the
   previous file, never half of one. Reads are bounded (`read_within`, the notes' too).

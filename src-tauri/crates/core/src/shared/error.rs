@@ -33,7 +33,6 @@ pub enum UserFacingErrorCode {
     /// A file given to a note is not an image a note takes (PNG, JPEG, GIF, WebP), or is broken.
     ImageUnsupported,
     InvalidCommit,
-    #[cfg(any(target_os = "macos", windows))]
     InvalidShortcut,
     NoteListMissing,
     NoteMissing,
@@ -44,9 +43,7 @@ pub enum UserFacingErrorCode {
     ProjectNotFound,
     RepositoryMissing,
     /// Sidekyk's other global shortcut has these keys.
-    #[cfg(any(target_os = "macos", windows))]
     ShortcutInUse,
-    #[cfg(any(target_os = "macos", windows))]
     ShortcutTaken,
 }
 
@@ -65,7 +62,6 @@ impl UserFacingErrorCode {
             Self::ImageTooLarge => "image_too_large",
             Self::ImageUnsupported => "image_unsupported",
             Self::InvalidCommit => "invalid_commit",
-            #[cfg(any(target_os = "macos", windows))]
             Self::InvalidShortcut => "invalid_shortcut",
             Self::NoteListMissing => "note_list_missing",
             Self::NoteMissing => "note_missing",
@@ -74,9 +70,7 @@ impl UserFacingErrorCode {
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
-            #[cfg(any(target_os = "macos", windows))]
             Self::ShortcutInUse => "shortcut_in_use",
-            #[cfg(any(target_os = "macos", windows))]
             Self::ShortcutTaken => "shortcut_taken",
         }
     }
@@ -99,7 +93,6 @@ impl UserFacingErrorCode {
         Self::ImageTooLarge,
         Self::ImageUnsupported,
         Self::InvalidCommit,
-        #[cfg(any(target_os = "macos", windows))]
         Self::InvalidShortcut,
         Self::NoteListMissing,
         Self::NoteMissing,
@@ -108,9 +101,7 @@ impl UserFacingErrorCode {
         Self::PathOutsideRepository,
         Self::ProjectNotFound,
         Self::RepositoryMissing,
-        #[cfg(any(target_os = "macos", windows))]
         Self::ShortcutInUse,
-        #[cfg(any(target_os = "macos", windows))]
         Self::ShortcutTaken,
     ];
 }
@@ -275,7 +266,6 @@ mod tests {
         assert_eq!(UserFacingErrorCode::parse("unknown"), None);
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
     fn shortcut_error_codes_keep_the_wire_contract() {
         let cases = [

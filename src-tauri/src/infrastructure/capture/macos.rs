@@ -3,14 +3,13 @@
 //! dimmed while an area is picked: drawn, moved, resized by its handles, then taken by `↵`, a
 //! double click in it or its button. The area shows bright through a second layer of the same
 //! frame, so a drag moves layers and repaints nothing (`.local/capture-overlay/`: on glass in
-//! 63-84 ms, ~10 MB). The panel is made for one capture and dropped after it; the area taken
-//! comes back at the next capture on the same display, for this session.
+//! 63-84 ms, ~10 MB). The panel is made for one capture and dropped after it; the area last taken
+//! on the same display, given by the caller, shows picked at the start.
 
 use std::cell::{Cell, RefCell};
 use std::ffi::c_void;
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::anyhow;
 use block2::RcBlock;
@@ -40,7 +39,9 @@ use objc2_screen_capture_kit::{
     SCStreamConfiguration,
 };
 
-use super::{Done, Outcome};
+use tauri::AppHandle;
+
+use super::{Done, Outcome, Taken};
 use sidekyk_core::modules::capture::{Area, Grip, Handle, Point, Selection, Size};
 use sidekyk_core::modules::notes::{prepare_capture, PreparedImage};
 
@@ -70,53 +71,51 @@ const BUTTON_RADIUS: CGFloat = 6.0;
 /// The button's shadow: opacity, blur radius and downward offset in points.
 const BUTTON_SHADOW: (f32, CGFloat, CGFloat) = (0.35, 6.0, 2.0);
 
-/// A capture is on, from its start until its panel closes: another start is ignored.
-static CAPTURING: AtomicBool = AtomicBool::new(false);
-
 thread_local! {
     /// The panel on screen, kept until the capture ends.
     static PANEL: RefCell<Option<Retained<OverlayPanel>>> = const { RefCell::new(None) };
-    /// The area last taken, and its display's id.
-    static LAST: Cell<Option<(u32, Area)>> = const { Cell::new(None) };
 }
 
-/// Starts a capture of the display under the pointer, `confirm` its button's text; `done` is
-/// called once it ends, unless this returns false: a capture was already on. Called on the main
-/// thread.
-pub(crate) fn start(confirm: &'static str, done: Done) -> bool {
+/// Starts a capture of the display under the pointer, `confirm` its button's text; the area
+/// `last` taken shows picked when it is on that display. `done` is called once it ends, even if
+/// the capture cannot reach the main thread, where AppKit shows its panel. One at a time: the
+/// caller's to see to.
+pub(crate) fn start(app: &AppHandle, confirm: &'static str, last: Option<Taken>, done: Done) {
+    let slot = Arc::new(Once(Mutex::new(Some(done))));
+    let queued = slot.clone();
+    let result = app.run_on_main_thread(move || {
+        if let Some(done) = queued.take() {
+            begin(confirm, last, done);
+        }
+    });
+    if let Err(error) = result {
+        if let Some(done) = slot.take() {
+            done(Outcome::Failed(anyhow::Error::from(error)));
+        }
+    }
+}
+
+/// `start`, on the main thread.
+fn begin(confirm: &'static str, last: Option<Taken>, done: Done) {
     let Some(mtm) = MainThreadMarker::new() else {
-        done(Outcome::Failed(anyhow!(
+        return done(Outcome::Failed(anyhow!(
             "a capture starts on the main thread"
         )));
-        return true;
     };
-    if CAPTURING.swap(true, Ordering::SeqCst) {
-        if PANEL.with(|panel| panel.borrow().is_none()) {
-            // ScreenCaptureKit has not answered the last start: it always should
-            tracing::warn!("a capture is still reading the screen");
-        }
-        return false;
-    }
     if !CGPreflightScreenCaptureAccess() {
         // the system's prompt the first time; afterwards it only answers no
         CGRequestScreenCaptureAccess();
-        end(done, Outcome::NoPermission);
-        return true;
+        return done(Outcome::NoPermission);
     }
     match display_under_pointer(mtm) {
-        Some(display) => read(display, confirm, done),
-        None => end(
-            done,
-            Outcome::Failed(anyhow!("no display under the pointer")),
-        ),
+        Some(display) => {
+            let last = last
+                .filter(|taken| taken.display == display.id)
+                .map(|taken| taken.area);
+            read(display, confirm, last, done);
+        }
+        None => done(Outcome::Failed(anyhow!("no display under the pointer"))),
     }
-    true
-}
-
-/// Ends a capture that never showed its panel.
-fn end(done: Done, outcome: Outcome) {
-    CAPTURING.store(false, Ordering::SeqCst);
-    done(outcome);
 }
 
 /// A display, as AppKit places it.
@@ -163,8 +162,9 @@ impl Once {
     }
 }
 
-/// Reads the display at its pixels, Sidekyk left out, then shows the panel on the main thread.
-fn read(display: Display, confirm: &'static str, done: Done) {
+/// Reads the display at its pixels, Sidekyk left out, then shows the panel on the main thread,
+/// `last` picked.
+fn read(display: Display, confirm: &'static str, last: Option<Area>, done: Done) {
     let once = Once(Mutex::new(Some(done)));
     let listed = RcBlock::new(
         move |content: *mut SCShareableContent, error: *mut NSError| {
@@ -173,17 +173,17 @@ fn read(display: Display, confirm: &'static str, done: Done) {
             let content = unsafe { content.as_ref() };
             let Some((filter, config)) = content.and_then(|content| filter(content, &display))
             else {
-                return end(done, Outcome::Failed(failure("the display", error)));
+                return done(Outcome::Failed(failure("the display", error)));
             };
             let once = Once(Mutex::new(Some(done)));
             let shot = RcBlock::new(move |image: *mut CGImage, error: *mut NSError| {
                 let Some(done) = once.take() else { return };
                 let Some(image) = NonNull::new(image) else {
-                    return end(done, Outcome::Failed(failure("the screen", error)));
+                    return done(Outcome::Failed(failure("the screen", error)));
                 };
                 // SAFETY: a valid image, retained for the panel.
                 let image = unsafe { CFRetained::retain(image) };
-                DispatchQueue::main().exec_async(move || show(image, display, confirm, done));
+                DispatchQueue::main().exec_async(move || show(image, display, confirm, last, done));
             });
             // SAFETY: the filter and configuration are valid; the handler is called once.
             unsafe {
@@ -245,9 +245,15 @@ fn filter(
 }
 
 /// Puts the panel up over the display, holding the frame. On the main thread.
-fn show(image: CFRetained<CGImage>, display: Display, confirm: &'static str, done: Done) {
+fn show(
+    image: CFRetained<CGImage>,
+    display: Display,
+    confirm: &'static str,
+    last: Option<Area>,
+    done: Done,
+) {
     let mtm = MainThreadMarker::new().expect("the main queue runs on the main thread");
-    let panel = OverlayPanel::new(mtm, image, display, confirm, done);
+    let panel = OverlayPanel::new(mtm, image, display, confirm, last, done);
     panel.orderFrontRegardless();
     panel.makeKeyWindow();
     NSCursor::crosshairCursor().set();
@@ -275,6 +281,7 @@ impl OverlayPanel {
         image: CFRetained<CGImage>,
         display: Display,
         confirm: &'static str,
+        last: Option<Area>,
         done: Done,
     ) -> Retained<Self> {
         // SAFETY: NSPanel's designated initializer; released by `PANEL`, not when closed.
@@ -298,7 +305,7 @@ impl OverlayPanel {
         panel.setHidesOnDeactivate(false);
         panel.setHasShadow(false);
         panel.setOpaque(true);
-        let view = OverlayView::new(mtm, image, display, confirm, done);
+        let view = OverlayView::new(mtm, image, display, confirm, last, done);
         panel.setContentView(Some(&view));
         panel.makeFirstResponder(Some(&view));
         panel
@@ -401,6 +408,7 @@ impl OverlayView {
         image: CFRetained<CGImage>,
         display: Display,
         confirm: &'static str,
+        last: Option<Area>,
         done: Done,
     ) -> Retained<Self> {
         let size = Size {
@@ -477,15 +485,12 @@ impl OverlayView {
         ));
         root.addSublayer(&button);
 
-        let remembered = LAST
-            .with(Cell::get)
-            .and_then(|(id, area)| (id == display.id).then_some(area));
         let state = ViewState {
             image,
             display: display.id,
             scale: display.scale,
             size,
-            selection: RefCell::new(Selection::new(size, remembered)),
+            selection: RefCell::new(Selection::new(size, last)),
             bright,
             handles,
             label,
@@ -630,11 +635,10 @@ impl OverlayView {
         )
     }
 
-    /// Takes the area picked, if one is, and remembers it for the next capture.
+    /// Takes the area picked, if one is.
     fn confirm(&self) {
         let picked = self.ivars().selection.borrow().picked();
         if let Some(area) = picked {
-            LAST.with(|last| last.set(Some((self.ivars().display, area))));
             self.finish(Some(area));
         }
     }
@@ -652,24 +656,28 @@ impl OverlayView {
         DispatchQueue::main().exec_async(|| {
             PANEL.with(|slot| slot.borrow_mut().take());
         });
-        CAPTURING.store(false, Ordering::SeqCst);
         let crop = area.and_then(|area| {
             let picked = area.pixels(state.scale, self.frame_pixels())?;
-            CGImage::with_image_in_rect(
+            let crop = CGImage::with_image_in_rect(
                 Some(&state.image),
                 CGRect::new(
                     CGPoint::new(picked.x.into(), picked.y.into()),
                     CGSize::new(picked.width.into(), picked.height.into()),
                 ),
-            )
+            )?;
+            Some((crop, area))
         });
+        let display = state.display;
         match crop {
             None => done(Outcome::Cancelled),
             // off the main thread: a whole display's PNG takes a while
-            Some(crop) => {
+            Some((crop, area)) => {
                 std::thread::spawn(move || {
                     done(match prepared(&crop) {
-                        Ok(image) => Outcome::Captured(image),
+                        Ok(image) => Outcome::Captured {
+                            image,
+                            taken: Taken { display, area },
+                        },
                         Err(error) => Outcome::Failed(error),
                     })
                 });

@@ -187,31 +187,24 @@ pub struct GlobalShortcutStatuses {
     pub note: Option<GlobalShortcutStatus>,
 }
 
-/// Where a global shortcut stands, as registered. The frontend knows every platform's kinds;
-/// each platform builds only its own.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[cfg_attr(any(target_os = "macos", windows), derive(Default))]
+/// Where a global shortcut stands, as registered. Which kinds a system gives is its own
+/// (`global_shortcuts` in the app's `infrastructure/`): `command` on Linux, the others elsewhere.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum GlobalShortcutStatus {
-    #[cfg(any(target_os = "macos", windows))]
     #[default]
     Off,
     /// Registered. `conflict`: macOS uses the same keys for a shortcut of its own, which gets
     /// them first.
-    #[cfg(any(target_os = "macos", windows))]
     Active { keys: String, conflict: bool },
     /// The stored shortcut could not be registered at startup, as another app or the system
     /// holds it: it does not work.
-    #[cfg(any(target_os = "macos", windows))]
     Refused { keys: String },
     /// The stored shortcut has another's keys, which that one took first: it does not work.
-    #[cfg(any(target_os = "macos", windows))]
     InUse { keys: String },
     /// No global shortcut on this system: the plugin could not start.
-    #[cfg(any(target_os = "macos", windows))]
     Unavailable,
     /// Linux: the desktop's own shortcut runs this command, which does what the shortcut would.
-    #[cfg(not(any(target_os = "macos", windows)))]
     Command { command: String },
 }
 
@@ -308,7 +301,6 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
     fn shortcut_statuses_serialize_with_their_kind() {
         let cases = [
@@ -345,7 +337,6 @@ mod tests {
         }
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
     fn shortcut_statuses_go_by_shortcut() {
         let statuses = GlobalShortcutStatuses {
@@ -363,7 +354,6 @@ mod tests {
         );
     }
 
-    #[cfg(not(any(target_os = "macos", windows)))]
     #[test]
     fn the_linux_status_serializes_with_its_kind() {
         let status = GlobalShortcutStatus::Command {

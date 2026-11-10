@@ -5,6 +5,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+use crate::infrastructure::tray::TrayLabels;
 use sidekyk_core::modules::notes::ExportWords;
 use sidekyk_core::modules::settings::Language;
 
@@ -26,6 +27,18 @@ pub(crate) struct Texts {
     pub(crate) export_file: &'static str,
     pub(crate) export: ExportWords,
     pub(crate) first_list: &'static str,
+}
+
+impl Texts {
+    /// The tray menu's labels.
+    pub(crate) fn tray(&self) -> TrayLabels {
+        TrayLabels {
+            show: self.show,
+            capture: self.capture,
+            note: self.note,
+            quit: self.quit,
+        }
+    }
 }
 
 static ENGLISH: Texts = Texts {

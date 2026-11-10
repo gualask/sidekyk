@@ -48,11 +48,14 @@ An area of the screen captured from any app becomes a new note, its marks open a
   layers: the frame dimmed (0.35), the same `CGImage` bright through the area's `contentsRect`,
   the border, the handles, a `CATextLayer` label and button; an `NSTrackingArea` for the
   pointer's shape. Nothing redrawn but those layers. The crop is drawn into an sRGB RGBA bitmap
-  and encoded off the main thread. A start while ScreenCaptureKit has not answered the last one
-  is dropped with a warning in the log.
-- `infrastructure/capture/`: whether capture is built here (`BUILT`, which the frontend reads
-  through `can_capture`) and the system's settings for the permission.
-- `interfaces/tauri/capture.rs`: each crop waits in a queue until the frontend, told `taken`,
+  and encoded off the main thread. The area last taken, given at the start, shows picked on its
+  display.
+- `infrastructure/capture/`: whether capture is built here (`CAPTURE_BUILT`, which the frontend
+  reads through `can_capture`), the system's settings for the permission, `start` on every system
+  (elsewhere it ends at once, never reached).
+- `interfaces/tauri/capture.rs`: one capture at a time, from its start until its outcome, another
+  start ignored; the area last taken, by display, for the session. Each crop waits in a queue
+  until the frontend, told `taken`,
   names the book (`add_capture`; `NotesStore::add_capture`: a new note on top of its open list),
   so two captures in a row each find their own. `set_marking`
   holds captures while marks are edited; a page loaded again resets it. The button's text is

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
 use super::quick_note::{self, Then};
-use super::tray;
+use crate::infrastructure::{tray, window as system};
 use sidekyk_core::app::projects::Projects;
 
 /// If the page never says it painted (a script that failed to load), the window shows anyway
@@ -67,7 +67,7 @@ pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option
 fn show_first(app: &AppHandle) -> bool {
     let first = record_show(app);
     if first {
-        bring_back(app);
+        system::bring_back(app);
     }
     first
 }
@@ -79,7 +79,7 @@ pub(crate) fn show_main_window(app: &AppHandle) {
         return;
     }
     record_show(app);
-    bring_back(app);
+    system::bring_back(app);
 }
 
 /// Records that the window shows, and the time from startup the first time: true only then.
@@ -108,36 +108,9 @@ pub(crate) fn toggle_main_window(app: &AppHandle) {
         && !window.is_minimized().unwrap_or(false)
         && window.is_focused().unwrap_or(false);
     if in_front {
-        hide_main_window(app);
+        system::hide(app);
     } else {
         show_main_window(app);
-    }
-}
-
-/// macOS hides the whole app, so the app used before comes back to the front; a window hidden
-/// alone would leave Sidekyk active with nothing on screen.
-#[cfg(target_os = "macos")]
-pub(crate) fn hide_main_window(app: &AppHandle) {
-    let _ = app.hide();
-}
-
-/// Elsewhere the window hides and the system brings the next one to the front.
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn hide_main_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.hide();
-    }
-}
-
-/// Shows the window and gives it the focus, as it is: a quick note open stays.
-pub(crate) fn bring_back(app: &AppHandle) {
-    // the app hidden by the shortcut shows again with its window
-    #[cfg(target_os = "macos")]
-    let _ = app.show();
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
     }
 }
 
@@ -156,18 +129,10 @@ pub(crate) fn hide_on_close(window: &Window, event: &WindowEvent) {
     }
 }
 
-/// On macOS, a click on the Dock's icon brings back a window closed into the tray.
-#[cfg(target_os = "macos")]
+/// The system asks for the window back: on macOS, a click on the Dock's icon brings back a window
+/// closed into the tray.
 pub(crate) fn on_run_event(app: &AppHandle, event: RunEvent) {
-    if let RunEvent::Reopen {
-        has_visible_windows: false,
-        ..
-    } = event
-    {
+    if system::asks_for_window(&event) {
         show_main_window(app);
     }
 }
-
-/// Elsewhere the tray's menu (or launching the app again) brings it back.
-#[cfg(not(target_os = "macos"))]
-pub(crate) fn on_run_event(_app: &AppHandle, _event: RunEvent) {}

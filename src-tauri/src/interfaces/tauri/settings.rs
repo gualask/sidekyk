@@ -6,8 +6,7 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::texts::{self, Texts};
-use super::{shortcut, tray};
-use crate::infrastructure::settings_store;
+use crate::infrastructure::{global_shortcuts, settings_store, tray};
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::settings::{Language, Settings, Theme};
 use sidekyk_core::shared::error::AppError;
@@ -44,7 +43,7 @@ pub(crate) fn window_theme(theme: Theme) -> tauri::Theme {
 pub(crate) fn apply_language(app: &tauri::AppHandle, language: Option<Language>) -> &'static Texts {
     let texts = texts::set(language);
     app.state::<NotesStore>().name_first_lists(texts.first_list);
-    tray::speak(app, texts);
+    tray::speak(app, texts.tray());
     texts
 }
 
@@ -72,7 +71,7 @@ pub(crate) async fn set_settings(
             return Ok(settings);
         }
         // their own check: one the system turned down is tried again at each change
-        shortcut::apply(app, &settings)?;
+        global_shortcuts::apply(app, &settings)?;
         if settings.theme != applied.theme {
             app.set_theme(Some(window_theme(settings.theme)));
         }

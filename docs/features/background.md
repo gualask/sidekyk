@@ -28,7 +28,7 @@ hidden.
   whole, unlike a bare mark, which they put in a grey tile (checked on macOS 27.2 with
   `NSWorkspace`'s icon of a test bundle). No Liquid Glass `.icon` yet (`ROADMAP.md`).
   `generate_context!` and `include_image!` read the files at compile time and Cargo does not
-  track them: after new icons, touch `bootstrap/mod.rs` and `interfaces/tauri/tray.rs`.
+  track them: after new icons, touch `bootstrap/mod.rs` and `infrastructure/tray.rs`.
 - Tray: on macOS a template glyph, `icons/tray-template.png`: 18 pt drawn at 36 px, the mark's
   two arms thickened, from `icons/source/tray.svg` (`pnpm tauri icon … -p 36 -o <dir>`, its
   `36x36.png`); elsewhere the app icon in color. On Linux without appindicator its panic is
@@ -42,7 +42,7 @@ hidden.
   the backend. A refused one keeps the previous and shows a problem; a press tells the two apart
   by the plugin's id of capture's, read without the lock a change holds. macOS accepts duplicates
   silently, so its own shortcuts are read (`CopySymbolicHotKeys`,
-  `infrastructure/system_shortcuts.rs`) to warn. `⌥`-only shortcuts work on macOS 27.
+  `infrastructure/global_shortcuts/system_shortcuts.rs`) to warn. `⌥`-only shortcuts work on macOS 27.
 
 ## Decisions
 
