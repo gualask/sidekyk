@@ -226,9 +226,9 @@ impl Projects {
     }
 
     /// Whether `path`, a path of this host, is inside a project's folder: what Sidekyk never
-    /// writes in.
+    /// writes in. Asked of a copy of the list: it reads the disk, which must not hold the list.
     pub fn holds_host_path(&self, path: &Path) -> bool {
-        self.machines.holds_host_path(&lock(&self.list), path)
+        self.machines.holds_host_path(&self.list(), path)
     }
 
     /// Stops the search in contents going on, wherever it runs.
