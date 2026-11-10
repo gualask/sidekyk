@@ -64,7 +64,8 @@ paths for an agent, marked with letters and arrows. The notes themselves:
 - Out: `note-image://localhost/<book>/<file>` (`http://note-image.localhost/…` on Windows), the
   book and the file encoded as `project-file:`'s (`previews.md`); only a file a note of the book
   names, `immutable` (an id names its bytes). CSP `img-src` lists it. `copy_note` composes the
-  copy; for WSL, `wslpath -u` of the notes' folder once per distro and session. `note_image_png`
+  copy; each image's path as the project's machine names it (`Machine::host_path`; for WSL,
+  `wslpath -u` of its folder once per distro, folder and session). `note_image_png`
   gives a non-PNG image as PNG for the clipboard (`ClipboardItem`).
 - Marked image: a PNG drawn in the webview (`draw-marks.ts`, the editor's own drawing code at
   the image's size, the app's font loaded first) over the original as PNG (`note_image_png`),

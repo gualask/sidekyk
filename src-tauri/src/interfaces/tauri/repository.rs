@@ -5,11 +5,11 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
+use sidekyk_core::app::machines::Start;
 use sidekyk_core::modules::folder::{
     Directory, FileContent, FileStamp, FolderKind, RecentFiles, RepositoryInfo,
 };
 use sidekyk_core::modules::preview::MarkdownDocument;
-use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::reader::Repositories;
 use sidekyk_core::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
@@ -20,37 +20,24 @@ use sidekyk_core::shared::error::AppError;
 
 /// What `on_folder` gives its work: a project's folder, as what reads it there knows it.
 pub(super) struct OnFolder<'a> {
-    pub(super) app: &'a tauri::AppHandle,
-    /// Where the folder is.
-    pub(super) folder: &'a Location,
     pub(super) repositories: &'a dyn Repositories,
     pub(super) info: &'a RepositoryInfo,
 }
 
-impl OnFolder<'_> {
-    /// Fails, `distro_stopped`, when reading the folder would start the WSL distro that holds it:
-    /// only the project's Start button may.
-    pub(super) fn readable_without_starting(&self) -> anyhow::Result<()> {
-        self.app
-            .state::<ProjectsState>()
-            .readable_without_starting(self.folder)
-    }
-}
-
-/// Runs `work` off the async runtime on a folder of a project the user added, with what reads it.
+/// Runs `work` off the async runtime on a folder of a project the user added, with what reads it,
+/// once `start` allows it: `Start::Never` fails `distro_stopped` for a stopped WSL distro.
 pub(super) async fn on_folder<T: Send + 'static>(
     command: &'static str,
     app: tauri::AppHandle,
     folder_id: String,
+    start: Start,
     work: impl FnOnce(OnFolder) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, AppError> {
     blocking(command, app, move |app| {
         let projects = app.state::<ProjectsState>();
         let (project, folder) = projects.folder(&folder_id)?;
         work(OnFolder {
-            app,
-            folder: &folder.location,
-            repositories: &*projects.repositories_at(&folder.location)?,
+            repositories: &*projects.repositories_at(&folder.location, start)?,
             info: &folder.repository(&project),
         })
     })
@@ -66,12 +53,13 @@ pub(crate) async fn get_folder_kind(
     folder_id: String,
     start: bool,
 ) -> Result<FolderKind, AppError> {
-    on_folder("get_folder_kind", app, folder_id, move |on| {
-        if !start {
-            on.readable_without_starting()?;
-        }
-        on.repositories.folder_kind(on.info)
-    })
+    on_folder(
+        "get_folder_kind",
+        app,
+        folder_id,
+        if start { Start::May } else { Start::Never },
+        move |on| on.repositories.folder_kind(on.info),
+    )
     .await
 }
 
@@ -81,9 +69,13 @@ pub(crate) async fn get_repository_snapshot(
     app: tauri::AppHandle,
     folder_id: String,
 ) -> Result<RepositorySnapshot, AppError> {
-    on_folder("get_repository_snapshot", app, folder_id, |on| {
-        on.repositories.snapshot(on.info)
-    })
+    on_folder(
+        "get_repository_snapshot",
+        app,
+        folder_id,
+        Start::May,
+        |on| on.repositories.snapshot(on.info),
+    )
     .await
 }
 
@@ -93,11 +85,13 @@ pub(crate) async fn get_repository_summary(
     app: tauri::AppHandle,
     folder_id: String,
 ) -> Result<RepositorySummary, AppError> {
-    on_folder("get_repository_summary", app, folder_id, |on| {
-        // the rows never start a stopped WSL distro
-        on.readable_without_starting()?;
-        on.repositories.summary(on.info)
-    })
+    on_folder(
+        "get_repository_summary",
+        app,
+        folder_id,
+        Start::Never,
+        |on| on.repositories.summary(on.info),
+    )
     .await
 }
 
@@ -108,7 +102,7 @@ pub(crate) async fn get_file_diff(
     folder_id: String,
     request: FileDiffRequest,
 ) -> Result<UnifiedDiff, AppError> {
-    on_folder("get_file_diff", app, folder_id, move |on| {
+    on_folder("get_file_diff", app, folder_id, Start::May, move |on| {
         on.repositories.file_diff(on.info, &request)
     })
     .await
@@ -121,9 +115,13 @@ pub(crate) async fn get_changes_ignoring_whitespace(
     app: tauri::AppHandle,
     folder_id: String,
 ) -> Result<ChangesIgnoringWhitespace, AppError> {
-    on_folder("get_changes_ignoring_whitespace", app, folder_id, |on| {
-        on.repositories.changes_ignoring_whitespace(on.info)
-    })
+    on_folder(
+        "get_changes_ignoring_whitespace",
+        app,
+        folder_id,
+        Start::May,
+        |on| on.repositories.changes_ignoring_whitespace(on.info),
+    )
     .await
 }
 
@@ -133,7 +131,7 @@ pub(crate) async fn get_recent_commits(
     app: tauri::AppHandle,
     folder_id: String,
 ) -> Result<RecentCommits, AppError> {
-    on_folder("get_recent_commits", app, folder_id, |on| {
+    on_folder("get_recent_commits", app, folder_id, Start::May, |on| {
         on.repositories.recent_commits(on.info)
     })
     .await
@@ -147,9 +145,13 @@ pub(crate) async fn get_commit_activity(
     folder_id: String,
     since: i64,
 ) -> Result<CommitActivity, AppError> {
-    on_folder("get_commit_activity", app, folder_id, move |on| {
-        on.repositories.commit_activity(on.info, since)
-    })
+    on_folder(
+        "get_commit_activity",
+        app,
+        folder_id,
+        Start::May,
+        move |on| on.repositories.commit_activity(on.info, since),
+    )
     .await
 }
 
@@ -160,7 +162,7 @@ pub(crate) async fn get_commit_files(
     folder_id: String,
     commit: CommitRequest,
 ) -> Result<CommitFiles, AppError> {
-    on_folder("get_commit_files", app, folder_id, move |on| {
+    on_folder("get_commit_files", app, folder_id, Start::May, move |on| {
         on.repositories.commit_files(on.info, &commit)
     })
     .await
@@ -173,9 +175,13 @@ pub(crate) async fn get_commit_file_diff(
     folder_id: String,
     request: CommitFileDiffRequest,
 ) -> Result<UnifiedDiff, AppError> {
-    on_folder("get_commit_file_diff", app, folder_id, move |on| {
-        on.repositories.commit_file_diff(on.info, &request)
-    })
+    on_folder(
+        "get_commit_file_diff",
+        app,
+        folder_id,
+        Start::May,
+        move |on| on.repositories.commit_file_diff(on.info, &request),
+    )
     .await
 }
 
@@ -186,7 +192,7 @@ pub(crate) async fn get_directory(
     folder_id: String,
     path: String,
 ) -> Result<Directory, AppError> {
-    on_folder("get_directory", app, folder_id, move |on| {
+    on_folder("get_directory", app, folder_id, Start::May, move |on| {
         on.repositories.directory(on.info, &path)
     })
     .await
@@ -198,7 +204,7 @@ pub(crate) async fn get_recent_files(
     app: tauri::AppHandle,
     folder_id: String,
 ) -> Result<RecentFiles, AppError> {
-    on_folder("get_recent_files", app, folder_id, move |on| {
+    on_folder("get_recent_files", app, folder_id, Start::May, move |on| {
         on.repositories.recent_files(on.info)
     })
     .await
@@ -211,7 +217,7 @@ pub(crate) async fn get_file_content(
     folder_id: String,
     path: String,
 ) -> Result<FileContent, AppError> {
-    on_folder("get_file_content", app, folder_id, move |on| {
+    on_folder("get_file_content", app, folder_id, Start::May, move |on| {
         on.repositories.file_content(on.info, &path)
     })
     .await
@@ -240,7 +246,7 @@ pub(crate) async fn get_file_stamp(
     folder_id: String,
     path: String,
 ) -> Result<FileStamp, AppError> {
-    on_folder("get_file_stamp", app, folder_id, move |on| {
+    on_folder("get_file_stamp", app, folder_id, Start::May, move |on| {
         on.repositories.file_stamp(on.info, &path)
     })
     .await
@@ -253,7 +259,7 @@ pub(crate) async fn get_blob_size(
     folder_id: String,
     blob: String,
 ) -> Result<u64, AppError> {
-    on_folder("get_blob_size", app, folder_id, move |on| {
+    on_folder("get_blob_size", app, folder_id, Start::May, move |on| {
         on.repositories.blob_size(on.info, &blob)
     })
     .await
@@ -266,9 +272,13 @@ pub(crate) async fn get_markdown_preview(
     folder_id: String,
     path: String,
 ) -> Result<Option<MarkdownDocument>, AppError> {
-    on_folder("get_markdown_preview", app, folder_id, move |on| {
-        on.repositories.markdown_preview(on.info, &path)
-    })
+    on_folder(
+        "get_markdown_preview",
+        app,
+        folder_id,
+        Start::May,
+        move |on| on.repositories.markdown_preview(on.info, &path),
+    )
     .await
 }
 
@@ -279,7 +289,7 @@ pub(crate) async fn get_syntax_colors(
     folder_id: String,
     request: SyntaxRequest,
 ) -> Result<SyntaxColors, AppError> {
-    on_folder("get_syntax_colors", app, folder_id, move |on| {
+    on_folder("get_syntax_colors", app, folder_id, Start::May, move |on| {
         on.repositories.syntax_colors(on.info, &request)
     })
     .await

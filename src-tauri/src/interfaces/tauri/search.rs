@@ -8,6 +8,7 @@ use super::notes::project_book;
 use super::repository::on_folder;
 use super::state::ProjectsState;
 use crate::infrastructure::notes_files::NotesFiles;
+use sidekyk_core::app::machines::Start;
 use sidekyk_core::modules::notes::{Book, NotesStore};
 use sidekyk_core::modules::search::{
     self, search_every_book, search_notes, ContentEnd, ContentFile, FileMatches, SearchRequest,
@@ -63,8 +64,7 @@ pub(crate) async fn search_contents(
     query: String,
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
-    on_folder("search_contents", app, folder_id, move |on| {
-        on.readable_without_starting()?;
+    on_folder("search_contents", app, folder_id, Start::Never, move |on| {
         on.repositories.search_contents(on.info, &query, &|files| {
             // the page went away: nothing left to stop
             let _ = on_files.send(files);
@@ -84,11 +84,10 @@ pub(crate) async fn search_files(
     folder_id: String,
     query: String,
 ) -> Result<FileMatches, AppError> {
-    on_folder("search_files", app, folder_id, move |on| {
-        if query.is_empty() {
-            return Ok(FileMatches::default());
-        }
-        on.readable_without_starting()?;
+    if query.is_empty() {
+        return Ok(FileMatches::default());
+    }
+    on_folder("search_files", app, folder_id, Start::Never, move |on| {
         let mut found = on
             .repositories
             .search_files(on.info, &query)

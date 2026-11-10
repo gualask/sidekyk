@@ -16,7 +16,7 @@ use crate::app::machines::{Machine, MachineReader};
 use crate::infrastructure::agent::AgentRepositories;
 use crate::infrastructure::hide_console;
 use crate::infrastructure::process;
-use crate::modules::projects::{same_distro, FoundFolder, Location, NameCase};
+use crate::modules::projects::{same_distro, FoundFolder, Location, NameCase, ProjectList};
 use crate::modules::reader::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -35,7 +35,7 @@ const COPY: &str = r#"set -e; mkdir -p "$1"; tmp="$1/.$2.$$"; cp "$(wslpath -u "
 /// A path of a WSL distro as Windows names it, as the folder dialog gives it:
 /// `\\wsl.localhost\<distro>\…`, or `\\wsl$\<distro>\…` on older Windows 10. The distro, and the
 /// path in it.
-pub fn wsl_path(path: &Path) -> Option<(String, String)> {
+fn wsl_path(path: &Path) -> Option<(String, String)> {
     let path = path.to_str()?;
     let rest = path
         .strip_prefix(r"\\?\UNC\")
@@ -165,7 +165,7 @@ impl LinuxMachine for Distro {
 
 /// How a distro names a Windows path (`wslpath -u`): `/mnt/c/…` for `C:\…` unless the distro
 /// mounts drives elsewhere. Starts the distro when it is stopped: run it off the main thread.
-pub fn linux_path(distro: &str, path: &Path) -> anyhow::Result<String> {
+fn linux_path(distro: &str, path: &Path) -> anyhow::Result<String> {
     let mut command = Distro(distro.into()).command("wslpath");
     command.args(["-u", &plain_windows_path(path)]);
     let output = process::run(&mut command, None, MAX_OUTPUT, LIST_TIMEOUT)
@@ -209,6 +209,9 @@ pub struct WslRepositories {
     hidden: AtomicBool,
     /// Each distro's state as last listed, by its name in lower case, for `STATE_KEPT`.
     states: Mutex<HashMap<String, (Instant, DistroState)>>,
+    /// How each distro names a folder of Windows (`wslpath`), by the distro's name in lower case
+    /// and the folder: asked once a session, not once per file.
+    linux_folders: Mutex<HashMap<(String, PathBuf), String>>,
 }
 
 impl WslRepositories {
@@ -219,6 +222,7 @@ impl WslRepositories {
             distros: Mutex::default(),
             hidden: AtomicBool::new(false),
             states: Mutex::default(),
+            linux_folders: Mutex::default(),
         }
     }
 
@@ -271,6 +275,11 @@ impl WslRepositories {
         lock(&self.states).insert(key, (Instant::now(), state));
         Ok(state)
     }
+}
+
+/// `name` in a folder a distro names `linux_folder`.
+fn in_linux_folder(linux_folder: &str, name: &str) -> String {
+    format!("{}/{name}", linux_folder.trim_end_matches('/'))
 }
 
 /// The distro of a WSL folder; `Machines` asks only about the folders this machine holds.
@@ -327,6 +336,31 @@ impl Machine for WslRepositories {
         })())
     }
 
+    /// The folder's name asked once a session (`linux_folders`), the file's name added to it.
+    fn host_path(&self, location: &Location, path: &Path) -> anyhow::Result<String> {
+        let distro = distro_of(location);
+        let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
+            return linux_path(distro, path);
+        };
+        let key = (distro.to_ascii_lowercase(), folder.to_path_buf());
+        let known = lock(&self.linux_folders).get(&key).cloned();
+        let linux_folder = match known {
+            Some(linux_folder) => linux_folder,
+            None => {
+                let linux_folder = linux_path(distro, folder)?;
+                lock(&self.linux_folders).insert(key, linux_folder.clone());
+                linux_folder
+            }
+        };
+        Ok(in_linux_folder(&linux_folder, &name.to_string_lossy()))
+    }
+
+    /// A path of a distro as Windows names it; never a link resolved, as the distro reads it.
+    fn holds_host_path(&self, list: &ProjectList, path: &Path) -> Option<bool> {
+        let (distro, path) = wsl_path(path)?;
+        Some(list.holds_in_wsl(&distro, &path))
+    }
+
     /// Every distro, and the ones asked for later too; a helper tells a change it saw meanwhile
     /// as a change.
     fn set_visible(&self, visible: bool) -> Option<Location> {
@@ -364,6 +398,21 @@ mod tests {
         assert_eq!(found(r"\\server\share\shop"), None);
         assert_eq!(found(r"C:\Users\ale\shop"), None);
         assert_eq!(found(r"\\wsl.localhost"), None);
+    }
+
+    #[test]
+    fn a_file_is_named_in_its_folder_as_the_distro_names_the_folder() {
+        assert_eq!(
+            in_linux_folder(
+                "/mnt/c/Users/me/AppData/notes/shop-3f9a2c/",
+                "00112233445566ff.png"
+            ),
+            "/mnt/c/Users/me/AppData/notes/shop-3f9a2c/00112233445566ff.png"
+        );
+        assert_eq!(
+            in_linux_folder("/mnt/c/notes", "a.png"),
+            "/mnt/c/notes/a.png"
+        );
     }
 
     #[test]

@@ -1,8 +1,6 @@
 //! Tauri adapters for notes. Every command names a book: the Inbox, or a project of the list.
 
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
@@ -11,8 +9,8 @@ use super::blocking::blocking;
 use super::state::ProjectsState;
 use super::texts;
 use crate::infrastructure::files::write_whole;
-use crate::infrastructure::notes_files::{read_image_file, resolved_path, NotesFiles};
-use sidekyk_core::infrastructure::machines::wsl::{linux_path, wsl_path};
+use crate::infrastructure::notes_files::{read_image_file, NotesFiles};
+use sidekyk_core::app::machines::Start;
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
     MovedList, MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes, EXPORT_IMAGES,
@@ -20,7 +18,6 @@ use sidekyk_core::modules::notes::{
 };
 use sidekyk_core::modules::projects::{Location, Project};
 use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
-use sidekyk_core::shared::sync::lock;
 use sidekyk_core::shared::url::percent_decoded;
 
 /// A project's book.
@@ -246,8 +243,15 @@ pub(crate) async fn copy_note(
     with_store("copy_note", app, move |app, store, files| {
         let book = book_of(app, &book)?;
         let (text, images) = store.note_copy(files, &book, &id)?;
-        let images = match wsl_distro(app, &book)? {
-            Some(distro) => in_distro(&distro, files.root(), images)?,
+        let images = match book_place(app, &book)? {
+            // as the project's machine names them; a copy may start it (`docs/features/wsl.md`)
+            Some(place) => images
+                .iter()
+                .map(|image| {
+                    let projects = app.state::<ProjectsState>();
+                    projects.host_path(&place, Path::new(image), Start::May)
+                })
+                .collect::<anyhow::Result<_>>()?,
             None => images,
         };
         Ok(copy_text(&text, &images))
@@ -267,8 +271,9 @@ fn copy_text(text: &str, images: &[String]) -> String {
     }
 }
 
-/// The distro a book's project is in, if it is a WSL project's.
-fn wsl_distro(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<String>> {
+/// Where a book's project's folders are: its first's place, all of them on one machine. None for
+/// the Inbox and a project without folder.
+fn book_place(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<Location>> {
     let Book::Project { id, .. } = book else {
         return Ok(None);
     };
@@ -276,49 +281,8 @@ fn wsl_distro(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<Stri
     Ok(project
         .folders
         .into_iter()
-        .find_map(|folder| match folder.location {
-            Location::Wsl { distro, .. } => Some(distro),
-            Location::Local { .. } => None,
-        }))
-}
-
-/// How a distro names the notes' folder, asked once (`wslpath`) and kept: one `wsl.exe` per
-/// distro and session, not one per copy.
-static NOTES_IN_DISTRO: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
-
-/// Paths under the notes' folder (`root`) as `distro` names them.
-fn in_distro(distro: &str, root: &Path, paths: Vec<String>) -> anyhow::Result<Vec<String>> {
-    let known = lock(&NOTES_IN_DISTRO)
-        .as_ref()
-        .and_then(|roots| roots.get(distro).cloned());
-    let linux_root = match known {
-        Some(linux_root) => linux_root,
-        None => {
-            let linux_root = linux_path(distro, root)?;
-            lock(&NOTES_IN_DISTRO)
-                .get_or_insert_with(HashMap::new)
-                .insert(distro.into(), linux_root.clone());
-            linux_root
-        }
-    };
-    paths
-        .iter()
-        .map(|path| under_linux_root(&linux_root, root, Path::new(path)))
-        .collect()
-}
-
-/// `path`, under `root`, as under `linux_root`: its parts joined by `/`.
-fn under_linux_root(linux_root: &str, root: &Path, path: &Path) -> anyhow::Result<String> {
-    let inside = path.strip_prefix(root)?;
-    let parts: Vec<String> = inside
-        .components()
-        .map(|part| part.as_os_str().to_string_lossy().into_owned())
-        .collect();
-    Ok(format!(
-        "{}/{}",
-        linux_root.trim_end_matches('/'),
-        parts.join("/")
-    ))
+        .next()
+        .map(|folder| folder.location))
 }
 
 #[tauri::command]
@@ -540,12 +504,7 @@ pub(crate) async fn export_notes(
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
-        let list = projects.list();
-        let inside = match wsl_path(&path) {
-            Some((distro, path)) => list.holds_in_wsl(&distro, &path),
-            None => list.holds(&path, resolved_path, projects.name_case()),
-        };
-        if inside {
+        if projects.holds_host_path(&path) {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
         }
         let markdown = store.with_notes(files, &book, |lists, notes| {
@@ -604,20 +563,5 @@ mod tests {
         assert_eq!(copy_text("look\n", &images), "look\n\n/n/a.png\n/n/b.jpg");
         assert_eq!(copy_text("  \n", &images[..1]), "/n/a.png");
         assert_eq!(copy_text("only text\n", &[]), "only text\n");
-    }
-
-    #[test]
-    fn a_path_under_the_notes_is_named_as_a_distro_names_the_notes() {
-        let root = Path::new("/data/notes");
-        assert_eq!(
-            under_linux_root(
-                "/mnt/c/Users/me/AppData/notes/",
-                root,
-                &root.join("shop-3f9a2c").join("00112233445566ff.png")
-            )
-            .unwrap(),
-            "/mnt/c/Users/me/AppData/notes/shop-3f9a2c/00112233445566ff.png"
-        );
-        assert!(under_linux_root("/mnt/c", root, Path::new("/elsewhere/a.png")).is_err());
     }
 }

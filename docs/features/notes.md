@@ -83,7 +83,8 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   a broken file is skipped and logged, never removed; a change that changes nothing writes
   nothing. A new folder never takes one in use (two projects of one name).
 - Export (`export_notes`): a section per list, notes between `---`, done ones under `### Done`;
-  refused inside a project's repository (`export_in_repository`, `ProjectList::holds`). Removing a
+  refused inside a project's repository (`export_in_repository`, `Machines::holds_host_path`: the
+  machine whose path it is resolves it, `ProjectList::holds` and `holds_in_wsl` compare). Removing a
   project deletes its notes first; if they cannot go, the project stays (`RemoveProjectDialog`).
 - Frontend: `NotesWorkspace` (lazy), cards virtualized with measured heights (`useCardRows`);
   `InboxColumn` (the app places it at level 0) with the same `Composer` and `NoteCard`.

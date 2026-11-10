@@ -31,9 +31,12 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   holds its `Location` (`infrastructure/machines/`): `LocalMachine` (`LocalRepositories`) or
   `WslRepositories` (an `AgentRepositories` per distro, one helper each). Every reader made is
   told the window's visibility and the folders it keeps; one with nothing on screen is told to
-  watch nothing, which starts no helper. A container is one more adapter. "Nothing starts a distro unasked" is the machine's
-  (`readable_without_starting`), checked by `search` and `search_contents`; the kind's query asks
-  with `start` only from the Start button (`useStartFolder`).
+  watch nothing, which starts no helper. A container is one more adapter.
+- "Nothing starts a distro unasked": one gate, `Machines::of` and `host_path`, each call naming
+  `Start::May` or `Start::Never`; `Never` asks the adapter's `readable_without_starting` first.
+  Never: the kind without `start`, the summary, images, both searches, the palette's files, the
+  folders holding a file. The kind's query asks with `start` only from the Start button
+  (`useStartFolder`). A note's copy may start the distro (`host_path`, below).
 - Distro state: `wsl.exe --list --running --quiet` and `--list --quiet`, names only (the columns of
   `--list --verbose` are in Windows' language); `WSL_UTF8=1`, UTF-16LE read too. Checked before a
   summary when no helper runs: `distro_stopped`, `distro_missing`, kept 5 s for the distro's other

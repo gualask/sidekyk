@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 use crate::infrastructure::settings_store;
-use sidekyk_core::app::machines::Machines;
+use sidekyk_core::app::machines::{Machines, Start};
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::machines::local::LocalMachine;
 use sidekyk_core::infrastructure::machines::wsl::WslRepositories;
@@ -106,23 +106,33 @@ impl ProjectsState {
         Ok((project.clone(), folder.clone()))
     }
 
-    /// What reads the repository at `folder`, where it is.
+    /// What reads the repository at `folder`, where it is, as `start` allows.
     pub(crate) fn repositories_at(
         &self,
         folder: &Location,
+        start: Start,
     ) -> anyhow::Result<Arc<dyn Repositories>> {
-        self.machines.of(folder)
+        self.machines.of(folder, start)
+    }
+
+    /// How the machine holding `folder` names `path`, a path of this host, as `start` allows.
+    pub(crate) fn host_path(
+        &self,
+        folder: &Location,
+        path: &Path,
+        start: Start,
+    ) -> anyhow::Result<String> {
+        self.machines.host_path(folder, path, start)
+    }
+
+    /// Whether `path`, a path of this host, is inside a project's folder.
+    pub(crate) fn holds_host_path(&self, path: &Path) -> bool {
+        self.machines.holds_host_path(&lock(&self.list), path)
     }
 
     /// How this machine's file system compares names, for the places of the list.
     pub(crate) fn name_case(&self) -> NameCase {
         self.machines.name_case()
-    }
-
-    /// Whether the folder at `folder` can be read without starting what holds it: everything but
-    /// a project's Start button reads it so.
-    pub(crate) fn readable_without_starting(&self, folder: &Location) -> anyhow::Result<()> {
-        self.machines.readable_without_starting(folder)
     }
 
     /// The repository that contains `candidate`, on this machine or in a WSL distro.
@@ -166,8 +176,7 @@ impl ProjectsState {
         let on_screen = self.folder_on_screen();
         let files_of = |id: &str| {
             let (project, folder) = on_screen.as_ref().filter(|(p, _)| p.id == id)?;
-            self.readable_without_starting(&folder.location).ok()?;
-            self.repositories_at(&folder.location)
+            self.repositories_at(&folder.location, Start::Never)
                 .ok()?
                 .search_files(&folder.repository(project), &request.query)
         };
@@ -189,25 +198,19 @@ impl ProjectsState {
         path: &str,
     ) -> anyhow::Result<Vec<String>> {
         let project = self.list().find(project_id)?.clone();
-        let readable =
-            |folder: &ProjectFolder| self.readable_without_starting(&folder.location).is_ok();
         let first = first.and_then(|id| project.folders.iter().find(|f| f.id == id));
         let on_screen_holds = |folder: &ProjectFolder| {
-            readable(folder)
-                && self
-                    .repositories_at(&folder.location)
-                    .and_then(|on| on.file_stamp(&folder.repository(&project), path))
-                    .is_ok()
+            self.repositories_at(&folder.location, Start::Never)
+                .and_then(|on| on.file_stamp(&folder.repository(&project), path))
+                .is_ok()
         };
         if let Some(folder) = first.filter(|f| on_screen_holds(f)) {
             return Ok(vec![folder.id.clone()]);
         }
         let holds = |folder: &ProjectFolder| {
-            readable(folder)
-                && self
-                    .repositories_at(&folder.location)
-                    .and_then(|on| on.tree_holds_now(&folder.repository(&project), path))
-                    .unwrap_or(false)
+            self.repositories_at(&folder.location, Start::Never)
+                .and_then(|on| on.tree_holds_now(&folder.repository(&project), path))
+                .unwrap_or(false)
         };
         let others: Vec<&ProjectFolder> = project
             .folders

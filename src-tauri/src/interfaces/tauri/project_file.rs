@@ -11,6 +11,7 @@ use tauri::http::{header, Response, StatusCode};
 use tauri::UriSchemeResponder;
 
 use super::repository::on_folder;
+use sidekyk_core::app::machines::Start;
 
 pub(crate) const SCHEME: &str = "project-file";
 
@@ -35,9 +36,8 @@ pub(crate) fn respond(
     let blob = query.and_then(blob);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let image = on_folder("project_file", app, folder_id, move |on| {
-            // a project shown is read: this never starts a stopped WSL distro
-            on.readable_without_starting()?;
+        // a project shown is read: this never starts a stopped WSL distro
+        let image = on_folder("project_file", app, folder_id, Start::Never, move |on| {
             on.repositories.image(on.info, &path, blob.as_deref())
         })
         .await;
