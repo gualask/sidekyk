@@ -38,7 +38,7 @@ pub(crate) fn respond(
     tauri::async_runtime::spawn(async move {
         // a project shown is read: this never starts a stopped WSL distro
         let image = on_folder("project_file", app, folder_id, Start::Never, move |on| {
-            on.repositories.image(on.info, &path, blob.as_deref())
+            on.reader.image(&on.info, &path, blob.as_deref())
         })
         .await;
         responder.respond(match image {

@@ -78,8 +78,10 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 (`default-members`) except `cargo fmt`, which needs `--all`.
 
 - `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, the hidden window, tray, the
-  CLI argument), `interfaces/tauri/` (commands, tray, window, `state.rs`: the project list and the
-  `Repositories` it is read through; blocking work on `spawn_blocking`), and the app's own
+  CLI argument; the composition root: the machines' adapters, `Projects` over `SettingsFile`, this
+  machine's reader, through the helper with `SIDEKYK_AGENT=local`), `interfaces/tauri/`
+  (commands, tray, window, `state.rs`: what a launch opened, the palette's search, the folders
+  holding a file; blocking work on `spawn_blocking`), and the app's own
   infrastructure (`settings_store.rs`, `stored_json.rs`, `notes_files.rs`, `files.rs`, `logging.rs`,
   `system_shortcuts.rs`, `capture/`, `window/`: the window as a quick note).
 - Files the app writes (notes, settings and projects, an export) go through `files.rs`'s
@@ -115,7 +117,11 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - `app/`: the application service, over the modules, which never import it; it never imports
     `infrastructure`. `machines.rs`: the `Machine` port, one adapter per kind of `Location`, and
     the policy over them: which reads a folder, what each watches and keeps, the window's
-    visibility, how this machine compares names (`NameCase`) (`features/wsl.md`).
+    visibility, how this machine compares names (`NameCase`), whether a call may start a machine
+    (`Start`) (`features/wsl.md`). `projects.rs`: the list (ids outside it refused, stored in
+    order after each change through the `ProjectsStorage` port, a failed save kept for the
+    session), the folder on screen and its watch, the window's visibility, a folder opened, a
+    folder's reader by id (`FolderReader`).
   - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
     output size and a time), `watcher.rs` (notify), `agent/`, `machines/` (`local.rs`, `wsl.rs`,
     `linux_helper.rs`: the adapters of `Machine`).

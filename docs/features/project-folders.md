@@ -54,7 +54,7 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
   (`app/project-entry.ts`) keeps the one picked of each project for the session
   (`folderOnScreen`: that one, else the project's only one), never stored, and is every way into
   a project. `useFolderOnScreen` tells the folder to the backend, in order
-  (`show_project_folder`, `null` for none), which keeps it in memory (`ProjectsState::on_screen`):
+  (`show_project_folder`, `null` for none), which keeps it in memory (`Projects::show_folder`):
   the folder watched (`watch_on_screen` compares its id and place) and the one `⌘K` searches.
   Others are read when their menu, row or hint shows, as level 0 reads the projects not on
   screen. A project of several folders none picked (its folder removed) shows level 0.

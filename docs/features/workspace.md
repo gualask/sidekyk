@@ -69,7 +69,7 @@ problems. Why semantic zoom: `../product.md`.
   `preloadable` part, shown by `Preloaded`, renders at once once loaded, so a transition never
   captures an empty frame. `Preloaded` is one component at module level: a factory
   defining one fails Biome's `noComponentHookFactories` (React's `component-hook-factories`).
-- Start at level 1: the backend keeps what the folder argument opened (`ProjectsState::opened`:
+- Start at level 1: the backend keeps what the folder argument opened (`Launch::opened`:
   a project and its folder, or a folder above repositories to ask about, `project-folders.md`) and says the list
   changed; the frontend takes it once (`take_opened`). `onProjectsChanged` also runs once as listening starts, so a change made
   before is not missed.

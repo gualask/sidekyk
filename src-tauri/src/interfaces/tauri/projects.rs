@@ -7,9 +7,10 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::notes::project_book;
-use super::state::ProjectsState;
+use super::state::Launch;
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
+use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::repository_name;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{
@@ -20,14 +21,14 @@ use sidekyk_core::shared::error::AppError;
 #[tauri::command]
 /// Every project, and the one on screen.
 pub(crate) fn get_projects(app: tauri::AppHandle) -> ProjectList {
-    app.state::<ProjectsState>().list()
+    app.state::<Projects>().list()
 }
 
 #[tauri::command]
 /// What a folder given on the command line did, once: a project to show its panels, or a folder
 /// above repositories to ask about.
 pub(crate) fn take_opened(app: tauri::AppHandle) -> Option<Opened> {
-    app.state::<ProjectsState>().take_opened()
+    app.state::<Launch>().take_opened()
 }
 
 #[tauri::command]
@@ -46,21 +47,10 @@ pub(crate) async fn choose_project_folder(
         else {
             return Ok(None);
         };
-        let path = folder.into_path()?;
-        let projects = app.state::<ProjectsState>();
-        let found = projects.folder_at(&path)?;
-        let inside = projects.repositories_inside(&found)?;
-        // given back to `create_project` as a string, as every path the frontend holds
-        let path = path
-            .into_os_string()
-            .into_string()
-            .map_err(|_| anyhow::anyhow!("the folder's path is not Unicode"))?;
-        Ok(Some(projects.list().folder_choice(
-            path,
-            found,
-            inside,
-            projects.name_case(),
-        )))
+        Ok(Some(
+            app.state::<Projects>()
+                .folder_choice(&folder.into_path()?)?,
+        ))
     })
     .await
 }
@@ -74,16 +64,17 @@ pub(crate) async fn create_project(
     folders: Vec<String>,
 ) -> Result<ProjectList, AppError> {
     blocking("create_project", app, move |app| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let folders = folders
             .iter()
             .map(|path| Ok(projects.folder_at(Path::new(path))?.location))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        let case = projects.name_case();
-        projects.update(app, |list| {
-            let project = list.add(&name, folders, case)?;
-            list.activate(&project.id)
-        })
+        projects
+            .update(|list, case| {
+                let project = list.add(&name, folders, case)?;
+                list.activate(&project.id)
+            })
+            .map(|((), list)| list)
     })
     .await
 }
@@ -96,8 +87,8 @@ pub(crate) async fn rename_project(
     name: String,
 ) -> Result<ProjectList, AppError> {
     blocking("rename_project", app, move |app| {
-        app.state::<ProjectsState>()
-            .update_stored(app, |list| list.rename(&project_id, &name))
+        app.state::<Projects>()
+            .update_stored(|list| list.rename(&project_id, &name))
     })
     .await
 }
@@ -109,8 +100,9 @@ pub(crate) async fn activate_project(
     project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("activate_project", app, move |app| {
-        app.state::<ProjectsState>()
-            .update(app, |list| list.activate(&project_id))
+        app.state::<Projects>()
+            .update(|list, _| list.activate(&project_id))
+            .map(|((), list)| list)
     })
     .await
 }
@@ -123,11 +115,13 @@ pub(crate) async fn remove_project(
     project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let project = projects.project(&project_id)?;
         app.state::<NotesStore>()
             .delete_book(app.state::<NotesFiles>().inner(), &project_book(&project))?;
-        projects.update(app, |list| list.remove(&project_id))
+        projects
+            .update(|list, _| list.remove(&project_id))
+            .map(|((), list)| list)
     })
     .await
 }
@@ -140,8 +134,8 @@ pub(crate) async fn set_project_layout(
     layout: TilesLayout,
 ) -> Result<ProjectList, AppError> {
     blocking("set_project_layout", app, move |app| {
-        app.state::<ProjectsState>()
-            .update_stored(app, |list| list.set_layout(&project_id, layout))
+        app.state::<Projects>()
+            .update_stored(|list| list.set_layout(&project_id, layout))
     })
     .await
 }
@@ -154,7 +148,7 @@ pub(crate) async fn show_project_folder(
     folder_id: Option<String>,
 ) -> Result<(), AppError> {
     blocking("show_project_folder", app, move |app| {
-        app.state::<ProjectsState>().show_folder(app, folder_id);
+        app.state::<Projects>().show_folder(folder_id);
         Ok(())
     })
     .await
@@ -180,7 +174,7 @@ pub(crate) async fn add_project_folder(
     project_id: String,
 ) -> Result<Option<FolderChange>, AppError> {
     blocking("add_project_folder", app, move |app| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let project = projects.project(&project_id)?;
         let Some(folder) = app
             .dialog()
@@ -191,9 +185,8 @@ pub(crate) async fn add_project_folder(
             return Ok(None);
         };
         let found = projects.folder_at(&folder.into_path()?)?;
-        let case = projects.name_case();
         let (other, list) =
-            projects.update_with(app, |list| list.add_folder(&project_id, found, case))?;
+            projects.update(|list, case| list.add_folder(&project_id, found, case))?;
         Ok(Some(folder_change(other, list)))
     })
     .await
@@ -208,8 +201,9 @@ pub(crate) async fn remove_project_folder(
     folder_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project_folder", app, move |app| {
-        app.state::<ProjectsState>()
-            .update(app, |list| list.remove_folder(&project_id, &folder_id))
+        app.state::<Projects>()
+            .update(|list, _| list.remove_folder(&project_id, &folder_id))
+            .map(|((), list)| list)
     })
     .await
 }
@@ -224,7 +218,7 @@ pub(crate) async fn merge_projects(
     from: String,
 ) -> Result<ProjectList, AppError> {
     blocking("merge_projects", app, move |app| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let (target, merged) = (projects.project(&into)?, projects.project(&from)?);
         // before any note moves: folders on two machines or one inside another
         let case = projects.name_case();
@@ -235,7 +229,9 @@ pub(crate) async fn merge_projects(
             &project_book(&target),
             &merged.name,
         )?;
-        projects.update(app, |list| list.merge(&into, &from, case))
+        projects
+            .update(|list, case| list.merge(&into, &from, case))
+            .map(|((), list)| list)
     })
     .await
 }
@@ -249,7 +245,7 @@ pub(crate) async fn relocate_folder(
     folder_id: String,
 ) -> Result<Option<FolderChange>, AppError> {
     blocking("relocate_folder", app, move |app| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let (_, folder) = projects.folder(&folder_id)?;
         let Some(picked) = app
             .dialog()
@@ -264,9 +260,7 @@ pub(crate) async fn relocate_folder(
             return Ok(None);
         };
         let found = projects.folder_at(&picked.into_path()?)?;
-        let case = projects.name_case();
-        let (other, list) =
-            projects.update_with(app, |list| list.relocate(&folder_id, found, case))?;
+        let (other, list) = projects.update(|list, case| list.relocate(&folder_id, found, case))?;
         Ok(Some(folder_change(other, list)))
     })
     .await

@@ -2,4 +2,7 @@
 //! which never depend on it. Only the app runs it; the helper runs the modules it serves. It
 //! reaches the machines, the stores and the system through ports the infrastructure implements.
 
+#[cfg(test)]
+mod fake;
 pub mod machines;
+pub mod projects;

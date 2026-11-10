@@ -6,9 +6,10 @@ use tauri::Manager;
 use super::blocking::blocking;
 use super::notes::project_book;
 use super::repository::on_folder;
-use super::state::ProjectsState;
+use super::state;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{Book, NotesStore};
 use sidekyk_core::modules::search::{
     self, search_every_book, search_notes, ContentEnd, ContentFile, FileMatches, SearchRequest,
@@ -29,7 +30,8 @@ pub(crate) async fn search(
         let notes = app.state::<NotesStore>();
         let files = app.state::<NotesFiles>();
         let query = request.query.as_str();
-        Ok(app.state::<ProjectsState>().search(
+        Ok(state::search(
+            &app.state::<Projects>(),
             &request,
             |project| {
                 notes
@@ -65,7 +67,7 @@ pub(crate) async fn search_contents(
     on_files: Channel<Vec<ContentFile>>,
 ) -> Result<ContentEnd, AppError> {
     on_folder("search_contents", app, folder_id, Start::Never, move |on| {
-        on.repositories.search_contents(on.info, &query, &|files| {
+        on.reader.search_contents(&on.info, &query, &|files| {
             // the page went away: nothing left to stop
             let _ = on_files.send(files);
         })
@@ -88,10 +90,7 @@ pub(crate) async fn search_files(
         return Ok(FileMatches::default());
     }
     on_folder("search_files", app, folder_id, Start::Never, move |on| {
-        let mut found = on
-            .repositories
-            .search_files(on.info, &query)
-            .unwrap_or_default();
+        let mut found = on.reader.search_files(&on.info, &query).unwrap_or_default();
         let cut = found.files.len().saturating_sub(NOTE_FILE_LIMIT);
         found.files.truncate(NOTE_FILE_LIMIT);
         found.more += cut as u32;
@@ -102,8 +101,8 @@ pub(crate) async fn search_files(
 
 #[tauri::command]
 /// Stops the search in contents going on: the palette closed.
-pub(crate) fn stop_content_search(state: tauri::State<'_, ProjectsState>) {
-    state.stop_content_search();
+pub(crate) fn stop_content_search(projects: tauri::State<'_, Projects>) {
+    projects.stop_content_search();
 }
 
 #[tauri::command]

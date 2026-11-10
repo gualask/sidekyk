@@ -4,25 +4,17 @@
 use tauri::Manager;
 
 use super::blocking::blocking;
-use super::state::ProjectsState;
+use super::state;
 use sidekyk_core::app::machines::Start;
-use sidekyk_core::modules::folder::{
-    Directory, FileContent, FileStamp, FolderKind, RecentFiles, RepositoryInfo,
-};
+use sidekyk_core::app::projects::{FolderReader, Projects};
+use sidekyk_core::modules::folder::{Directory, FileContent, FileStamp, FolderKind, RecentFiles};
 use sidekyk_core::modules::preview::MarkdownDocument;
-use sidekyk_core::modules::reader::Repositories;
 use sidekyk_core::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
     FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
-
-/// What `on_folder` gives its work: a project's folder, as what reads it there knows it.
-pub(super) struct OnFolder<'a> {
-    pub(super) repositories: &'a dyn Repositories,
-    pub(super) info: &'a RepositoryInfo,
-}
 
 /// Runs `work` off the async runtime on a folder of a project the user added, with what reads it,
 /// once `start` allows it: `Start::Never` fails `distro_stopped` for a stopped WSL distro.
@@ -31,15 +23,10 @@ pub(super) async fn on_folder<T: Send + 'static>(
     app: tauri::AppHandle,
     folder_id: String,
     start: Start,
-    work: impl FnOnce(OnFolder) -> anyhow::Result<T> + Send + 'static,
+    work: impl FnOnce(FolderReader) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, AppError> {
     blocking(command, app, move |app| {
-        let projects = app.state::<ProjectsState>();
-        let (project, folder) = projects.folder(&folder_id)?;
-        work(OnFolder {
-            repositories: &*projects.repositories_at(&folder.location, start)?,
-            info: &folder.repository(&project),
-        })
+        work(app.state::<Projects>().reader(&folder_id, start)?)
     })
     .await
 }
@@ -58,7 +45,7 @@ pub(crate) async fn get_folder_kind(
         app,
         folder_id,
         if start { Start::May } else { Start::Never },
-        move |on| on.repositories.folder_kind(on.info),
+        move |on| on.reader.folder_kind(&on.info),
     )
     .await
 }
@@ -74,7 +61,7 @@ pub(crate) async fn get_repository_snapshot(
         app,
         folder_id,
         Start::May,
-        |on| on.repositories.snapshot(on.info),
+        |on| on.reader.snapshot(&on.info),
     )
     .await
 }
@@ -90,7 +77,7 @@ pub(crate) async fn get_repository_summary(
         app,
         folder_id,
         Start::Never,
-        |on| on.repositories.summary(on.info),
+        |on| on.reader.summary(&on.info),
     )
     .await
 }
@@ -103,7 +90,7 @@ pub(crate) async fn get_file_diff(
     request: FileDiffRequest,
 ) -> Result<UnifiedDiff, AppError> {
     on_folder("get_file_diff", app, folder_id, Start::May, move |on| {
-        on.repositories.file_diff(on.info, &request)
+        on.reader.file_diff(&on.info, &request)
     })
     .await
 }
@@ -120,7 +107,7 @@ pub(crate) async fn get_changes_ignoring_whitespace(
         app,
         folder_id,
         Start::May,
-        |on| on.repositories.changes_ignoring_whitespace(on.info),
+        |on| on.reader.changes_ignoring_whitespace(&on.info),
     )
     .await
 }
@@ -132,7 +119,7 @@ pub(crate) async fn get_recent_commits(
     folder_id: String,
 ) -> Result<RecentCommits, AppError> {
     on_folder("get_recent_commits", app, folder_id, Start::May, |on| {
-        on.repositories.recent_commits(on.info)
+        on.reader.recent_commits(&on.info)
     })
     .await
 }
@@ -150,7 +137,7 @@ pub(crate) async fn get_commit_activity(
         app,
         folder_id,
         Start::May,
-        move |on| on.repositories.commit_activity(on.info, since),
+        move |on| on.reader.commit_activity(&on.info, since),
     )
     .await
 }
@@ -163,7 +150,7 @@ pub(crate) async fn get_commit_files(
     commit: CommitRequest,
 ) -> Result<CommitFiles, AppError> {
     on_folder("get_commit_files", app, folder_id, Start::May, move |on| {
-        on.repositories.commit_files(on.info, &commit)
+        on.reader.commit_files(&on.info, &commit)
     })
     .await
 }
@@ -180,7 +167,7 @@ pub(crate) async fn get_commit_file_diff(
         app,
         folder_id,
         Start::May,
-        move |on| on.repositories.commit_file_diff(on.info, &request),
+        move |on| on.reader.commit_file_diff(&on.info, &request),
     )
     .await
 }
@@ -193,7 +180,7 @@ pub(crate) async fn get_directory(
     path: String,
 ) -> Result<Directory, AppError> {
     on_folder("get_directory", app, folder_id, Start::May, move |on| {
-        on.repositories.directory(on.info, &path)
+        on.reader.directory(&on.info, &path)
     })
     .await
 }
@@ -205,7 +192,7 @@ pub(crate) async fn get_recent_files(
     folder_id: String,
 ) -> Result<RecentFiles, AppError> {
     on_folder("get_recent_files", app, folder_id, Start::May, move |on| {
-        on.repositories.recent_files(on.info)
+        on.reader.recent_files(&on.info)
     })
     .await
 }
@@ -218,14 +205,14 @@ pub(crate) async fn get_file_content(
     path: String,
 ) -> Result<FileContent, AppError> {
     on_folder("get_file_content", app, folder_id, Start::May, move |on| {
-        on.repositories.file_content(on.info, &path)
+        on.reader.file_content(&on.info, &path)
     })
     .await
 }
 
 #[tauri::command]
 /// The folders of a project whose tree holds the file at `path`, a note names
-/// (`ProjectsState::folders_holding`).
+/// (`state::folders_holding`).
 pub(crate) async fn folders_holding(
     app: tauri::AppHandle,
     project_id: String,
@@ -233,8 +220,12 @@ pub(crate) async fn folders_holding(
     path: String,
 ) -> Result<Vec<String>, AppError> {
     blocking("folders_holding", app, move |app| {
-        app.state::<ProjectsState>()
-            .folders_holding(&project_id, first.as_deref(), &path)
+        state::folders_holding(
+            &app.state::<Projects>(),
+            &project_id,
+            first.as_deref(),
+            &path,
+        )
     })
     .await
 }
@@ -247,7 +238,7 @@ pub(crate) async fn get_file_stamp(
     path: String,
 ) -> Result<FileStamp, AppError> {
     on_folder("get_file_stamp", app, folder_id, Start::May, move |on| {
-        on.repositories.file_stamp(on.info, &path)
+        on.reader.file_stamp(&on.info, &path)
     })
     .await
 }
@@ -260,7 +251,7 @@ pub(crate) async fn get_blob_size(
     blob: String,
 ) -> Result<u64, AppError> {
     on_folder("get_blob_size", app, folder_id, Start::May, move |on| {
-        on.repositories.blob_size(on.info, &blob)
+        on.reader.blob_size(&on.info, &blob)
     })
     .await
 }
@@ -277,7 +268,7 @@ pub(crate) async fn get_markdown_preview(
         app,
         folder_id,
         Start::May,
-        move |on| on.repositories.markdown_preview(on.info, &path),
+        move |on| on.reader.markdown_preview(&on.info, &path),
     )
     .await
 }
@@ -290,7 +281,7 @@ pub(crate) async fn get_syntax_colors(
     request: SyntaxRequest,
 ) -> Result<SyntaxColors, AppError> {
     on_folder("get_syntax_colors", app, folder_id, Start::May, move |on| {
-        on.repositories.syntax_colors(on.info, &request)
+        on.reader.syntax_colors(&on.info, &request)
     })
     .await
 }

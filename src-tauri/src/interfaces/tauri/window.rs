@@ -6,8 +6,8 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, RunEvent, Window, WindowEvent};
 
 use super::quick_note::{self, Then};
-use super::state::ProjectsState;
 use super::tray;
+use sidekyk_core::app::projects::Projects;
 
 /// If the page never says it painted (a script that failed to load), the window shows anyway
 /// after this long, rather than leave the app running with nothing on screen.
@@ -60,7 +60,7 @@ pub(crate) fn show_by_deadline(app: &AppHandle) {
 pub(crate) fn set_window_visible(app: tauri::AppHandle, visible: bool) -> Option<String> {
     // rare, and what tells whether a platform's webview reports it (docs/testing.md)
     tracing::info!(visible, "window visibility");
-    app.state::<ProjectsState>().set_visible(visible)
+    app.state::<Projects>().set_visible(visible)
 }
 
 /// Shows the window if nothing showed it yet, and says whether it did.

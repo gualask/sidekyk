@@ -5,12 +5,13 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use serde_json::{Map, Value};
 use tauri::Manager;
 
+use sidekyk_core::app::projects::ProjectsStorage;
 use sidekyk_core::modules::folder::repository_name;
 use sidekyk_core::modules::projects::{Location, Project, ProjectList};
 use sidekyk_core::modules::settings::Settings;
@@ -184,20 +185,22 @@ fn set_aside(path: &Path, error: &serde_json::Error) -> bool {
     }
 }
 
-pub(crate) fn load_projects(app: &tauri::AppHandle) -> ProjectList {
-    app.state::<SettingsFile>().projects()
-}
+impl ProjectsStorage for SettingsFile {
+    fn load(&self) -> ProjectList {
+        self.projects()
+    }
 
-pub(crate) fn save_projects(app: &tauri::AppHandle, list: &ProjectList) -> anyhow::Result<()> {
-    app.state::<SettingsFile>().write_projects(list)
+    fn save(&self, list: &ProjectList) -> anyhow::Result<()> {
+        self.write_projects(list)
+    }
 }
 
 pub(crate) fn load_settings(app: &tauri::AppHandle) -> Settings {
-    app.state::<SettingsFile>().settings()
+    app.state::<Arc<SettingsFile>>().settings()
 }
 
 pub(crate) fn save_settings(app: &tauri::AppHandle, settings: &Settings) -> anyhow::Result<()> {
-    app.state::<SettingsFile>()
+    app.state::<Arc<SettingsFile>>()
         .write(SETTINGS_KEY, settings, &[])
 }
 

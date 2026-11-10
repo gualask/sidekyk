@@ -4,6 +4,7 @@
 //! and infrastructure services remain unaware of this composition root.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
@@ -15,13 +16,21 @@ use crate::infrastructure::settings_store::{self, SettingsFile};
 use crate::interfaces::tauri as tauri_commands;
 use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
-use crate::interfaces::tauri::state::{open_folder, ProjectsState};
+use crate::interfaces::tauri::state::Launch;
 use crate::interfaces::tauri::tray;
 use crate::interfaces::tauri::window::{
     hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
 };
+use sidekyk_core::app::machines::Machines;
+use sidekyk_core::app::projects::Projects;
+use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
+use sidekyk_core::infrastructure::machines::local::LocalMachine;
+use sidekyk_core::infrastructure::machines::wsl::WslRepositories;
+use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
+use sidekyk_core::modules::folder::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
+use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
 use sidekyk_core::modules::settings::Theme;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
@@ -55,14 +64,48 @@ fn is_app_page(url: &::tauri::Url) -> bool {
         || (::tauri::is_dev() && url.host_str() == Some("localhost"))
 }
 
+/// This machine's folders, read here. A dev build started with `SIDEKYK_AGENT=local` reads them
+/// through the helper instead, a child process beside the app's binary, as it reads a WSL
+/// distro's (`docs/features/wsl.md`).
+fn local_reader() -> Arc<dyn Repositories> {
+    #[cfg(debug_assertions)]
+    if std::env::var_os("SIDEKYK_AGENT").is_some_and(|agent| agent == "local") {
+        use sidekyk_core::infrastructure::agent::{helper_beside_this_binary, AgentRepositories};
+        return Arc::new(AgentRepositories::new(|| Ok(helper_beside_this_binary())));
+    }
+    LocalRepositories::new(
+        Arc::new(LocalRepositoryBackend::default()),
+        Arc::new(LocalRepositoryWatcher::default()),
+    )
+}
+
+/// The project list, stored in `settings`, its folders read on this machine and in WSL distros
+/// (`helper`, the Linux helper the installer ships); a change of the folder on screen goes to the
+/// page.
+fn projects(app: &::tauri::AppHandle, settings: Arc<SettingsFile>, helper: PathBuf) -> Projects {
+    let machines = Machines::new(
+        Arc::new(LocalMachine::new(local_reader())),
+        vec![Arc::new(WslRepositories::new(helper))],
+    );
+    let page = app.clone();
+    Projects::new(
+        machines,
+        settings,
+        Arc::new(move |folder_id, change| {
+            let event = RepositoryChangedEvent::new(folder_id, change);
+            let _ = page.emit(REPOSITORY_CHANGED_EVENT, event);
+        }),
+    )
+}
+
 /// Adds and shows a folder named at launch, off the main thread: a WSL distro's may take a
 /// while to start. The frontend, told the list changed, takes the project to show its panels. A
 /// failure leaves the app as it was.
 fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
     let app = app.clone();
-    std::thread::spawn(move || match open_folder(&app, &folder) {
+    std::thread::spawn(move || match app.state::<Projects>().open_folder(&folder) {
         Ok(opened) => {
-            app.state::<ProjectsState>().set_opened(opened);
+            app.state::<Launch>().set_opened(opened);
             let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
         }
         Err(error) => tracing::warn!(
@@ -114,6 +157,7 @@ pub(crate) fn run() {
             },
         )
         .manage(NotesStore::default())
+        .manage(Launch::default())
         .manage(FirstShow::default())
         .manage(tauri_commands::capture::CaptureState::default())
         .manage(tauri_commands::quick_note::QuickNoteState::default())
@@ -122,7 +166,8 @@ pub(crate) fn run() {
                 logging::init(&dir);
             }
             let data = app.path().app_data_dir()?;
-            app.manage(SettingsFile::open(&data));
+            let settings_file = Arc::new(SettingsFile::open(&data));
+            app.manage(settings_file.clone());
             app.manage(NotesFiles::new(&data));
             // the Linux helper WSL distros run, among the installer's resources on Windows
             // (`tauri.helper.conf.json`, the installer build only)
@@ -133,7 +178,7 @@ pub(crate) fn run() {
                     tracing::warn!(%error, "no resources: WSL projects cannot be read");
                     PathBuf::new()
                 });
-            app.manage(ProjectsState::new(helper));
+            app.manage(projects(app.handle(), settings_file, helper));
             let settings = settings_store::load_settings(app.handle());
             // before the windows, whose pages may change the settings as they load; applied below
             app.manage(AppliedSettings::new(settings.clone()));
@@ -144,8 +189,6 @@ pub(crate) fn run() {
             // before the tray, which starts in the language returned
             let texts = apply_language(app.handle(), settings.language);
             tray::start(app.handle(), texts);
-            app.state::<ProjectsState>()
-                .restore(settings_store::load_projects(app.handle()));
             let args: Vec<String> = std::env::args().collect();
             if let Some(folder) = folder_argument(&args) {
                 open_or_log(app.handle(), folder);

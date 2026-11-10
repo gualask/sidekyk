@@ -6,11 +6,11 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
-use super::state::ProjectsState;
 use super::texts;
 use crate::infrastructure::files::write_whole;
 use crate::infrastructure::notes_files::{read_image_file, NotesFiles};
 use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
     MovedList, MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes, EXPORT_IMAGES,
@@ -33,7 +33,7 @@ pub(super) fn book_of(app: &tauri::AppHandle, book: &str) -> anyhow::Result<Book
     if book == INBOX_BOOK {
         return Ok(Book::Inbox);
     }
-    Ok(project_book(&app.state::<ProjectsState>().project(book)?))
+    Ok(project_book(&app.state::<Projects>().project(book)?))
 }
 
 /// Runs `work` with the notes and their files, off the async runtime.
@@ -248,7 +248,7 @@ pub(crate) async fn copy_note(
             Some(place) => images
                 .iter()
                 .map(|image| {
-                    let projects = app.state::<ProjectsState>();
+                    let projects = app.state::<Projects>();
                     projects.host_path(&place, Path::new(image), Start::May)
                 })
                 .collect::<anyhow::Result<_>>()?,
@@ -277,7 +277,7 @@ fn book_place(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<Loca
     let Book::Project { id, .. } = book else {
         return Ok(None);
     };
-    let project = app.state::<ProjectsState>().project(id)?;
+    let project = app.state::<Projects>().project(id)?;
     Ok(project
         .folders
         .into_iter()
@@ -481,7 +481,7 @@ pub(crate) async fn export_notes(
     project_id: String,
 ) -> Result<Option<String>, AppError> {
     with_store("export_notes", app, move |app, store, files| {
-        let projects = app.state::<ProjectsState>();
+        let projects = app.state::<Projects>();
         let project = projects.project(&project_id)?;
         let book = project_book(&project);
         let texts = texts::current();
