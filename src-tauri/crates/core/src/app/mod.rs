@@ -6,4 +6,5 @@
 mod fake;
 pub mod machines;
 pub mod notes;
+pub mod palette;
 pub mod projects;

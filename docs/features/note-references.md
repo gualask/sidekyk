@@ -54,7 +54,7 @@ hashes): `../../ROADMAP.md`, Notes.
   (`search::search_files`), the best 20; nothing for an empty query, nor while the distro is
   stopped. Asked at each key while a list shows (`['note-files', folder, query]`, the previous
   list kept while the next comes, nothing cached once closed).
-- `folders_holding(projectId, first, path)` (`state::folders_holding`), only on a click:
+- `folders_holding(projectId, first, path)` (`app::palette::folders_holding`), only on a click:
   `first`, the folder on screen, alone when its tree holds the path (`file_stamp`, its cached
   tree, which its watcher keeps fresh); else the other folders side by side (scoped threads),
   their trees read again and not kept (`tree_holds_now`, also through the WSL helper): no watcher

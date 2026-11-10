@@ -29,6 +29,9 @@ use crate::modules::repository::{ChangeKind, ChangedFile};
 /// At most this many files go back: the palette shows the best, the rest are counted.
 const FILE_LIMIT: usize = 500;
 
+/// At most this many files go back to a note's `@`: its menu shows a few.
+pub const NOTE_FILE_LIMIT: usize = 20;
+
 /// A project's files: those git lists, and how they changed as its last snapshot found.
 pub struct ProjectFiles {
     pub tree: Arc<FileTree>,
@@ -105,6 +108,14 @@ pub fn rank_names(query: &str, names: &[&str]) -> Vec<usize> {
     best.into_iter().map(|scored| scored.index).collect()
 }
 
+/// The files a note's `@` gets of `found`: the best `NOTE_FILE_LIMIT`, the others counted.
+pub fn note_files(mut found: FileMatches) -> FileMatches {
+    let cut = found.files.len().saturating_sub(NOTE_FILE_LIMIT);
+    found.files.truncate(NOTE_FILE_LIMIT);
+    found.more += cut as u32;
+    found
+}
+
 /// The files of a project that match `query` best, and how many more did. A deleted file is not
 /// in the tree, but Changes lists it: it is searched too.
 pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
@@ -162,6 +173,25 @@ fn marks_by_path(changed: &[ChangedFile]) -> HashMap<&str, ChangeMark> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_note_gets_the_best_files_the_others_counted() {
+        let found = |count: usize, more: u32| FileMatches {
+            files: (0..count)
+                .map(|n| FileMatch {
+                    path: format!("{n}.ts"),
+                    mark: None,
+                    score: 0,
+                    highlights: Vec::new(),
+                })
+                .collect(),
+            more,
+        };
+        let cut = note_files(found(NOTE_FILE_LIMIT + 5, 7));
+        assert_eq!((cut.files.len(), cut.more), (NOTE_FILE_LIMIT, 12));
+        let few = note_files(found(3, 0));
+        assert_eq!((few.files.len(), few.more), (3, 0));
+    }
     use crate::modules::projects::Location;
     use crate::modules::repository::ChangeArea;
 

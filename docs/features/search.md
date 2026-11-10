@@ -27,8 +27,9 @@ The palette is the only search; panels have no filter.
 
 ## How it is built
 
-- `search` runs at every key: panel titles (sent by the frontend) and, once something is typed,
-  the files of the project named, or the projects when none is. Files: the cached tree plus
+- `search` (`app/palette.rs`, over the project list and the notes) runs at every key: panel
+  titles (sent by the frontend) and, once something is typed, the files of the project named (its
+  folder on screen's, none while its distro is stopped), or the projects when none is. Files: the cached tree plus
   deleted files, marked from the last snapshot. Words match independently, case ignored; matched
   letters as UTF-16 offsets; at most 500 files, the best picked without sorting the rest; from
   20,000 paths on up to 8 threads (Zed's 4,366 paths 0.37 ms; 200,000 synthetic 80 → 14 ms).

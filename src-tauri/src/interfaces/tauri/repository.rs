@@ -4,8 +4,8 @@
 use tauri::Manager;
 
 use super::blocking::blocking;
-use super::state;
 use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::palette;
 use sidekyk_core::app::projects::{FolderReader, Projects};
 use sidekyk_core::modules::folder::{Directory, FileContent, FileStamp, FolderKind, RecentFiles};
 use sidekyk_core::modules::preview::MarkdownDocument;
@@ -212,7 +212,7 @@ pub(crate) async fn get_file_content(
 
 #[tauri::command]
 /// The folders of a project whose tree holds the file at `path`, a note names
-/// (`state::folders_holding`).
+/// (`palette::folders_holding`).
 pub(crate) async fn folders_holding(
     app: tauri::AppHandle,
     project_id: String,
@@ -220,7 +220,7 @@ pub(crate) async fn folders_holding(
     path: String,
 ) -> Result<Vec<String>, AppError> {
     blocking("folders_holding", app, move |app| {
-        state::folders_holding(
+        palette::folders_holding(
             &app.state::<Projects>(),
             &project_id,
             first.as_deref(),

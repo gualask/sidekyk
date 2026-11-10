@@ -5,15 +5,13 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::repository::on_folder;
-use super::state;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::machines::Start;
-use sidekyk_core::app::notes::project_book;
+use sidekyk_core::app::palette;
 use sidekyk_core::app::projects::Projects;
-use sidekyk_core::modules::notes::{Book, NotesStore};
+use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::search::{
-    self, search_every_book, search_notes, ContentEnd, ContentFile, FileMatches, SearchRequest,
-    SearchResults,
+    self, ContentEnd, ContentFile, FileMatches, SearchRequest, SearchResults,
 };
 use sidekyk_core::shared::error::AppError;
 
@@ -27,31 +25,12 @@ pub(crate) async fn search(
     request: SearchRequest,
 ) -> Result<SearchResults, AppError> {
     blocking("search", app, move |app| {
-        let notes = app.state::<NotesStore>();
-        let files = app.state::<NotesFiles>();
-        let query = request.query.as_str();
-        Ok(state::search(
+        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
+        Ok(palette::search(
             &app.state::<Projects>(),
+            &store,
+            files.inner(),
             &request,
-            |project| {
-                notes
-                    .with_notes(files.inner(), &project_book(project), |lists, found| {
-                        search_notes(query, &project.id, lists, found)
-                    })
-                    .inspect_err(
-                        |error| tracing::debug!(error = %format!("{error:#}"), "no notes to search"),
-                    )
-                    .ok()
-            },
-            |projects| {
-                // the Inbox first: equal scores keep the books' order
-                let books: Vec<Book> = std::iter::once(Book::Inbox)
-                    .chain(projects.iter().map(project_book))
-                    .collect();
-                notes.with_every_book(files.inner(), &books, |found| {
-                    search_every_book(query, found)
-                })
-            },
         ))
     })
     .await
@@ -75,9 +54,6 @@ pub(crate) async fn search_contents(
     .await
 }
 
-/// At most this many files go back to a note's `@`: its menu shows a few.
-const NOTE_FILE_LIMIT: usize = 20;
-
 #[tauri::command]
 /// The files of a project's folder that match `query` best, as the palette ranks them: what a
 /// note's `@` suggests. Nothing for an empty query, nor while the folder's WSL distro is stopped.
@@ -90,11 +66,8 @@ pub(crate) async fn search_files(
         return Ok(FileMatches::default());
     }
     on_folder("search_files", app, folder_id, Start::Never, move |on| {
-        let mut found = on.reader.search_files(&on.info, &query).unwrap_or_default();
-        let cut = found.files.len().saturating_sub(NOTE_FILE_LIMIT);
-        found.files.truncate(NOTE_FILE_LIMIT);
-        found.more += cut as u32;
-        Ok(found)
+        let found = on.reader.search_files(&on.info, &query).unwrap_or_default();
+        Ok(search::note_files(found))
     })
     .await
 }
