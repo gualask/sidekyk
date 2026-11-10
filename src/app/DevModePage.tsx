@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
-import {
-    createBrowserRuntime,
-    isScenario,
-    SCENARIOS,
-} from '@/infrastructure/fixtures/browser-runtime-ports';
+import { createBrowserRuntime } from '@/infrastructure/fixtures/runtime';
+import { isScenario, SCENARIOS } from '@/infrastructure/fixtures/scenario';
 import { AppShell } from './AppShell';
 import { AppProviders } from './providers';
 

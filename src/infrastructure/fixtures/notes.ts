@@ -18,11 +18,8 @@ import {
     sourceImage,
 } from '@/modules/notes';
 import { REPOSITORY_IMAGES } from './fixture-files';
-
-/** A native command's failure, as the backend sends it. */
-function failure(code: string) {
-    return { code, message: code };
-}
+import { type FixtureProjects, TOPIC_PROJECT } from './projects';
+import { failure, hasScenarioData, isLarge, type Scenario } from './scenario';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -239,38 +236,36 @@ function largeBook(): Book {
     return bookOf(rows);
 }
 
-/**
- * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
- * each book starts as `initial` says (the scenario's project with the mock's notes, the Inbox with
- * a few in `review` and `clean`, the project without folder with its topic's, any other book with
- * none). `checkBook` refuses a book the backend would not know.
- */
-export function fixtureNotes({
-    initial,
-    checkBook,
-}: {
-    initial: (book: string) => 'review' | 'large' | 'inbox' | 'topic' | 'empty';
-    checkBook: (book: string) => void;
-}): NotesPort & {
+/** The notes a book starts with in `scenario`. */
+function initialNotes(scenario: Scenario, book: string): Book {
+    if (book === INBOX_BOOK) {
+        return scenario === 'review' || scenario === 'clean' ? inboxBook() : emptyBook();
+    }
+    if (book === TOPIC_PROJECT.id) return bookOf(TOPIC_NOTES);
+    if (!hasScenarioData(scenario, book)) return emptyBook();
+    return isLarge(scenario, book) ? largeBook() : bookOf(REVIEW_NOTES);
+}
+
+/** The notes port, and what the other fixtures read of it. */
+export type FixtureNotes = NotesPort & {
     peek: (book: string) => ProjectNotes;
     drop: (book: string) => void;
-} {
+};
+
+/**
+ * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
+ * each book starts with the scenario's notes (the scenario's project with the mock's notes, the
+ * Inbox with a few in `review` and `clean`, the project without folder with its topic's, any other
+ * book with none). As the backend, a book is the Inbox or a project in the list, not its
+ * repository: a moved one's notes stay.
+ */
+export function fixtureNotes(scenario: Scenario, projects: FixtureProjects): FixtureNotes {
     const books = new Map<string, Book>();
     const book = (key: string): Book => {
-        checkBook(key);
+        if (key !== INBOX_BOOK) projects.project(key);
         let found = books.get(key);
         if (!found) {
-            const kind = initial(key);
-            found =
-                kind === 'review'
-                    ? bookOf(REVIEW_NOTES)
-                    : kind === 'large'
-                      ? largeBook()
-                      : kind === 'inbox'
-                        ? inboxBook()
-                        : kind === 'topic'
-                          ? bookOf(TOPIC_NOTES)
-                          : emptyBook();
+            found = initialNotes(scenario, key);
             books.set(key, found);
         }
         return found;
