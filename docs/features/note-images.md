@@ -63,7 +63,7 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   files (`add_note_image_files`, a regular file within the limit).
 - Out: `note-image://localhost/<book>/<file>` (`http://note-image.localhost/…` on Windows), the
   book and the file encoded as `project-file:`'s (`previews.md`); only a file a note of the book
-  names, `immutable` (an id names its bytes). CSP `img-src` lists it. `copy_note` composes the
+  names, `immutable` (an id names its bytes). CSP `img-src` lists it. `Notes::copy` composes the
   copy; each image's path as the project's machine names it (`Machine::host_path`; for WSL,
   `wslpath -u` of its folder once per distro, folder and session). `note_image_png`
   gives a non-PNG image as PNG for the clipboard (`ClipboardItem`).

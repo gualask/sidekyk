@@ -238,31 +238,12 @@ impl Projects {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
-    use crate::app::fake::{Here, Told};
+    use crate::app::fake::{Here, Kept, Told};
     use crate::shared::error::{user_facing_code, UserFacingErrorCode};
 
-    /// A list kept in memory; each save recorded, or refused while `refuse` is set.
-    #[derive(Default)]
-    struct Kept {
-        list: ProjectList,
-        saved: Mutex<Vec<ProjectList>>,
-        refuse: Mutex<bool>,
-    }
-
-    impl ProjectsStorage for Kept {
-        fn load(&self) -> ProjectList {
-            self.list.clone()
-        }
-        fn save(&self, list: &ProjectList) -> anyhow::Result<()> {
-            anyhow::ensure!(!*lock(&self.refuse), "the disk is full");
-            lock(&self.saved).push(list.clone());
-            Ok(())
-        }
-    }
-
-    fn shop() -> Project {
+    pub(crate) fn shop() -> Project {
         Project::new(
             "shop".into(),
             [Location::Local {
@@ -272,7 +253,7 @@ mod tests {
     }
 
     /// `list`'s projects on this machine, read by `told`.
-    fn projects(list: ProjectList, told: &Arc<Told>) -> (Projects, Arc<Kept>) {
+    pub(crate) fn projects(list: ProjectList, told: &Arc<Told>) -> (Projects, Arc<Kept>) {
         let storage = Arc::new(Kept {
             list,
             ..Kept::default()

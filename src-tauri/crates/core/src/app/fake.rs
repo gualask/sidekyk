@@ -1,13 +1,16 @@
-//! A machine that reads nothing, for the tests of the application service: it records what it is
-//! told to watch and keep, and what it is told of the window.
+//! Fakes for the tests of the application service: a machine that reads nothing, recording what
+//! it is told to watch and keep and what it is told of the window; notes kept in memory.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
 use super::machines::{Machine, MachineReader};
+use crate::app::projects::ProjectsStorage;
 use crate::modules::folder::{
     Directory, FileContent, FileStamp, FolderKind, RecentFiles, RepositoryInfo,
 };
+use crate::modules::notes::NotesStorage;
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::projects::{FoundFolder, Location, NameCase, ProjectList};
 use crate::modules::reader::{OnChange, Repositories};
@@ -152,8 +155,8 @@ impl Machine for Here {
     fn host_path(&self, _: &Location, _: &Path) -> anyhow::Result<String> {
         unreachable!()
     }
-    fn holds_host_path(&self, _: &ProjectList, _: &Path) -> Option<bool> {
-        unreachable!()
+    fn holds_host_path(&self, list: &ProjectList, path: &Path) -> Option<bool> {
+        Some(list.holds(path, Path::to_path_buf, NameCase::Kept))
     }
     fn set_visible(&self, visible: bool) -> Option<Location> {
         let root = self.0.set_visible(visible)?;
@@ -161,5 +164,67 @@ impl Machine for Here {
     }
     fn name_case(&self) -> NameCase {
         NameCase::Kept
+    }
+}
+
+/// Notes' files in memory, by folder and name; `refuse_removal` makes removing a folder fail.
+#[derive(Default)]
+pub(crate) struct Shelf {
+    files: Mutex<BTreeMap<(String, String), Vec<u8>>>,
+    pub(crate) refuse_removal: Mutex<bool>,
+}
+
+impl NotesStorage for Shelf {
+    fn folders(&self) -> anyhow::Result<Vec<String>> {
+        let mut folders: Vec<String> = lock(&self.files).keys().map(|(f, _)| f.clone()).collect();
+        folders.dedup();
+        Ok(folders)
+    }
+    fn files(&self, folder: &str) -> anyhow::Result<Vec<String>> {
+        Ok(lock(&self.files)
+            .keys()
+            .filter(|(f, _)| f == folder)
+            .map(|(_, name)| name.clone())
+            .collect())
+    }
+    fn read(&self, folder: &str, file: &str, _: u64) -> anyhow::Result<Option<Vec<u8>>> {
+        Ok(lock(&self.files)
+            .get(&(folder.into(), file.into()))
+            .cloned())
+    }
+    fn write(&self, folder: &str, file: &str, bytes: &[u8]) -> anyhow::Result<()> {
+        lock(&self.files).insert((folder.into(), file.into()), bytes.to_vec());
+        Ok(())
+    }
+    fn remove(&self, folder: &str, file: &str) -> anyhow::Result<()> {
+        lock(&self.files).remove(&(folder.into(), file.into()));
+        Ok(())
+    }
+    fn remove_folder(&self, folder: &str) -> anyhow::Result<()> {
+        anyhow::ensure!(!*lock(&self.refuse_removal), "the folder is in use");
+        lock(&self.files).retain(|(f, _), _| f != folder);
+        Ok(())
+    }
+    fn location(&self, folder: &str, file: &str) -> anyhow::Result<String> {
+        Ok(format!("/data/notes/{folder}/{file}"))
+    }
+}
+
+/// A project list kept in memory; each save recorded, or refused while `refuse` is set.
+#[derive(Default)]
+pub(crate) struct Kept {
+    pub(crate) list: ProjectList,
+    pub(crate) saved: Mutex<Vec<ProjectList>>,
+    pub(crate) refuse: Mutex<bool>,
+}
+
+impl ProjectsStorage for Kept {
+    fn load(&self) -> ProjectList {
+        self.list.clone()
+    }
+    fn save(&self, list: &ProjectList) -> anyhow::Result<()> {
+        anyhow::ensure!(!*lock(&self.refuse), "the disk is full");
+        lock(&self.saved).push(list.clone());
+        Ok(())
     }
 }

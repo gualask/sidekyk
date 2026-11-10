@@ -4,11 +4,11 @@ use tauri::ipc::Channel;
 use tauri::Manager;
 
 use super::blocking::blocking;
-use super::notes::project_book;
 use super::repository::on_folder;
 use super::state;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::notes::project_book;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{Book, NotesStore};
 use sidekyk_core::modules::search::{

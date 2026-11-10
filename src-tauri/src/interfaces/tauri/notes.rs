@@ -7,33 +7,24 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::texts;
-use crate::infrastructure::files::write_whole;
+use crate::infrastructure::files::HostFiles;
 use crate::infrastructure::notes_files::{read_image_file, NotesFiles};
-use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::notes::Notes;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{
-    as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
-    MovedList, MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes, EXPORT_IMAGES,
-    INBOX_BOOK, MAX_IMAGE_BYTES,
+    as_png, prepare, Book, DeletedList, ImageTarget, ListTarget, Mark, MovedList, MovedNote, Note,
+    NoteList, NotesCount, NotesStore, ProjectNotes, MAX_IMAGE_BYTES,
 };
-use sidekyk_core::modules::projects::{Location, Project};
-use sidekyk_core::shared::error::{user_facing, AppError, UserFacingErrorCode};
+use sidekyk_core::shared::error::AppError;
 use sidekyk_core::shared::url::percent_decoded;
 
-/// A project's book.
-pub(crate) fn project_book(project: &Project) -> Book {
-    Book::Project {
-        id: project.id.clone(),
-        name: project.name.clone(),
-    }
-}
-
-/// The book the frontend names: the Inbox, or a project of the list. Any other id is refused.
-pub(super) fn book_of(app: &tauri::AppHandle, book: &str) -> anyhow::Result<Book> {
-    if book == INBOX_BOOK {
-        return Ok(Book::Inbox);
-    }
-    Ok(project_book(&app.state::<Projects>().project(book)?))
+/// The notes of the list's books, as the app keeps them.
+pub(super) fn notes<'a>(
+    app: &'a tauri::AppHandle,
+    store: &'a NotesStore,
+    files: &'a NotesFiles,
+) -> Notes<'a> {
+    Notes::new(app.state::<Projects>().inner(), store, files)
 }
 
 /// Runs `work` with the notes and their files, off the async runtime.
@@ -56,7 +47,7 @@ pub(super) async fn with_notes<T: Send + 'static>(
     work: impl FnOnce(&NotesStore, &NotesFiles, &Book) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, AppError> {
     with_store(command, app, move |app, store, files| {
-        work(store, files, &book_of(app, &book)?)
+        work(store, files, &notes(app, store, files).book(&book)?)
     })
     .await
 }
@@ -241,48 +232,9 @@ pub(crate) async fn copy_note(
     id: String,
 ) -> Result<String, AppError> {
     with_store("copy_note", app, move |app, store, files| {
-        let book = book_of(app, &book)?;
-        let (text, images) = store.note_copy(files, &book, &id)?;
-        let images = match book_place(app, &book)? {
-            // as the project's machine names them; a copy may start it (`docs/features/wsl.md`)
-            Some(place) => images
-                .iter()
-                .map(|image| {
-                    let projects = app.state::<Projects>();
-                    projects.host_path(&place, Path::new(image), Start::May)
-                })
-                .collect::<anyhow::Result<_>>()?,
-            None => images,
-        };
-        Ok(copy_text(&text, &images))
+        notes(app, store, files).copy(&book, &id)
     })
     .await
-}
-
-/// A note's text, then its images' paths, a line each; without images, the text as it is.
-fn copy_text(text: &str, images: &[String]) -> String {
-    if images.is_empty() {
-        return text.to_string();
-    }
-    let paths = images.join("\n");
-    match text.trim_end() {
-        "" => paths,
-        text => format!("{text}\n\n{paths}"),
-    }
-}
-
-/// Where a book's project's folders are: its first's place, all of them on one machine. None for
-/// the Inbox and a project without folder.
-fn book_place(app: &tauri::AppHandle, book: &Book) -> anyhow::Result<Option<Location>> {
-    let Book::Project { id, .. } = book else {
-        return Ok(None);
-    };
-    let project = app.state::<Projects>().project(id)?;
-    Ok(project
-        .folders
-        .into_iter()
-        .next()
-        .map(|folder| folder.location))
 }
 
 #[tauri::command]
@@ -348,7 +300,10 @@ pub(crate) async fn move_note(
     list: ListTarget,
 ) -> Result<MovedNote, AppError> {
     with_store("move_note", app, move |app, store, files| {
-        let (from, to) = (book_of(app, &from)?, book_of(app, &to)?);
+        let (from, to) = (
+            notes(app, store, files).book(&from)?,
+            notes(app, store, files).book(&to)?,
+        );
         store.move_note(files, &from, &id, &to, list)
     })
     .await
@@ -363,7 +318,10 @@ pub(crate) async fn unmove_note(
     home: String,
 ) -> Result<Note, AppError> {
     with_store("unmove_note", app, move |app, store, files| {
-        let (at, home) = (book_of(app, &at)?, book_of(app, &home)?);
+        let (at, home) = (
+            notes(app, store, files).book(&at)?,
+            notes(app, store, files).book(&home)?,
+        );
         store.unmove_note(files, &at, original, &home)
     })
     .await
@@ -378,7 +336,10 @@ pub(crate) async fn move_list(
     to: String,
 ) -> Result<MovedList, AppError> {
     with_store("move_list", app, move |app, store, files| {
-        let (from, to) = (book_of(app, &from)?, book_of(app, &to)?);
+        let (from, to) = (
+            notes(app, store, files).book(&from)?,
+            notes(app, store, files).book(&to)?,
+        );
         store.move_list(files, &from, &list, &to)
     })
     .await
@@ -388,7 +349,10 @@ pub(crate) async fn move_list(
 /// Brings a moved list back where it was, with its notes (undo).
 pub(crate) async fn unmove_list(app: tauri::AppHandle, moved: MovedList) -> Result<(), AppError> {
     with_store("unmove_list", app, move |app, store, files| {
-        let (from, to) = (book_of(app, &moved.from)?, book_of(app, &moved.to)?);
+        let (from, to) = (
+            notes(app, store, files).book(&moved.from)?,
+            notes(app, store, files).book(&moved.to)?,
+        );
         store.unmove_list(files, &from, &to, moved)
     })
     .await
@@ -481,52 +445,23 @@ pub(crate) async fn export_notes(
     project_id: String,
 ) -> Result<Option<String>, AppError> {
     with_store("export_notes", app, move |app, store, files| {
-        let projects = app.state::<Projects>();
-        let project = projects.project(&project_id)?;
-        let book = project_book(&project);
+        let notes = notes(app, store, files);
+        let target = notes.export_target(&project_id)?;
         let texts = texts::current();
-        let images: Vec<String> = store.with_notes(files, &book, |_, notes| {
-            notes
-                .iter()
-                .flat_map(|note| note.images.iter().map(image_file))
-                .collect()
-        })?;
-        let file_name = texts.export_file.replace("{name}", &project.name);
+        let file_name = texts.export_file.replace("{name}", &target.name);
         let dialog = app.dialog().file().set_title(texts.export_notes);
-        let dialog = if images.is_empty() {
+        let dialog = if target.folder {
+            dialog.set_file_name(file_name.trim_end_matches(".md"))
+        } else {
             dialog
                 .set_file_name(&file_name)
                 .add_filter("Markdown", &["md"])
-        } else {
-            dialog.set_file_name(file_name.trim_end_matches(".md"))
         };
         let Some(path) = dialog.blocking_save_file() else {
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
-        if projects.holds_host_path(&path) {
-            return Err(user_facing(UserFacingErrorCode::ExportInRepository));
-        }
-        let markdown = store.with_notes(files, &book, |lists, notes| {
-            to_markdown(&project.name, lists, notes, &texts.export)
-        })?;
-        if images.is_empty() {
-            write_whole(&path, markdown.as_bytes())?;
-            return Ok(Some(path.to_string_lossy().into_owned()));
-        }
-        // a folder: the name chosen names the Markdown file in it too
-        let name = path.file_name().map_or_else(
-            || file_name.trim_end_matches(".md").to_string(),
-            |name| name.to_string_lossy().into_owned(),
-        );
-        let folder = path.join(EXPORT_IMAGES);
-        write_whole(&path.join(format!("{name}.md")), markdown.as_bytes())?;
-        for image in &images {
-            // one at a time: an export holds one image in memory at most
-            if let Some((_, bytes)) = store.image(files, &book, image)? {
-                write_whole(&folder.join(image), &bytes)?;
-            }
-        }
+        notes.export(&project_id, &path, &texts.export, &HostFiles)?;
         Ok(Some(path.to_string_lossy().into_owned()))
     })
     .await
@@ -555,13 +490,5 @@ mod tests {
         .unwrap();
         assert!(read.marks.is_empty() && drawn.is_empty());
         assert!(marking(b"{}").is_err());
-    }
-
-    #[test]
-    fn a_copy_is_the_text_then_a_line_per_image() {
-        let images = ["/n/a.png".to_string(), "/n/b.jpg".to_string()];
-        assert_eq!(copy_text("look\n", &images), "look\n\n/n/a.png\n/n/b.jpg");
-        assert_eq!(copy_text("  \n", &images[..1]), "/n/a.png");
-        assert_eq!(copy_text("only text\n", &[]), "only text\n");
     }
 }

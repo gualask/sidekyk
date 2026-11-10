@@ -121,7 +121,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     (`Start`) (`features/wsl.md`). `projects.rs`: the list (ids outside it refused, stored in
     order after each change through the `ProjectsStorage` port, a failed save kept for the
     session), the folder on screen and its watch, the window's visibility, a folder opened, a
-    folder's reader by id (`FolderReader`).
+    folder's reader by id (`FolderReader`). `notes.rs`: the list's books, a project removed or
+    merged with its notes, a note's copy, the export (`ExportFiles` port).
   - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
     output size and a time), `watcher.rs` (notify), `agent/`, `machines/` (`local.rs`, `wsl.rs`,
     `linux_helper.rs`: the adapters of `Machine`).

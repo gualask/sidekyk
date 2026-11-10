@@ -6,6 +6,8 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
+use sidekyk_core::app::notes::ExportFiles;
+
 /// What a write writes before it renames over the file: one cut short leaves it beside.
 pub(crate) const TEMP_SUFFIX: &str = ".tmp";
 
@@ -27,6 +29,15 @@ pub(crate) fn read_within(path: &Path, limit: u64) -> anyhow::Result<Option<Vec<
         path.display()
     );
     Ok(Some(bytes))
+}
+
+/// This host's files, as an export writes them (`write_whole`).
+pub(crate) struct HostFiles;
+
+impl ExportFiles for HostFiles {
+    fn write_whole(&self, path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+        write_whole(path, bytes)
+    }
 }
 
 /// Writes `bytes` to `path` whole, making the folders above it: to a file beside it, flushed to

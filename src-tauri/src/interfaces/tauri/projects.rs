@@ -6,7 +6,7 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
-use super::notes::project_book;
+use super::notes::notes;
 use super::state::Launch;
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
@@ -115,13 +115,8 @@ pub(crate) async fn remove_project(
     project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
-        let projects = app.state::<Projects>();
-        let project = projects.project(&project_id)?;
-        app.state::<NotesStore>()
-            .delete_book(app.state::<NotesFiles>().inner(), &project_book(&project))?;
-        projects
-            .update(|list, _| list.remove(&project_id))
-            .map(|((), list)| list)
+        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
+        notes(app, &store, &files).remove_project(&project_id)
     })
     .await
 }
@@ -218,20 +213,8 @@ pub(crate) async fn merge_projects(
     from: String,
 ) -> Result<ProjectList, AppError> {
     blocking("merge_projects", app, move |app| {
-        let projects = app.state::<Projects>();
-        let (target, merged) = (projects.project(&into)?, projects.project(&from)?);
-        // before any note moves: folders on two machines or one inside another
-        let case = projects.name_case();
-        projects.list().check_merge(&into, &from, case)?;
-        app.state::<NotesStore>().merge_book(
-            app.state::<NotesFiles>().inner(),
-            &project_book(&merged),
-            &project_book(&target),
-            &merged.name,
-        )?;
-        projects
-            .update(|list, case| list.merge(&into, &from, case))
-            .map(|((), list)| list)
+        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
+        notes(app, &store, &files).merge_projects(&into, &from)
     })
     .await
 }

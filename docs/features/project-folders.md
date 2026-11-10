@@ -48,8 +48,8 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
 - `ProjectList::folder(id)` finds a folder of a project of the list, any other id refused;
   `add_folder`, `remove_folder`, `merge`, `relocate(folder)`; refusals in `checked_beside`
   (`Location::same_machine`, `overlaps`, in `place.rs`). Commands `add_project_folder`,
-  `remove_project_folder`, `merge_projects` (notes first, `NotesStore::merge_book`, then the
-  list; the list's check runs before any note moves), `relocate_folder`.
+  `remove_project_folder`, `merge_projects` (`Notes::merge_projects`: notes first,
+  `NotesStore::merge_book`, then the list; the list's check runs before any note moves), `relocate_folder`.
 - The folder on screen is the window's, as its zoom level: `useProjectEntry`
   (`app/project-entry.ts`) keeps the one picked of each project for the session
   (`folderOnScreen`: that one, else the project's only one), never stored, and is every way into

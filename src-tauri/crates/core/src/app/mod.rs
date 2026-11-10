@@ -5,4 +5,5 @@
 #[cfg(test)]
 mod fake;
 pub mod machines;
+pub mod notes;
 pub mod projects;
