@@ -51,6 +51,16 @@ export function useProjects() {
 }
 
 /**
+ * The list as it is now, not as the last render read it: a request that comes right after the
+ * list changed (a folder given at startup, a project relocated) finds its project there before
+ * the next render does.
+ */
+export function useCurrentProjects(): () => ProjectList | undefined {
+    const queryClient = useQueryClient();
+    return useCallback(() => queryClient.getQueryData<ProjectList>(projectsKey), [queryClient]);
+}
+
+/**
  * Reads the list again when the backend changed it, such as a folder given on the command line;
  * what that folder did goes to `onOpened` once the list read has it: the project put on screen,
  * or a folder above repositories to ask about.

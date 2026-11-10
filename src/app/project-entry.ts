@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import { flushSync } from 'react-dom';
-import { type ProjectList, useActivateProject, useFolderOnScreen } from '@/modules/projects';
+import {
+    type ProjectList,
+    useActivateProject,
+    useCurrentProjects,
+    useFolderOnScreen,
+} from '@/modules/projects';
 import { folderOnScreen, type ProjectInfo } from '@/shared/projects/project-info';
 
 /** A project of several folders being entered, until a folder is picked; then `then` goes on. */
@@ -19,13 +24,15 @@ interface Picking {
  * target), on the folder given, else its only one; one of several asks which first (`picker`),
  * only among the folders given if any (those holding a file a note names),
  * and `Esc` there leaves everything as it was. `select` puts a project on screen without entering
- * it: the row selected at all projects.
+ * it: the row selected at all projects. `enter` looks the project up in the list as it is now, so
+ * a folder given at startup opens before the list's first render.
  */
 export function useProjectEntry(list: ProjectList | undefined, project: ProjectInfo | null) {
     const [picked, setPicked] = useState<Readonly<Record<string, string>>>({});
     const folder = project ? folderOnScreen(project, picked) : null;
     useFolderOnScreen(folder?.id ?? null);
     const select = useActivateProject();
+    const currentList = useCurrentProjects();
     const [picking, setPicking] = useState<Picking | null>(null);
     // the project being entered, whose row the zoom grows from while the list catches up
     const [entering, setEntering] = useState<string | null>(null);
@@ -39,7 +46,8 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
         folderId: string | null = null,
         among: readonly string[] | null = null,
     ) => {
-        const next = list?.projects.find((p) => p.id === projectId);
+        // the list as it is now: entered right after it changed, the render's has not the project
+        const next = currentList()?.projects.find((p) => p.id === projectId);
         if (!next) return;
         if (folderId === null && (among !== null || next.folders.length > 1)) {
             setPicking({ projectId, then, among });

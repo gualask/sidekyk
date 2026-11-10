@@ -2,6 +2,7 @@ export { type ProjectsPort, ProjectsProvider } from './application/projects.port
 export {
     DEFAULT_TILES_LAYOUT,
     useActivateProject,
+    useCurrentProjects,
     useFolderOnScreen,
     useProjectLayout,
     useProjects,
