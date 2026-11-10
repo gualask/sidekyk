@@ -8,9 +8,9 @@
     "files": {
         "includes": [
             "src/**",
-            "!src/dev/fixture-files/previews.json",
-            "!src/dev/fixture-files/diagrams.json",
-            "!src/dev/fixture-files/**/*.md",
+            "!src/infrastructure/fixtures/fixture-files/previews.json",
+            "!src/infrastructure/fixtures/fixture-files/diagrams.json",
+            "!src/infrastructure/fixtures/fixture-files/**/*.md",
             "*.json",
             "*.js",
             "*.ts",

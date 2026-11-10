@@ -7,7 +7,7 @@ import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 import { AppShell } from './AppShell';
 
 const DevModePage = import.meta.env.DEV
-    ? lazy(() => import('@/dev').then((module) => ({ default: module.DevModePage })))
+    ? lazy(() => import('./DevModePage').then((module) => ({ default: module.DevModePage })))
     : null;
 
 function hasDevFixtureRequest(search: string): boolean {

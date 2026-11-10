@@ -61,7 +61,7 @@ for reading.
 
 ## Browser fixtures
 
-`pnpm dev`, `http://localhost:1420/?dev=app&scenario=…` (`src/dev/`, dev builds only): the app on
+`pnpm dev`, `http://localhost:1420/?dev=app&scenario=…` (`src/app/DevModePage.tsx` on `src/infrastructure/fixtures/`, dev builds only): the app on
 in-memory ports. UI changes are checked there, light and dark.
 
 - Scenarios: `review` (changes, commits, notes, long files changed in many places; a WSL clone
@@ -70,7 +70,7 @@ in-memory ports. UI changes are checked there, light and dark.
   panel). `review` and `clean` have `Vault`, a folder without git (Markdown, an `.ignore`;
   `guide.md` holds every construct the preview shows, a Mermaid block among them, an image and an
   SVG beside it, `architecture.mmd` a diagram of its own); `review`'s `README.md` is changed, for
-  its Preview. The Vault and the shop's Markdown are files (`src/dev/fixture-files/`); their
+  its Preview. The Vault and the shop's Markdown are files (`src/infrastructure/fixtures/fixture-files/`); their
   previews are the backend parser's, written to `previews.json` by the Rust test
   `fixture_previews`, their diagrams the backend's renderer's in both themes, written to
   `diagrams.json` by `fixture_diagrams`. Each fails while its file is out of date

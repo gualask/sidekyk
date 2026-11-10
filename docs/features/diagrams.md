@@ -57,7 +57,7 @@ machine. The other previews: `previews.md`.
 - A block keeps its identity by its place among the diagrams beside it (`kindKeys`), as every
   block of the preview: a diagram written above another takes, while it does not read, the
   last diagram drawn in that place.
-- Browser fixtures: `src/dev/fixture-files/diagrams.json`, written by the Rust test
+- Browser fixtures: `src/infrastructure/fixtures/fixture-files/diagrams.json`, written by the Rust test
   `fixture_diagrams` in both themes from `theme.css` and `diagram-tokens.json`
   (`docs/testing.md`).
 - Measured (release, M4, `.local/mermaid-renderers/`): 1-7 ms a diagram of the corpus, 40 ms a

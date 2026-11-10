@@ -42,7 +42,7 @@ async function collectSourceFiles(directory) {
     for (const entry of entries) {
         const entryPath = path.join(directory, entry.name);
         if (entry.isDirectory()) {
-            if (relativePath(entryPath) !== 'src/dev') files.push(...(await collectSourceFiles(entryPath)));
+            if (relativePath(entryPath) !== 'src/infrastructure/fixtures') files.push(...(await collectSourceFiles(entryPath)));
         } else if (
             SOURCE_EXTENSIONS.has(path.extname(entry.name)) &&
             !/\.test\.tsx?$/.test(entry.name)

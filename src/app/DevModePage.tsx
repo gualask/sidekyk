@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import { AppShell } from '@/app/AppShell';
-import { AppProviders } from '@/app/providers';
-import { createBrowserRuntime, isScenario, SCENARIOS } from './browser-runtime-ports';
+import {
+    createBrowserRuntime,
+    isScenario,
+    SCENARIOS,
+} from '@/infrastructure/fixtures/browser-runtime-ports';
+import { AppShell } from './AppShell';
+import { AppProviders } from './providers';
 
 /**
  * Browser dev mode: `?dev=app&scenario=review|clean|no-repo|large|problems` renders the real app

@@ -8,9 +8,9 @@ pub fn src() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../src")
 }
 
-/// The browser fixtures' files (`src/dev/fixture-files/`).
+/// The browser fixtures' files (`src/infrastructure/fixtures/fixture-files/`).
 pub fn fixture_files() -> PathBuf {
-    src().join("dev/fixture-files")
+    src().join("infrastructure/fixtures/fixture-files")
 }
 
 /// Every file under `folder`, by its path from it with `/`, and its size.

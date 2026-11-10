@@ -9,7 +9,10 @@ const SOURCE_DIR = path.join(ROOT_DIR, 'src');
 const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'target']);
 const IMPORT_PATTERN = /\b(?:from\s*|import\s*\(?\s*|require\s*\(\s*)['"]([^'"]+)['"]/g;
-const LAYERS = /^(app|modules|infrastructure|shared|dev)(?:\/|$)/;
+const LAYERS = /^(app|modules|infrastructure|shared)(?:\/|$)/;
+/** The fixture runtime: loaded by dev mode alone, in a chunk only dev builds have. */
+const FIXTURES = '@/infrastructure/fixtures';
+const DEV_MODE_PAGE = 'src/app/DevModePage.tsx';
 
 function relativePath(filePath) {
     return path.relative(ROOT_DIR, filePath).split(path.sep).join('/');
@@ -58,11 +61,20 @@ function reachesIntoModule(fromFile, specifier) {
     return moduleOwner(`@/${relativePath(fromFile).slice('src/'.length)}`) !== owner;
 }
 
+function isFixtureImport(specifier) {
+    return specifier === FIXTURES || specifier.startsWith(`${FIXTURES}/`);
+}
+
+function isFixtureImporter(file) {
+    const relative = relativePath(file);
+    return relative === DEV_MODE_PAGE || relative.startsWith('src/infrastructure/fixtures/');
+}
+
 function isAllowedImport(fromLayer, fromFile, specifier) {
     const targetLayer = importedLayer(specifier);
     if (!targetLayer) return true;
     if (reachesIntoModule(fromFile, specifier)) return false;
-    if (targetLayer === 'dev' && fromLayer !== 'dev' && fromLayer !== 'app') return false;
+    if (isFixtureImport(specifier) && !isFixtureImporter(fromFile)) return false;
 
     if (fromLayer === 'shared') {
         return targetLayer === 'shared';

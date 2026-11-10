@@ -1,4 +1,4 @@
-//! The browser fixtures' Markdown previews (`src/dev/fixture-files/previews.json`), made by the
+//! The browser fixtures' Markdown previews (`src/infrastructure/fixtures/fixture-files/previews.json`), made by the
 //! real parser so the fixtures show what the app shows. A Markdown file under `<project>/` is
 //! read against that project's files; one under `edits/<project>/` is a later version of one of
 //! them, for `sidekykDev.writeFile`. `SIDEKYK_UPDATE_FIXTURES=1 cargo test fixture_previews`
