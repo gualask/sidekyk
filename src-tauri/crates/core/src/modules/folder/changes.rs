@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 
-use crate::modules::repository::{FolderRules, RepositoryBackend, Visible};
+use super::ignored::Visible;
+use super::ports::{FolderRules, RepositoryBackend};
 
 /// Which changes the watcher saw in a folder without git show: those its walk would list, by the
 /// same rules. No git runs, so the answer is the same while the window is hidden.

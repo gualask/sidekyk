@@ -10,11 +10,11 @@ use super::notes::project_book;
 use super::state::ProjectsState;
 use super::texts;
 use crate::infrastructure::notes_files::NotesFiles;
+use sidekyk_core::modules::folder::repository_name;
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{
     FolderChange, FolderChoice, Opened, Project, ProjectList, TilesLayout,
 };
-use sidekyk_core::modules::repository::repository_name;
 use sidekyk_core::shared::error::AppError;
 
 #[tauri::command]

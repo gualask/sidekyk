@@ -9,7 +9,7 @@ const DIAGRAMS = new Set(['mmd', 'mermaid']);
 /** Those WKWebView, WebKitGTK and WebView2 all decode; SVG is text, and has its code too. */
 const IMAGES = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico']);
 
-/** Larger images are not shown (`MAX_IMAGE_BYTES` in the backend's `repository/limits.rs`). */
+/** Larger images are not shown (`MAX_IMAGE_BYTES` in the backend's `folder/reading.rs`). */
 export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
 /** The preview a file has, if any. */

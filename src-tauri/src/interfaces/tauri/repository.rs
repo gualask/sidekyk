@@ -5,14 +5,15 @@ use tauri::Manager;
 
 use super::blocking::blocking;
 use super::state::ProjectsState;
-use sidekyk_core::modules::folder::FolderKind;
+use sidekyk_core::modules::folder::{
+    Directory, FileContent, FileStamp, FolderKind, RecentFiles, RepositoryInfo,
+};
 use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::projects::Location;
 use sidekyk_core::modules::reader::Repositories;
 use sidekyk_core::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles, RepositoryInfo,
-    RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;

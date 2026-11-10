@@ -4,7 +4,7 @@
 use std::path::Path;
 
 use super::contracts::Location;
-use crate::modules::repository::RepositoryInfo;
+use crate::modules::folder::RepositoryInfo;
 
 /// Whether this machine's file system tells names apart without case, as macOS and Windows do by
 /// default.

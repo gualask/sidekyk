@@ -16,9 +16,8 @@ use cache::{Coloring, Lines};
 pub use colors::line_check;
 pub use contracts::{SyntaxColors, SyntaxRequest};
 
-use crate::modules::repository::{
-    load_version_text, FileVersion, RepositoryBackend, RepositoryInfo, VersionText,
-};
+use crate::modules::folder::{RepositoryBackend, RepositoryInfo};
+use crate::modules::repository::{load_version_text, FileVersion, VersionText};
 
 /// The colors of the last versions colored, and the thread that colors them, in the app's state.
 pub type ColorCache = cache::ColorThread<colors::Colored>;

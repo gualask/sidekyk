@@ -242,7 +242,7 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
-    use crate::modules::repository::{FakeBackend, GitOutput};
+    use crate::modules::folder::{FakeBackend, GitOutput};
 
     /// Ignores `target/` and `*.log` and records every question; `repositories` hold a `.git`.
     #[derive(Default)]

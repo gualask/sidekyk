@@ -1,10 +1,9 @@
 //! How much of the working tree's changes is formatting only, read when the user asks: never
 //! with a snapshot, since it diffs every changed file once more (`docs/features/changes.md`).
 
-use super::contracts::{AreaLines, ChangeArea, ChangesIgnoringWhitespace, RepositoryInfo};
-use super::open::existing_root;
-use super::ports::{joined, RepositoryBackend};
+use super::contracts::{AreaLines, ChangeArea, ChangesIgnoringWhitespace};
 use super::snapshot::{numstat, Numstat};
+use crate::modules::folder::{existing_root, joined, RepositoryBackend, RepositoryInfo};
 
 /// Makes git ignore every whitespace difference, line endings included (`\r` is whitespace to
 /// git).

@@ -15,7 +15,7 @@ use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::{BinaryDetection, Searcher, SearcherBuilder, Sink, SinkMatch};
 
 use super::contracts::{ContentFile, ContentLine, Highlight};
-use crate::modules::repository::{RepositoryBackend, MAX_FILE_BYTES};
+use crate::modules::folder::{RepositoryBackend, MAX_FILE_BYTES};
 use crate::shared::sync::lock;
 use crate::shared::threads::threads;
 
@@ -258,7 +258,7 @@ pub fn narrows(previous: &str, next: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::FakeBackend;
+    use crate::modules::folder::FakeBackend;
     use std::collections::HashMap;
 
     /// Files by path, read from memory.

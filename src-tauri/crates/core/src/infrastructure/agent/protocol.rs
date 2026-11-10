@@ -9,9 +9,8 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
-use crate::modules::repository::{
-    CommitFileDiffRequest, CommitRequest, FileDiffRequest, RepositoryChange, RepositoryInfo,
-};
+use crate::modules::folder::{RepositoryChange, RepositoryInfo};
+use crate::modules::repository::{CommitFileDiffRequest, CommitRequest, FileDiffRequest};
 use crate::modules::search::ContentFile;
 use crate::modules::syntax::SyntaxRequest;
 use crate::shared::error::{rebuilt, wire_code, UserFacingErrorCode};

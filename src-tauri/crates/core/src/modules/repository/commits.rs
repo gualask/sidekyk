@@ -5,14 +5,15 @@ use std::collections::HashMap;
 
 use super::contracts::{
     ChangeKind, Commit, CommitFileDiffRequest, CommitFiles, CommitRequest, FileChange,
-    RecentCommits, RepositoryInfo, UnifiedDiff,
+    RecentCommits, UnifiedDiff,
 };
-use super::diff::{checked_path, context_option, unified_diff};
+use super::diff::{context_option, unified_diff};
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
 use super::numstat::{parse_numstat_z, Counts};
-use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend, LITERAL_PATHSPECS};
 use super::status::{kind_of, object_id};
+use crate::modules::folder::{
+    checked_path, existing_root, git_checked, RepositoryBackend, RepositoryInfo, LITERAL_PATHSPECS,
+};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// How many commits are listed, as many as a page of VS Code's graph (`scm.graph.pageSize`).

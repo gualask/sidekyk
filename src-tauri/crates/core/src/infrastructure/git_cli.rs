@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 use super::folder_walk;
 use super::hide_console;
 use super::process::{self, TimedOut};
-use crate::modules::repository::{
+use crate::modules::folder::{
     FileStamp, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
 };
 use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
@@ -341,16 +341,19 @@ mod tests {
     use crate::modules::folder::{
         folder_kind, load_folder_tree, repositories_inside, resolve_folder, FolderKind,
     };
+    use crate::modules::folder::{
+        load_file_content, load_file_stamp, load_file_tree, load_image, load_recent_files,
+        repository_name, resolve_repository, Changed, FileContent, FolderAdded, FolderWatcher,
+        Hiding, IgnoredPaths, RepositoryChange, RepositoryInfo, RepositoryWatcher, Visible, Watch,
+        WatchedFolders, MAX_IMAGE_BYTES,
+    };
     use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
         load_blob_image, load_blob_size, load_changes_ignoring_whitespace, load_commit_activity,
-        load_commit_file_diff, load_commit_files, load_file_content, load_file_diff,
-        load_file_stamp, load_file_tree, load_image, load_recent_commits, load_recent_files,
-        load_snapshot, load_summary, load_version_text, repository_name, resolve_repository,
-        ChangeArea, ChangeKind, Changed, Commit, CommitFileDiffRequest, CommitRequest, FileContent,
-        FileDiffRequest, FileVersion, FolderAdded, FolderWatcher, Hiding, IgnoredPaths,
-        RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositoryWatcher, VersionText,
-        Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
+        load_commit_file_diff, load_commit_files, load_file_diff, load_recent_commits,
+        load_snapshot, load_summary, load_version_text, ChangeArea, ChangeKind, Commit,
+        CommitFileDiffRequest, CommitRequest, FileDiffRequest, FileVersion, RepositorySnapshot,
+        VersionText,
     };
     use crate::modules::search::{
         search, search_contents, search_files, ContentSearch, ProjectFiles, SearchRequest,

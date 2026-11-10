@@ -11,8 +11,8 @@ use serde::Serialize;
 use serde_json::{Map, Value};
 use tauri::Manager;
 
+use sidekyk_core::modules::folder::repository_name;
 use sidekyk_core::modules::projects::{Location, Project, ProjectList};
-use sidekyk_core::modules::repository::repository_name;
 use sidekyk_core::modules::settings::Settings;
 use sidekyk_core::shared::sync::lock;
 

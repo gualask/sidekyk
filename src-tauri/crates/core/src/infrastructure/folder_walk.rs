@@ -7,8 +7,7 @@ use std::sync::Mutex;
 
 use ignore::{IncrementalIgnore, WalkBuilder, WalkState};
 
-use crate::modules::folder::always_hidden;
-use crate::modules::repository::{FolderRules, Walked};
+use crate::modules::folder::{always_hidden, FolderRules, Walked};
 use crate::shared::sync::lock;
 use crate::shared::threads::threads;
 

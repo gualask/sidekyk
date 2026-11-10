@@ -1,9 +1,8 @@
 //! How many lines the branch on screen changed, commit by commit, since a time: the week of work
 //! on a project's row. Read when the row shows, never in the background.
 
-use super::contracts::{CommitActivity, CommittedLines, RepositoryInfo};
-use super::open::existing_root;
-use super::ports::{git_checked, RepositoryBackend};
+use super::contracts::{CommitActivity, CommittedLines};
+use crate::modules::folder::{existing_root, git_checked, RepositoryBackend, RepositoryInfo};
 
 /// At most this many commits are read: a week of a busy team's repository stays well below.
 const MAX_COMMITS: usize = 500;

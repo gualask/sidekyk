@@ -98,15 +98,17 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 - `src-tauri/crates/core/` (`sidekyk-core`): no Tauri, which the compiler keeps out; the app runs
   all of it, the helper what reads a folder. Its items are `pub` for the app, so one the app stops
   using no longer warns.
-  - `modules/repository/`: parsers, snapshot, diffs, commits, tree, file content, path checks,
-    the ignored-paths filter, which changes matter (`watched.rs`) and which folders to watch
-    (`folders.rs`). No disk of its own: the `RepositoryBackend` port (git, reads, `walk`,
-    `folder_rules`, `real_path`) and the `RepositoryWatcher` port.
+  - `modules/folder/`: a project's folder, with or without git: the `RepositoryBackend` port (git,
+    reads, `walk`, `folder_rules`, `real_path`) and the `RepositoryWatcher` port to the machine
+    that holds it, its kind and root (`resolve_folder`), the tree and a file's content, path
+    checks and read limits (`reading.rs`), the ignored-paths filter, which changes matter
+    (`watched.rs`, `FolderChanges`) and which folders to watch (`folders.rs`), its wire
+    contracts. No disk of its own.
+  - `modules/repository/`: git's review over `folder`: parsers, snapshot, diffs, commits,
+    versions. `repository` imports `folder`, never the other way.
   - `modules/reader/`: one machine's folders as the app reads them, repositories or not: the
-    `Repositories` port, one method per read, and `LocalRepositories` (coalesced reads, the cached tree, the last content search, `ColorCache`, the watched folder,
-    `watch.rs`).
-  - `modules/folder/`: a folder without git: kind, `resolve_folder`, tree, `FolderChanges`,
-    `always_hidden`.
+    `Repositories` port, one method per read, and `LocalRepositories` (coalesced reads, the
+    cached tree, the last content search, `ColorCache`, the watched folder, `watch.rs`).
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
     `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure), `diagram`
     (Mermaid to an SVG with merman, pure).

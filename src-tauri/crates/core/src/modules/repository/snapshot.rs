@@ -2,14 +2,14 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::contracts::{
-    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary,
+    ChangeArea, ChangeKind, ChangeTotals, ChangedFile, RepositorySnapshot, RepositorySummary,
 };
 use super::limits::{MAX_CHANGED_PATHS, MAX_NUMSTAT_BYTES};
 use super::numstat::{count_text_lines, parse_name_status_z, parse_numstat_z, Counts, LineCounts};
-use super::open::existing_root;
-use super::ports::{git_checked, joined, RepositoryBackend, LITERAL_PATHSPECS};
 use super::status::{parse_porcelain_v2, StatusEntry, StatusReport};
+use crate::modules::folder::{
+    existing_root, git_checked, joined, RepositoryBackend, RepositoryInfo, LITERAL_PATHSPECS,
+};
 
 /// Untracked files are read to count their lines, within these limits per snapshot. Past them a
 /// file gets no count: reading thousands of generated files on every refresh would cost more than
@@ -390,7 +390,7 @@ pub fn load_summary(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::repository::{FakeBackend, GitOutput};
+    use crate::modules::folder::{FakeBackend, GitOutput};
 
     /// Files of `size` bytes of text, one line each, except `logo.png` which is binary.
     struct FakeFiles {

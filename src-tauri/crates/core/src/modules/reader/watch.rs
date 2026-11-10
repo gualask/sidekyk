@@ -6,10 +6,10 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use super::{LocalRepositories, OnChange};
-use crate::modules::folder::{folder_kind, FolderChanges, FolderKind};
-use crate::modules::repository::{
-    classify, resolve_repository, Changed, Hiding, IgnoredPaths, RepositoryBackend,
-    RepositoryChange, RepositoryInfo, Visible, Watch, WatchedChanges, WatchedFolders,
+use crate::modules::folder::{
+    classify, folder_kind, resolve_repository, Changed, FolderChanges, FolderKind, Hiding,
+    IgnoredPaths, RepositoryBackend, RepositoryChange, RepositoryInfo, Visible, Watch,
+    WatchedChanges, WatchedFolders,
 };
 use crate::shared::sync::lock;
 

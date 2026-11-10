@@ -14,8 +14,8 @@ use serde_json::value::RawValue;
 use super::protocol::{
     read_frame, write_bytes, write_frame, Message, Request, RequestFrame, WireError,
 };
+use crate::modules::folder::{RepositoryChange, RepositoryInfo};
 use crate::modules::reader::{LocalRepositories, Repositories};
-use crate::modules::repository::{RepositoryChange, RepositoryInfo};
 use crate::shared::sync::lock;
 
 /// Where every thread writes its frames, one whole frame at a time.

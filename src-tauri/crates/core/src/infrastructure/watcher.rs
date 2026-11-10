@@ -14,7 +14,7 @@ use notify_debouncer_mini::notify::{
 };
 use notify_debouncer_mini::{new_debouncer_opt, DebounceEventResult, Debouncer};
 
-use crate::modules::repository::{Changed, FolderAdded, FolderWatcher, RepositoryWatcher, Watch};
+use crate::modules::folder::{Changed, FolderAdded, FolderWatcher, RepositoryWatcher, Watch};
 use crate::shared::sync::lock;
 
 /// Long enough to fold an agent's burst of writes into one refresh.

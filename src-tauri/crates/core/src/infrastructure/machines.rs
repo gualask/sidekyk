@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::wsl::{installed_distro, wsl_path, WslRepositories};
+use crate::modules::folder::RepositoryInfo;
 use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
 use crate::modules::reader::{OnChange, Repositories};
-use crate::modules::repository::RepositoryInfo;
 
 pub struct Machines {
     /// This machine's repositories.
@@ -153,12 +153,13 @@ mod tests {
 
     use super::*;
     use crate::modules::folder::FolderKind;
+    use crate::modules::folder::{Directory, FileContent, FileStamp, RecentFiles};
     use crate::modules::preview::MarkdownDocument;
     use crate::modules::projects::Project;
     use crate::modules::repository::{
         ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles,
-        CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits,
-        RecentFiles, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+        CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary,
+        UnifiedDiff,
     };
     use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
     use crate::modules::syntax::{SyntaxColors, SyntaxRequest};

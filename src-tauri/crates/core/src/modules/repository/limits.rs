@@ -1,5 +1,8 @@
 //! How much git output the repository module reads, shared by the snapshot, the diffs and the
-//! recent commits. Past a limit git is killed instead of read to the end (see `ports.rs`).
+//! recent commits. Past a limit git is killed instead of read to the end (see
+//! `modules/folder/ports.rs`).
+
+use crate::modules::folder::MAX_FILE_BYTES;
 
 /// At most this many changed paths are listed, of the working tree or of a commit, as VS Code's
 /// `git.statusLimit`: past it, an unignored `node_modules` or build folder would fill the list and
@@ -9,16 +12,5 @@ pub(super) const MAX_CHANGED_PATHS: usize = 10_000;
 /// Output read from a numstat, well past what `MAX_CHANGED_PATHS` paths take.
 pub(super) const MAX_NUMSTAT_BYTES: usize = 4 * 1024 * 1024;
 
-/// Larger diffs are cut at the last whole line before this size.
-pub(super) const MAX_DIFF_BYTES: usize = 2 * 1024 * 1024;
-
-/// The Files panel shows at most this many files of a project's folder: past them (an unignored
-/// `node_modules` of hundreds of thousands), the tree stops there.
-pub const MAX_TREE_PATHS: usize = 200_000;
-
-/// The Files panel shows a file's first 2 MiB, cut at the last whole line, as a diff is.
-pub const MAX_FILE_BYTES: usize = MAX_DIFF_BYTES;
-
-/// Larger images are not shown, in the viewer or a Markdown preview (the frontend's
-/// `MAX_IMAGE_BYTES` says the same).
-pub const MAX_IMAGE_BYTES: usize = 16 * 1024 * 1024;
+/// Larger diffs are cut at the last whole line before this size, as a file shown is.
+pub(super) const MAX_DIFF_BYTES: usize = MAX_FILE_BYTES;

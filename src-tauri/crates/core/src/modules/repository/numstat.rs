@@ -1,6 +1,8 @@
 //! Parsers for `git diff --numstat -z` and `--name-status -z`, plus line counting for untracked
 //! files.
 
+use crate::modules::folder::looks_binary;
+
 /// Lines added and removed in one file. Both are `None` for a binary file, and for a file that
 /// was not counted.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -84,11 +86,6 @@ pub(super) fn parse_name_status_z(bytes: &[u8]) -> Vec<String> {
         paths.extend(fields.by_ref().take(sides).map(str::to_string));
     }
     paths
-}
-
-/// A NUL in the first 8 KiB: the heuristic git uses to call a file binary.
-pub(super) fn looks_binary(bytes: &[u8]) -> bool {
-    bytes[..bytes.len().min(8000)].contains(&0)
 }
 
 /// How many lines a new file adds, or `None` when it looks binary.

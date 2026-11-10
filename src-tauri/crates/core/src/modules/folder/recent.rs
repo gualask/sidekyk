@@ -49,7 +49,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::modules::repository::FakeBackend;
+    use crate::modules::folder::FakeBackend;
 
     /// A disk where each file's time is given, `None` for one gone.
     struct Times(HashMap<String, Option<i64>>);

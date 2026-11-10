@@ -22,8 +22,9 @@ use std::sync::Arc;
 use contracts::{ChangeMark, PanelMatch, ProjectMatch};
 use rank::{Ranker, Texts};
 
+use crate::modules::folder::FileTree;
 use crate::modules::projects::Project;
-use crate::modules::repository::{ChangeKind, ChangedFile, FileTree};
+use crate::modules::repository::{ChangeKind, ChangedFile};
 
 /// At most this many files go back: the palette shows the best, the rest are counted.
 const FILE_LIMIT: usize = 500;

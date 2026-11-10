@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::modules::repository::RepositoryInfo;
+use crate::modules::folder::RepositoryInfo;
 use crate::shared::id::new_id;
 
 pub const PROJECTS_CHANGED_EVENT: &str = "projects-changed";

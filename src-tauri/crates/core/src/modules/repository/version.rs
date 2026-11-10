@@ -4,12 +4,11 @@
 use std::path::Path;
 
 use super::commits::checked_commit;
-use super::contracts::{FileVersion, RepositoryInfo};
-use super::diff::checked_path;
-use super::limits::MAX_IMAGE_BYTES;
-use super::numstat::looks_binary;
-use super::open::existing_root;
-use super::ports::{RepositoryBackend, WorktreeEntry};
+use super::contracts::FileVersion;
+use crate::modules::folder::{
+    checked_path, existing_root, looks_binary, RepositoryBackend, RepositoryInfo, WorktreeEntry,
+    MAX_IMAGE_BYTES,
+};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A version of a file, as `load_version_text` finds it.

@@ -12,13 +12,15 @@ use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::modules::folder::{self, FolderKind};
+use crate::modules::folder::{
+    self, Directory, FileContent, FileStamp, FileTree, FolderKind, RecentFiles, RepositoryBackend,
+    RepositoryInfo, RepositoryWatcher, WatchedFolders,
+};
 use crate::modules::preview::{self, MarkdownDocument};
 use crate::modules::repository::{
     self, ChangedFile, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
-    CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest, FileStamp, FileTree,
-    RecentCommits, RecentFiles, RepositoryBackend, RepositoryInfo, RepositorySnapshot,
-    RepositorySummary, RepositoryWatcher, UnifiedDiff, WatchedFolders,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{
     self, ContentEnd, ContentFile, ContentSearch, FileMatches, ProjectFiles,
@@ -206,7 +208,7 @@ impl LocalRepositories {
         let backend = &*self.backend;
         let root = Path::new(&info.root);
         Ok(match folder::folder_kind(backend, root)? {
-            FolderKind::Repository => repository::load_file_tree(backend, info)?,
+            FolderKind::Repository => folder::load_file_tree(backend, info)?,
             FolderKind::Plain => folder::load_folder_tree(backend, root),
         })
     }
@@ -332,17 +334,17 @@ impl Repositories for LocalRepositories {
 
     fn recent_files(&self, info: &RepositoryInfo) -> anyhow::Result<RecentFiles> {
         let tree = self.file_tree(info)?;
-        repository::load_recent_files(&*self.backend, info, &tree)
+        folder::load_recent_files(&*self.backend, info, &tree)
     }
 
     fn file_content(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileContent> {
         self.tree_holding(info, path)?;
-        repository::load_file_content(&*self.backend, info, path)
+        folder::load_file_content(&*self.backend, info, path)
     }
 
     fn file_stamp(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<FileStamp> {
         self.tree_holding(info, path)?;
-        repository::load_file_stamp(&*self.backend, info, path)
+        folder::load_file_stamp(&*self.backend, info, path)
     }
 
     fn tree_holds_now(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<bool> {
@@ -363,7 +365,7 @@ impl Repositories for LocalRepositories {
             return repository::load_blob_image(&*self.backend, info, blob);
         }
         self.tree_holding(info, path)?;
-        repository::load_image(&*self.backend, info, path)
+        folder::load_image(&*self.backend, info, path)
     }
 
     fn blob_size(&self, info: &RepositoryInfo, blob: &str) -> anyhow::Result<u64> {
@@ -377,7 +379,7 @@ impl Repositories for LocalRepositories {
     ) -> anyhow::Result<Option<MarkdownDocument>> {
         let tree = self.tree_holding(info, path)?;
         Ok(
-            match repository::load_file_content(&*self.backend, info, path)? {
+            match folder::load_file_content(&*self.backend, info, path)? {
                 FileContent::Text { text, truncated } => Some(preview::parse_markdown(
                     &text,
                     path,

@@ -3,12 +3,13 @@
 
 use std::path::Path;
 
-use crate::modules::folder::FolderKind;
+use crate::modules::folder::{
+    Directory, FileContent, FileStamp, FolderKind, RecentFiles, RepositoryChange, RepositoryInfo,
+};
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles,
-    RepositoryChange, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};

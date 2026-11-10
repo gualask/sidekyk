@@ -1,53 +1,28 @@
-//! The repository under review: opening it, summarizing its working tree, and producing file
-//! diffs. Everything is read-only. Sidekyk never writes to the index or the working tree.
+//! The repository under review: summarizing its working tree, its diffs and commits, over the
+//! folder that holds it (`modules/folder`). Everything is read-only. Sidekyk never writes to the
+//! index or the working tree.
 
 mod activity;
 mod commits;
 mod contracts;
 mod diff;
-#[cfg(test)]
-mod fake;
-mod folders;
-mod ignored;
 mod limits;
 mod numstat;
-mod open;
-mod ports;
-mod recent;
 mod snapshot;
 mod status;
-mod tree;
 mod version;
-mod watched;
 mod whitespace;
 
 pub use activity::load_commit_activity;
 pub use commits::{load_commit_file_diff, load_commit_files, load_recent_commits};
 pub use contracts::{
     AreaLines, ChangeKind, ChangedFile, ChangesIgnoringWhitespace, CommitActivity,
-    CommitFileDiffRequest, CommitFiles, CommitRequest, Directory, FileContent, FileDiffRequest,
-    FileStamp, FileVersion, RecentCommits, RecentFile, RecentFiles, RepositoryChange,
-    RepositoryChangedEvent, RepositoryInfo, RepositorySnapshot, RepositorySummary, UnifiedDiff,
-    REPOSITORY_CHANGED_EVENT,
+    CommitFileDiffRequest, CommitFiles, CommitRequest, FileDiffRequest, FileVersion, RecentCommits,
+    RepositorySnapshot, RepositorySummary, UnifiedDiff,
 };
 #[cfg(test)]
 pub use contracts::{ChangeArea, Commit};
 pub use diff::load_file_diff;
-#[cfg(test)]
-pub(crate) use fake::FakeBackend;
-pub use folders::{Hiding, WatchedFolders};
-pub use ignored::{IgnoredPaths, Visible};
-pub use limits::{MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS};
-pub use open::{existing_folder, repository_name, resolve_repository};
-pub use ports::{
-    Changed, FolderAdded, FolderRules, FolderWatcher, GitOutput, RepositoryBackend,
-    RepositoryWatcher, Walked, Watch, WorktreeEntry,
-};
-pub use recent::load_recent_files;
 pub use snapshot::{load_snapshot, load_summary};
-pub use tree::{
-    compare_names, load_file_content, load_file_stamp, load_file_tree, load_image, FileTree,
-};
 pub use version::{load_blob_image, load_blob_size, load_version_text, VersionText};
-pub use watched::{classify, WatchedChanges};
 pub use whitespace::load_changes_ignoring_whitespace;
