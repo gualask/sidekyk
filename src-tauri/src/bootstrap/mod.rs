@@ -53,6 +53,7 @@ fn local_reader() -> Arc<dyn Repositories> {
 fn projects(app: &::tauri::AppHandle, settings: Arc<SettingsFile>, helper: PathBuf) -> Projects {
     let machines = Machines::new(
         Arc::new(LocalMachine::new(local_reader())),
+        LocalMachine::NAME_CASE,
         vec![Arc::new(WslRepositories::new(helper))],
     );
     let page = app.clone();

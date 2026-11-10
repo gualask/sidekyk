@@ -30,7 +30,11 @@ fn this_machine(list: ProjectList) -> Projects {
         Arc::new(LocalRepositoryBackend::default()),
         Arc::new(LocalRepositoryWatcher::default()),
     );
-    let machines = Machines::new(Arc::new(LocalMachine::new(reader)), Vec::new());
+    let machines = Machines::new(
+        Arc::new(LocalMachine::new(reader)),
+        LocalMachine::NAME_CASE,
+        Vec::new(),
+    );
     Projects::new(machines, Arc::new(Kept(list)), Arc::new(|_, _| {}))
 }
 

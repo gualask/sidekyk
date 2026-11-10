@@ -8,18 +8,18 @@ use crate::app::machines::{Machine, MachineReader};
 use crate::modules::projects::{FoundFolder, Location, NameCase, ProjectList};
 use crate::modules::reader::Repositories;
 
-/// How this machine's file system compares names: macOS and Windows ignore case by default.
-const NAME_CASE: NameCase = if cfg!(any(target_os = "macos", windows)) {
-    NameCase::Ignored
-} else {
-    NameCase::Kept
-};
-
 pub struct LocalMachine {
     reader: Arc<dyn Repositories>,
 }
 
 impl LocalMachine {
+    /// How this machine's file system compares names: macOS and Windows ignore case by default.
+    pub const NAME_CASE: NameCase = if cfg!(any(target_os = "macos", windows)) {
+        NameCase::Ignored
+    } else {
+        NameCase::Kept
+    };
+
     pub fn new(reader: Arc<dyn Repositories>) -> Self {
         Self { reader }
     }
@@ -73,16 +73,12 @@ impl Machine for LocalMachine {
 
     /// Any path not another machine's is this one's.
     fn holds_host_path(&self, list: &ProjectList, path: &Path) -> Option<bool> {
-        Some(list.holds(path, resolved_path, NAME_CASE))
+        Some(list.holds(path, resolved_path, Self::NAME_CASE))
     }
 
     fn set_visible(&self, visible: bool) -> Option<Location> {
         let root = self.reader.set_visible(visible)?;
         Some(Location::Local { root })
-    }
-
-    fn name_case(&self) -> NameCase {
-        NAME_CASE
     }
 }
 

@@ -258,7 +258,7 @@ pub(crate) mod tests {
             list,
             ..Kept::default()
         });
-        let machines = Machines::new(Arc::new(Here(told.clone())), Vec::new());
+        let machines = Machines::new(Arc::new(Here(told.clone())), NameCase::Kept, Vec::new());
         let projects = Projects::new(machines, storage.clone(), Arc::new(|_, _| {}));
         (projects, storage)
     }

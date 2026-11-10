@@ -16,7 +16,7 @@ use crate::app::machines::{Machine, MachineReader};
 use crate::infrastructure::agent::AgentRepositories;
 use crate::infrastructure::hide_console;
 use crate::infrastructure::process;
-use crate::modules::projects::{same_distro, FoundFolder, Location, NameCase, ProjectList};
+use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
 use crate::modules::reader::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -370,11 +370,6 @@ impl Machine for WslRepositories {
             repositories.set_visible(visible);
         }
         None
-    }
-
-    /// Linux tells names apart by case.
-    fn name_case(&self) -> NameCase {
-        NameCase::Kept
     }
 }
 

@@ -54,9 +54,6 @@ pub trait Machine: Send + Sync {
     /// folder on screen if this machine saw it change meanwhile and told no one (a helper tells
     /// its own as a change).
     fn set_visible(&self, visible: bool) -> Option<Location>;
-
-    /// How its file system compares names.
-    fn name_case(&self) -> NameCase;
 }
 
 /// One reader of a machine, and which folders it reads.
@@ -68,13 +65,24 @@ pub struct MachineReader {
 pub struct Machines {
     /// This machine: a host path no other machine claims is its.
     local: Arc<dyn Machine>,
+    /// How this machine's file system compares names; a WSL distro's are Linux's, always by case
+    /// (`modules/projects/place.rs`).
+    name_case: NameCase,
     /// The other kinds: WSL distros.
     others: Vec<Arc<dyn Machine>>,
 }
 
 impl Machines {
-    pub fn new(local: Arc<dyn Machine>, others: Vec<Arc<dyn Machine>>) -> Self {
-        Self { local, others }
+    pub fn new(
+        local: Arc<dyn Machine>,
+        name_case: NameCase,
+        others: Vec<Arc<dyn Machine>>,
+    ) -> Self {
+        Self {
+            local,
+            name_case,
+            others,
+        }
     }
 
     /// Every kind of machine, this one first.
@@ -127,7 +135,7 @@ impl Machines {
 
     /// How this machine's file system compares names, for the places of the project list.
     pub fn name_case(&self) -> NameCase {
-        self.local.name_case()
+        self.name_case
     }
 
     /// Every reader made so far, this machine's first.
@@ -257,9 +265,6 @@ mod tests {
         fn set_visible(&self, _: bool) -> Option<Location> {
             None
         }
-        fn name_case(&self) -> NameCase {
-            NameCase::Kept
-        }
     }
 
     #[test]
@@ -267,6 +272,7 @@ mod tests {
         let stopped = Arc::new(Stopped::default());
         let machines = Machines::new(
             Arc::new(Here(Arc::new(Told::default()))),
+            NameCase::Kept,
             vec![stopped.clone()],
         );
         let api = Location::Wsl {
@@ -291,7 +297,7 @@ mod tests {
     #[test]
     fn a_project_without_folder_is_never_routed_to_a_machine() {
         let local = Arc::new(Told::default());
-        let machines = Machines::new(Arc::new(Here(local.clone())), Vec::new());
+        let machines = Machines::new(Arc::new(Here(local.clone())), NameCase::Kept, Vec::new());
         let home = Project::new("Home".into(), []);
         let shop = Project::new(
             "shop".into(),

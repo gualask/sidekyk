@@ -162,9 +162,6 @@ impl Machine for Here {
         let root = self.0.set_visible(visible)?;
         Some(Location::Local { root })
     }
-    fn name_case(&self) -> NameCase {
-        NameCase::Kept
-    }
 }
 
 /// Notes' files in memory, by folder and name; `refuse_removal` makes removing a folder fail.
