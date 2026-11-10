@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 use super::notes::with_notes;
 use super::window::show_main_window;
 use crate::infrastructure::capture as system;
-use sidekyk_core::modules::notes::{ImageTarget, Note, PreparedImage};
+use sidekyk_core::modules::notes::{Note, PreparedImage};
 use sidekyk_core::shared::error::AppError;
 use sidekyk_core::shared::sync::lock;
 
@@ -45,8 +45,7 @@ pub(crate) async fn add_capture(app: AppHandle, book: String) -> Result<Note, Ap
         .pop_front()
         .ok_or_else(|| AppError::from(anyhow::anyhow!("no capture to add")))?;
     with_notes("add_capture", app, book, move |store, files, book| {
-        let list = store.notes(files, book)?.open_list;
-        store.add_images(files, book, ImageTarget::New { list }, vec![image])
+        store.add_capture(files, book, image)
     })
     .await
 }

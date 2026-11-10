@@ -21,6 +21,10 @@ pub type OnChange = Box<dyn Fn(RepositoryChange) + Send + Sync>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ContentRun(pub(super) u64);
 
+/// A watch's turn, taken as it is asked: one asked earlier never replaces a later one.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WatchTurn(pub(super) u64);
+
 pub trait Repositories: Send + Sync {
     /// The folder a project takes for `candidate`: the repository that holds it, else itself
     /// (`folder::resolve_folder`).
@@ -135,8 +139,7 @@ pub trait Repositories: Send + Sync {
     /// Watches the project's folder on screen, unless it is the one watched already, and stops
     /// watching the previous one; `None` watches nothing. `on_change` gets each change that
     /// shows, a change of kind included; for the folder watched already, the first `on_change`
-    /// stays. The caller calls it in the order
-    /// the repository on screen changed.
+    /// stays. Two watches in a row end on the last asked, whichever runs first.
     fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange);
 
     /// Records whether the window shows. A change of the repository on screen seen meanwhile is

@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 use anyhow::Context;
 
 use sidekyk_core::app::notes::ExportFiles;
+use sidekyk_core::modules::notes::GivenFiles;
 
 /// What a write writes before it renames over the file: one cut short leaves it beside.
 pub(crate) const TEMP_SUFFIX: &str = ".tmp";
@@ -31,12 +32,27 @@ pub(crate) fn read_within(path: &Path, limit: u64) -> anyhow::Result<Option<Vec<
     Ok(Some(bytes))
 }
 
-/// This host's files, as an export writes them (`write_whole`).
+/// This host's files: an export writes them (`write_whole`), a note reads those given it.
 pub(crate) struct HostFiles;
 
 impl ExportFiles for HostFiles {
     fn write_whole(&self, path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
         write_whole(path, bytes)
+    }
+}
+
+impl GivenFiles for HostFiles {
+    fn regular_file_size(&self, path: &Path) -> anyhow::Result<Option<u64>> {
+        let metadata = fs::metadata(path).with_context(|| format!("reading {}", path.display()))?;
+        Ok(metadata.is_file().then_some(metadata.len()))
+    }
+
+    fn read(&self, path: &Path, limit: u64) -> anyhow::Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        fs::File::open(path)
+            .and_then(|file| file.take(limit + 1).read_to_end(&mut bytes))
+            .with_context(|| format!("reading {}", path.display()))?;
+        Ok(bytes)
     }
 }
 
@@ -76,6 +92,20 @@ fn write_flushed(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_given_file_is_read_with_one_byte_past_the_limit() {
+        let data = tempfile::tempdir().unwrap();
+        let file = data.path().join("shot.png");
+        fs::write(&file, b"12345").unwrap();
+        assert_eq!(HostFiles.regular_file_size(&file).unwrap(), Some(5));
+        assert_eq!(HostFiles.regular_file_size(data.path()).unwrap(), None);
+        assert!(HostFiles
+            .regular_file_size(&data.path().join("gone.png"))
+            .is_err());
+        assert_eq!(HostFiles.read(&file, 5).unwrap(), b"12345");
+        assert_eq!(HostFiles.read(&file, 3).unwrap(), b"1234");
+    }
 
     #[test]
     fn a_file_is_replaced_whole_and_no_copy_stays() {

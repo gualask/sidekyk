@@ -60,7 +60,8 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   headers). A drop never reaches the webview: Tauri's handler takes every file drop on the three
   systems (wry 0.57.1), so `onDragDropEvent` gives paths and a position; the column under it
   (`elementFromPoint`, `data-image-drop`) picks the card or the field, and the backend reads the
-  files (`add_note_image_files`, a regular file within the limit).
+  files (`add_note_image_files`, `given_images`: a regular file within the limit, all or none, read
+  through the `GivenFiles` port).
 - Out: `note-image://localhost/<book>/<file>` (`http://note-image.localhost/…` on Windows), the
   book and the file encoded as `project-file:`'s (`previews.md`); only a file a note of the book
   names, `immutable` (an id names its bytes). CSP `img-src` lists it. `Notes::copy` composes the

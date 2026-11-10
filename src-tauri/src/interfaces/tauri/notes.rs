@@ -1,6 +1,6 @@
 //! Tauri adapters for notes. Every command names a book: the Inbox, or a project of the list.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
@@ -8,12 +8,12 @@ use tauri_plugin_dialog::DialogExt;
 use super::blocking::blocking;
 use super::texts;
 use crate::infrastructure::files::HostFiles;
-use crate::infrastructure::notes_files::{read_image_file, NotesFiles};
+use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::notes::Notes;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{
-    as_png, prepare, Book, DeletedList, ImageTarget, ListTarget, Mark, MovedList, MovedNote, Note,
-    NoteList, NotesCount, NotesStore, ProjectNotes, MAX_IMAGE_BYTES,
+    as_png, given_images, prepare, Book, DeletedList, ImageTarget, ListTarget, Mark, MovedList,
+    MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes,
 };
 use sidekyk_core::shared::error::AppError;
 use sidekyk_core::shared::url::percent_decoded;
@@ -105,11 +105,7 @@ pub(crate) async fn add_note_image_files(
         app,
         book,
         move |store, files, book| {
-            let images = paths
-                .iter()
-                .map(|path| prepare(read_image_file(Path::new(path), MAX_IMAGE_BYTES)?))
-                .collect::<anyhow::Result<Vec<_>>>()?;
-            store.add_images(files, book, target, images)
+            store.add_images(files, book, target, given_images(&HostFiles, &paths)?)
         },
     )
     .await

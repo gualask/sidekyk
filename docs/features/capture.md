@@ -53,7 +53,8 @@ An area of the screen captured from any app becomes a new note, its marks open a
 - `infrastructure/capture/`: whether capture is built here (`BUILT`, which the frontend reads
   through `can_capture`) and the system's settings for the permission.
 - `interfaces/tauri/capture.rs`: each crop waits in a queue until the frontend, told `taken`,
-  names the book (`add_capture`), so two captures in a row each find their own. `set_marking`
+  names the book (`add_capture`; `NotesStore::add_capture`: a new note on top of its open list),
+  so two captures in a row each find their own. `set_marking`
   holds captures while marks are edited; a page loaded again resets it. The button's text is
   read without the settings' lock (`texts::current`), on the main thread a settings change may
   wait on.

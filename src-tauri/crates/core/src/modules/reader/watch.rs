@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
-use super::{LocalRepositories, OnChange};
+use super::{LocalRepositories, OnChange, WatchTurn};
 use crate::modules::folder::{
     classify, folder_kind, resolve_repository, Changed, FolderChanges, FolderKind, Hiding,
     IgnoredPaths, RepositoryBackend, RepositoryChange, RepositoryInfo, Visible, Watch,
@@ -141,8 +141,18 @@ impl MissedPaths {
 
 impl LocalRepositories {
     /// `Repositories::watch`.
-    pub(super) fn watch_on_screen(&self, repository: Option<&RepositoryInfo>, on_change: OnChange) {
+    pub(super) fn watch_on_screen(
+        &self,
+        turn: WatchTurn,
+        repository: Option<&RepositoryInfo>,
+        on_change: OnChange,
+    ) {
         let mut watched = lock(&self.watched);
+        // a watch asked later was done: this one came late
+        if turn.0 < self.watch_done.load(Ordering::Relaxed) {
+            return;
+        }
+        self.watch_done.store(turn.0, Ordering::Relaxed);
         let Some(repository) = repository else {
             *watched = None;
             return;

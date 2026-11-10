@@ -1347,6 +1347,49 @@ mod tests {
         );
     }
 
+    /// A watcher that watches nothing, keeping the roots it is asked to watch.
+    #[derive(Default)]
+    struct RootsWatcher(Arc<Mutex<Vec<PathBuf>>>);
+
+    impl RepositoryWatcher for RootsWatcher {
+        fn watch(
+            &self,
+            root: &Path,
+            _: Option<&Path>,
+            _: Box<dyn FnMut(Changed) + Send>,
+        ) -> anyhow::Result<Watch> {
+            self.0.lock().unwrap().push(root.to_path_buf());
+            Ok(Watch {
+                guard: Box::new(()),
+                folders: None,
+            })
+        }
+    }
+
+    #[test]
+    fn a_watch_asked_earlier_never_replaces_a_later_one() {
+        let (shop, docs) = (scratch_repo(), scratch_repo());
+        let watcher = RootsWatcher::default();
+        let roots = watcher.0.clone();
+        let repositories = LocalRepositories::new(
+            Arc::new(LocalRepositoryBackend::default()),
+            Arc::new(watcher),
+        );
+        let shop = repositories.resolve(shop.path()).unwrap();
+        let docs = repositories.resolve(docs.path()).unwrap();
+        // asked in this order, run in the other: two threads racing
+        let (first, second) = (repositories.next_watch(), repositories.next_watch());
+        repositories.watch_in_turn(second, Some(&docs), Box::new(|_| {}));
+        repositories.watch_in_turn(first, Some(&shop), Box::new(|_| {}));
+        assert_eq!(*roots.lock().unwrap(), [PathBuf::from(&docs.root)]);
+        // a watch asked after both runs
+        repositories.watch(Some(&shop), Box::new(|_| {}));
+        assert_eq!(
+            *roots.lock().unwrap(),
+            [PathBuf::from(&docs.root), PathBuf::from(&shop.root)]
+        );
+    }
+
     /// The local watcher, keeping every path it reports: a failure tells what the system sent.
     #[derive(Default)]
     struct RecordingWatcher(Arc<Mutex<Vec<PathBuf>>>);

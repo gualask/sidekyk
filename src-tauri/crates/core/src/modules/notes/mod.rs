@@ -14,7 +14,9 @@ pub use contracts::{
     Book, DeletedList, ImageKind, ImageTarget, ListTarget, Mark, MarkPoint, MarkedImage, MovedList,
     MovedNote, Note, NoteImage, NoteList, NotesCount, ProjectNotes, SourceImage, INBOX_BOOK,
 };
-pub use images::{as_png, image_file, prepare, prepare_capture, PreparedImage, MAX_IMAGE_BYTES};
+pub use images::{
+    as_png, given_images, image_file, prepare, prepare_capture, PreparedImage, MAX_IMAGE_BYTES,
+};
 pub use markdown::{to_markdown, ExportWords, EXPORT_IMAGES};
-pub use ports::NotesStorage;
+pub use ports::{GivenFiles, NotesStorage};
 pub use store::{BookNotes, NotesStore};

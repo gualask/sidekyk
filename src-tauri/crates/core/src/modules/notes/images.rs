@@ -3,11 +3,13 @@
 //! Pure: bytes in, bytes out; `NotesStore` writes them.
 
 use std::io::Cursor;
+use std::path::Path;
 
 use image::imageops::FilterType;
 use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits, RgbaImage};
 
 use super::contracts::{ImageKind, Mark, NoteImage};
+use super::ports::GivenFiles;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 use crate::shared::id::is_id;
 
@@ -63,6 +65,34 @@ fn kind_of(bytes: &[u8]) -> Option<(ImageKind, ImageFormat)> {
         _ => return None,
     };
     Some((kind, format))
+}
+
+/// The image files a user gave a note (dropped), each a regular file within `MAX_IMAGE_BYTES`,
+/// prepared: all of them, or none when one is refused as the user is told.
+pub fn given_images(
+    files: &dyn GivenFiles,
+    paths: &[String],
+) -> anyhow::Result<Vec<PreparedImage>> {
+    paths
+        .iter()
+        .map(|path| prepare(given_image(files, Path::new(path))?))
+        .collect()
+}
+
+/// The bytes of one image file a user gave: a regular file, at most `MAX_IMAGE_BYTES`.
+fn given_image(files: &dyn GivenFiles, path: &Path) -> anyhow::Result<Vec<u8>> {
+    let size = files
+        .regular_file_size(path)?
+        .ok_or_else(|| user_facing(UserFacingErrorCode::ImageUnsupported))?;
+    if size > MAX_IMAGE_BYTES {
+        return Err(too_large());
+    }
+    // it may have grown since
+    let bytes = files.read(path, MAX_IMAGE_BYTES)?;
+    if bytes.len() as u64 > MAX_IMAGE_BYTES {
+        return Err(too_large());
+    }
+    Ok(bytes)
 }
 
 /// Checks an image a note is given and makes its thumbnail: a format every webview shows, at most
@@ -222,6 +252,37 @@ pub(super) fn image_of_file(file: &str) -> Option<&str> {
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
+
+    /// One file of `size` bytes, as the user gave it, or a folder.
+    struct Given {
+        size: Option<u64>,
+    }
+
+    impl GivenFiles for Given {
+        fn regular_file_size(&self, _: &Path) -> anyhow::Result<Option<u64>> {
+            Ok(self.size)
+        }
+        fn read(&self, _: &Path, limit: u64) -> anyhow::Result<Vec<u8>> {
+            let size = self.size.unwrap_or_default().min(limit + 1);
+            Ok(vec![0; size as usize])
+        }
+    }
+
+    #[test]
+    fn a_given_image_is_a_regular_file_within_the_limit() {
+        let code = |size: Option<u64>| {
+            given_image(&Given { size }, Path::new("shot.png"))
+                .err()
+                .and_then(|error| user_facing_code(&error))
+        };
+        assert_eq!(code(Some(5)), None);
+        assert_eq!(code(Some(MAX_IMAGE_BYTES)), None);
+        assert_eq!(
+            code(Some(MAX_IMAGE_BYTES + 1)),
+            Some(UserFacingErrorCode::ImageTooLarge)
+        );
+        assert_eq!(code(None), Some(UserFacingErrorCode::ImageUnsupported));
+    }
     use crate::shared::error::user_facing_code;
 
     #[test]

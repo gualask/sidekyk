@@ -30,7 +30,7 @@ use crate::shared::coalesce::Coalesced;
 use crate::shared::error::{unshare, user_facing, UserFacingErrorCode};
 use crate::shared::sync::lock;
 
-pub use port::{ContentRun, OnChange, Repositories};
+pub use port::{ContentRun, OnChange, Repositories, WatchTurn};
 use watch::{Visibility, Watched};
 
 /// A result shared by every caller that waited for it.
@@ -90,6 +90,10 @@ pub struct LocalRepositories {
     watched: Mutex<Option<Watched>>,
     /// Counts the repositories put on screen: a batch of a watcher replaced since is dropped.
     generation: AtomicU64,
+    /// Counts the watches asked for (`next_watch`), and the last one done, changed under
+    /// `watched`'s lock: an older one coming late is dropped.
+    watch_turns: AtomicU64,
+    watch_done: AtomicU64,
     /// Kept apart from `watched`, which is held while a watcher starts: the app reports the
     /// window's visibility on its main thread, which must not wait for that.
     visibility: Mutex<Visibility>,
@@ -124,6 +128,8 @@ impl LocalRepositories {
             colors: ColorCache::default(),
             watched: Mutex::default(),
             generation: AtomicU64::new(0),
+            watch_turns: AtomicU64::new(0),
+            watch_done: AtomicU64::new(0),
             visibility: Mutex::default(),
             folders: Mutex::default(),
             snapshots: PerRepository::default(),
@@ -134,6 +140,22 @@ impl LocalRepositories {
             contents: Mutex::default(),
             content_runs: AtomicU64::new(0),
         })
+    }
+
+    /// Takes the next watch's turn, in the order watches were asked for, before any of them runs:
+    /// two in a row end on the last.
+    pub fn next_watch(&self) -> WatchTurn {
+        WatchTurn(self.watch_turns.fetch_add(1, Ordering::Relaxed) + 1)
+    }
+
+    /// Watches as `Repositories::watch`, unless a watch asked later was done already.
+    pub fn watch_in_turn(
+        &self,
+        turn: WatchTurn,
+        repository: Option<&RepositoryInfo>,
+        on_change: OnChange,
+    ) {
+        self.watch_on_screen(turn, repository, on_change);
     }
 
     /// Takes the next search in contents' turn, which stops the one going on: in the order
@@ -441,7 +463,7 @@ impl Repositories for LocalRepositories {
     }
 
     fn watch(&self, repository: Option<&RepositoryInfo>, on_change: OnChange) {
-        self.watch_on_screen(repository, on_change);
+        self.watch_in_turn(self.next_watch(), repository, on_change);
     }
 
     fn set_visible(&self, visible: bool) -> Option<String> {

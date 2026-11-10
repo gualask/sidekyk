@@ -1,3 +1,5 @@
+use std::path::Path;
+
 /// Where notes are kept: folders of small files, one folder per project, under the app's data. A
 /// folder or file name is always one this module made.
 pub trait NotesStorage: Send + Sync {
@@ -22,4 +24,14 @@ pub trait NotesStorage: Send + Sync {
 
     /// Where a file is, as this system names it: what a note's copy gives an agent to read.
     fn location(&self, folder: &str, file: &str) -> anyhow::Result<String>;
+}
+
+/// The files a user gives a note, dropped from the file manager: read where they are.
+pub trait GivenFiles: Send + Sync {
+    /// The size of the file at `path` when it is a regular file; `None` for a folder or anything
+    /// else that is not one.
+    fn regular_file_size(&self, path: &Path) -> anyhow::Result<Option<u64>>;
+
+    /// The first `limit` bytes of the file at `path`, and one more when it is longer.
+    fn read(&self, path: &Path, limit: u64) -> anyhow::Result<Vec<u8>>;
 }

@@ -58,7 +58,9 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   not base64; a search in contents streams its files, then its reply;
   changes come unasked; cancel is a message; over 64 MiB is a broken stream; failures keep their
   code. Each request on a thread of its own, except what depends on order: stop, visibility,
-  forgetting projects, a content search's turn. Visibility is not waited for: a change missed
+  forgetting projects, and the turn of a content search or a watch, taken as the request comes
+  (`next_content_search`, `next_watch`): a newer search stops an older one, an older watch never
+  replaces a newer one, whichever thread runs first. Visibility is not waited for: a change missed
   while hidden comes up as a change. A change names the root it was watched by; one of a
   repository no longer watched is dropped. The helper's stderr goes to the app's log.
 - Lifecycle: one helper per distro, a child of the app, started by the first request that waits

@@ -706,6 +706,17 @@ impl NotesStore {
 
     /// Adds images to a note, or to a new one on top of a list: their files first, then the note
     /// that names them. Files written for a change that fails are removed at the next session.
+    /// A captured area, a new note on top of the book's open list.
+    pub fn add_capture(
+        &self,
+        storage: &dyn NotesStorage,
+        book: &Book,
+        image: PreparedImage,
+    ) -> anyhow::Result<Note> {
+        let list = self.notes(storage, book)?.open_list;
+        self.add_images(storage, book, ImageTarget::New { list }, vec![image])
+    }
+
     pub fn add_images(
         &self,
         storage: &dyn NotesStorage,

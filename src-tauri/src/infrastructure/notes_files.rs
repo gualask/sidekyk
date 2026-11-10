@@ -1,35 +1,14 @@
 //! Notes as files under the app's data folder (`<app data>/notes/<folder>/<file>`).
 
 use std::fs;
-use std::io::{ErrorKind, Read};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use anyhow::Context;
 
 use sidekyk_core::modules::notes::NotesStorage;
-use sidekyk_core::shared::error::{user_facing, UserFacingErrorCode};
 
 use super::files::{read_within, write_whole, TEMP_SUFFIX};
-
-/// The bytes of an image file the user gave a note (dropped): a regular file, at most `limit`
-/// bytes, else refused as the user is told.
-pub(crate) fn read_image_file(path: &Path, limit: u64) -> anyhow::Result<Vec<u8>> {
-    let metadata = fs::metadata(path).with_context(|| format!("reading {}", path.display()))?;
-    if !metadata.is_file() {
-        return Err(user_facing(UserFacingErrorCode::ImageUnsupported));
-    }
-    if metadata.len() > limit {
-        return Err(user_facing(UserFacingErrorCode::ImageTooLarge));
-    }
-    let mut bytes = Vec::with_capacity(metadata.len() as usize);
-    fs::File::open(path)
-        .and_then(|file| file.take(limit + 1).read_to_end(&mut bytes))
-        .with_context(|| format!("reading {}", path.display()))?;
-    if bytes.len() as u64 > limit {
-        return Err(user_facing(UserFacingErrorCode::ImageTooLarge));
-    }
-    Ok(bytes)
-}
 
 pub(crate) struct NotesFiles {
     dir: PathBuf,
@@ -163,22 +142,8 @@ mod tests {
     }
 
     #[test]
-    fn an_image_file_is_read_within_its_limit() {
-        use sidekyk_core::shared::error::user_facing_code;
+    fn a_file_is_located_in_its_folder_under_the_notes() {
         let data = tempfile::tempdir().unwrap();
-        let file = data.path().join("shot.png");
-        fs::write(&file, b"12345").unwrap();
-        assert_eq!(read_image_file(&file, 5).unwrap(), b"12345");
-        let code = |result: anyhow::Result<Vec<u8>>| user_facing_code(&result.unwrap_err());
-        assert_eq!(
-            code(read_image_file(&file, 4)),
-            Some(UserFacingErrorCode::ImageTooLarge)
-        );
-        assert_eq!(
-            code(read_image_file(data.path(), 5)),
-            Some(UserFacingErrorCode::ImageUnsupported)
-        );
-        assert!(read_image_file(&data.path().join("gone.png"), 5).is_err());
         let notes = NotesFiles::new(data.path());
         assert_eq!(
             PathBuf::from(notes.location("inbox", "a.png").unwrap()),

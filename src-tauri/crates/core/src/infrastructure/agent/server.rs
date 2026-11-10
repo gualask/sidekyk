@@ -5,7 +5,6 @@
 
 use std::io::{self, BufReader, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
@@ -14,7 +13,7 @@ use serde_json::value::RawValue;
 use super::protocol::{
     read_frame, write_bytes, write_frame, Message, Request, RequestFrame, WireError,
 };
-use crate::modules::folder::{RepositoryChange, RepositoryInfo};
+use crate::modules::folder::RepositoryChange;
 use crate::modules::reader::{LocalRepositories, Repositories};
 use crate::shared::sync::lock;
 
@@ -27,7 +26,6 @@ pub fn serve(
     output: impl Write + Send + 'static,
 ) -> anyhow::Result<()> {
     let output: Output = Arc::new(Mutex::new(Box::new(output)));
-    let watches = watch_in_order(repositories.clone(), output.clone());
     let mut input = BufReader::new(input);
     while let Some(RequestFrame { id, request }) = read_frame(&mut input)? {
         tracing::debug!(id, request = request_name(&request), "request");
@@ -52,11 +50,17 @@ pub fn serve(
                 repositories.retain(&roots);
                 reply(&output, id, value(()));
             }
+            // its turn is taken here, so two watches in a row end on the last whichever thread
+            // runs first
             Request::Watch { repository } => {
-                // the thread watching is gone only if a watch panicked
-                if watches.send((id, repository)).is_err() {
-                    reply(&output, id, Err(anyhow::anyhow!("the helper cannot watch")));
-                }
+                let turn = repositories.next_watch();
+                let changes = output.clone();
+                on_thread(Box::new(move |r| {
+                    let on_change =
+                        Box::new(move |event| send_message(&changes, &Message::Changed(event)));
+                    r.watch_in_turn(turn, repository.as_ref(), on_change);
+                    value(())
+                }));
             }
             // its turn is taken here, so a newer search stops it whichever thread runs first
             Request::SearchContents { repository, query } => {
@@ -174,29 +178,6 @@ type Reply = anyhow::Result<Box<RawValue>>;
 
 fn value(value: impl Serialize) -> Reply {
     Ok(serde_json::value::to_raw_value(&value)?)
-}
-
-/// The thread that starts and stops watching, one request after the other as they came: two
-/// watches in a row must end on the last one.
-fn watch_in_order(
-    repositories: Arc<LocalRepositories>,
-    output: Output,
-) -> mpsc::Sender<(u64, Option<RepositoryInfo>)> {
-    let (sender, receiver) = mpsc::channel::<(u64, Option<RepositoryInfo>)>();
-    std::thread::spawn(move || {
-        for (id, repository) in receiver {
-            let changes = output.clone();
-            let watched = guarded(|| {
-                repositories.watch(
-                    repository.as_ref(),
-                    Box::new(move |event| send_message(&changes, &Message::Changed(event))),
-                );
-                value(())
-            });
-            reply(&output, id, watched);
-        }
-    });
-    sender
 }
 
 /// `work`'s answer, or a failure if it panicked: the app waits for every reply.
