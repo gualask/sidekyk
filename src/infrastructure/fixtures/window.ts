@@ -1,4 +1,4 @@
-import type { RuntimePorts } from '@/infrastructure/tauri/runtime';
+import type { RuntimePorts } from '@/infrastructure/runtime-ports';
 import type { QuickNotePhase } from '@/shared/platform/quick-note';
 
 /** The window's ports in a browser tab, and what stands in for the quick note's shortcut. */

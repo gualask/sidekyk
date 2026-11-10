@@ -1,34 +1,13 @@
-import type { NotesPort } from '@/modules/notes';
-import type { ProjectsPort } from '@/modules/projects';
-import type { RepositoryPort } from '@/modules/repository';
-import type { SearchPort } from '@/modules/search';
-import type { SettingsPort } from '@/modules/settings';
-import type { QuickNotePort } from '@/shared/platform/quick-note';
-import type { TitleBarPort } from '@/shared/platform/title-bar';
-import { reportFrontendError } from './tauri-diagnostics';
-import { tauriNotes } from './tauri-notes';
-import { tauriProjects } from './tauri-projects';
-import { tauriQuickNote } from './tauri-quick-note';
-import { tauriRepository } from './tauri-repository';
-import { tauriSearch } from './tauri-search';
-import { tauriSettings } from './tauri-settings';
-import { tauriTitleBar } from './tauri-title-bar';
-import { showWindow } from './tauri-window';
-
-/** All runtime boundaries composed by the app shell. Each field remains a focused port. */
-export type RuntimePorts = {
-    notes: NotesPort;
-    projects: ProjectsPort;
-    repository: RepositoryPort;
-    search: SearchPort;
-    settings: SettingsPort;
-    titleBar: TitleBarPort;
-    quickNote: QuickNotePort;
-    /** Records an uncaught frontend error where problems are investigated (the app's log). */
-    reportError: (message: string) => void;
-    /** Shows the window, created hidden so that startup shows no blank frame. */
-    showWindow: () => void;
-};
+import type { RuntimePorts } from '@/infrastructure/runtime-ports';
+import { reportFrontendError } from './diagnostics';
+import { tauriNotes } from './notes';
+import { tauriProjects } from './projects';
+import { tauriQuickNote } from './quick-note';
+import { tauriRepository } from './repository';
+import { tauriSearch } from './search';
+import { tauriSettings } from './settings';
+import { tauriTitleBar } from './title-bar';
+import { showWindow } from './window';
 
 export const tauriRuntimePorts: RuntimePorts = {
     notes: tauriNotes,

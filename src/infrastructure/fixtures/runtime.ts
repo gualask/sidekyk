@@ -1,4 +1,4 @@
-import type { RuntimePorts } from '@/infrastructure/tauri/runtime';
+import type { RuntimePorts } from '@/infrastructure/runtime-ports';
 import { fixtureNotes } from './notes';
 import { fixtureProjectList, fixtureProjectsPort } from './projects';
 import { fixtureRepository } from './repository';

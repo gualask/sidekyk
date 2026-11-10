@@ -141,7 +141,7 @@ function newId(): string {
 const IMAGE_URLS = new Map<string, string>();
 
 /**
- * The browser's own file drags, as the app's (`tauri-notes.ts`) follows the system's: the files
+ * The browser's own file drags, as the app's (`tauri/notes.ts`) follows the system's: the files
  * read here, added one by one through `addImage`, the first making the note the rest join.
  */
 function onBrowserImageDrop(

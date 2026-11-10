@@ -44,8 +44,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`),
   `notes`, `search` (the palette; ranking and reading are the backend's), `settings`. Each panel
   module one lazy chunk.
-- `infrastructure/`: the two implementations of the ports, `tauri/` (the backend) and `fixtures/`
-  (in memory, for the browser); `app/` picks one, `DevModePage.tsx` the fixtures in a chunk
+- `infrastructure/`: the two implementations of `RuntimePorts` (`runtime-ports.ts`), `tauri/` (the
+  backend) and `fixtures/` (in memory, for the browser), a file per port in each; `app/` picks one, `DevModePage.tsx` the fixtures in a chunk
   loaded only in dev builds. `shared/`: tokens, primitives, session state (`useSessionState`),
   keys, errors, i18n, the panel contract, the project type.
 - Rules (`pnpm boundaries:check`): `app` composes and owns no workflow state; `modules` never import
