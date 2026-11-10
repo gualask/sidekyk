@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { placeName, remoteName } from './project-place';
+import { placeName, remoteMachine, remoteName } from './project-place';
+
+describe('remoteMachine', () => {
+    it('is the distro of a WSL project, nothing for a local one', () => {
+        expect(remoteMachine({ kind: 'wsl', distro: 'Ubuntu', root: '/home/ale/shop' })).toBe(
+            'Ubuntu',
+        );
+        expect(remoteMachine({ kind: 'local', root: '/Users/ale/shop' })).toBeNull();
+    });
+});
 
 describe('remoteName', () => {
     it('names the distro of a WSL project, nothing for a local one', () => {

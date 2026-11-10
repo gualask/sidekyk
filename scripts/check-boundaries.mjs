@@ -13,6 +13,9 @@ const LAYERS = /^(app|modules|infrastructure|shared)(?:\/|$)/;
 /** The fixture runtime: loaded by dev mode alone, in a chunk only dev builds have. */
 const FIXTURES = '@/infrastructure/fixtures';
 const DEV_MODE_PAGE = 'src/app/DevModePage.tsx';
+/** A read of a location's variant: only `shared/projects/` and the fixtures, which stand in for the backend. */
+const LOCATION_VARIANT = /\.kind\s*[!=]==\s*'(?:local|wsl)'|\.distro\b/g;
+const LOCATION_READERS = ['src/shared/projects/', 'src/infrastructure/fixtures/'];
 
 function relativePath(filePath) {
     return path.relative(ROOT_DIR, filePath).split(path.sep).join('/');
@@ -70,6 +73,11 @@ function isFixtureImporter(file) {
     return relative === DEV_MODE_PAGE || relative.startsWith('src/infrastructure/fixtures/');
 }
 
+/** Tests build locations of every variant; the readers are named in `LOCATION_READERS`. */
+function readsLocations(relative) {
+    return /\.test\.tsx?$/.test(relative) || LOCATION_READERS.some((reader) => relative.startsWith(reader));
+}
+
 function isAllowedImport(fromLayer, fromFile, specifier) {
     const targetLayer = importedLayer(specifier);
     if (!targetLayer) return true;
@@ -115,6 +123,12 @@ async function main() {
             if (!isAllowedImport(fromLayer, file, specifier)) {
                 violations.push(`${relative}:${line}: ${fromLayer} cannot import ${specifier}`);
             }
+        }
+
+        if (readsLocations(relative)) continue;
+        for (const match of source.matchAll(LOCATION_VARIANT)) {
+            const line = source.slice(0, match.index).split('\n').length;
+            violations.push(`${relative}:${line}: a location's variant read outside shared/projects`);
         }
     }
 

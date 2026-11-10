@@ -3,7 +3,7 @@ import { hasErrorCode } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelSummaryProps } from '@/shared/panels/panel';
 import type { ProjectFolder } from '@/shared/projects/project-info';
-import { folderName } from '@/shared/projects/project-place';
+import { folderName, remoteMachine } from '@/shared/projects/project-place';
 import { useRepositorySummaries, useRepositorySummary } from '../application/repository.queries';
 import { branchLabel } from '../model/branch';
 import { projectErrorMessage } from '../model/project-error';
@@ -36,8 +36,9 @@ function BranchOrProblem({ folder }: { folder: ProjectFolder }) {
     const summary = useRowSummary(folder);
     const i18n = useTranslation();
     // never started for a row: it says so
-    if (summary.isError && hasErrorCode(summary.error, 'distro_stopped') && folder.kind === 'wsl') {
-        return <Lead>{i18n.t('changes.distroStopped', { distro: folder.distro })}</Lead>;
+    const distro = remoteMachine(folder);
+    if (summary.isError && hasErrorCode(summary.error, 'distro_stopped') && distro) {
+        return <Lead>{i18n.t('changes.distroStopped', { distro })}</Lead>;
     }
     if (summary.isError) {
         const message = projectErrorMessage(summary.error, folder, i18n);

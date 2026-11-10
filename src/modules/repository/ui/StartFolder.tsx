@@ -2,6 +2,7 @@ import { IconPlayerPlay } from '@tabler/icons-react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import type { ProjectFolder } from '@/shared/projects/project-info';
+import { remoteMachine } from '@/shared/projects/project-place';
 import { useStartFolder } from '../application/repository.queries';
 import { projectErrorMessage } from '../model/project-error';
 
@@ -11,7 +12,8 @@ import { projectErrorMessage } from '../model/project-error';
  * folder's panels take its place.
  */
 export function StartFolder({ folder }: PanelProps) {
-    return folder?.kind === 'wsl' ? <Start folder={folder} distro={folder.distro} /> : null;
+    const distro = folder ? remoteMachine(folder) : null;
+    return folder && distro ? <Start folder={folder} distro={distro} /> : null;
 }
 
 function Start({ folder, distro }: { folder: ProjectFolder; distro: string }) {

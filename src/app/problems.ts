@@ -5,7 +5,7 @@ import { SHORTCUT_ACTIONS, shortcutProblem, useGlobalShortcutStatus } from '@/mo
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { MACOS } from '@/shared/platform/macos';
 import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
-import { placeName } from '@/shared/projects/project-place';
+import { placeName, remoteMachine } from '@/shared/projects/project-place';
 
 /** Something that stays wrong until fixed, listed in the top bar with its fix. */
 export interface Problem {
@@ -87,8 +87,8 @@ function folderProblem(
         };
     }
     // the others are a WSL distro's; on this machine, git missing is the panels' to tell
-    if (folder.kind !== 'wsl') return null;
-    const { distro } = folder;
+    const distro = remoteMachine(folder);
+    if (!distro) return null;
     if (failure === 'distro_missing') {
         return {
             id,

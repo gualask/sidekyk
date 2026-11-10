@@ -51,7 +51,8 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 - Rules (`pnpm boundaries:check`): `app` composes and owns no workflow state; `modules` never import
   `app`, `infrastructure` or another module; outside a module only its `index.ts`;
   `infrastructure` never imports `app`; `shared` imports only `shared`; `@tauri-apps/*` only in
-  `infrastructure/tauri/`; `infrastructure/fixtures/` only from `app/DevModePage.tsx`.
+  `infrastructure/tauri/`; `infrastructure/fixtures/` only from `app/DevModePage.tsx`; only
+  `shared/projects/` reads a location's variant (`project-place.ts`), the fixtures aside.
 - Panels: `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, needs,
   optional `summary` and `tileMinWidth`. `PanelProps`: `project`, `header` (a portal), `tileFit`,
   `target` (a request in the panel's terms) and `targetTaken`, `place` (`tile`/`full`), `selected`

@@ -5,6 +5,7 @@ import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { keysLabel } from '@/shared/platform/keys';
 import type { ProjectFolder } from '@/shared/projects/project-info';
+import { remoteMachine } from '@/shared/projects/project-place';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
@@ -71,6 +72,8 @@ function Changes({
 }: Omit<PanelProps, 'folder'> & { folder: ProjectFolder }) {
     const i18n = useTranslation();
     const folderId = folder.id;
+    // the machine holding the folder when not this one: its first read may start Sidekyk's helper
+    const machine = remoteMachine(folder);
     // the file shown, one for both panels: the tree of Files reveals it
     const {
         snapshot,
@@ -432,10 +435,9 @@ function Changes({
                             <p className="text-sm">{i18n.t('changes.nothing')}</p>
                             <OtherFolders project={project} folder={folder} onShow={showFolder} />
                         </div>
-                    ) : snapshot.isPending && folder?.kind === 'wsl' ? (
-                        // the first read may start Sidekyk's helper in the distro
+                    ) : snapshot.isPending && machine ? (
                         <div className="flex h-full items-center justify-center text-sm text-ui-text-muted">
-                            {i18n.t('projects.starting', { distro: folder.distro })}
+                            {i18n.t('projects.starting', { distro: machine })}
                         </div>
                     ) : null}
                 </main>

@@ -53,6 +53,7 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget, SummaryPart } from '@/shared/panels/panel';
 import { onlyFolder, type ProjectFolder, type ProjectInfo } from '@/shared/projects/project-info';
+import { remoteMachine } from '@/shared/projects/project-place';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import { preloadable } from '@/shared/ui/preloadable';
 import { whenIdle } from '@/shared/ui/when-idle';
@@ -183,7 +184,7 @@ export function AppShell() {
         [level, tiles, i18n],
     );
     // the distro to start before the project's files are searched, while it is stopped
-    const stoppedDistro = folderKind.stopped && folder?.kind === 'wsl' ? folder.distro : null;
+    const stoppedDistro = folderKind.stopped && folder ? remoteMachine(folder) : null;
     // the Inbox's field takes the focus (`⌘N` at all projects)
     const [focusInbox, setFocusInbox] = useState(false);
     const inboxFocused = useCallback(() => setFocusInbox(false), []);
@@ -819,12 +820,13 @@ function RowSummaries({
  */
 function WaitingPanels({ folder }: { folder: ProjectFolder | null }) {
     const { t } = useTranslation();
+    const machine = folder ? remoteMachine(folder) : null;
     return (
         <div
             className="flex h-full items-center justify-center text-sm text-ui-text-muted"
             style={PROJECT_ZOOM}
         >
-            {folder?.kind === 'wsl' ? t('projects.starting', { distro: folder.distro }) : null}
+            {machine ? t('projects.starting', { distro: machine }) : null}
         </div>
     );
 }
