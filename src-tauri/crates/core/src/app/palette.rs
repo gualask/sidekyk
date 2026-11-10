@@ -1,6 +1,6 @@
 //! The palette and what a note names, across the project list: the projects, the panels, the
 //! files of the folder on screen and the notes of the books, and the folders that hold a file a
-//! note names (`docs/features/palette.md`, `note-references.md`).
+//! note names (`docs/features/search.md`, `note-references.md`).
 
 use super::machines::Start;
 use super::notes::project_book;
