@@ -37,7 +37,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Colors only from the `--ui-*` tokens (`*-ui-*` in Tailwind).
 - UI text only from the catalogs (`src/shared/i18n/messages/`), English and Italian together;
   keys written whole, never built (`docs/features/languages.md`). Rust text for the user:
-  `interfaces/tauri/texts.rs`.
+  `src-tauri/src/desktop/texts.rs`.
 - A contract change (`contracts.rs`, `repository.types.ts`) also updates the Tauri adapter, the fixtures and the serialization tests; a new error code needs its key in `app-error.ts` and its message in both catalogs.
 - Hot-path logs are `debug`; `info` and above only for rare events and problems.
 - Code comments in English.

@@ -1,6 +1,7 @@
 //! Sidekyk's native backend (Tauri).
 
 mod bootstrap;
+mod desktop;
 mod infrastructure;
 mod interfaces;
 

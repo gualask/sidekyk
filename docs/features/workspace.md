@@ -91,7 +91,7 @@ problems. Why semantic zoom: `../product.md`.
   render, stored after.
 - Sidebar widths: one setting (`sidebarWidths`: `changes`, `files`, `notes`, `inbox`) through
   `shared/ui/sidebar-width.ts`; a drag stores the width the layout allowed.
-- Settings in effect: one copy in memory (`AppliedSettings`), read at startup, written on each
+- Settings in effect: one copy in memory (`AppliedSettings`, `desktop/settings.rs`), read at startup, written on each
   change. `set_settings` applies only what differs: theme and language set again only
   when changed, the shortcut only when not registered as asked; a dragged sidebar only writes the
   file.

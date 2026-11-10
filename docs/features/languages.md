@@ -35,8 +35,8 @@ The UI in English and Italian: the frontend's text, and what the backend writes 
 - `pnpm i18n:check` (`scripts/check-i18n.mjs`): every catalog has English's keys and placeholders;
   every key is used by the code as a string literal (parsed with Vite's parser, tests and
   `src/infrastructure/fixtures/` excluded); no key built at runtime.
-- Backend: `Settings.language` (`None` until the first start stores one); `interfaces/tauri/texts.rs`,
-  one `Texts` per language (the struct makes both complete): tray menu, dialog titles, export name
+- Backend: `Settings.language` (`None` until the first start stores one); `desktop/texts.rs`, one
+  `Texts` per language (the struct makes both complete): tray menu, dialog titles, export name
   and words, the first list's name. Applied at startup and by `set_settings` (`tray::speak`).
 
 ## Decisions

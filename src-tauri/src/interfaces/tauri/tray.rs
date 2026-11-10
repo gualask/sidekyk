@@ -4,16 +4,14 @@
 
 use tauri::AppHandle;
 
-use super::capture::capture;
-use super::quick_note;
-use super::window::show_main_window;
+use crate::desktop::{capture, quick_note, window};
 use crate::infrastructure::tray::TrayItem;
 
 /// An item of the menu chosen.
 pub(crate) fn chosen(app: &AppHandle, item: TrayItem) {
     match item {
-        TrayItem::Show => show_main_window(app),
-        TrayItem::Capture => capture(app),
+        TrayItem::Show => window::show(app),
+        TrayItem::Capture => capture::capture(app),
         TrayItem::Note => quick_note::toggle(app),
         TrayItem::Quit => app.exit(0),
     }
@@ -21,5 +19,5 @@ pub(crate) fn chosen(app: &AppHandle, item: TrayItem) {
 
 /// A click on the icon.
 pub(crate) fn clicked(app: &AppHandle) {
-    show_main_window(app);
+    window::show(app);
 }

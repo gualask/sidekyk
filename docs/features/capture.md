@@ -53,7 +53,7 @@ An area of the screen captured from any app becomes a new note, its marks open a
 - `infrastructure/capture/`: whether capture is built here (`CAPTURE_BUILT`, which the frontend
   reads through `can_capture`), the system's settings for the permission, `start` on every system
   (elsewhere it ends at once, never reached).
-- `interfaces/tauri/capture.rs`: one capture at a time, from its start until its outcome, another
+- `desktop/capture.rs`: one capture at a time, from its start until its outcome, another
   start ignored; the area last taken, by display, for the session. Each crop waits in a queue
   until the frontend, told `taken`,
   names the book (`add_capture`; `NotesStore::add_capture`: a new note on top of its open list),

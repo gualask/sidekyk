@@ -7,8 +7,7 @@ use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
 use super::notes::notes;
-use super::state::Launch;
-use super::texts;
+use crate::desktop::{launch, texts};
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::repository_name;
@@ -28,7 +27,7 @@ pub(crate) fn get_projects(app: tauri::AppHandle) -> ProjectList {
 /// What a folder given on the command line did, once: a project to show its panels, or a folder
 /// above repositories to ask about.
 pub(crate) fn take_opened(app: tauri::AppHandle) -> Option<Opened> {
-    app.state::<Launch>().take_opened()
+    launch::take_opened(&app)
 }
 
 #[tauri::command]

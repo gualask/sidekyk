@@ -77,11 +77,12 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands cover every crate
 (`default-members`) except `cargo fmt`, which needs `--all`.
 
-- `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, the hidden window, tray, the
-  CLI argument; the composition root: the machines' adapters, `Projects` over `SettingsFile`, this
-  machine's reader, through the helper with `SIDEKYK_AGENT=local`), `interfaces/tauri/`
-  (commands, tray, window, `state.rs`: what a launch opened, the palette's search, the folders
-  holding a file; blocking work on `spawn_blocking`), and the app's own
+- `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, tray, the CLI argument; the
+  composition root: the machines' adapters, `Projects` over `SettingsFile`, this machine's reader,
+  through the helper with `SIDEKYK_AGENT=local`), `interfaces/tauri/` (commands, what a tray
+  item or a shortcut press does; blocking work on `spawn_blocking`), `desktop/` (the window's
+  session: its first show, showing and hiding it, the quick note, the capture going on, the
+  settings in effect, the backend's texts, what a launch opened), and the app's own
   infrastructure, every system `#[cfg]` of the crate (`settings_store.rs`, `stored_json.rs`,
   `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs`, `global_shortcuts/`, `capture/`,
   `window/`: hiding and bringing back the window, the window as a quick note); what a tray item,

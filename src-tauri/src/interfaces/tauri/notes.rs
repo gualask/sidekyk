@@ -6,7 +6,7 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use super::blocking::blocking;
-use super::texts;
+use crate::desktop::texts;
 use crate::infrastructure::files::HostFiles;
 use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::notes::Notes;

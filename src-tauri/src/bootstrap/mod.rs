@@ -8,19 +8,19 @@ use std::sync::Arc;
 
 use ::tauri::path::BaseDirectory;
 use ::tauri::webview::PageLoadEvent;
-use ::tauri::{Emitter, Manager, WebviewWindowBuilder};
+use ::tauri::{Emitter, Manager};
 
+use crate::desktop::capture::CaptureSession;
+use crate::desktop::launch::{self, Launch};
+use crate::desktop::quick_note::{self, QuickNoteState};
+use crate::desktop::settings::{apply_language, AppliedSettings};
+use crate::desktop::window::{self, FirstShow};
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::settings_store::{self, SettingsFile};
 use crate::infrastructure::tray::TrayActions;
 use crate::infrastructure::{global_shortcuts, logging, tray};
 use crate::interfaces::tauri as tauri_commands;
-use crate::interfaces::tauri::settings::{apply_language, window_theme, AppliedSettings};
 use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
-use crate::interfaces::tauri::state::Launch;
-use crate::interfaces::tauri::window::{
-    hide_on_close, on_run_event, show_by_deadline, show_main_window, toggle_main_window, FirstShow,
-};
 use sidekyk_core::app::machines::Machines;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
@@ -29,9 +29,7 @@ use sidekyk_core::infrastructure::machines::wsl::WslRepositories;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::folder::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::notes::NotesStore;
-use sidekyk_core::modules::projects::{ProjectsChangedEvent, PROJECTS_CHANGED_EVENT};
 use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
-use sidekyk_core::modules::settings::Theme;
 
 /// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
 fn folder_argument(args: &[String]) -> Option<PathBuf> {
@@ -39,29 +37,6 @@ fn folder_argument(args: &[String]) -> Option<PathBuf> {
         .skip(1)
         .find(|a| !a.starts_with('-'))
         .map(PathBuf::from)
-}
-
-/// Creates the windows `tauri.conf.json` leaves to the app (`create: false`), already in the theme
-/// of the settings: their first paint has the right colors, with no flash of the system's theme.
-/// The page never leaves the app nor opens another window: a link in a file the app shows opens
-/// outside it through `open_url`, if at all.
-fn create_windows(app: &::tauri::AppHandle, theme: Theme) -> ::tauri::Result<()> {
-    for config in app.config().app.windows.iter().filter(|w| !w.create) {
-        WebviewWindowBuilder::from_config(app, config)?
-            .theme(Some(window_theme(theme)))
-            .on_navigation(is_app_page)
-            .on_new_window(|_, _| ::tauri::webview::NewWindowResponse::Deny)
-            .build()?;
-    }
-    Ok(())
-}
-
-/// The app's own page: `tauri://localhost` (`http://tauri.localhost` on Windows), or Vite's while
-/// developing.
-fn is_app_page(url: &::tauri::Url) -> bool {
-    url.scheme() == "tauri"
-        || url.host_str() == Some("tauri.localhost")
-        || (::tauri::is_dev() && url.host_str() == Some("localhost"))
 }
 
 /// This machine's folders, read here. A dev build started with `SIDEKYK_AGENT=local` reads them
@@ -98,24 +73,6 @@ fn projects(app: &::tauri::AppHandle, settings: Arc<SettingsFile>, helper: PathB
     )
 }
 
-/// Adds and shows a folder named at launch, off the main thread: a WSL distro's may take a
-/// while to start. The frontend, told the list changed, takes the project to show its panels. A
-/// failure leaves the app as it was.
-fn open_or_log(app: &::tauri::AppHandle, folder: PathBuf) {
-    let app = app.clone();
-    std::thread::spawn(move || match app.state::<Projects>().open_folder(&folder) {
-        Ok(opened) => {
-            app.state::<Launch>().set_opened(opened);
-            let _ = app.emit(PROJECTS_CHANGED_EVENT, ProjectsChangedEvent::default());
-        }
-        Err(error) => tracing::warn!(
-            folder = %folder.display(),
-            error = %format!("{error:#}"),
-            "could not open the folder"
-        ),
-    });
-}
-
 /// Boots the Tauri app and registers all commands/plugins.
 pub(crate) fn run() {
     let builder = ::tauri::Builder::default();
@@ -123,12 +80,12 @@ pub(crate) fn run() {
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
         if let Some(folder) = folder_argument(&args) {
-            open_or_log(app, PathBuf::from(cwd).join(folder));
-            show_main_window(app);
+            launch::open(app, PathBuf::from(cwd).join(folder));
+            window::show(app);
         } else if args.iter().skip(1).any(|a| a == TOGGLE_FLAG) {
-            toggle_main_window(app);
+            window::toggle(app);
         } else {
-            show_main_window(app);
+            window::show(app);
         }
     }));
 
@@ -159,8 +116,8 @@ pub(crate) fn run() {
         .manage(NotesStore::default())
         .manage(Launch::default())
         .manage(FirstShow::default())
-        .manage(tauri_commands::capture::CaptureState::default())
-        .manage(tauri_commands::quick_note::QuickNoteState::default())
+        .manage(CaptureSession::default())
+        .manage(QuickNoteState::default())
         .setup(|app| {
             if let Ok(dir) = app.path().app_log_dir() {
                 logging::init(&dir);
@@ -184,8 +141,7 @@ pub(crate) fn run() {
             app.manage(AppliedSettings::new(settings.clone()));
             // before the windows: their pages reach the shortcut's state as they load
             global_shortcuts::start(app.handle(), &settings, shortcut::pressed, TOGGLE_FLAG);
-            create_windows(app.handle(), settings.theme)?;
-            show_by_deadline(app.handle());
+            window::create(app.handle(), settings.theme)?;
             // before the tray, which starts in the language returned
             let texts = apply_language(app.handle(), settings.language);
             let actions = TrayActions {
@@ -195,7 +151,7 @@ pub(crate) fn run() {
             tray::start(app.handle(), texts.tray(), actions);
             let args: Vec<String> = std::env::args().collect();
             if let Some(folder) = folder_argument(&args) {
-                open_or_log(app.handle(), folder);
+                launch::open(app.handle(), folder);
             }
             Ok(())
         })
@@ -205,10 +161,10 @@ pub(crate) fn run() {
             if payload.event() == PageLoadEvent::Started {
                 tracing::info!(webview = webview.label(), "page loading");
                 global_shortcuts::set_recording(webview.app_handle(), false);
-                tauri_commands::quick_note::forget(webview.app_handle());
+                quick_note::forget(webview.app_handle());
             }
         })
-        .on_window_event(hide_on_close)
+        .on_window_event(window::on_close)
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
             tauri_commands::projects::take_opened,
@@ -291,7 +247,7 @@ pub(crate) fn run() {
         ])
         .build(::tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(on_run_event);
+        .run(|app, event| window::on_run_event(app, &event));
 }
 
 #[cfg(test)]

@@ -49,7 +49,7 @@ and the Move dialog: `notes.md`.
   `Move` they make (`moveOf`): a list to make, the images and the toast with Undo are Move's,
   the toast saying "Added to …". Undo and a failed move leave the note in the Inbox.
 - A hidden webview never paints, and a window shown before its page painted shows the frame
-  before it. So the backend (`interfaces/tauri/quick_note.rs`) turns the window transparent
+  before it. So the backend (`desktop/quick_note.rs`) turns the window transparent
   (`NSWindow.alphaValue` 0), changes its frame and shows it, then tells the page (`quick-note`:
   `open`); the page, two animation frames later, says it painted (`quick_note_shown`) and the
   window turns opaque. Closing is the same the other way (`close_quick_note`, `close`,
