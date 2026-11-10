@@ -361,7 +361,7 @@ mod tests {
 
     use crate::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
     use crate::modules::projects::{Location, Project};
-    use crate::modules::repositories::{LocalRepositories, Repositories};
+    use crate::modules::reader::{LocalRepositories, Repositories};
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
 

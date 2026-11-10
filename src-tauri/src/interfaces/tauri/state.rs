@@ -13,7 +13,7 @@ use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::projects::{
     FoundFolder, Location, Opened, Project, ProjectFolder, ProjectList,
 };
-use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
+use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::search::{self, ListMatch, NoteMatch, SearchRequest, SearchResults};
 use sidekyk_core::shared::sync::lock;

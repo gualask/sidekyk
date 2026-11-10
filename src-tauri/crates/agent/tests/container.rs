@@ -13,7 +13,7 @@ use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::linux_helper::{LinuxHelper, LinuxMachine, SERVER_DIR};
 use sidekyk_core::infrastructure::watcher::REPORT_INTERVAL;
 use sidekyk_core::modules::folder::FolderKind;
-use sidekyk_core::modules::repositories::Repositories;
+use sidekyk_core::modules::reader::Repositories;
 use sidekyk_core::modules::repository::{RepositoryChange, RepositoryInfo};
 
 const PROJECT: &str = "/home/ubuntu/project";

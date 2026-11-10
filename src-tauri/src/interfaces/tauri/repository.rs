@@ -8,7 +8,7 @@ use super::state::ProjectsState;
 use sidekyk_core::modules::folder::FolderKind;
 use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::projects::Location;
-use sidekyk_core::modules::repositories::Repositories;
+use sidekyk_core::modules::reader::Repositories;
 use sidekyk_core::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
     Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles, RepositoryInfo,

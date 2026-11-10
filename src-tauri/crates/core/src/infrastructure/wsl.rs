@@ -15,7 +15,7 @@ use super::agent::AgentRepositories;
 use super::hide_console;
 use super::linux_helper::{LinuxHelper, LinuxMachine};
 use super::process;
-use crate::modules::repositories::Repositories;
+use crate::modules::reader::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
 

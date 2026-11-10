@@ -14,7 +14,7 @@ use serde_json::value::RawValue;
 use super::protocol::{
     read_frame, write_bytes, write_frame, Message, Request, RequestFrame, WireError,
 };
-use crate::modules::repositories::{LocalRepositories, Repositories};
+use crate::modules::reader::{LocalRepositories, Repositories};
 use crate::modules::repository::{RepositoryChange, RepositoryInfo};
 use crate::shared::sync::lock;
 

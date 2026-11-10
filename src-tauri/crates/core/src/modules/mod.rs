@@ -7,7 +7,7 @@ pub mod folder;
 pub mod notes;
 pub mod preview;
 pub mod projects;
-pub mod repositories;
+pub mod reader;
 pub mod repository;
 pub mod search;
 pub mod settings;

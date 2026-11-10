@@ -102,8 +102,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     the ignored-paths filter, which changes matter (`watched.rs`) and which folders to watch
     (`folders.rs`). No disk of its own: the `RepositoryBackend` port (git, reads, `walk`,
     `folder_rules`, `real_path`) and the `RepositoryWatcher` port.
-  - `modules/repositories/`: the `Repositories` port, one method per read, and `LocalRepositories`
-    (coalesced reads, the cached tree, the last content search, `ColorCache`, the watched folder,
+  - `modules/reader/`: one machine's folders as the app reads them, repositories or not: the
+    `Repositories` port, one method per read, and `LocalRepositories` (coalesced reads, the cached tree, the last content search, `ColorCache`, the watched folder,
     `watch.rs`).
   - `modules/folder/`: a folder without git: kind, `resolve_folder`, tree, `FolderChanges`,
     `always_hidden`.

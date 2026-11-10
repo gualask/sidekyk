@@ -12,7 +12,7 @@ use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
 use sidekyk_core::modules::folder::FolderKind;
-use sidekyk_core::modules::repositories::{LocalRepositories, Repositories};
+use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{FileContent, FileDiffRequest, RepositoryInfo};
 use sidekyk_core::shared::error::{user_facing_code, UserFacingErrorCode};
 

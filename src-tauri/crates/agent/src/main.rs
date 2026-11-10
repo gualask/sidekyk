@@ -12,7 +12,7 @@ use std::sync::Arc;
 use sidekyk_core::infrastructure::agent::serve;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
-use sidekyk_core::modules::repositories::LocalRepositories;
+use sidekyk_core::modules::reader::LocalRepositories;
 
 fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {

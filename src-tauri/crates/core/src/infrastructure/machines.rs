@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use super::wsl::{installed_distro, wsl_path, WslRepositories};
 use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
-use crate::modules::repositories::{OnChange, Repositories};
+use crate::modules::reader::{OnChange, Repositories};
 use crate::modules::repository::RepositoryInfo;
 
 pub struct Machines {

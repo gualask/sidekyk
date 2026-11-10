@@ -22,7 +22,7 @@ use super::protocol::{
 use crate::infrastructure::hide_console;
 use crate::modules::folder::FolderKind;
 use crate::modules::preview::MarkdownDocument;
-use crate::modules::repositories::{OnChange, Repositories};
+use crate::modules::reader::{OnChange, Repositories};
 use crate::modules::repository::{
     ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
     Directory, FileContent, FileDiffRequest, FileStamp, RecentCommits, RecentFiles,
