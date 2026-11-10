@@ -2,55 +2,16 @@
 
 use std::path::PathBuf;
 
-use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
-use super::blocking::blocking;
+use super::blocking::{blocking, notes, ports, with_notes, with_store};
 use crate::desktop::texts;
-use crate::infrastructure::files::HostFiles;
-use crate::infrastructure::notes_files::NotesFiles;
-use sidekyk_core::app::notes::Notes;
-use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::notes::{
-    as_png, given_images, prepare, Book, DeletedList, ImageTarget, ListTarget, Mark, MovedList,
-    MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes,
+    as_png, given_images, prepare, DeletedList, ImageTarget, ListTarget, Mark, MovedList,
+    MovedNote, Note, NoteList, NotesCount, ProjectNotes,
 };
 use sidekyk_core::shared::error::AppError;
 use sidekyk_core::shared::url::percent_decoded;
-
-/// The notes of the list's books, as the app keeps them.
-pub(super) fn notes<'a>(
-    app: &'a tauri::AppHandle,
-    store: &'a NotesStore,
-    files: &'a NotesFiles,
-) -> Notes<'a> {
-    Notes::new(app.state::<Projects>().inner(), store, files)
-}
-
-/// Runs `work` with the notes and their files, off the async runtime.
-async fn with_store<T: Send + 'static>(
-    command: &'static str,
-    app: tauri::AppHandle,
-    work: impl FnOnce(&tauri::AppHandle, &NotesStore, &NotesFiles) -> anyhow::Result<T> + Send + 'static,
-) -> Result<T, AppError> {
-    blocking(command, app, move |app| {
-        work(app, &app.state::<NotesStore>(), &app.state::<NotesFiles>())
-    })
-    .await
-}
-
-/// Runs `work` on a book's notes, once the book is known.
-pub(super) async fn with_notes<T: Send + 'static>(
-    command: &'static str,
-    app: tauri::AppHandle,
-    book: String,
-    work: impl FnOnce(&NotesStore, &NotesFiles, &Book) -> anyhow::Result<T> + Send + 'static,
-) -> Result<T, AppError> {
-    with_store(command, app, move |app, store, files| {
-        work(store, files, &notes(app, store, files).book(&book)?)
-    })
-    .await
-}
 
 #[tauri::command]
 /// Every note of a book, its lists and the one open.
@@ -100,14 +61,11 @@ pub(crate) async fn add_note_image_files(
     target: ImageTarget,
     paths: Vec<String>,
 ) -> Result<Note, AppError> {
-    with_notes(
-        "add_note_image_files",
-        app,
-        book,
-        move |store, files, book| {
-            store.add_images(files, book, target, given_images(&HostFiles, &paths)?)
-        },
-    )
+    with_store("add_note_image_files", app, move |app, store, files| {
+        let book = notes(app).book(&book)?;
+        let images = given_images(&*ports(app).given, &paths)?;
+        store.add_images(files, &book, target, images)
+    })
     .await
 }
 
@@ -227,10 +185,7 @@ pub(crate) async fn copy_note(
     book: String,
     id: String,
 ) -> Result<String, AppError> {
-    with_store("copy_note", app, move |app, store, files| {
-        notes(app, store, files).copy(&book, &id)
-    })
-    .await
+    blocking("copy_note", app, move |app| notes(app).copy(&book, &id)).await
 }
 
 #[tauri::command]
@@ -296,10 +251,7 @@ pub(crate) async fn move_note(
     list: ListTarget,
 ) -> Result<MovedNote, AppError> {
     with_store("move_note", app, move |app, store, files| {
-        let (from, to) = (
-            notes(app, store, files).book(&from)?,
-            notes(app, store, files).book(&to)?,
-        );
+        let (from, to) = (notes(app).book(&from)?, notes(app).book(&to)?);
         store.move_note(files, &from, &id, &to, list)
     })
     .await
@@ -314,10 +266,7 @@ pub(crate) async fn unmove_note(
     home: String,
 ) -> Result<Note, AppError> {
     with_store("unmove_note", app, move |app, store, files| {
-        let (at, home) = (
-            notes(app, store, files).book(&at)?,
-            notes(app, store, files).book(&home)?,
-        );
+        let (at, home) = (notes(app).book(&at)?, notes(app).book(&home)?);
         store.unmove_note(files, &at, original, &home)
     })
     .await
@@ -332,10 +281,7 @@ pub(crate) async fn move_list(
     to: String,
 ) -> Result<MovedList, AppError> {
     with_store("move_list", app, move |app, store, files| {
-        let (from, to) = (
-            notes(app, store, files).book(&from)?,
-            notes(app, store, files).book(&to)?,
-        );
+        let (from, to) = (notes(app).book(&from)?, notes(app).book(&to)?);
         store.move_list(files, &from, &list, &to)
     })
     .await
@@ -345,10 +291,7 @@ pub(crate) async fn move_list(
 /// Brings a moved list back where it was, with its notes (undo).
 pub(crate) async fn unmove_list(app: tauri::AppHandle, moved: MovedList) -> Result<(), AppError> {
     with_store("unmove_list", app, move |app, store, files| {
-        let (from, to) = (
-            notes(app, store, files).book(&moved.from)?,
-            notes(app, store, files).book(&moved.to)?,
-        );
+        let (from, to) = (notes(app).book(&moved.from)?, notes(app).book(&moved.to)?);
         store.unmove_list(files, &from, &to, moved)
     })
     .await
@@ -440,8 +383,8 @@ pub(crate) async fn export_notes(
     app: tauri::AppHandle,
     project_id: String,
 ) -> Result<Option<String>, AppError> {
-    with_store("export_notes", app, move |app, store, files| {
-        let notes = notes(app, store, files);
+    blocking("export_notes", app, move |app| {
+        let notes = notes(app);
         let target = notes.export_target(&project_id)?;
         let texts = texts::current();
         let file_name = texts.export_file.replace("{name}", &target.name);
@@ -457,7 +400,7 @@ pub(crate) async fn export_notes(
             return Ok(None);
         };
         let path: PathBuf = path.into_path()?;
-        notes.export(&project_id, &path, &texts.export, &HostFiles)?;
+        notes.export(&project_id, &path, &texts.export, &*ports(app).export)?;
         Ok(Some(path.to_string_lossy().into_owned()))
     })
     .await

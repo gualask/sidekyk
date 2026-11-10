@@ -1,9 +1,32 @@
+//! How a command reaches its work: off the async runtime, logged; on a folder by its id, on a
+//! book's notes, through the core's ports whose adapters `bootstrap` chose.
+
 use std::collections::BTreeSet;
 use std::sync::Mutex;
 use std::time::Instant;
 
+use tauri::{AppHandle, Manager};
+
+use sidekyk_core::app::machines::Start;
+use sidekyk_core::app::notes::{ExportFiles, Notes};
+use sidekyk_core::app::projects::{FolderReader, Projects};
+use sidekyk_core::modules::notes::{Book, GivenFiles, NotesStorage, NotesStore};
 use sidekyk_core::shared::error::{user_facing_code, AppError};
 use sidekyk_core::shared::sync::lock;
+
+/// What the commands reach through the core's ports, each adapter chosen by `bootstrap`.
+pub(crate) struct Ports {
+    /// Where the notes are kept.
+    pub(crate) notes: Box<dyn NotesStorage>,
+    /// Files of this host given to a note.
+    pub(crate) given: Box<dyn GivenFiles>,
+    /// Files of this host an export writes.
+    pub(crate) export: Box<dyn ExportFiles>,
+}
+
+pub(super) fn ports(app: &AppHandle) -> &Ports {
+    app.state::<Ports>().inner()
+}
 
 /// The failures logged, until their command next succeeds: a read that fails on every refresh,
 /// up to once a second while an agent writes, writes one line, not one a second.
@@ -16,8 +39,8 @@ const MAX_KEPT: usize = 1_000;
 /// took and how it failed.
 pub(super) async fn blocking<T: Send + 'static>(
     command: &'static str,
-    app: tauri::AppHandle,
-    work: impl FnOnce(&tauri::AppHandle) -> anyhow::Result<T> + Send + 'static,
+    app: AppHandle,
+    work: impl FnOnce(&AppHandle) -> anyhow::Result<T> + Send + 'static,
 ) -> Result<T, AppError> {
     let started = Instant::now();
     let result = tauri::async_runtime::spawn_blocking(move || work(&app))
@@ -50,6 +73,55 @@ pub(super) async fn blocking<T: Send + 'static>(
         }
     }
     result.map_err(AppError::from)
+}
+
+/// Runs `work` off the async runtime on a folder of a project the user added, with what reads it,
+/// once `start` allows it: `Start::Never` fails `distro_stopped` for a stopped WSL distro.
+pub(super) async fn on_folder<T: Send + 'static>(
+    command: &'static str,
+    app: AppHandle,
+    folder_id: String,
+    start: Start,
+    work: impl FnOnce(FolderReader) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, AppError> {
+    blocking(command, app, move |app| {
+        work(app.state::<Projects>().reader(&folder_id, start)?)
+    })
+    .await
+}
+
+/// The notes of the list's books, as the app keeps them.
+pub(super) fn notes(app: &AppHandle) -> Notes<'_> {
+    Notes::new(
+        app.state::<Projects>().inner(),
+        app.state::<NotesStore>().inner(),
+        &*ports(app).notes,
+    )
+}
+
+/// Runs `work` with the notes and where they are kept, off the async runtime.
+pub(super) async fn with_store<T: Send + 'static>(
+    command: &'static str,
+    app: AppHandle,
+    work: impl FnOnce(&AppHandle, &NotesStore, &dyn NotesStorage) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, AppError> {
+    blocking(command, app, move |app| {
+        work(app, &app.state::<NotesStore>(), &*ports(app).notes)
+    })
+    .await
+}
+
+/// Runs `work` on a book's notes, once the book is known.
+pub(super) async fn with_notes<T: Send + 'static>(
+    command: &'static str,
+    app: AppHandle,
+    book: String,
+    work: impl FnOnce(&NotesStore, &dyn NotesStorage, &Book) -> anyhow::Result<T> + Send + 'static,
+) -> Result<T, AppError> {
+    with_store(command, app, move |app, store, files| {
+        work(store, files, &notes(app).book(&book)?)
+    })
+    .await
 }
 
 /// Each command's failures logged, by message.

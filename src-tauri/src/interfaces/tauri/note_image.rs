@@ -8,8 +8,7 @@ use std::borrow::Cow;
 use tauri::http::{header, Response, StatusCode};
 use tauri::{Manager, UriSchemeResponder};
 
-use super::notes::notes;
-use crate::infrastructure::notes_files::NotesFiles;
+use super::blocking::{notes, ports};
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::shared::url::percent_decoded;
 
@@ -24,10 +23,10 @@ pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSche
     };
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
-        let image = notes(&app, &store, &files)
+        let store = app.state::<NotesStore>();
+        let image = notes(&app)
             .book(&book)
-            .and_then(|book| store.image(files.inner(), &book, &file));
+            .and_then(|book| store.image(&*ports(&app).notes, &book, &file));
         responder.respond(match image {
             Ok(Some((kind, bytes))) => Response::builder()
                 .header(header::CONTENT_TYPE, kind.mime())

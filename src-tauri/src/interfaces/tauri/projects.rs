@@ -5,13 +5,10 @@ use std::path::Path;
 use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
-use super::blocking::blocking;
-use super::notes::notes;
+use super::blocking::{blocking, notes};
 use crate::desktop::{launch, texts};
-use crate::infrastructure::notes_files::NotesFiles;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::repository_name;
-use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::projects::{
     FolderChange, FolderChoice, Opened, Project, ProjectList, TilesLayout,
 };
@@ -114,8 +111,7 @@ pub(crate) async fn remove_project(
     project_id: String,
 ) -> Result<ProjectList, AppError> {
     blocking("remove_project", app, move |app| {
-        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
-        notes(app, &store, &files).remove_project(&project_id)
+        notes(app).remove_project(&project_id)
     })
     .await
 }
@@ -212,8 +208,7 @@ pub(crate) async fn merge_projects(
     from: String,
 ) -> Result<ProjectList, AppError> {
     blocking("merge_projects", app, move |app| {
-        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
-        notes(app, &store, &files).merge_projects(&into, &from)
+        notes(app).merge_projects(&into, &from)
     })
     .await
 }

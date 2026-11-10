@@ -3,9 +3,7 @@
 use tauri::ipc::Channel;
 use tauri::Manager;
 
-use super::blocking::blocking;
-use super::repository::on_folder;
-use crate::infrastructure::notes_files::NotesFiles;
+use super::blocking::{blocking, on_folder, ports};
 use sidekyk_core::app::machines::Start;
 use sidekyk_core::app::palette;
 use sidekyk_core::app::projects::Projects;
@@ -25,11 +23,10 @@ pub(crate) async fn search(
     request: SearchRequest,
 ) -> Result<SearchResults, AppError> {
     blocking("search", app, move |app| {
-        let (store, files) = (app.state::<NotesStore>(), app.state::<NotesFiles>());
         Ok(palette::search(
             &app.state::<Projects>(),
-            &store,
-            files.inner(),
+            &app.state::<NotesStore>(),
+            &*ports(app).notes,
             &request,
         ))
     })

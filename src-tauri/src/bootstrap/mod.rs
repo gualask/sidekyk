@@ -1,26 +1,27 @@
-//! Tauri composition root.
-//!
-//! Runtime plugins, managed state, and the stable inbound command list are wired here. Modules
-//! and infrastructure services remain unaware of this composition root.
+//! The composition root, the only place that names both adapters and entry points: the plugins,
+//! the managed state, the core's ports given their adapters, the commands, and what the tray, the
+//! global shortcuts and the app's events call.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use ::tauri::path::BaseDirectory;
-use ::tauri::webview::PageLoadEvent;
 use ::tauri::{Emitter, Manager};
 
 use crate::desktop::capture::CaptureSession;
-use crate::desktop::launch::{self, Launch};
-use crate::desktop::quick_note::{self, QuickNoteState};
+use crate::desktop::launch::Launch;
+use crate::desktop::quick_note::QuickNoteState;
 use crate::desktop::settings::{apply_language, AppliedSettings};
 use crate::desktop::window::{self, FirstShow};
+use crate::infrastructure::files::HostFiles;
 use crate::infrastructure::notes_files::NotesFiles;
 use crate::infrastructure::settings_store::{self, SettingsFile};
 use crate::infrastructure::tray::TrayActions;
 use crate::infrastructure::{global_shortcuts, logging, tray};
 use crate::interfaces::tauri as tauri_commands;
-use crate::interfaces::tauri::shortcut::{self, TOGGLE_FLAG};
+use crate::interfaces::tauri::blocking::Ports;
+use crate::interfaces::tauri::cli::{self, TOGGLE_FLAG};
+use crate::interfaces::tauri::{lifecycle, shortcuts};
 use sidekyk_core::app::machines::Machines;
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
@@ -30,14 +31,6 @@ use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::folder::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
-
-/// The first argument that is not a flag: `sidekyk ~/Dev/project` opens that repository.
-fn folder_argument(args: &[String]) -> Option<PathBuf> {
-    args.iter()
-        .skip(1)
-        .find(|a| !a.starts_with('-'))
-        .map(PathBuf::from)
-}
 
 /// This machine's folders, read here. A dev build started with `SIDEKYK_AGENT=local` reads them
 /// through the helper instead, a child process beside the app's binary, as it reads a WSL
@@ -79,14 +72,7 @@ pub(crate) fn run() {
 
     #[cfg(any(target_os = "macos", windows, target_os = "linux"))]
     let builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
-        if let Some(folder) = folder_argument(&args) {
-            launch::open(app, PathBuf::from(cwd).join(folder));
-            window::show(app);
-        } else if args.iter().skip(1).any(|a| a == TOGGLE_FLAG) {
-            window::toggle(app);
-        } else {
-            window::show(app);
-        }
+        cli::launched_again(app, &args, &cwd);
     }));
 
     builder
@@ -125,7 +111,11 @@ pub(crate) fn run() {
             let data = app.path().app_data_dir()?;
             let settings_file = Arc::new(SettingsFile::open(&data));
             app.manage(settings_file.clone());
-            app.manage(NotesFiles::new(&data));
+            app.manage(Ports {
+                notes: Box::new(NotesFiles::new(&data)),
+                given: Box::new(HostFiles),
+                export: Box::new(HostFiles),
+            });
             // the Linux helper WSL distros run, among the installer's resources on Windows
             // (`tauri.helper.conf.json`, the installer build only)
             let helper = app
@@ -140,31 +130,23 @@ pub(crate) fn run() {
             // before the windows, whose pages may change the settings as they load; applied below
             app.manage(AppliedSettings::new(settings.clone()));
             // before the windows: their pages reach the shortcut's state as they load
-            global_shortcuts::start(app.handle(), &settings, shortcut::pressed, TOGGLE_FLAG);
+            global_shortcuts::start(app.handle(), &settings, shortcuts::pressed, TOGGLE_FLAG);
             window::create(app.handle(), settings.theme)?;
             // before the tray, which starts in the language returned
             let texts = apply_language(app.handle(), settings.language);
             let actions = TrayActions {
-                item: tauri_commands::tray::chosen,
-                click: tauri_commands::tray::clicked,
+                show: tauri_commands::tray::show,
+                capture: tauri_commands::tray::capture,
+                note: tauri_commands::tray::note,
+                quit: tauri_commands::tray::quit,
+                click: tauri_commands::tray::show,
             };
             tray::start(app.handle(), texts.tray(), actions);
-            let args: Vec<String> = std::env::args().collect();
-            if let Some(folder) = folder_argument(&args) {
-                launch::open(app.handle(), folder);
-            }
+            cli::launched(app.handle());
             Ok(())
         })
-        // a page loaded again (a crashed webview) forgets a shortcut its predecessor was recording
-        // and a quick note it had open; logged, so a second load of a webview tells a crash
-        .on_page_load(|webview, payload| {
-            if payload.event() == PageLoadEvent::Started {
-                tracing::info!(webview = webview.label(), "page loading");
-                global_shortcuts::set_recording(webview.app_handle(), false);
-                quick_note::forget(webview.app_handle());
-            }
-        })
-        .on_window_event(window::on_close)
+        .on_page_load(lifecycle::page_loading)
+        .on_window_event(lifecycle::window_event)
         .invoke_handler(::tauri::generate_handler![
             tauri_commands::projects::get_projects,
             tauri_commands::projects::take_opened,
@@ -237,8 +219,8 @@ pub(crate) fn run() {
             tauri_commands::search::search_files,
             tauri_commands::settings::get_settings,
             tauri_commands::settings::set_settings,
-            tauri_commands::shortcut::get_global_shortcut_status,
-            tauri_commands::shortcut::set_shortcut_recording,
+            tauri_commands::shortcuts::get_global_shortcut_status,
+            tauri_commands::shortcuts::set_shortcut_recording,
             tauri_commands::window::set_window_visible,
             tauri_commands::window::show_window,
             tauri_commands::diagnostics::log_frontend_error,
@@ -247,20 +229,5 @@ pub(crate) fn run() {
         ])
         .build(::tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| window::on_run_event(app, &event));
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_folder_argument_skips_the_binary_and_flags() {
-        let args = |a: &[&str]| a.iter().map(|s| s.to_string()).collect::<Vec<_>>();
-        assert_eq!(
-            folder_argument(&args(&["sidekyk", "--flag", "proj"])),
-            Some(PathBuf::from("proj"))
-        );
-        assert_eq!(folder_argument(&args(&["sidekyk"])), None);
-    }
+        .run(lifecycle::run_event);
 }

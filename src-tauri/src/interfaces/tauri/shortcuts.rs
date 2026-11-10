@@ -6,9 +6,6 @@ use tauri::AppHandle;
 use crate::desktop::{capture, quick_note, settings, window};
 use sidekyk_core::modules::settings::{GlobalShortcutStatuses, ShortcutAction};
 
-/// `sidekyk --toggle`, run while Sidekyk runs, shows or hides its window like the shortcut.
-pub(crate) const TOGGLE_FLAG: &str = "--toggle";
-
 /// A global shortcut pressed, from any app.
 pub(crate) fn pressed(app: &AppHandle, action: ShortcutAction) {
     match action {

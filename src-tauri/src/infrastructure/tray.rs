@@ -14,7 +14,7 @@ use super::window::QUICK_NOTE_BUILT;
 
 /// An item of the tray's menu.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum TrayItem {
+enum TrayItem {
     Show,
     Capture,
     Note,
@@ -54,10 +54,24 @@ impl TrayLabels {
     }
 }
 
-/// What an item chosen, or a click on the icon, does.
+/// What each item chosen, or a click on the icon, does.
 pub(crate) struct TrayActions {
-    pub(crate) item: fn(&AppHandle, TrayItem),
+    pub(crate) show: fn(&AppHandle),
+    pub(crate) capture: fn(&AppHandle),
+    pub(crate) note: fn(&AppHandle),
+    pub(crate) quit: fn(&AppHandle),
     pub(crate) click: fn(&AppHandle),
+}
+
+impl TrayActions {
+    fn of(&self, item: TrayItem) -> fn(&AppHandle) {
+        match item {
+            TrayItem::Show => self.show,
+            TrayItem::Capture => self.capture,
+            TrayItem::Note => self.note,
+            TrayItem::Quit => self.quit,
+        }
+    }
 }
 
 /// Managed once the icon is in the tray, which Tauri keeps until the app exits: its menu's items,
@@ -104,7 +118,7 @@ fn build(app: &AppHandle, labels: TrayLabels, actions: TrayActions) -> tauri::Re
         .map(|(_, entry)| entry as &dyn IsMenuItem<tauri::Wry>)
         .collect();
     let menu = Menu::with_items(app, &entries)?;
-    let TrayActions { item, click } = actions;
+    let click = actions.click;
     TrayIconBuilder::new()
         .icon(icon(app))
         // drawn by macOS in the menu bar's colors; elsewhere the app's icon, in color
@@ -119,7 +133,7 @@ fn build(app: &AppHandle, labels: TrayLabels, actions: TrayActions) -> tauri::Re
                 .into_iter()
                 .find(|candidate| candidate.id() == event.id.as_ref());
             if let Some(chosen) = chosen {
-                item(app, chosen);
+                actions.of(chosen)(app);
             }
         })
         .on_tray_icon_event(move |tray, event| {

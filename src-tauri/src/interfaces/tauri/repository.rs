@@ -3,10 +3,10 @@
 
 use tauri::Manager;
 
-use super::blocking::blocking;
+use super::blocking::{blocking, on_folder};
 use sidekyk_core::app::machines::Start;
 use sidekyk_core::app::palette;
-use sidekyk_core::app::projects::{FolderReader, Projects};
+use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::{Directory, FileContent, FileStamp, FolderKind, RecentFiles};
 use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::repository::{
@@ -15,21 +15,6 @@ use sidekyk_core::modules::repository::{
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
-
-/// Runs `work` off the async runtime on a folder of a project the user added, with what reads it,
-/// once `start` allows it: `Start::Never` fails `distro_stopped` for a stopped WSL distro.
-pub(super) async fn on_folder<T: Send + 'static>(
-    command: &'static str,
-    app: tauri::AppHandle,
-    folder_id: String,
-    start: Start,
-    work: impl FnOnce(FolderReader) -> anyhow::Result<T> + Send + 'static,
-) -> Result<T, AppError> {
-    blocking(command, app, move |app| {
-        work(app.state::<Projects>().reader(&folder_id, start)?)
-    })
-    .await
-}
 
 #[tauri::command]
 /// Whether a folder of a project is a repository or a folder without git. No git runs, so the

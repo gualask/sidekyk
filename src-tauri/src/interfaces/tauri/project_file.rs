@@ -10,7 +10,7 @@ use sidekyk_core::shared::url::percent_decoded;
 use tauri::http::{header, Response, StatusCode};
 use tauri::UriSchemeResponder;
 
-use super::repository::on_folder;
+use super::blocking::on_folder;
 use sidekyk_core::app::machines::Start;
 
 pub(crate) const SCHEME: &str = "project-file";

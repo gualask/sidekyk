@@ -4,7 +4,7 @@
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
-use super::notes::with_notes;
+use super::blocking::with_notes;
 use crate::desktop::capture::{self, CAPTURE_BUILT, SETTINGS_URL};
 use sidekyk_core::modules::notes::Note;
 use sidekyk_core::shared::error::AppError;
