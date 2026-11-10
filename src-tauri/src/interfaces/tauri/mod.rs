@@ -1,7 +1,7 @@
 //! The entry points: the commands and URI schemes the page calls, what the tray's items and the
 //! global shortcuts do, the command line and the app's events. Each translates and delegates to
-//! the core's `app`, `desktop/` or a Tauri plugin; none holds state but `blocking.rs`'s log of
-//! failures, and none imports another but `blocking.rs`.
+//! the core's `app`, `desktop/` or a Tauri plugin; none holds state but `blocking.rs`: its log of
+//! failures and the ports `bootstrap` chose. None imports another but `blocking.rs`.
 
 pub(crate) mod blocking;
 pub(crate) mod capture;

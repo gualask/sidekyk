@@ -1,4 +1,4 @@
-//! Tauri adapters for the list of projects.
+//! The project list's commands.
 
 use std::path::Path;
 

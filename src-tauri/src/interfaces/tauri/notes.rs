@@ -1,4 +1,4 @@
-//! Tauri adapters for notes. Every command names a book: the Inbox, or a project of the list.
+//! The notes' commands. Every command names a book: the Inbox, or a project of the list.
 
 use std::path::PathBuf;
 

@@ -1,4 +1,4 @@
-//! Tauri adapters for the projects' folders, each named by its id: a repository under review, or
+//! The commands on the projects' folders, each named by its id: a repository under review, or
 //! a folder without git.
 
 use tauri::Manager;

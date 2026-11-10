@@ -1,4 +1,4 @@
-//! Tauri adapter for the command palette's search.
+//! The command palette's search command.
 
 use tauri::ipc::Channel;
 use tauri::Manager;
