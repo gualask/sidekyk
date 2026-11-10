@@ -28,12 +28,12 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Use a web API or CSS feature only if WKWebView, WebKitGTK and WebView2 all support it.
 - Shortcuts: `⌘` on macOS, `Ctrl` elsewhere.
 - Never assume `/` as separator or a Unix layout; paths exchanged with git and the frontend use `/`.
-- Platform-specific code and child processes live in `infrastructure/`, behind `#[cfg]` and a port. Type-check `#[cfg(windows)]` code for `x86_64-pc-windows-msvc`; the Mac cannot (`onig_sys` builds C), so it is `ci.yml`'s job, run on demand (`docs/testing.md`, CI).
+- Platform-specific code and child processes live in `infrastructure/` (the core's or the app's), behind `#[cfg]` and a port or a callback; never a `target_os` in the core's `modules/`, `app/`, `shared/`, nor a system `#[cfg]` in the app's `interfaces/`, `desktop/`. Type-check `#[cfg(windows)]` code for `x86_64-pc-windows-msvc`; the Mac cannot (`onig_sys` builds C), so it is `ci.yml`'s job, run on demand (`docs/testing.md`, CI).
 
 ## Code
 
 - Biome and rustfmt own formatting. Conditional JSX uses `cond ? (…) : null`, not `&&`. No `biome-ignore` or other suppressions: fix the root cause, or ask.
-- Layers (`pnpm boundaries:check`): `@tauri-apps/*` only in `src/infrastructure/tauri/`; modules reach the backend through ports from React context; `modules` never import `app`, `infrastructure` or another module; outside a module only its `index.ts` is imported; `shared` imports only `shared`. In Rust, `src-tauri/crates/core` (modules, shared, git, watcher) has no Tauri; its `modules/` reach git and the disk only through ports (`RepositoryBackend`, `RepositoryWatcher`).
+- Layers (`pnpm boundaries:check`): `@tauri-apps/*` only in `src/infrastructure/tauri/`; modules reach the backend through ports from React context; `modules` never import `app`, `infrastructure` or another module; outside a module only its `index.ts` is imported; `shared` imports only `shared`. In Rust (`docs/architecture.md`, Backend): `src-tauri/crates/core` has no Tauri; `app -> modules -> shared`, `infrastructure` implements their ports, `modules/` reach git and the disk only through them (`RepositoryBackend`, `RepositoryWatcher`). In the app crate, `interfaces/tauri/` holds entry points only (no state, importing no other entry file but `blocking.rs`), `desktop/` the window's session, `infrastructure/` the system's code, `bootstrap/` alone names adapters and entry points both.
 - Colors only from the `--ui-*` tokens (`*-ui-*` in Tailwind).
 - UI text only from the catalogs (`src/shared/i18n/messages/`), English and Italian together;
   keys written whole, never built (`docs/features/languages.md`). Rust text for the user:

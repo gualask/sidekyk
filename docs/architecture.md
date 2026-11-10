@@ -77,16 +77,30 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands cover every crate
 (`default-members`) except `cargo fmt`, which needs `--all`.
 
-- `src-tauri/` (`sidekyk`): `bootstrap/` (plugins, state, commands, tray, the CLI argument; the
-  composition root: the machines' adapters, `Projects` over `SettingsFile`, this machine's reader,
-  through the helper with `SIDEKYK_AGENT=local`), `interfaces/tauri/` (commands, what a tray
-  item or a shortcut press does; blocking work on `spawn_blocking`), `desktop/` (the window's
-  session: its first show, showing and hiding it, the quick note, the capture going on, the
-  settings in effect, the backend's texts, what a launch opened), and the app's own
-  infrastructure, every system `#[cfg]` of the crate (`settings_store.rs`, `stored_json.rs`,
-  `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs`, `global_shortcuts/`, `capture/`,
-  `window/`: hiding and bringing back the window, the window as a quick note); what a tray item,
-  a click or a shortcut press does reaches it as a callback from `bootstrap/`.
+- `src-tauri/` (`sidekyk`), the desktop app:
+  - `bootstrap/`: the composition root, the only place that names both adapters and entry points:
+    plugins, managed state, the commands; the machines' adapters, `Projects` over `SettingsFile`,
+    this machine's reader (through the helper with `SIDEKYK_AGENT=local`); the core's ports the
+    commands reach (`Ports`: notes storage, files given to a note, files an export writes); what
+    the tray's items, the shortcuts' presses and the app's events call.
+  - `interfaces/tauri/`: entry points only, each translating and delegating to the core's `app`,
+    `desktop/` or a Tauri plugin (dialog, opener): the commands and URI schemes, `tray.rs` and
+    `shortcuts.rs` (what an item or a press does), `cli.rs` (a folder, `--toggle`, else show),
+    `lifecycle.rs` (page load, close, run events). `blocking.rs`, the one file the others import:
+    work off the async runtime, logged; a folder by its id; a book's notes; the `Ports`.
+  - `desktop/`: the window's session: the first show, showing and hiding it, closing into the tray
+    (`window.rs`), the quick note's stages (`quick_note.rs`), one capture at a time and the areas
+    waiting (`capture.rs`), the settings in effect (`settings.rs`), the backend's texts
+    (`texts.rs`), what a launch opened (`launch.rs`). Never imports `interfaces/`; inside it,
+    `window -> quick_note`, `capture -> window, texts`, `settings -> texts, window`.
+  - `infrastructure/`: every system `#[cfg]` of the crate: `settings_store.rs`, `stored_json.rs`,
+    `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs` (icon, menu, whether it is up),
+    `global_shortcuts/` (the plugin's registrar, Linux's command, macOS's own shortcuts),
+    `capture/`, `window/` (hiding and bringing back the window, a Dock reopen, the window as a
+    quick note). Never imports `desktop/` nor `interfaces/`: what a tray item, a click or a press
+    does comes as a callback from `bootstrap/`, the tray's labels as values. The `#[cfg]` left
+    elsewhere decide no system: `main.rs`'s console, `lib.rs`'s mobile entry, `bootstrap/`'s
+    desktop-only single instance and dev-only helper.
 - Files the app writes (notes, settings and projects, an export) go through `files.rs`'s
   `write_whole`: beside the file, `sync_all`, renamed over, so a crash or a full disk leaves the
   previous file, never half of one. Reads are bounded (`read_within`, the notes' too).
@@ -117,6 +131,11 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
     `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure), `diagram`
     (Mermaid to an SVG with merman, pure).
+  - Rules: `app -> modules -> shared`; `infrastructure` implements the ports of `app` and
+    `modules`. Modules import each other without a cycle (`repository -> folder`; `syntax ->
+    repository, folder`; `search -> folder, repository, notes, projects`; `projects -> folder`;
+    `reader -> folder, repository, preview, search, syntax`). No `target_os` in `modules/`, `app/`,
+    `shared/`.
   - `app/`: the application service, over the modules, which never import it; it never imports
     `infrastructure`. `machines.rs`: the `Machine` port, one adapter per kind of `Location`, and
     the policy over them: which reads a folder, what each watches and keeps, the window's
