@@ -704,8 +704,6 @@ impl NotesStore {
         self.change(storage, book, |notes| notes.set_text(id, text, now()))
     }
 
-    /// Adds images to a note, or to a new one on top of a list: their files first, then the note
-    /// that names them. Files written for a change that fails are removed at the next session.
     /// A captured area, a new note on top of the book's open list.
     pub fn add_capture(
         &self,
@@ -717,6 +715,8 @@ impl NotesStore {
         self.add_images(storage, book, ImageTarget::New { list }, vec![image])
     }
 
+    /// Adds images to a note, or to a new one on top of a list: their files first, then the note
+    /// that names them. Files written for a change that fails are removed at the next session.
     pub fn add_images(
         &self,
         storage: &dyn NotesStorage,
