@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 
-use super::process;
+use crate::infrastructure::process;
 
 /// Where the helper is installed, under the machine's user's home.
 pub const SERVER_DIR: &str = ".sidekyk-server";

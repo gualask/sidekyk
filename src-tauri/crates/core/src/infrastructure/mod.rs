@@ -4,11 +4,9 @@
 pub mod agent;
 mod folder_walk;
 pub mod git_cli;
-pub mod linux_helper;
 pub mod machines;
 mod process;
 pub mod watcher;
-pub mod wsl;
 
 use std::process::Command;
 

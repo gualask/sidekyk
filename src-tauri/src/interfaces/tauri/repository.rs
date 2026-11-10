@@ -50,7 +50,7 @@ pub(super) async fn on_folder<T: Send + 'static>(
         work(OnFolder {
             app,
             folder: &folder.location,
-            repositories: &*projects.repositories_at(&folder.location),
+            repositories: &*projects.repositories_at(&folder.location)?,
             info: &folder.repository(&project),
         })
     })

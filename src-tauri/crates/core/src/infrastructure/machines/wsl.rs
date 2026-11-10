@@ -11,10 +11,12 @@ use std::time::{Duration, Instant};
 
 use anyhow::Context;
 
-use super::agent::AgentRepositories;
-use super::hide_console;
 use super::linux_helper::{LinuxHelper, LinuxMachine};
-use super::process;
+use crate::app::machines::{Machine, MachineReader};
+use crate::infrastructure::agent::AgentRepositories;
+use crate::infrastructure::hide_console;
+use crate::infrastructure::process;
+use crate::modules::projects::{same_distro, FoundFolder, Location, NameCase};
 use crate::modules::reader::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -221,7 +223,7 @@ impl WslRepositories {
     }
 
     /// What reads `distro`'s repositories. Starts nothing until asked something.
-    pub fn of(&self, distro: &str) -> Arc<AgentRepositories> {
+    fn of(&self, distro: &str) -> Arc<AgentRepositories> {
         let key = distro.to_ascii_lowercase();
         let mut distros = lock(&self.distros);
         if let Some(repositories) = distros.get(&key) {
@@ -240,18 +242,9 @@ impl WslRepositories {
         repositories
     }
 
-    /// Tells every distro whether the window shows, and the ones asked for later too.
-    pub fn set_visible(&self, visible: bool) {
-        let distros = lock(&self.distros);
-        self.hidden.store(!visible, Ordering::Relaxed);
-        for repositories in distros.values() {
-            repositories.set_visible(visible);
-        }
-    }
-
     /// Whether `distro` can be read without starting it, as the projects' rows are: a helper runs
     /// there, or the distro does. Otherwise `distro_stopped`, or `distro_missing`.
-    pub fn readable_without_starting(&self, distro: &str) -> anyhow::Result<()> {
+    fn distro_readable_without_starting(&self, distro: &str) -> anyhow::Result<()> {
         if self.of(distro).is_running() {
             return Ok(());
         }
@@ -278,13 +271,76 @@ impl WslRepositories {
         lock(&self.states).insert(key, (Instant::now(), state));
         Ok(state)
     }
+}
 
-    /// Every distro asked for so far, with what reads its repositories.
-    pub fn each(&self) -> Vec<(String, Arc<AgentRepositories>)> {
+/// The distro of a WSL folder; `Machines` asks only about the folders this machine holds.
+fn distro_of(location: &Location) -> &str {
+    match location {
+        Location::Wsl { distro, .. } => distro,
+        Location::Local { .. } => "",
+    }
+}
+
+impl Machine for WslRepositories {
+    fn holds(&self, location: &Location) -> bool {
+        matches!(location, Location::Wsl { .. })
+    }
+
+    fn reader(&self, location: &Location) -> Arc<dyn Repositories> {
+        self.of(distro_of(location))
+    }
+
+    fn readable_without_starting(&self, location: &Location) -> anyhow::Result<()> {
+        self.distro_readable_without_starting(distro_of(location))
+    }
+
+    /// Each distro asked for so far, reading its own folders.
+    fn readers(&self) -> Vec<MachineReader> {
         lock(&self.distros)
             .iter()
-            .map(|(distro, repositories)| (distro.clone(), repositories.clone()))
+            .map(|(distro, repositories)| {
+                let distro = distro.clone();
+                MachineReader {
+                    reader: repositories.clone(),
+                    holds: Box::new(move |location| {
+                        matches!(location, Location::Wsl { distro: d, .. } if same_distro(d, &distro))
+                    }),
+                }
+            })
             .collect()
+    }
+
+    /// A path of a WSL distro as Windows names it (`\\wsl.localhost\<distro>\…`), read in that
+    /// distro; the distro as WSL names it: `ubuntu` typed in the dialog is the project of `Ubuntu`.
+    fn folder_at(&self, path: &Path) -> Option<anyhow::Result<FoundFolder>> {
+        let (distro, path) = wsl_path(path)?;
+        Some((|| {
+            let distro = installed_distro(&distro)?;
+            let found = self.of(&distro).resolve(Path::new(&path))?;
+            Ok(FoundFolder {
+                name: found.name,
+                location: Location::Wsl {
+                    distro,
+                    root: found.root,
+                },
+            })
+        })())
+    }
+
+    /// Every distro, and the ones asked for later too; a helper tells a change it saw meanwhile
+    /// as a change.
+    fn set_visible(&self, visible: bool) -> Option<Location> {
+        let distros = lock(&self.distros);
+        self.hidden.store(!visible, Ordering::Relaxed);
+        for repositories in distros.values() {
+            repositories.set_visible(visible);
+        }
+        None
+    }
+
+    /// Linux tells names apart by case.
+    fn name_case(&self) -> NameCase {
+        NameCase::Kept
     }
 }
 

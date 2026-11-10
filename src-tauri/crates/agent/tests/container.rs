@@ -10,7 +10,7 @@ use std::sync::{mpsc, Arc};
 use std::time::{Duration, Instant};
 
 use sidekyk_core::infrastructure::agent::AgentRepositories;
-use sidekyk_core::infrastructure::linux_helper::{LinuxHelper, LinuxMachine, SERVER_DIR};
+use sidekyk_core::infrastructure::machines::linux_helper::{LinuxHelper, LinuxMachine, SERVER_DIR};
 use sidekyk_core::infrastructure::watcher::REPORT_INTERVAL;
 use sidekyk_core::modules::folder::{FolderKind, RepositoryChange, RepositoryInfo};
 use sidekyk_core::modules::reader::Repositories;

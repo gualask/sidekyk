@@ -1,87 +1,105 @@
-//! The machines a project's repository can be on, this one and WSL distros, and what reads each:
-//! where a project is read, and what every machine is told (`docs/features/wsl.md`).
+//! The machines a project's folders can be on, this one and others (WSL distros), and what each
+//! is told: where a folder is read, which folders each keeps, what each watches, whether the
+//! window shows (`docs/features/wsl.md`). Each kind of machine is an adapter of `Machine`
+//! (`infrastructure/machines/`); only the composition root names them.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::Arc;
 
-use super::wsl::{installed_distro, wsl_path, WslRepositories};
 use crate::modules::folder::RepositoryInfo;
-use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
+use crate::modules::projects::{FoundFolder, Location, NameCase, ProjectList};
 use crate::modules::reader::{OnChange, Repositories};
 
+/// A kind of machine a project's folder can be on: this one, or WSL distros. Asked only about
+/// the folders it `holds`.
+pub trait Machine: Send + Sync {
+    /// Whether the folder at `location` is on this kind of machine.
+    fn holds(&self, location: &Location) -> bool;
+
+    /// What reads the folder at `location`. Starts nothing until asked something.
+    fn reader(&self, location: &Location) -> Arc<dyn Repositories>;
+
+    /// Whether the folder at `location` reads without starting what holds it, as the projects'
+    /// rows are: a stopped WSL distro is `distro_stopped`, one gone `distro_missing`.
+    fn readable_without_starting(&self, location: &Location) -> anyhow::Result<()>;
+
+    /// The readers made so far, each with the folders it reads: a machine not asked for yet has
+    /// none, and is told nothing.
+    fn readers(&self) -> Vec<MachineReader>;
+
+    /// The folder at `path` as the host names it (`\\wsl.localhost\<distro>\…` for a distro's),
+    /// the repository holding it if any; `None` when the path is not this machine's.
+    fn folder_at(&self, path: &Path) -> Option<anyhow::Result<FoundFolder>>;
+
+    /// Tells the readers whether the window shows, and those made later. When it shows again, the
+    /// folder on screen if this machine saw it change meanwhile and told no one (a helper tells
+    /// its own as a change).
+    fn set_visible(&self, visible: bool) -> Option<Location>;
+
+    /// How its file system compares names.
+    fn name_case(&self) -> NameCase;
+}
+
+/// One reader of a machine, and which folders it reads.
+pub struct MachineReader {
+    pub reader: Arc<dyn Repositories>,
+    pub holds: Box<dyn Fn(&Location) -> bool + Send + Sync>,
+}
+
 pub struct Machines {
-    /// This machine's repositories.
-    local: Arc<dyn Repositories>,
-    /// The WSL distros', a helper per distro.
-    wsl: WslRepositories,
-}
-
-/// This machine, or a WSL distro: what one `Repositories` reads.
-enum Machine {
-    Local,
-    Wsl(String),
-}
-
-impl Machine {
-    fn holds(&self, location: &Location) -> bool {
-        match (self, location) {
-            (Self::Local, Location::Local { .. }) => true,
-            (Self::Wsl(distro), Location::Wsl { distro: d, .. }) => same_distro(distro, d),
-            _ => false,
-        }
-    }
+    /// This machine: a host path no other machine claims is its.
+    local: Arc<dyn Machine>,
+    /// The other kinds: WSL distros.
+    others: Vec<Arc<dyn Machine>>,
 }
 
 impl Machines {
-    /// `helper`: the Linux helper the installer ships, for WSL distros.
-    pub fn new(local: Arc<dyn Repositories>, helper: PathBuf) -> Self {
-        Self {
-            local,
-            wsl: WslRepositories::new(helper),
-        }
+    pub fn new(local: Arc<dyn Machine>, others: Vec<Arc<dyn Machine>>) -> Self {
+        Self { local, others }
     }
 
-    /// What reads the repository at `location`.
-    pub fn of(&self, location: &Location) -> Arc<dyn Repositories> {
-        match location {
-            Location::Local { .. } => self.local.clone(),
-            Location::Wsl { distro, .. } => self.wsl.of(distro),
-        }
+    /// Every kind of machine, this one first.
+    fn kinds(&self) -> impl Iterator<Item = &Arc<dyn Machine>> {
+        std::iter::once(&self.local).chain(&self.others)
     }
 
-    /// Whether the repository at `location` can be read without starting what holds it, as the
+    /// The kind of machine the folder at `location` is on.
+    fn holding(&self, location: &Location) -> anyhow::Result<&dyn Machine> {
+        self.kinds()
+            .find(|machine| machine.holds(location))
+            .map(|machine| &**machine)
+            .ok_or_else(|| anyhow::anyhow!("no machine holds {location:?}"))
+    }
+
+    /// What reads the folder at `location`.
+    pub fn of(&self, location: &Location) -> anyhow::Result<Arc<dyn Repositories>> {
+        Ok(self.holding(location)?.reader(location))
+    }
+
+    /// Whether the folder at `location` can be read without starting what holds it, as the
     /// projects' rows are: a WSL distro that does not run is not started.
     pub fn readable_without_starting(&self, location: &Location) -> anyhow::Result<()> {
-        match location {
-            Location::Local { .. } => Ok(()),
-            Location::Wsl { distro, .. } => self.wsl.readable_without_starting(distro),
-        }
+        self.holding(location)?.readable_without_starting(location)
     }
 
-    /// What reads each machine's repositories, this one's first; a distro only once asked for.
-    fn every(&self) -> Vec<(Machine, Arc<dyn Repositories>)> {
-        let wsl = self.wsl.each().into_iter();
-        std::iter::once((Machine::Local, self.local.clone()))
-            .chain(wsl.map(|(distro, r)| (Machine::Wsl(distro), r as Arc<dyn Repositories>)))
-            .collect()
+    /// How this machine's file system compares names, for the places of the project list.
+    pub fn name_case(&self) -> NameCase {
+        self.local.name_case()
     }
 
-    /// The repository that contains `candidate`: a folder of this machine, or of a WSL distro as
-    /// Windows names it (`\\wsl.localhost\<distro>\…`), read in that distro.
+    /// Every reader made so far, this machine's first.
+    fn readers(&self) -> Vec<MachineReader> {
+        self.kinds().flat_map(|machine| machine.readers()).collect()
+    }
+
+    /// The repository that contains `candidate`, or the folder itself without git: on the machine
+    /// whose path it is, this one when no other claims it.
     pub fn folder_at(&self, candidate: &Path) -> anyhow::Result<FoundFolder> {
-        let Some((distro, path)) = wsl_path(candidate) else {
-            return Ok(FoundFolder::local(self.local.resolve(candidate)?));
-        };
-        // as WSL names it: `ubuntu` typed in the dialog is the project of `Ubuntu`
-        let distro = installed_distro(&distro)?;
-        let found = self.wsl.of(&distro).resolve(Path::new(&path))?;
-        Ok(FoundFolder {
-            name: found.name,
-            location: Location::Wsl {
-                distro,
-                root: found.root,
-            },
-        })
+        self.others
+            .iter()
+            .find_map(|machine| machine.folder_at(candidate))
+            .or_else(|| self.local.folder_at(candidate))
+            .unwrap_or_else(|| anyhow::bail!("no machine holds {}", candidate.display()))
     }
 
     /// The repositories right inside `found`, a folder without git, on its machine: none for a
@@ -91,7 +109,7 @@ impl Machines {
             root: found.location.root().to_string(),
             name: found.name.clone(),
         };
-        let inside = self.of(&found.location).repositories_inside(&folder)?;
+        let inside = self.of(&found.location)?.repositories_inside(&folder)?;
         Ok(inside
             .into_iter()
             .map(|repository| FoundFolder {
@@ -101,48 +119,50 @@ impl Machines {
             .collect())
     }
 
-    /// Watches `followed`, the folder on screen, as its repository, where it is; every other machine
+    /// Watches `followed`, the folder on screen, as its repository, where it is; every other reader
     /// first watches nothing, so a helper left idle closes in time. A project without folder
     /// watches none.
     pub fn watch(&self, followed: Option<(&Location, RepositoryInfo)>, on_change: OnChange) {
-        for (machine, repositories) in self.every() {
+        for machine in self.readers() {
             if !followed
                 .as_ref()
-                .is_some_and(|(folder, _)| machine.holds(folder))
+                .is_some_and(|(folder, _)| (machine.holds)(folder))
             {
-                repositories.watch(None, Box::new(|_| {}));
+                machine.reader.watch(None, Box::new(|_| {}));
             }
         }
         if let Some((folder, info)) = followed {
-            self.of(folder).watch(Some(&info), on_change);
+            match self.of(folder) {
+                Ok(reader) => reader.watch(Some(&info), on_change),
+                Err(error) => tracing::warn!(error = %format!("{error:#}"), "nothing to watch"),
+            }
         }
     }
 
-    /// Tells each machine the folders it still reads, of `list`'s.
+    /// Tells each reader the folders it still reads, of `list`'s.
     pub fn retain(&self, list: &ProjectList) {
-        for (machine, repositories) in self.every() {
+        for machine in self.readers() {
             let roots: Vec<String> = list
                 .folders()
-                .filter(|folder| machine.holds(folder))
+                .filter(|folder| (machine.holds)(folder))
                 .map(|folder| folder.root().to_string())
                 .collect();
-            repositories.retain(&roots);
+            machine.reader.retain(&roots);
         }
     }
 
     /// Tells every machine whether the window shows; when it shows again, the location of the
-    /// project on screen if this machine saw it change meanwhile (a helper tells its own as a
-    /// change).
+    /// folder on screen if a machine saw it change meanwhile.
     pub fn set_visible(&self, visible: bool) -> Option<Location> {
-        self.wsl.set_visible(visible);
-        let root = self.local.set_visible(visible)?;
-        Some(Location::Local { root })
+        self.kinds()
+            .map(|machine| machine.set_visible(visible))
+            .fold(None, |missed, told| missed.or(told))
     }
 
     /// Stops the search in contents going on, wherever it runs.
     pub fn stop_content_search(&self) {
-        for (_, repositories) in self.every() {
-            repositories.stop_content_search();
+        for machine in self.readers() {
+            machine.reader.stop_content_search();
         }
     }
 }
@@ -279,10 +299,40 @@ mod tests {
         }
     }
 
+    /// This machine, read by `Told`.
+    struct Here(Arc<Told>);
+
+    impl Machine for Here {
+        fn holds(&self, location: &Location) -> bool {
+            matches!(location, Location::Local { .. })
+        }
+        fn reader(&self, _: &Location) -> Arc<dyn Repositories> {
+            self.0.clone()
+        }
+        fn readable_without_starting(&self, _: &Location) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn readers(&self) -> Vec<MachineReader> {
+            vec![MachineReader {
+                reader: self.0.clone(),
+                holds: Box::new(|location| matches!(location, Location::Local { .. })),
+            }]
+        }
+        fn folder_at(&self, _: &Path) -> Option<anyhow::Result<FoundFolder>> {
+            unreachable!()
+        }
+        fn set_visible(&self, _: bool) -> Option<Location> {
+            None
+        }
+        fn name_case(&self) -> NameCase {
+            NameCase::Kept
+        }
+    }
+
     #[test]
     fn a_project_without_folder_is_never_routed_to_a_machine() {
         let local = Arc::new(Told::default());
-        let machines = Machines::new(local.clone(), PathBuf::new());
+        let machines = Machines::new(Arc::new(Here(local.clone())), Vec::new());
         let home = Project::new("Home".into(), []);
         let shop = Project::new(
             "shop".into(),

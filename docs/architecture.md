@@ -112,9 +112,13 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
     `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure), `diagram`
     (Mermaid to an SVG with merman, pure).
+  - `app/`: the application service, over the modules, which never import it; it never imports
+    `infrastructure`. `machines.rs`: the `Machine` port, one adapter per kind of `Location`, and
+    the policy over them: which reads a folder, what each watches and keeps, the window's
+    visibility, how this machine compares names (`NameCase`) (`features/wsl.md`).
   - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
-    output size and a time), `watcher.rs` (notify), `agent/`, `linux_helper.rs`, `wsl.rs`,
-    `machines.rs` (`features/wsl.md`).
+    output size and a time), `watcher.rs` (notify), `agent/`, `machines/` (`local.rs`, `wsl.rs`,
+    `linux_helper.rs`: the adapters of `Machine`).
   - `shared/`: `AppError` (`{ code, message }`; a new code needs its key in `app-error.ts` and both
     catalogs), `coalesce.rs` (one run in flight, later callers share the next), `threads.rs` (8 at
     most).

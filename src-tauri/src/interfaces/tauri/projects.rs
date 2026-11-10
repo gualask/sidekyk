@@ -55,7 +55,12 @@ pub(crate) async fn choose_project_folder(
             .into_os_string()
             .into_string()
             .map_err(|_| anyhow::anyhow!("the folder's path is not Unicode"))?;
-        Ok(Some(projects.list().folder_choice(path, found, inside)))
+        Ok(Some(projects.list().folder_choice(
+            path,
+            found,
+            inside,
+            projects.name_case(),
+        )))
     })
     .await
 }
@@ -74,8 +79,9 @@ pub(crate) async fn create_project(
             .iter()
             .map(|path| Ok(projects.folder_at(Path::new(path))?.location))
             .collect::<anyhow::Result<Vec<_>>>()?;
+        let case = projects.name_case();
         projects.update(app, |list| {
-            let project = list.add(&name, folders)?;
+            let project = list.add(&name, folders, case)?;
             list.activate(&project.id)
         })
     })
@@ -185,8 +191,9 @@ pub(crate) async fn add_project_folder(
             return Ok(None);
         };
         let found = projects.folder_at(&folder.into_path()?)?;
+        let case = projects.name_case();
         let (other, list) =
-            projects.update_with(app, |list| list.add_folder(&project_id, found))?;
+            projects.update_with(app, |list| list.add_folder(&project_id, found, case))?;
         Ok(Some(folder_change(other, list)))
     })
     .await
@@ -220,14 +227,15 @@ pub(crate) async fn merge_projects(
         let projects = app.state::<ProjectsState>();
         let (target, merged) = (projects.project(&into)?, projects.project(&from)?);
         // before any note moves: folders on two machines or one inside another
-        projects.list().check_merge(&into, &from)?;
+        let case = projects.name_case();
+        projects.list().check_merge(&into, &from, case)?;
         app.state::<NotesStore>().merge_book(
             app.state::<NotesFiles>().inner(),
             &project_book(&merged),
             &project_book(&target),
             &merged.name,
         )?;
-        projects.update(app, |list| list.merge(&into, &from))
+        projects.update(app, |list| list.merge(&into, &from, case))
     })
     .await
 }
@@ -256,7 +264,9 @@ pub(crate) async fn relocate_folder(
             return Ok(None);
         };
         let found = projects.folder_at(&picked.into_path()?)?;
-        let (other, list) = projects.update_with(app, |list| list.relocate(&folder_id, found))?;
+        let case = projects.name_case();
+        let (other, list) =
+            projects.update_with(app, |list| list.relocate(&folder_id, found, case))?;
         Ok(Some(folder_change(other, list)))
     })
     .await

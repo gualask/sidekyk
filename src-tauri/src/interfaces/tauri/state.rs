@@ -7,12 +7,14 @@ use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager};
 
 use crate::infrastructure::settings_store;
+use sidekyk_core::app::machines::Machines;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
-use sidekyk_core::infrastructure::machines::Machines;
+use sidekyk_core::infrastructure::machines::local::LocalMachine;
+use sidekyk_core::infrastructure::machines::wsl::WslRepositories;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::folder::{RepositoryChangedEvent, REPOSITORY_CHANGED_EVENT};
 use sidekyk_core::modules::projects::{
-    FoundFolder, Location, Opened, Project, ProjectFolder, ProjectList,
+    FoundFolder, Location, NameCase, Opened, Project, ProjectFolder, ProjectList,
 };
 use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
 use sidekyk_core::modules::search::{self, ListMatch, NoteMatch, SearchRequest, SearchResults};
@@ -56,7 +58,10 @@ impl ProjectsState {
             list: Mutex::default(),
             on_screen: Mutex::default(),
             watching: Mutex::default(),
-            machines: Machines::new(repositories(), helper),
+            machines: Machines::new(
+                Arc::new(LocalMachine::new(repositories())),
+                vec![Arc::new(WslRepositories::new(helper))],
+            ),
             opened: Mutex::default(),
         }
     }
@@ -102,8 +107,16 @@ impl ProjectsState {
     }
 
     /// What reads the repository at `folder`, where it is.
-    pub(crate) fn repositories_at(&self, folder: &Location) -> Arc<dyn Repositories> {
+    pub(crate) fn repositories_at(
+        &self,
+        folder: &Location,
+    ) -> anyhow::Result<Arc<dyn Repositories>> {
         self.machines.of(folder)
+    }
+
+    /// How this machine's file system compares names, for the places of the list.
+    pub(crate) fn name_case(&self) -> NameCase {
+        self.machines.name_case()
     }
 
     /// Whether the folder at `folder` can be read without starting what holds it: everything but
@@ -122,7 +135,7 @@ impl ProjectsState {
     pub(crate) fn set_visible(&self, visible: bool) -> Option<String> {
         let missed = self.machines.set_visible(visible)?;
         let list = lock(&self.list);
-        let (_, folder) = list.folder_at(&missed)?;
+        let (_, folder) = list.folder_at(&missed, self.machines.name_case())?;
         Some(folder.id.clone())
     }
 
@@ -155,6 +168,7 @@ impl ProjectsState {
             let (project, folder) = on_screen.as_ref().filter(|(p, _)| p.id == id)?;
             self.readable_without_starting(&folder.location).ok()?;
             self.repositories_at(&folder.location)
+                .ok()?
                 .search_files(&folder.repository(project), &request.query)
         };
         let notes_of = |id: &str| list.find(id).ok().and_then(notes_of);
@@ -182,7 +196,7 @@ impl ProjectsState {
             readable(folder)
                 && self
                     .repositories_at(&folder.location)
-                    .file_stamp(&folder.repository(&project), path)
+                    .and_then(|on| on.file_stamp(&folder.repository(&project), path))
                     .is_ok()
         };
         if let Some(folder) = first.filter(|f| on_screen_holds(f)) {
@@ -192,7 +206,7 @@ impl ProjectsState {
             readable(folder)
                 && self
                     .repositories_at(&folder.location)
-                    .tree_holds_now(&folder.repository(&project), path)
+                    .and_then(|on| on.tree_holds_now(&folder.repository(&project), path))
                     .unwrap_or(false)
         };
         let others: Vec<&ProjectFolder> = project
@@ -304,15 +318,16 @@ pub(crate) fn open_folder(app: &tauri::AppHandle, candidate: &Path) -> anyhow::R
     let state = app.state::<ProjectsState>();
     let found = state.folder_at(candidate)?;
     let list = state.list();
-    if list.at(&found.location).is_none() {
+    let case = state.name_case();
+    if list.at(&found.location, case).is_none() {
         let inside = state.repositories_inside(&found)?;
         let path = candidate.to_string_lossy().into_owned();
-        let choice = list.folder_choice(path, found.clone(), inside);
+        let choice = list.folder_choice(path, found.clone(), inside, case);
         if choice.holds_free_repositories() {
             return Ok(Opened::Choice { choice });
         }
     }
-    let (opened, _) = state.update_with(app, |list| Ok(list.open_folder(found)))?;
+    let (opened, _) = state.update_with(app, |list| Ok(list.open_folder(found, case)))?;
     Ok(opened)
 }
 

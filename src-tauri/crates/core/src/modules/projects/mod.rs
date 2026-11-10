@@ -9,4 +9,4 @@ pub use contracts::{
     FolderChange, FolderChoice, Location, Opened, Project, ProjectFolder, ProjectList,
     ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT,
 };
-pub use place::{same_distro, FoundFolder};
+pub use place::{same_distro, FoundFolder, NameCase};

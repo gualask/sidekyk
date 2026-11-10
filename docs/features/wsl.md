@@ -27,10 +27,11 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
 - Identity: `{ distro, root }`, `root` a Linux path, the distro's default user. `wsl_path` reads
   `\\wsl.localhost\`, `\\wsl$\` and `\\?\UNC\` once, where a folder is chosen; the notes export
   refuses a path in a distro.
-- Routing: `Machines` (`infrastructure/machines.rs`) sends a project to `LocalRepositories` or to
-  its distro's `AgentRepositories` (`WslRepositories`, one helper per distro). Every machine is
-  told the window's visibility and the projects it keeps; one with nothing on screen is told to
-  watch nothing, which starts no helper. "Nothing starts a distro unasked" is the machine's
+- Routing: `Machines` (`app/machines.rs`, the core) sends a folder to the `Machine` adapter that
+  holds its `Location` (`infrastructure/machines/`): `LocalMachine` (`LocalRepositories`) or
+  `WslRepositories` (an `AgentRepositories` per distro, one helper each). Every reader made is
+  told the window's visibility and the folders it keeps; one with nothing on screen is told to
+  watch nothing, which starts no helper. A container is one more adapter. "Nothing starts a distro unasked" is the machine's
   (`readable_without_starting`), checked by `search` and `search_contents`; the kind's query asks
   with `start` only from the Start button (`useStartFolder`).
 - Distro state: `wsl.exe --list --running --quiet` and `--list --quiet`, names only (the columns of
@@ -46,7 +47,7 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   `build.yml`). Installed on first use as `~/.sidekyk-server/sidekyk-agent-<version>-<hash>`
   (`wslpath -u` + `cp` from `/mnt/…`, stdin as fallback; a temp name, `chmod 755`, `mv`); `version`
   checked at each start; the helper removes older ones. Started as `wsl.exe --distribution <d> --cd
-  ~ --exec .sidekyk-server/<name> serve`, no shell (`infrastructure/wsl.rs`, `linux_helper.rs` over
+  ~ --exec .sidekyk-server/<name> serve`, no shell (`infrastructure/machines/wsl.rs`, `linux_helper.rs` over
   a `LinuxMachine`, which the container fixture also implements).
 - Protocol (`infrastructure/agent/`): frames of a u32 LE length and a JSON envelope `{ id, … }`,
   several in flight; one request per method of the `Repositories` port; a reply's value is raw

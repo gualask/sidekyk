@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use super::contracts::{
     FolderChoice, FolderInside, Location, Opened, Project, ProjectFolder, ProjectList, TilesLayout,
 };
-use super::place::{linux_parts, local_parts, same_distro, FoundFolder, IGNORE_CASE};
+use super::place::{linux_parts, local_parts, same_distro, FoundFolder, NameCase};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// A stored layout is the frontend's: panel ids are short words, and a project has a few panels.
@@ -53,15 +53,23 @@ impl ProjectList {
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))
     }
 
-    /// The project following the folder at `location`, if one does.
-    pub fn at(&self, location: &Location) -> Option<&Project> {
-        self.folder_at(location).map(|(project, _)| project)
+    /// The project following the folder at `location`, if one does; this machine's names compared
+    /// as `case` says, here and in every method that compares places.
+    pub fn at(&self, location: &Location, case: NameCase) -> Option<&Project> {
+        self.folder_at(location, case).map(|(project, _)| project)
     }
 
     /// The folder at `location`, if a project follows it, and that project.
-    pub fn folder_at(&self, location: &Location) -> Option<(&Project, &ProjectFolder)> {
+    pub fn folder_at(
+        &self,
+        location: &Location,
+        case: NameCase,
+    ) -> Option<(&Project, &ProjectFolder)> {
         self.projects.iter().find_map(|p| {
-            let folder = p.folders.iter().find(|f| f.location.same_place(location))?;
+            let folder = p
+                .folders
+                .iter()
+                .find(|f| f.location.same_place(location, case))?;
             Some((p, folder))
         })
     }
@@ -69,8 +77,8 @@ impl ProjectList {
     /// Puts on screen the project following `found`, adding a project at the end, named after the
     /// folder, when none follows it: a folder is one project's. That project comes back, with
     /// the folder to show.
-    pub fn open_folder(&mut self, found: FoundFolder) -> Opened {
-        let (id, folder) = match self.folder_at(&found.location) {
+    pub fn open_folder(&mut self, found: FoundFolder, case: NameCase) -> Opened {
+        let (id, folder) = match self.folder_at(&found.location, case) {
             Some((project, folder)) => (project.id.clone(), folder.id.clone()),
             None => {
                 let project = Project::new(found.name, [found.location]);
@@ -89,13 +97,18 @@ impl ProjectList {
     /// A new project of this name, following `folders` (none, one or several), last; the one on
     /// screen stays, unless there was none. A folder is one project's: one already followed is
     /// refused, and so are folders on two machines or one inside another.
-    pub fn add(&mut self, name: &str, folders: Vec<Location>) -> anyhow::Result<Project> {
+    pub fn add(
+        &mut self,
+        name: &str,
+        folders: Vec<Location>,
+        case: NameCase,
+    ) -> anyhow::Result<Project> {
         let name = checked_name(name)?;
         for (index, folder) in folders.iter().enumerate() {
-            if let Some(other) = self.at(folder) {
+            if let Some(other) = self.at(folder, case) {
                 anyhow::bail!("that folder is already the project {}", other.id);
             }
-            checked_beside(folder, &folders[..index])?;
+            checked_beside(folder, &folders[..index], case)?;
         }
         let project = Project::new(name, folders);
         self.projects.push(project.clone());
@@ -108,12 +121,17 @@ impl ProjectList {
     /// Adds the folder found at `found` to the project `id`, last. When it is
     /// another project's, nothing changes and that project comes back: a folder is one
     /// project's, and that project may be merged into this one (`merge`).
-    pub fn add_folder(&mut self, id: &str, found: FoundFolder) -> anyhow::Result<Option<Project>> {
+    pub fn add_folder(
+        &mut self,
+        id: &str,
+        found: FoundFolder,
+        case: NameCase,
+    ) -> anyhow::Result<Option<Project>> {
         let project = self.find(id)?;
-        if let Some(other) = self.at(&found.location).filter(|p| p.id != id) {
+        if let Some(other) = self.at(&found.location, case).filter(|p| p.id != id) {
             return Ok(Some(other.clone()));
         }
-        checked_beside(&found.location, project.locations())?;
+        checked_beside(&found.location, project.locations(), case)?;
         self.project_mut(id)?
             .folders
             .push(ProjectFolder::new(found.location));
@@ -136,8 +154,8 @@ impl ProjectList {
     /// Moves the folders of the project `from` into the project `into`, after its own, and
     /// forgets `from`: its notes are the caller's to move first. Refused, changing nothing, when
     /// the folders would be on two machines or one inside another.
-    pub fn merge(&mut self, into: &str, from: &str) -> anyhow::Result<()> {
-        self.check_merge(into, from)?;
+    pub fn merge(&mut self, into: &str, from: &str, case: NameCase) -> anyhow::Result<()> {
+        self.check_merge(into, from, case)?;
         let moved = self.find(from)?.folders.clone();
         let was_active = self.active.as_deref() == Some(from);
         self.remove(from)?;
@@ -150,13 +168,13 @@ impl ProjectList {
 
     /// Whether the project `from` may be merged into `into` (`merge`), changing nothing: its
     /// folders on the same machine as `into`'s, none overlapping another.
-    pub fn check_merge(&self, into: &str, from: &str) -> anyhow::Result<()> {
+    pub fn check_merge(&self, into: &str, from: &str, case: NameCase) -> anyhow::Result<()> {
         anyhow::ensure!(into != from, "a project merged into itself");
         let target = self.find(into)?;
         let moved = self.find(from)?;
         for (index, folder) in moved.folders.iter().enumerate() {
             let earlier = moved.folders[..index].iter().map(|f| &f.location);
-            checked_beside(&folder.location, target.locations().chain(earlier))?;
+            checked_beside(&folder.location, target.locations().chain(earlier), case)?;
         }
         Ok(())
     }
@@ -175,8 +193,9 @@ impl ProjectList {
         path: String,
         found: FoundFolder,
         inside: Vec<FoundFolder>,
+        case: NameCase,
     ) -> FolderChoice {
-        if let Some(other) = self.at(&found.location) {
+        if let Some(other) = self.at(&found.location, case) {
             return FolderChoice::InProject {
                 id: other.id.clone(),
                 name: other.name.clone(),
@@ -188,7 +207,7 @@ impl ProjectList {
                 let path = Path::new(&path).join(&repository.name).into_os_string();
                 Some(FolderInside {
                     path: path.into_string().ok()?,
-                    in_project: self.at(&repository.location).map(|p| p.name.clone()),
+                    in_project: self.at(&repository.location, case).map(|p| p.name.clone()),
                     name: repository.name,
                     location: repository.location,
                 })
@@ -233,18 +252,9 @@ impl ProjectList {
     }
 
     /// Whether `path`, on this machine, is inside a local project's folder, compared as the file
-    /// system does. `canonical` names a path as the file system does (links resolved).
-    pub fn holds(&self, path: &Path, canonical: impl Fn(&Path) -> PathBuf) -> bool {
-        self.holds_as(path, canonical, IGNORE_CASE)
-    }
-
-    fn holds_as(
-        &self,
-        path: &Path,
-        canonical: impl Fn(&Path) -> PathBuf,
-        ignore_case: bool,
-    ) -> bool {
-        let parts = |path: &Path| local_parts(&canonical(path), ignore_case);
+    /// system does (`case`). `canonical` names a path as the file system does (links resolved).
+    pub fn holds(&self, path: &Path, canonical: impl Fn(&Path) -> PathBuf, case: NameCase) -> bool {
+        let parts = |path: &Path| local_parts(&canonical(path), case);
         let path = parts(path);
         self.folders()
             .filter_map(Location::local_root)
@@ -270,14 +280,15 @@ impl ProjectList {
         &mut self,
         folder: &str,
         found: FoundFolder,
+        case: NameCase,
     ) -> anyhow::Result<Option<Project>> {
         let (project, _) = self.folder(folder)?;
         let id = project.id.clone();
-        if let Some(other) = self.at(&found.location).filter(|p| p.id != id) {
+        if let Some(other) = self.at(&found.location, case).filter(|p| p.id != id) {
             return Ok(Some(other.clone()));
         }
         let others = project.folders.iter().filter(|f| f.id != folder);
-        checked_beside(&found.location, others.map(|f| &f.location))?;
+        checked_beside(&found.location, others.map(|f| &f.location), case)?;
         if let Some(moved) = self
             .project_mut(&id)?
             .folders
@@ -312,12 +323,13 @@ impl ProjectList {
 fn checked_beside<'a>(
     folder: &Location,
     beside: impl IntoIterator<Item = &'a Location>,
+    case: NameCase,
 ) -> anyhow::Result<()> {
     for other in beside {
         if !other.same_machine(folder) {
             return Err(user_facing(UserFacingErrorCode::FolderElsewhere));
         }
-        if other.overlaps(folder) {
+        if other.overlaps(folder, case) {
             return Err(user_facing(UserFacingErrorCode::FolderOverlaps));
         }
     }
@@ -334,6 +346,9 @@ fn checked_name(name: &str) -> anyhow::Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Names compared as Linux does; the case ignored is told in its own tests.
+    const CASE: NameCase = NameCase::Kept;
     use crate::shared::error::user_facing_code;
 
     /// A project stored before ids, so its id is its root: `/a`.
@@ -370,7 +385,7 @@ mod tests {
     #[test]
     fn a_new_folder_is_a_new_project_on_screen() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
-        projects.open_folder(found("/c"));
+        projects.open_folder(found("/c"), CASE);
         assert_eq!(roots(&projects), ["/a", "/b", "/c"]);
         let added = &projects.projects[2];
         assert_eq!(added.name, "c");
@@ -381,30 +396,34 @@ mod tests {
     #[test]
     fn a_folder_already_followed_opens_its_project() {
         let mut projects = list(&["/a", "/b"], Some("/b"));
-        projects.open_folder(found("/a/"));
+        projects.open_folder(found("/a/"), CASE);
         assert_eq!(projects, list(&["/a", "/b"], Some("/a")));
     }
 
     #[test]
     fn a_project_added_by_name_has_no_folder_and_leaves_the_one_on_screen() {
         let mut projects = list(&["/a"], Some("/a"));
-        let added = projects.add("  Casa ", vec![]).unwrap();
+        let added = projects.add("  Casa ", vec![], CASE).unwrap();
         assert_eq!((added.name.as_str(), added.folders.len()), ("Casa", 0));
         assert_eq!(projects.active.as_deref(), Some("/a"));
-        assert!(projects.add("  ", vec![]).is_err());
+        assert!(projects.add("  ", vec![], CASE).is_err());
 
         let mut empty = ProjectList::default();
-        let first = empty.add("Casa", vec![]).unwrap();
+        let first = empty.add("Casa", vec![], CASE).unwrap();
         assert_eq!(empty.active, Some(first.id));
     }
 
     #[test]
     fn a_project_added_with_a_folder_follows_it_unless_another_does() {
         let mut projects = list(&["/a"], Some("/a"));
-        let added = projects.add("api", vec![found("/api").location]).unwrap();
+        let added = projects
+            .add("api", vec![found("/api").location], CASE)
+            .unwrap();
         assert_eq!(roots(&projects), ["/a", "/api"]);
         assert_eq!(added.folders[0].location, found("/api").location);
-        assert!(projects.add("again", vec![found("/a/").location]).is_err());
+        assert!(projects
+            .add("again", vec![found("/a/").location], CASE)
+            .is_err());
         assert_eq!(projects.projects.len(), 2);
     }
 
@@ -426,18 +445,19 @@ mod tests {
             .add(
                 "Shop",
                 vec![found("/shop/api").location, found("/shop/web").location],
+                CASE,
             )
             .unwrap();
         assert_eq!(shop.folders.len(), 2);
         assert_ne!(shop.folders[0].id, shop.folders[1].id);
         let nested = vec![found("/x").location, found("/x/y").location];
         assert_eq!(
-            code(projects.add("x", nested).unwrap_err()),
+            code(projects.add("x", nested, CASE).unwrap_err()),
             Some("folder_overlaps")
         );
         let apart = vec![found("/x").location, wsl("/x")];
         assert_eq!(
-            code(projects.add("x", apart).unwrap_err()),
+            code(projects.add("x", apart, CASE).unwrap_err()),
             Some("folder_elsewhere")
         );
         assert_eq!(projects.projects.len(), 1);
@@ -447,7 +467,11 @@ mod tests {
     fn a_folder_removed_leaves_its_project() {
         let mut projects = ProjectList::default();
         let shop = projects
-            .add("Shop", vec![found("/api").location, found("/web").location])
+            .add(
+                "Shop",
+                vec![found("/api").location, found("/web").location],
+                CASE,
+            )
             .unwrap();
         let web = &shop.folders[1].id;
         projects.remove_folder(&shop.id, web).unwrap();
@@ -471,9 +495,13 @@ mod tests {
     fn opening_a_folder_of_a_project_shows_that_folder() {
         let mut projects = list(&["/a"], Some("/a"));
         let shop = projects
-            .add("Shop", vec![found("/api").location, found("/web").location])
+            .add(
+                "Shop",
+                vec![found("/api").location, found("/web").location],
+                CASE,
+            )
             .unwrap();
-        let opened = projects.open_folder(found("/web/"));
+        let opened = projects.open_folder(found("/web/"), CASE);
         assert_eq!(projects.active.as_deref(), Some(shop.id.as_str()));
         assert_eq!(
             opened,
@@ -487,17 +515,17 @@ mod tests {
     #[test]
     fn a_folder_added_goes_last_and_another_project_s_is_not_taken() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
-        assert_eq!(projects.add_folder("/a", found("/c")).unwrap(), None);
+        assert_eq!(projects.add_folder("/a", found("/c"), CASE).unwrap(), None);
         assert_eq!(projects.projects[0].folders.len(), 2);
         assert_eq!(projects.projects[0].folders[1].location.root(), "/c");
-        let other = projects.add_folder("/a", found("/b")).unwrap();
+        let other = projects.add_folder("/a", found("/b"), CASE).unwrap();
         assert_eq!(other.map(|p| p.id), Some("/b".into()));
         assert_eq!(
-            code(projects.add_folder("/a", found("/c/d")).unwrap_err()),
+            code(projects.add_folder("/a", found("/c/d"), CASE).unwrap_err()),
             Some("folder_overlaps")
         );
         assert_eq!(
-            code(projects.add_folder("/a", found("/")).unwrap_err()),
+            code(projects.add_folder("/a", found("/"), CASE).unwrap_err()),
             Some("folder_overlaps")
         );
         assert_eq!(
@@ -508,7 +536,8 @@ mod tests {
                         FoundFolder {
                             name: "w".into(),
                             location: wsl("/w")
-                        }
+                        },
+                        CASE
                     )
                     .unwrap_err()
             ),
@@ -516,7 +545,7 @@ mod tests {
         );
         // the project's own folder again: already there
         assert_eq!(
-            code(projects.add_folder("/a", found("/a")).unwrap_err()),
+            code(projects.add_folder("/a", found("/a"), CASE).unwrap_err()),
             Some("folder_overlaps")
         );
         assert_eq!(projects.projects[0].folders.len(), 2);
@@ -526,7 +555,7 @@ mod tests {
     fn a_project_merged_brings_its_folders_and_goes() {
         let mut projects = list(&["/api", "/web", "/ops"], Some("/web"));
         projects.set_layout("/web", layout(0.3)).unwrap();
-        projects.merge("/api", "/web").unwrap();
+        projects.merge("/api", "/web", CASE).unwrap();
         assert_eq!(roots(&projects), ["/api", "/ops"]);
         let folders: Vec<&str> = projects.projects[0]
             .folders
@@ -536,13 +565,13 @@ mod tests {
         assert_eq!(folders, ["/api", "/web"]);
         assert_eq!(projects.active.as_deref(), Some("/api"));
         assert!(projects.layouts.is_empty());
-        assert!(projects.merge("/api", "/api").is_err());
-        assert!(projects.merge("/api", "/gone").is_err());
+        assert!(projects.merge("/api", "/api", CASE).is_err());
+        assert!(projects.merge("/api", "/gone", CASE).is_err());
 
         let mut apart = list(&["/x"], Some("/x"));
-        let inside = apart.add("y", vec![found("/x/y").location]).unwrap();
+        let inside = apart.add("y", vec![found("/x/y").location], CASE).unwrap();
         assert_eq!(
-            code(apart.merge("/x", &inside.id).unwrap_err()),
+            code(apart.merge("/x", &inside.id, CASE).unwrap_err()),
             Some("folder_overlaps")
         );
         assert_eq!(apart.projects.len(), 2);
@@ -551,7 +580,7 @@ mod tests {
     #[test]
     fn a_folder_picked_is_another_projects_or_one_to_follow() {
         let projects = list(&["/a"], Some("/a"));
-        let usable = projects.folder_choice("/api/src".into(), found("/api"), vec![]);
+        let usable = projects.folder_choice("/api/src".into(), found("/api"), vec![], CASE);
         assert_eq!(
             usable,
             FolderChoice::Usable {
@@ -561,7 +590,7 @@ mod tests {
                 repositories: vec![],
             }
         );
-        let taken = projects.folder_choice("/a/src".into(), found("/a/"), vec![]);
+        let taken = projects.folder_choice("/a/src".into(), found("/a/"), vec![], CASE);
         assert_eq!(
             taken,
             FolderChoice::InProject {
@@ -582,7 +611,7 @@ mod tests {
         };
         let inside = vec![repository("api"), repository("web")];
         let FolderChoice::Usable { repositories, .. } =
-            projects.folder_choice("/shop".into(), found("/shop"), inside)
+            projects.folder_choice("/shop".into(), found("/shop"), inside, CASE)
         else {
             panic!("a folder of no project");
         };
@@ -686,28 +715,31 @@ mod tests {
     fn a_path_inside_a_repository_is_found_however_it_is_written() {
         let projects = list(&["/Dev/Shop"], Some("/Dev/Shop"));
         let same = |path: &Path| path.to_path_buf();
-        assert!(projects.holds_as(Path::new("/Dev/Shop/notes.md"), same, false));
-        assert!(!projects.holds_as(Path::new("/Dev/Shopping/notes.md"), same, false));
-        assert!(!projects.holds_as(Path::new("/dev/shop/notes.md"), same, false));
-        assert!(projects.holds_as(Path::new("/dev/shop/notes.md"), same, true));
+        assert!(projects.holds(Path::new("/Dev/Shop/notes.md"), same, NameCase::Kept));
+        assert!(!projects.holds(Path::new("/Dev/Shopping/notes.md"), same, NameCase::Kept));
+        assert!(!projects.holds(Path::new("/dev/shop/notes.md"), same, NameCase::Kept));
+        assert!(projects.holds(Path::new("/dev/shop/notes.md"), same, NameCase::Ignored));
         // a link to the repository, as the file system resolves it
         let resolved =
             |path: &Path| PathBuf::from(path.to_string_lossy().replace("/link", "/Dev/Shop"));
-        assert!(projects.holds_as(Path::new("/link/notes.md"), resolved, false));
+        assert!(projects.holds(Path::new("/link/notes.md"), resolved, NameCase::Kept));
     }
 
     #[test]
     fn a_wsl_project_holds_no_path_of_this_machine() {
         let mut projects = list(&[], None);
-        projects.open_folder(FoundFolder {
-            name: "shop".into(),
-            location: Location::Wsl {
-                distro: "Ubuntu".into(),
-                root: "/home/ale/shop".into(),
+        projects.open_folder(
+            FoundFolder {
+                name: "shop".into(),
+                location: Location::Wsl {
+                    distro: "Ubuntu".into(),
+                    root: "/home/ale/shop".into(),
+                },
             },
-        });
+            CASE,
+        );
         let same = |path: &Path| path.to_path_buf();
-        assert!(!projects.holds_as(Path::new("/home/ale/shop/notes.md"), same, false));
+        assert!(!projects.holds(Path::new("/home/ale/shop/notes.md"), same, NameCase::Kept));
         assert!(projects.holds_in_wsl("Ubuntu", "/home/ale/shop/notes.md"));
         assert!(projects.holds_in_wsl("ubuntu", "/home/ale/shop"));
         assert!(!projects.holds_in_wsl("Ubuntu", "/home/ale/shopping/notes.md"));
@@ -718,7 +750,10 @@ mod tests {
     fn a_project_found_elsewhere_keeps_its_id_name_place_and_layout() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
         projects.set_layout("/a", layout(0.3)).unwrap();
-        assert_eq!(projects.relocate("/a", found("/moved")).unwrap(), None);
+        assert_eq!(
+            projects.relocate("/a", found("/moved"), CASE).unwrap(),
+            None
+        );
         assert_eq!(roots(&projects), ["/moved", "/b"]);
         let moved = &projects.projects[0];
         assert_eq!((moved.id.as_str(), moved.name.as_str()), ("/a", "a"));
@@ -729,28 +764,32 @@ mod tests {
     #[test]
     fn a_folder_of_another_project_is_not_taken() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
-        let other = projects.relocate("/a", found("/b")).unwrap();
+        let other = projects.relocate("/a", found("/b"), CASE).unwrap();
         assert_eq!(other.map(|p| p.id), Some("/b".into()));
         assert_eq!(projects, list(&["/a", "/b"], Some("/a")));
-        assert_eq!(projects.relocate("/a", found("/a")).unwrap(), None);
-        assert!(projects.relocate("/gone", found("/c")).is_err());
+        assert_eq!(projects.relocate("/a", found("/a"), CASE).unwrap(), None);
+        assert!(projects.relocate("/gone", found("/c"), CASE).is_err());
     }
 
     #[test]
     fn a_folder_relocated_keeps_its_id_beside_the_others() {
         let mut projects = ProjectList::default();
         let shop = projects
-            .add("Shop", vec![found("/api").location, found("/web").location])
+            .add(
+                "Shop",
+                vec![found("/api").location, found("/web").location],
+                CASE,
+            )
             .unwrap();
         let web = &shop.folders[1].id;
-        assert_eq!(projects.relocate(web, found("/moved")).unwrap(), None);
+        assert_eq!(projects.relocate(web, found("/moved"), CASE).unwrap(), None);
         let folders = &projects.projects[0].folders;
         assert_eq!(
             (folders[1].id.as_str(), folders[1].location.root()),
             (web.as_str(), "/moved")
         );
         assert_eq!(
-            code(projects.relocate(web, found("/api/web")).unwrap_err()),
+            code(projects.relocate(web, found("/api/web"), CASE).unwrap_err()),
             Some("folder_overlaps")
         );
     }

@@ -12,7 +12,7 @@ use super::state::ProjectsState;
 use super::texts;
 use crate::infrastructure::files::write_whole;
 use crate::infrastructure::notes_files::{read_image_file, resolved_path, NotesFiles};
-use sidekyk_core::infrastructure::wsl::{linux_path, wsl_path};
+use sidekyk_core::infrastructure::machines::wsl::{linux_path, wsl_path};
 use sidekyk_core::modules::notes::{
     as_png, image_file, prepare, to_markdown, Book, DeletedList, ImageTarget, ListTarget, Mark,
     MovedList, MovedNote, Note, NoteList, NotesCount, NotesStore, ProjectNotes, EXPORT_IMAGES,
@@ -543,7 +543,7 @@ pub(crate) async fn export_notes(
         let list = projects.list();
         let inside = match wsl_path(&path) {
             Some((distro, path)) => list.holds_in_wsl(&distro, &path),
-            None => list.holds(&path, resolved_path),
+            None => list.holds(&path, resolved_path, projects.name_case()),
         };
         if inside {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
