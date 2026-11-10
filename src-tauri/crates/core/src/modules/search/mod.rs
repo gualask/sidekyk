@@ -30,7 +30,7 @@ use crate::modules::repository::{ChangeKind, ChangedFile};
 const FILE_LIMIT: usize = 500;
 
 /// At most this many files go back to a note's `@`: its menu shows a few.
-pub const NOTE_FILE_LIMIT: usize = 20;
+const SUGGESTED_FILE_LIMIT: usize = 20;
 
 /// A project's files: those git lists, and how they changed as its last snapshot found.
 pub struct ProjectFiles {
@@ -108,10 +108,10 @@ pub fn rank_names(query: &str, names: &[&str]) -> Vec<usize> {
     best.into_iter().map(|scored| scored.index).collect()
 }
 
-/// The files a note's `@` gets of `found`: the best `NOTE_FILE_LIMIT`, the others counted.
+/// The files a note's `@` gets of `found`: the best `SUGGESTED_FILE_LIMIT`, the others counted.
 pub fn note_files(mut found: FileMatches) -> FileMatches {
-    let cut = found.files.len().saturating_sub(NOTE_FILE_LIMIT);
-    found.files.truncate(NOTE_FILE_LIMIT);
+    let cut = found.files.len().saturating_sub(SUGGESTED_FILE_LIMIT);
+    found.files.truncate(SUGGESTED_FILE_LIMIT);
     found.more += cut as u32;
     found
 }
@@ -187,8 +187,8 @@ mod tests {
                 .collect(),
             more,
         };
-        let cut = note_files(found(NOTE_FILE_LIMIT + 5, 7));
-        assert_eq!((cut.files.len(), cut.more), (NOTE_FILE_LIMIT, 12));
+        let cut = note_files(found(SUGGESTED_FILE_LIMIT + 5, 7));
+        assert_eq!((cut.files.len(), cut.more), (SUGGESTED_FILE_LIMIT, 12));
         let few = note_files(found(3, 0));
         assert_eq!((few.files.len(), few.more), (3, 0));
     }

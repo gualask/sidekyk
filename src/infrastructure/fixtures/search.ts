@@ -11,8 +11,8 @@ import type { FixtureNotes } from './notes';
 import type { FixtureProjects } from './projects';
 import type { FixtureFolders } from './repository';
 
-/** As the backend's `NOTE_FILE_LIMIT`: the files a note's `@` gets at most. */
-const NOTE_FILE_LIMIT = 20;
+/** As the backend's `SUGGESTED_FILE_LIMIT`: the files a note's `@` gets at most. */
+const SUGGESTED_FILE_LIMIT = 20;
 
 /** The search port over the projects, their folders and their notes. */
 export function fixtureSearchPort(
@@ -59,7 +59,7 @@ export function fixtureSearchPort(
             folders.readableWithoutStarting(folderId);
             const files = folders.searched(folderId);
             return query && files
-                ? fixtureFileMatches(query, files, NOTE_FILE_LIMIT)
+                ? fixtureFileMatches(query, files, SUGGESTED_FILE_LIMIT)
                 : { files: [], more: 0 };
         },
         stopContentSearch: async () => undefined,
