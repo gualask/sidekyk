@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type { QuickNotePhase, QuickNotePort } from '@/shared/platform/quick-note';
 import { onTauriEvent } from './events';
 
-/** `src-tauri/src/interfaces/tauri/quick_note.rs`. */
+/** `src-tauri/src/desktop/quick_note.rs`. */
 const EVENT = 'quick-note';
 
 /** Tells the backend without waiting: the window is its, and a failure there is logged there. */
