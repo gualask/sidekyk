@@ -41,8 +41,8 @@ use objc2_screen_capture_kit::{
 
 use tauri::AppHandle;
 
-use super::{Done, Outcome, Taken};
-use sidekyk_core::modules::capture::{Area, Grip, Handle, Point, Selection, Size};
+use super::Done;
+use sidekyk_core::modules::capture::{Area, Grip, Handle, Outcome, Point, Selection, Size, Taken};
 use sidekyk_core::modules::notes::{prepare_capture, PreparedImage};
 
 /// Key codes: `Esc`, `↵` and the keypad's Enter.

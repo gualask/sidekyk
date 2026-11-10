@@ -134,8 +134,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   - Rules: `app -> modules -> shared`; `infrastructure` implements the ports of `app` and
     `modules`. Modules import each other without a cycle (`repository -> folder`; `syntax ->
     repository, folder`; `search -> folder, repository, notes, projects`; `projects -> folder`;
-    `reader -> folder, repository, preview, search, syntax`). No `target_os` in `modules/`, `app/`,
-    `shared/`.
+    `capture -> notes`; `reader -> folder, repository, preview, search, syntax`). No `target_os`
+    in `modules/`, `app/`, `shared/`.
   - `app/`: the application service, over the modules, which never import it; it never imports
     `infrastructure`. `machines.rs`: the `Machine` port, one adapter per kind of `Location`, and
     the policy over them: which reads a folder, what each watches and keeps, the window's

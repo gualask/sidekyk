@@ -38,10 +38,11 @@ An area of the screen captured from any app becomes a new note, its marks open a
 
 - Core `modules/capture/`: the area and how a drag changes it (`Selection`: what a press does
   where, draw, move, resize, a click undone, a remembered area that fits), its pixels at the
-  display's scale, its label and where it goes; the event (`capture`: `taken`, `refused`,
-  `failed`). Tested; each system's overlay only forwards the pointer and draws. The crop's
-  pixels become the note's image in `notes::prepare_capture`: PNG and thumbnail encoded once,
-  never decoded again.
+  display's scale, its label and where it goes; how a capture ends (`Outcome`, the area `Taken`
+  on its display), here so a system without capture builds no outcome it never makes, which
+  would be dead code there; the event (`capture`: `taken`, `refused`, `failed`). Tested; each
+  system's overlay only forwards the pointer and draws. The crop's pixels become the note's
+  image in `notes::prepare_capture`: PNG and thumbnail encoded once, never decoded again.
 - macOS, `infrastructure/capture/macos.rs`: ScreenCaptureKit (`SCShareableContent`, a filter of
   the display without our process, `SCScreenshotManager`); a non-activating `NSPanel` at the
   screen saver level (`CanJoinAllSpaces`, `FullScreenAuxiliary`), its view hosting CoreAnimation

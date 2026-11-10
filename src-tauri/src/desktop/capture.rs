@@ -10,9 +10,9 @@ use std::sync::Mutex;
 use tauri::{AppHandle, Emitter, Manager};
 
 use super::{texts, window};
-use crate::infrastructure::capture::{self as system, Outcome, Taken};
+use crate::infrastructure::capture as system;
 pub(crate) use crate::infrastructure::capture::{CAPTURE_BUILT, SETTINGS_URL};
-use sidekyk_core::modules::capture::{CaptureEvent, CAPTURE_EVENT};
+use sidekyk_core::modules::capture::{CaptureEvent, Outcome, Taken, CAPTURE_EVENT};
 use sidekyk_core::modules::notes::PreparedImage;
 use sidekyk_core::shared::sync::lock;
 

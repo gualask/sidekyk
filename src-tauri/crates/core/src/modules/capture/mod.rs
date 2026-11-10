@@ -6,7 +6,31 @@ mod selection;
 
 use serde::Serialize;
 
+use crate::modules::notes::PreparedImage;
+
 pub use selection::{Area, Grip, Handle, PixelRect, Point, Selection, Size};
+
+/// An area taken, on its display by the system's id.
+#[derive(Clone, Copy, Debug)]
+pub struct Taken {
+    pub display: u32,
+    pub area: Area,
+}
+
+/// How a capture ended, as each system's capture tells it.
+#[derive(Debug)]
+pub enum Outcome {
+    /// The area picked, ready for a note, and where it was.
+    Captured {
+        image: PreparedImage,
+        taken: Taken,
+    },
+    /// `Esc`.
+    Cancelled,
+    /// The system does not let Sidekyk read the screen; it was asked to.
+    NoPermission,
+    Failed(anyhow::Error),
+}
 
 /// The event that tells the frontend how a capture ended; a cancel tells nothing.
 pub const CAPTURE_EVENT: &str = "capture";
