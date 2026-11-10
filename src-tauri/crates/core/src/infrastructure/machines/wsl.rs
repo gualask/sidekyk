@@ -77,7 +77,7 @@ fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
 
 /// The name a distro is installed under, from one written in any case (a path typed by hand):
 /// one distro is one helper and one project. `distro_missing` when none has it.
-pub fn installed_distro(distro: &str) -> anyhow::Result<String> {
+fn installed_distro(distro: &str) -> anyhow::Result<String> {
     distros(&["--list", "--quiet"])?
         .into_iter()
         .find(|name| name.eq_ignore_ascii_case(distro))
