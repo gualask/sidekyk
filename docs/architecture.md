@@ -44,12 +44,12 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`),
   `notes`, `search` (the palette; ranking and reading are the backend's), `settings`. Each panel
   module one lazy chunk.
-- `infrastructure/platform/`: Tauri adapters implementing the ports. `shared/`: tokens, primitives,
+- `infrastructure/tauri/`: Tauri adapters implementing the ports. `shared/`: tokens, primitives,
   session state (`useSessionState`), keys, errors, i18n, the panel contract, the project type. `dev/`:
   browser fixtures.
 - Rules (`pnpm boundaries:check`): `app` composes and owns no workflow state; `modules` never import
   `app`, `infrastructure`, `dev` or another module; outside a module only its `index.ts`;
-  `shared` imports only `shared`; `@tauri-apps/*` only in `infrastructure/`.
+  `shared` imports only `shared`; `@tauri-apps/*` only in `infrastructure/tauri/`.
 - Panels: `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, needs,
   optional `summary` and `tileMinWidth`. `PanelProps`: `project`, `header` (a portal), `tileFit`,
   `target` (a request in the panel's terms) and `targetTaken`, `place` (`tile`/`full`), `selected`

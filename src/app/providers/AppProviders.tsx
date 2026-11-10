@@ -1,7 +1,7 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 
-import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/platform/runtime';
+import { type RuntimePorts, tauriRuntimePorts } from '@/infrastructure/tauri/runtime';
 import {
     type MoveTargets,
     MoveTargetsProvider,

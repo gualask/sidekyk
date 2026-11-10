@@ -33,7 +33,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 ## Code
 
 - Biome and rustfmt own formatting. Conditional JSX uses `cond ? (…) : null`, not `&&`. No `biome-ignore` or other suppressions: fix the root cause, or ask.
-- Layers (`pnpm boundaries:check`): `@tauri-apps/*` only in `src/infrastructure/`; modules reach the backend through ports from React context; `modules` never import `app`, `infrastructure` or another module; outside a module only its `index.ts` is imported; `shared` imports only `shared`. In Rust, `src-tauri/crates/core` (modules, shared, git, watcher) has no Tauri; its `modules/` reach git and the disk only through ports (`RepositoryBackend`, `RepositoryWatcher`).
+- Layers (`pnpm boundaries:check`): `@tauri-apps/*` only in `src/infrastructure/tauri/`; modules reach the backend through ports from React context; `modules` never import `app`, `infrastructure` or another module; outside a module only its `index.ts` is imported; `shared` imports only `shared`. In Rust, `src-tauri/crates/core` (modules, shared, git, watcher) has no Tauri; its `modules/` reach git and the disk only through ports (`RepositoryBackend`, `RepositoryWatcher`).
 - Colors only from the `--ui-*` tokens (`*-ui-*` in Tailwind).
 - UI text only from the catalogs (`src/shared/i18n/messages/`), English and Italian together;
   keys written whole, never built (`docs/features/languages.md`). Rust text for the user:

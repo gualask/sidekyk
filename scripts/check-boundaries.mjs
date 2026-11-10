@@ -96,8 +96,8 @@ async function main() {
             const specifier = match[1];
             const line = source.slice(0, match.index).split('\n').length;
 
-            if (specifier.startsWith('@tauri-apps/') && fromLayer !== 'infrastructure') {
-                violations.push(`${relative}:${line}: direct Tauri import outside infrastructure`);
+            if (specifier.startsWith('@tauri-apps/') && !relative.startsWith('src/infrastructure/tauri/')) {
+                violations.push(`${relative}:${line}: direct Tauri import outside infrastructure/tauri`);
             }
 
             if (!isAllowedImport(fromLayer, file, specifier)) {

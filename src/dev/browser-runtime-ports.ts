@@ -1,4 +1,4 @@
-import type { RuntimePorts } from '@/infrastructure/platform/runtime';
+import type { RuntimePorts } from '@/infrastructure/tauri/runtime';
 import { INBOX_BOOK } from '@/modules/notes';
 import type { FolderChoice, Opened, ProjectList } from '@/modules/projects';
 import type { FileContent, FolderKind, RepositoryChangedEvent } from '@/modules/repository';
