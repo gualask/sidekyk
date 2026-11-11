@@ -55,11 +55,11 @@ An area of the screen captured from any app becomes a new note, its marks open a
   reads through `can_capture`), the system's settings for the permission, `start` on every system
   (elsewhere it ends at once, never reached).
 - `desktop/capture.rs`: one capture at a time, from its start until its outcome, another
-  start ignored; the area last taken, by display, for the session. Each crop waits in a queue
-  until the frontend, told `taken`,
-  names the book (`add_capture`; `NotesStore::add_capture`: a new note on top of its open list),
-  so two captures in a row each find their own. `set_marking`
-  holds captures while marks are edited; a page loaded again resets it. The button's text is
+  start ignored and logged at `info`, so a capture that never ends (ScreenCaptureKit silent)
+  shows in the release log; the area last taken, by display, for the session. Each crop waits
+  in a queue until the frontend, told `taken`, names the book (`add_capture`;
+  `NotesStore::add_capture`: a new note on top of its open list), so two captures in a row each
+  find their own. `set_marking` holds captures while marks are edited; a page loaded again resets it. The button's text is
   read without the settings' lock (`texts::current`), on the main thread a settings change may
   wait on.
 - Frontend: the capture's marks wait for its card (`useCaptureMarks`) and open once, apart from

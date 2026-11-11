@@ -38,8 +38,10 @@ pub(crate) fn capture(app: &AppHandle) {
         window::show(app);
         return;
     }
+    // rare, a press of the user's: kept, so a capture that never ends (ScreenCaptureKit silent)
+    // shows in the log as every press after it
     if session.on.swap(true, Ordering::SeqCst) {
-        tracing::debug!("a capture is already on");
+        tracing::info!("a capture is already on: this one ignored");
         return;
     }
     let last = *lock(&session.last);
