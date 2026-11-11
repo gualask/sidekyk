@@ -236,6 +236,13 @@ impl AgentRepositories {
         self.running().is_some()
     }
 
+    /// How the helper's WSL distro names `windows`, a path of Windows (`wslpath -u`, run there).
+    /// Starts a helper if none runs.
+    pub fn linux_path(&self, windows: &str) -> anyhow::Result<String> {
+        let windows = windows.to_string();
+        self.call(Request::LinuxPath { windows }, &nothing)
+    }
+
     /// Sends `request` to the helper running without waiting, and starts none: what a helper
     /// must know is in `Kept`, told to the next one first.
     fn tell(&self, request: Request) {

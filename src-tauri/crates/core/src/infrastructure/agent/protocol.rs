@@ -26,7 +26,7 @@ pub struct RequestFrame {
     pub request: Request,
 }
 
-/// One per method of `Repositories`.
+/// One per method of `Repositories`, and `LinuxPath`.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Request {
@@ -121,6 +121,10 @@ pub enum Request {
     },
     SetVisible {
         visible: bool,
+    },
+    /// How the helper's WSL distro names a path of Windows (`wslpath -u`).
+    LinuxPath {
+        windows: String,
     },
 }
 

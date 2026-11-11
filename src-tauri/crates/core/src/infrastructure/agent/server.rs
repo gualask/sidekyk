@@ -5,14 +5,18 @@
 
 use std::io::{self, BufReader, Read, Write};
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
+use anyhow::Context;
 use serde::Serialize;
 use serde_json::value::RawValue;
 
 use super::protocol::{
     read_frame, write_bytes, write_frame, Message, Request, RequestFrame, WireError,
 };
+use crate::infrastructure::process;
 use crate::modules::folder::RepositoryChange;
 use crate::modules::reader::{LocalRepositories, Repositories};
 use crate::shared::sync::lock;
@@ -168,6 +172,9 @@ pub fn serve(
                     value(r.search_files(&repository, &query))
                 }));
             }
+            Request::LinuxPath { windows } => {
+                on_thread(Box::new(move |_| value(linux_path(&windows)?)));
+            }
         }
     }
     Ok(())
@@ -175,6 +182,25 @@ pub fn serve(
 
 /// A request's answer, as JSON.
 type Reply = anyhow::Result<Box<RawValue>>;
+
+/// `wslpath` reads no disk: it answers at once, or is stuck.
+const WSLPATH_TIMEOUT: Duration = Duration::from_secs(10);
+const WSLPATH_MAX_OUTPUT: usize = 64 * 1024;
+
+/// How this WSL distro names a path of Windows (`wslpath -u`): `/mnt/c/…` for `C:\…` unless the
+/// distro mounts drives elsewhere. Run inside the distro, it costs no `wsl.exe` on Windows' side.
+fn linux_path(windows: &str) -> anyhow::Result<String> {
+    let mut command = Command::new("wslpath");
+    command
+        .args(["-u", windows])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let output = process::run(&mut command, None, WSLPATH_MAX_OUTPUT, WSLPATH_TIMEOUT)
+        .context("could not run wslpath")?;
+    anyhow::ensure!(output.code == 0, "wslpath failed: {}", output.stderr.trim());
+    let linux = String::from_utf8(output.stdout).context("wslpath wrote no UTF-8")?;
+    Ok(linux.trim_end_matches(['\n', '\r']).to_string())
+}
 
 fn value(value: impl Serialize) -> Reply {
     Ok(serde_json::value::to_raw_value(&value)?)
@@ -257,5 +283,6 @@ fn request_name(request: &Request) -> &'static str {
         Request::Retain { .. } => "retain",
         Request::Watch { .. } => "watch",
         Request::SetVisible { .. } => "setVisible",
+        Request::LinuxPath { .. } => "linuxPath",
     }
 }

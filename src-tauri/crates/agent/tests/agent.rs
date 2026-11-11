@@ -223,6 +223,40 @@ fn a_failure_keeps_its_code_through_the_helper() {
     );
 }
 
+/// A `wslpath` of a distro that mounts `C:` at `/mnt/c`, first on the helper's `PATH`.
+#[cfg(unix)]
+#[test]
+fn a_windows_path_is_named_by_the_helpers_wslpath() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let bin = tempfile::tempdir().unwrap();
+    let wslpath = bin.path().join("wslpath");
+    std::fs::write(
+        &wslpath,
+        "#!/bin/sh\n[ \"$1\" = -u ] && [ \"$2\" = 'C:\\notes' ] && echo /mnt/c/notes && exit 0\n\
+         echo \"wslpath: $2: not a Windows path\" >&2; exit 1\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&wslpath, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let path = format!(
+        "{}:{}",
+        bin.path().display(),
+        std::env::var("PATH").unwrap_or_default()
+    );
+    let agent = AgentRepositories::new(move || {
+        let mut command = helper();
+        command.env("PATH", &path);
+        Ok(command)
+    });
+
+    assert_eq!(agent.linux_path(r"C:\notes").unwrap(), "/mnt/c/notes");
+    let error = agent.linux_path("notes").unwrap_err();
+    assert!(
+        format!("{error:#}").contains("not a Windows path"),
+        "{error:#}"
+    );
+}
+
 #[test]
 fn changes_come_through_the_helper_and_a_missed_one_when_the_window_shows() {
     let dir = scratch_repo();

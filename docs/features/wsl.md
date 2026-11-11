@@ -53,7 +53,8 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   ~ --exec .sidekyk-server/<name> serve`, no shell (`infrastructure/machines/wsl.rs`, `linux_helper.rs` over
   a `LinuxMachine`, which the container fixture also implements).
 - Protocol (`infrastructure/agent/`): frames of a u32 LE length and a JSON envelope `{ id, … }`,
-  several in flight; one request per method of the `Repositories` port; a reply's value is raw
+  several in flight; one request per method of the `Repositories` port, and `linuxPath` (a
+  Windows path as the distro names it, `wslpath -u` run by the helper); a reply's value is raw
   JSON, read once as the caller's type; an image's bytes follow a `Bytes` message as a raw frame,
   not base64; a search in contents streams its files, then its reply;
   changes come unasked; cancel is a message; over 64 MiB is a broken stream; failures keep their

@@ -163,22 +163,6 @@ impl LinuxMachine for Distro {
     }
 }
 
-/// How a distro names a Windows path (`wslpath -u`): `/mnt/c/…` for `C:\…` unless the distro
-/// mounts drives elsewhere. Starts the distro when it is stopped: run it off the main thread.
-fn linux_path(distro: &str, path: &Path) -> anyhow::Result<String> {
-    let mut command = Distro(distro.into()).command("wslpath");
-    command.args(["-u", &plain_windows_path(path)]);
-    let output = process::run(&mut command, None, MAX_OUTPUT, LIST_TIMEOUT)
-        .with_context(|| format!("could not ask {distro} for a path"))?;
-    anyhow::ensure!(
-        output.code == 0,
-        "wslpath failed in {distro}: {}",
-        output.stderr.trim()
-    );
-    let linux = String::from_utf8(output.stdout).context("wslpath wrote no UTF-8")?;
-    Ok(linux.trim_end_matches(['\n', '\r']).to_string())
-}
-
 /// A Windows path as `wslpath` reads it: without the `\\?\` prefix Windows' own APIs give, which
 /// it does not know.
 fn plain_windows_path(path: &Path) -> String {
@@ -209,8 +193,8 @@ pub struct WslRepositories {
     hidden: AtomicBool,
     /// Each distro's state as last listed, by its name in lower case, for `STATE_KEPT`.
     states: Mutex<HashMap<String, (Instant, DistroState)>>,
-    /// How each distro names a folder of Windows (`wslpath`), by the distro's name in lower case
-    /// and the folder: asked once a session, not once per file.
+    /// How each distro names a folder of Windows (its helper's `wslpath`), by the distro's name in
+    /// lower case and the folder: asked once a session, not once per file.
     linux_folders: Mutex<HashMap<(String, PathBuf), String>>,
 }
 
@@ -336,18 +320,21 @@ impl Machine for WslRepositories {
         })())
     }
 
-    /// The folder's name asked once a session (`linux_folders`), the file's name added to it.
+    /// Asked of the distro's helper, which runs `wslpath` there: no `wsl.exe` while it runs, as
+    /// it does once a folder of the distro was read. The folder's name asked once a session
+    /// (`linux_folders`), the file's name added to it.
     fn host_path(&self, location: &Location, path: &Path) -> anyhow::Result<String> {
         let distro = distro_of(location);
+        let linux_path = |path: &Path| self.of(distro).linux_path(&plain_windows_path(path));
         let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
-            return linux_path(distro, path);
+            return linux_path(path);
         };
         let key = (distro.to_ascii_lowercase(), folder.to_path_buf());
         let known = lock(&self.linux_folders).get(&key).cloned();
         let linux_folder = match known {
             Some(linux_folder) => linux_folder,
             None => {
-                let linux_folder = linux_path(distro, folder)?;
+                let linux_folder = linux_path(folder)?;
                 lock(&self.linux_folders).insert(key, linux_folder.clone());
                 linux_folder
             }
