@@ -45,27 +45,31 @@ export function useFilesKeys({
     pick: (path: string) => void;
     openFile: (path: string) => void;
 }) {
+    // a key moves in the view shown: true when it did, and the key is taken
+    const moveInRecent = (key: string): boolean => {
+        const move = recentMove(recent.listed.rows, recent.selected, key);
+        if (!move) return false;
+        if (move.kind === 'open') pick(move.path);
+        else if (place === 'tile') openFile(move.path);
+        else recent.select(move.path);
+        return true;
+    };
+    const moveInTree = (key: string): boolean => {
+        const move = treeMove(tree.rows, tree.selected, key);
+        if (!move) return false;
+        if (move.kind === 'toggle') tree.toggle(move.path);
+        else if (move.kind === 'open') pick(move.path);
+        else if (place === 'tile' && !move.folder) openFile(move.path);
+        else tree.select(move.path);
+        return true;
+    };
     useWindowKeys(
         (event) => {
             const ours = place === 'full' ? FULL_KEYS : TILE_KEYS;
             if (!active || !ours.has(event.key) || event.defaultPrevented) return;
             if (!isOwnKey(event)) return;
-            if (view === 'recent') {
-                const move = recentMove(recent.listed.rows, recent.selected, event.key);
-                if (!move) return;
-                event.preventDefault();
-                if (move.kind === 'open') pick(move.path);
-                else if (place === 'tile') openFile(move.path);
-                else recent.select(move.path);
-                return;
-            }
-            const move = treeMove(tree.rows, tree.selected, event.key);
-            if (!move) return;
-            event.preventDefault();
-            if (move.kind === 'toggle') tree.toggle(move.path);
-            else if (move.kind === 'open') pick(move.path);
-            else if (place === 'tile' && !move.folder) openFile(move.path);
-            else tree.select(move.path);
+            const moved = view === 'recent' ? moveInRecent(event.key) : moveInTree(event.key);
+            if (moved) event.preventDefault();
         },
         { capture: true },
     );

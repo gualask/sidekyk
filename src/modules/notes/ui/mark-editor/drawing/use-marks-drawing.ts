@@ -33,11 +33,7 @@ export function useMarksDrawing(
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.clearRect(0, 0, element.width, element.height);
         context.setTransform(ratio * scale, 0, 0, ratio * scale, 0, 0);
-        // the label being written is the field's, over it
-        const drawn = editing
-            ? withMark(marks, editing.index, { ...marks[editing.index], text: '' })
-            : marks;
-        const shapes = drawMarks(context, drawn, width, height, ink);
+        const shapes = drawMarks(context, drawnMarks(marks, editing), width, height, ink);
         const shape = selected === null || editing ? undefined : shapes[selected];
         const mark = marks[selected ?? -1];
         if (shape && mark) {
@@ -63,4 +59,10 @@ function fitCanvas(element: HTMLCanvasElement, width: number, height: number) {
     if (element.width === width && element.height === height) return;
     element.width = width;
     element.height = height;
+}
+
+/** The marks as the canvas draws them: the label being written without its text, the field's. */
+function drawnMarks(marks: Mark[], editing: MarksView['editing']): Mark[] {
+    if (!editing) return marks;
+    return withMark(marks, editing.index, { ...marks[editing.index], text: '' });
 }

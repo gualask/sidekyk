@@ -18,13 +18,13 @@ import {
 import { sourceImage } from '../../model/notes';
 import type { Mark, MarkPoint, NoteImage } from '../../model/notes.types';
 import { DiscardDialog } from './DiscardDialog';
-import { markInk, textMeasure } from './drawing/draw-marks';
+import { type MarkInk, markInk, textMeasure } from './drawing/draw-marks';
 import { useMarksDrawing } from './drawing/use-marks-drawing';
 import { EditorHeader } from './EditorHeader';
 import { MarkField } from './MarkField';
 import { markUnder, pressMarks } from './mark-press';
 import { useFontReady } from './use-font-ready';
-import { useRoom } from './use-room';
+import { type Size, useRoom } from './use-room';
 
 const NO_MARKS: Mark[] = [];
 
@@ -61,19 +61,16 @@ export function MarkEditor({
     const { t } = useTranslation();
     const { width, height } = image;
     const initial = image.marked?.marks ?? NO_MARKS;
-    const [history, setHistory] = useState(() => markHistory(initial));
-    const [draft, setDraft] = useState<Mark[] | null>(null);
-    const [selected, setSelected] = useState<number | null>(null);
-    const [editing, setEditing] = useState<Editing | null>(null);
+    const ink = useMemo(markInk, []);
+    const size = markSize(width, height);
+    const session = useMarkSession(initial, { width, height }, size, ink);
+    const { marks, selected, editing } = session;
     const [saving, setSaving] = useState(false);
     // Cancel asked whether to drop what the session changed
     const [asking, setAsking] = useState(false);
     const root = useRef<HTMLDivElement>(null);
     const stage = useRef<HTMLDivElement>(null);
     const canvas = useRef<HTMLCanvasElement>(null);
-    const ink = useMemo(markInk, []);
-    const size = markSize(width, height);
-    const marks = draft ?? history.present;
     const room = useRoom(stage);
     const fontReady = useFontReady(size, ink.family);
     // fitted, never scaled up
@@ -106,67 +103,28 @@ export function MarkEditor({
         };
     };
 
-    /** The shapes of `list`, to find what a pointer is on: of the marks it acts on, not of the
-     * last drawing, which may be behind them. */
-    const shapesOf = (list: readonly Mark[]): MarkShape[] => {
-        const measure = textMeasure(size, ink);
-        return list.map((mark) => markShape(mark, size, measure));
-    };
-
-    /** A step kept, every label whole inside the image. */
-    const commit = (next: Mark[]) => {
-        const shapes = shapesOf(next);
-        const inside = next.map((mark, index) => labelInside(mark, shapes[index], width, height));
-        setHistory((h) => withStep(h, inside));
-    };
-
-    /** The marks with the text being written in. */
-    const pending = (): Mark[] =>
-        editing ? withMarkText(history.present, editing.index, editing.text) : history.present;
-
-    /** The marks with the text being written kept, the field closed. */
-    const settled = (): Mark[] => {
-        if (!editing) return history.present;
-        const next = pending();
-        commit(next);
-        setEditing(null);
-        if (next.length < history.present.length) setSelected(null);
-        return next;
-    };
-
     const onPointerDown = (event: PointerEvent<HTMLCanvasElement>) => {
         if (event.button !== 0 || saving) return;
-        pressMarks(event, settled(), {
+        pressMarks(event, session.settled(), {
             image: { width, height },
             scale,
             selected,
             toImage,
-            shapesOf,
-            commit,
-            setDraft,
-            setSelected,
+            shapesOf: session.shapesOf,
+            commit: session.commit,
+            setDraft: session.setDraft,
+            setSelected: session.setSelected,
         });
     };
 
-    /** Opens the field writing the text of the mark at `index`, selected. */
-    const edit = (index: number) => {
-        setSelected(index);
-        setEditing({ index, text: history.present[index].text });
-    };
-
     const onDoubleClick = (event: { clientX: number; clientY: number }) => {
-        const hit = markUnder(shapesOf(history.present), toImage(event), scale);
-        if (hit >= 0) edit(hit);
-    };
-
-    const step = (to: typeof undone) => {
-        setHistory(to);
-        setSelected(null);
+        const hit = markUnder(session.shapesOf(session.present), toImage(event), scale);
+        if (hit >= 0) session.edit(hit);
     };
 
     const done = async () => {
         if (saving) return;
-        const final = settled();
+        const final = session.settled();
         setSaving(true);
         const left = await onDone(sameMarks(final, initial) ? null : final);
         if (!left) setSaving(false);
@@ -175,24 +133,22 @@ export function MarkEditor({
     /** Leaves without keeping the session's changes: asked first when there are any. */
     const cancel = () => {
         if (saving) return;
-        if (sameMarks(pending(), initial)) onCancel();
+        if (sameMarks(session.pending(), initial)) onCancel();
         else setAsking(true);
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
         // the field's keys are its own, the question's too (its keys reach here through React)
         if (event.target instanceof HTMLInputElement || asking) return;
-        const command = keyCommand(event, selected, history.present);
+        const command = keyCommand(event, selected, session.present);
         if (!command) return;
         event.preventDefault();
         if (command === 'cancel') cancel();
-        else if (command === 'undo') step(undone);
-        else if (command === 'redo') step(redone);
+        else if (command === 'undo') session.step(undone);
+        else if (command === 'redo') session.step(redone);
         else if (selected === null) return;
-        else if (command === 'remove') {
-            commit(withoutMark(history.present, selected));
-            setSelected(null);
-        } else edit(selected);
+        else if (command === 'remove') session.remove(selected);
+        else session.edit(selected);
     };
 
     const field = editing ? marks[editing.index] : undefined;
@@ -238,14 +194,16 @@ export function MarkEditor({
                                 size={size}
                                 scale={scale}
                                 ink={ink}
-                                onChange={(text) => setEditing({ index: editing.index, text })}
-                                onBlur={() => void settled()}
+                                onChange={(text) =>
+                                    session.setEditing({ index: editing.index, text })
+                                }
+                                onBlur={() => void session.settled()}
                                 onKeep={() => {
-                                    settled();
+                                    session.settled();
                                     root.current?.focus();
                                 }}
                                 onDrop={() => {
-                                    setEditing(null);
+                                    session.setEditing(null);
                                     root.current?.focus();
                                 }}
                             />
@@ -263,6 +221,77 @@ export function MarkEditor({
             />
         </div>
     );
+}
+
+/**
+ * The session's marks on an image of `image`'s size, their labels `size` large in `ink`: their
+ * history, the draft a drag shows over it, the mark selected and the text being written.
+ */
+function useMarkSession(initial: Mark[], image: Size, size: number, ink: MarkInk) {
+    const [history, setHistory] = useState(() => markHistory(initial));
+    const [draft, setDraft] = useState<Mark[] | null>(null);
+    const [selected, setSelected] = useState<number | null>(null);
+    const [editing, setEditing] = useState<Editing | null>(null);
+    const present = history.present;
+
+    /** The shapes of `list`, to find what a pointer is on: of the marks it acts on, not of the
+     * last drawing, which may be behind them. */
+    const shapesOf = (list: readonly Mark[]): MarkShape[] => {
+        const measure = textMeasure(size, ink);
+        return list.map((mark) => markShape(mark, size, measure));
+    };
+
+    /** A step kept, every label whole inside the image. */
+    const commit = (next: Mark[]) => {
+        const shapes = shapesOf(next);
+        const inside = next.map((mark, index) =>
+            labelInside(mark, shapes[index], image.width, image.height),
+        );
+        setHistory((h) => withStep(h, inside));
+    };
+
+    /** The marks with the text being written in. */
+    const pending = (): Mark[] =>
+        editing ? withMarkText(present, editing.index, editing.text) : present;
+
+    /** The marks with the text being written kept, the field closed. */
+    const settled = (): Mark[] => {
+        if (!editing) return present;
+        const next = pending();
+        commit(next);
+        setEditing(null);
+        if (next.length < present.length) setSelected(null);
+        return next;
+    };
+
+    return {
+        present,
+        /** What the canvas shows: the draft while a drag lasts. */
+        marks: draft ?? present,
+        selected,
+        editing,
+        shapesOf,
+        commit,
+        setDraft,
+        setSelected,
+        setEditing,
+        pending,
+        settled,
+        /** Opens the field writing the text of the mark at `index`, selected. */
+        edit: (index: number) => {
+            setSelected(index);
+            setEditing({ index, text: present[index].text });
+        },
+        step: (to: typeof undone) => {
+            setHistory(to);
+            setSelected(null);
+        },
+        /** Takes the mark at `index` out. */
+        remove: (index: number) => {
+            commit(withoutMark(present, index));
+            setSelected(null);
+        },
+    };
 }
 
 type KeyCommand = 'cancel' | 'remove' | 'edit' | 'undo' | 'redo';

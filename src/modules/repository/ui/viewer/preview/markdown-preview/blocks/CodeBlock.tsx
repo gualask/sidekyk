@@ -25,17 +25,7 @@ export function CodeFrame({ children }: { children: ReactNode }) {
 export function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
     const { folderId, path } = usePreview();
     const sides = useMemo(() => fileSides(path), [path]);
-    const asLines = useMemo<DiffLine[]>(
-        () =>
-            lines.map((line) => ({
-                id: line.number,
-                kind: 'context',
-                text: line.text,
-                oldNumber: line.number,
-                newNumber: line.number,
-            })),
-        [lines],
-    );
+    const asLines = useMemo(() => asDiffLines(lines), [lines]);
     const colorBlocks = useMemo(() => blocksOf(asLines, sides), [asLines, sides]);
     const colors = useSyntaxColors(folderId, sides, colorBlocks);
     return (
@@ -53,6 +43,17 @@ export function CodeBlock({ lines }: { lines: readonly MarkdownCodeLine[] }) {
             </code>
         </CodeFrame>
     );
+}
+
+/** The block's lines as a file's lines, unchanged, so the file's colors reach them. */
+function asDiffLines(lines: readonly MarkdownCodeLine[]): DiffLine[] {
+    return lines.map((line) => ({
+        id: line.number,
+        kind: 'context',
+        text: line.text,
+        oldNumber: line.number,
+        newNumber: line.number,
+    }));
 }
 
 /** A line's text from `from`, in its colors; a carriage return at its end left out. */

@@ -9,16 +9,16 @@ import { useFileFind } from '../../application/find';
 import { useFolderKind } from '../../application/queries/folder-kind';
 import { useSelectedFile } from '../../application/selection';
 import { useShownTarget } from '../../application/shown-target';
-import { selectionOf } from '../../model/selection';
+import { type Selection, selectionOf } from '../../model/selection';
 import type { FileLines } from '../../model/targets';
 import { changeMarks } from '../../model/tree/file-tree';
 import { FilesActions, type FilesView } from './FilesActions';
 import { FilesListing, TooManyFiles } from './FilesListing';
 import { FileViewer } from './FileViewer';
 import { recentFittingWidth } from './recent/recent-layout';
-import { useRecentList } from './recent/use-recent-list';
+import { type RecentListState, useRecentList } from './recent/use-recent-list';
 import { FILES_TREE_WIDTH, fittingWidth } from './tree/tree-layout';
-import { useFileTree } from './tree/use-file-tree';
+import { type FileTreeState, useFileTree } from './tree/use-file-tree';
 import { useFilesKeys } from './use-files-keys';
 
 /**
@@ -64,24 +64,12 @@ function Files({
         lines: marked,
     } = useSelectedFile(folderId, repository);
     const find = useFileFind(folderId, change?.path ?? file, findInFiles);
-    // the hunk a file asked for from Changes opens on, until another file shows
-    const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
-    // how many times lines were asked for: the viewer opens on the marked lines as it mounts, and
-    // again at each request
-    const [linesAsked, setLinesAsked] = useState(0);
+    const { openOn, linesAsked, openFile, askLines } = useOpenedFile(setSelection);
     const marks = useMemo(() => changeMarks(files), [files]);
     const shown =
         view === 'tree'
             ? { error: tree.error, truncated: tree.truncated() }
             : { error: recent.error, truncated: recent.truncated };
-    // what fits every row the view shows whole
-    const fitting = useCallback(
-        (box: HTMLElement) =>
-            view === 'tree'
-                ? fittingWidth(tree.rows, box)
-                : recentFittingWidth(recent.listed.rows, recent.listed.formats, box),
-        [view, tree.rows, recent.listed],
-    );
 
     // the file shown, wherever it was picked, is revealed: the folders above it open, and Recent
     // selects it
@@ -93,10 +81,6 @@ function Files({
         if (file) reveal(file);
     }, [file]);
 
-    const openFile = (path: string, hunk: number | null = null, lines: FileLines | null = null) => {
-        setSelection((current) => selectionOf(path, current, lines));
-        setOpenOn(hunk === null ? null : { file: path, hunk });
-    };
     // a file picked shows beside the tree full screen; from a tile in Changes, or without git in
     // Files full screen
     const pick = (path: string) => {
@@ -110,12 +94,12 @@ function Files({
         openFile(shown.path, shown.hunk, shown.lines);
         reveal(shown.path);
         if (shown.find) find.open(shown.path, shown.find);
-        if (shown.lines) setLinesAsked((count) => count + 1);
+        if (shown.lines) askLines();
     });
     useFilesKeys({ active: hasKeys, place, view, tree, recent, pick, openFile });
 
+    const { treeBox, fitting } = useTreeFit(view, tree, recent, tileFit);
     const treeWidth = useSidebarWidth('files', FILES_TREE_WIDTH);
-    const treeBox = useRef<HTMLDivElement>(null);
     const actions = header ? (
         <FilesActions
             header={header}
@@ -139,13 +123,6 @@ function Files({
         />
     );
     const tooMany = shown.truncated ? <TooManyFiles /> : null;
-
-    // in a tile, the tile's splitter fits the tree, as the tree's own does full screen
-    useEffect(() => {
-        if (!tileFit) return;
-        tileFit(() => (treeBox.current ? fitting(treeBox.current) : 0));
-        return () => tileFit(null);
-    }, [tileFit, fitting]);
 
     if (place === 'tile') {
         // in a tile the tree fills it; the app sets its width, the tree's (one setting)
@@ -200,4 +177,46 @@ function Files({
             </div>
         </div>
     );
+}
+
+/**
+ * The file opened, wherever it was asked for: selected, at the hunk it opens on until another file
+ * shows (`openOn`), and how many times lines were asked for (`linesAsked`): the viewer opens on the
+ * marked lines as it mounts, and again at each request (`askLines`).
+ */
+function useOpenedFile(setSelection: (next: (current: Selection) => Selection) => void) {
+    const [openOn, setOpenOn] = useState<{ file: string; hunk: number } | null>(null);
+    const [linesAsked, setLinesAsked] = useState(0);
+    const openFile = (path: string, hunk: number | null = null, lines: FileLines | null = null) => {
+        setSelection((current) => selectionOf(path, current, lines));
+        setOpenOn(hunk === null ? null : { file: path, hunk });
+    };
+    const askLines = () => setLinesAsked((count) => count + 1);
+    return { openOn, linesAsked, openFile, askLines };
+}
+
+/**
+ * What fits every row the view shows whole, measured in `treeBox`. In a tile, the tile's splitter
+ * fits the tree with it (`tileFit`), as the tree's own does full screen.
+ */
+function useTreeFit(
+    view: FilesView,
+    tree: FileTreeState,
+    recent: RecentListState,
+    tileFit: PanelProps['tileFit'],
+) {
+    const treeBox = useRef<HTMLDivElement>(null);
+    const fitting = useCallback(
+        (box: HTMLElement) =>
+            view === 'tree'
+                ? fittingWidth(tree.rows, box)
+                : recentFittingWidth(recent.listed.rows, recent.listed.formats, box),
+        [view, tree.rows, recent.listed],
+    );
+    useEffect(() => {
+        if (!tileFit) return;
+        tileFit(() => (treeBox.current ? fitting(treeBox.current) : 0));
+        return () => tileFit(null);
+    }, [tileFit, fitting]);
+    return { treeBox, fitting };
 }

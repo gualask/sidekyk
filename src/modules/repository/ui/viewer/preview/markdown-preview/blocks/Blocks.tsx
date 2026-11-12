@@ -117,8 +117,21 @@ function Quote({ block }: { block: BlockOf<'quote'> }) {
 /** A list, numbered from `start` or not; a task list's items with their checkbox. */
 function List({ block }: { block: BlockOf<'list'> }) {
     const tasks = block.items.some((item) => item.task !== null);
-    const items = block.items.map((item) => (
-        <li key={item.line} className={item.task === null ? 'pl-1' : 'flex gap-2'}>
+    const items = block.items.map((item) => <ListItem key={item.line} item={item} />);
+    const space = tasks ? 'list-none space-y-0.5' : 'space-y-0.5 pl-6';
+    return block.start === null ? (
+        <ul className={`${space} ${tasks ? '' : 'list-disc'}`}>{items}</ul>
+    ) : (
+        <ol start={block.start} className={`${space} list-decimal`}>
+            {items}
+        </ol>
+    );
+}
+
+/** A list's item, with its checkbox in a task list. */
+function ListItem({ item }: { item: BlockOf<'list'>['items'][number] }) {
+    return (
+        <li className={item.task === null ? 'pl-1' : 'flex gap-2'}>
             {item.task === null ? null : (
                 <input
                     type="checkbox"
@@ -132,14 +145,6 @@ function List({ block }: { block: BlockOf<'list'> }) {
                 <Blocks blocks={item.blocks} />
             </div>
         </li>
-    ));
-    const space = tasks ? 'list-none space-y-0.5' : 'space-y-0.5 pl-6';
-    return block.start === null ? (
-        <ul className={`${space} ${tasks ? '' : 'list-disc'}`}>{items}</ul>
-    ) : (
-        <ol start={block.start} className={`${space} list-decimal`}>
-            {items}
-        </ol>
     );
 }
 
@@ -151,23 +156,30 @@ function Footnotes({ block }: { block: BlockOf<'footnotes'> }) {
             <h2 className="mb-2 font-semibold text-ui-text-muted">{i18n.t('preview.footnotes')}</h2>
             <ol className="list-decimal space-y-1 pl-6">
                 {block.notes.map((note) => (
-                    <li key={note.number} id={footnoteId(note.number)}>
-                        {/* a note of one paragraph, as most are, ends with its links back */}
-                        {note.blocks.length === 1 && note.blocks[0].kind === 'paragraph' ? (
-                            <p>
-                                <Inlines content={note.blocks[0].content} />
-                                <BackLinks number={note.number} references={note.references} />
-                            </p>
-                        ) : (
-                            <>
-                                <Blocks blocks={note.blocks} />
-                                <BackLinks number={note.number} references={note.references} />
-                            </>
-                        )}
-                    </li>
+                    <Footnote key={note.number} note={note} />
                 ))}
             </ol>
         </section>
+    );
+}
+
+/** A footnote; one of one paragraph, as most are, ends with its links back on its last line. */
+function Footnote({ note }: { note: BlockOf<'footnotes'>['notes'][number] }) {
+    const only = note.blocks.length === 1 ? note.blocks[0] : null;
+    return (
+        <li id={footnoteId(note.number)}>
+            {only?.kind === 'paragraph' ? (
+                <p>
+                    <Inlines content={only.content} />
+                    <BackLinks number={note.number} references={note.references} />
+                </p>
+            ) : (
+                <>
+                    <Blocks blocks={note.blocks} />
+                    <BackLinks number={note.number} references={note.references} />
+                </>
+            )}
+        </li>
     );
 }
 
