@@ -1,17 +1,17 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useEffectEvent, useRef } from 'react';
+import { useCallback, useEffect, useEffectEvent } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import type { Opened, ProjectList, TilesLayout } from '../model/project.types';
+import type { Opened, ProjectList } from '../model/project.types';
 import { type ProjectsPort, useProjectsPort } from './projects.port';
 
-const projectsKey = ['projects'] as const;
+export const projectsKey = ['projects'] as const;
 
 /**
  * Changes to the list run one at a time, in the order the user made them: two quick switches end
  * on the second project, in the backend and on screen.
  */
-const projectsChange = { mutationKey: projectsKey, scope: { id: 'projects' } };
+export const projectsChange = { mutationKey: projectsKey, scope: { id: 'projects' } };
 
 /**
  * Whether no later change waits behind the one ending now. The list a change returns is shown
@@ -24,7 +24,7 @@ function isLastChange(queryClient: QueryClient): boolean {
 }
 
 /** Shows the list a change returned, when no later change waits behind it (`isLastChange`). */
-function showList(queryClient: QueryClient, list: ProjectList) {
+export function showList(queryClient: QueryClient, list: ProjectList) {
     if (isLastChange(queryClient)) queryClient.setQueryData(projectsKey, list);
 }
 
@@ -34,15 +34,8 @@ function projectName(queryClient: QueryClient, projectId: string): string {
     return list?.projects.find((project) => project.id === projectId)?.name ?? projectId;
 }
 
-/** The name of the project a folder of the list on screen is of, for a message about it. */
-function folderName(queryClient: QueryClient, folderId: string): string {
-    const list = queryClient.getQueryData<ProjectList>(projectsKey);
-    const project = list?.projects.find((p) => p.folders.some((folder) => folder.id === folderId));
-    return project?.name ?? folderId;
-}
-
 /** The list, as every reader of it asks for it. */
-function projectsQuery(port: ProjectsPort) {
+export function projectsQuery(port: ProjectsPort) {
     return { queryKey: projectsKey, queryFn: () => port.getProjects() };
 }
 
@@ -178,153 +171,6 @@ export function useRemoveProject() {
                     i18n,
                 ),
             );
-        },
-    });
-}
-
-/**
- * Asks where a moved folder of a project is now, and the project follows it there: `readAgain`
- * reads it at its new place (its id, so its queries, stay). A folder that is another project's is
- * not taken: a toast says whose, with `open` for it. A failure is a toast.
- */
-export function useRelocateFolder({
-    readAgain,
-    open,
-}: {
-    readAgain: (folderId: string) => void;
-    open: (projectId: string) => void;
-}) {
-    const port = useProjectsPort();
-    const queryClient = useQueryClient();
-    const showToast = useShowToast();
-    const i18n = useTranslation();
-    return useMutation({
-        ...projectsChange,
-        mutationFn: (folderId: string) => port.relocateFolder(folderId),
-        onSuccess: (change, folderId) => {
-            if (change?.kind === 'inProject') {
-                const { id, name } = change;
-                showToast({
-                    title: i18n.t('projects.folderInProject', { name }),
-                    action: { label: i18n.t('common.open'), run: () => open(id) },
-                });
-                return;
-            }
-            if (!change) return;
-            showList(queryClient, change.list);
-            readAgain(folderId);
-        },
-        onError: (error, folderId) => {
-            showToast(
-                errorToast(
-                    i18n.t('projects.locateFailed', { name: folderName(queryClient, folderId) }),
-                    error,
-                    i18n,
-                ),
-            );
-        },
-    });
-}
-
-/** A project's tiles until the user changes them: none minimized, the side column split even. */
-export const DEFAULT_TILES_LAYOUT: TilesLayout = { minimized: [], split: 0.5 };
-
-/**
- * How a project lays out its tiles, and how to change it: shown at once, stored after. A failure
- * is a toast; the layout stays as shown for the session.
- */
-export function useProjectLayout(projectId: string | null) {
-    const port = useProjectsPort();
-    const queryClient = useQueryClient();
-    const showToast = useShowToast();
-    const i18n = useTranslation();
-    const layout = useQuery({
-        ...projectsQuery(port),
-        select: (list) => (projectId ? list.layouts[projectId] : undefined) ?? DEFAULT_TILES_LAYOUT,
-    }).data;
-    const { mutate } = useMutation({
-        ...projectsChange,
-        mutationFn: ({ projectId, layout }: { projectId: string; layout: TilesLayout }) =>
-            port.setProjectLayout(projectId, layout),
-        onSuccess: (list) => {
-            showList(queryClient, list);
-        },
-        onError: (error) => {
-            showToast(errorToast(i18n.t('projects.layoutFailed'), error, i18n));
-        },
-    });
-    // shown at once, in the same render: a view transition captures the layout changed
-    const change = useCallback(
-        (next: (current: TilesLayout) => TilesLayout) => {
-            if (!projectId) return;
-            const list = queryClient.getQueryData<ProjectList>(projectsKey);
-            if (!list) return;
-            const layout = next(list.layouts[projectId] ?? DEFAULT_TILES_LAYOUT);
-            queryClient.setQueryData<ProjectList>(projectsKey, {
-                ...list,
-                layouts: { ...list.layouts, [projectId]: layout },
-            });
-            mutate({ projectId, layout });
-        },
-        [projectId, queryClient, mutate],
-    );
-    return [layout ?? DEFAULT_TILES_LAYOUT, change] as const;
-}
-
-/** A folder of a project, by both ids. */
-interface FolderOfProject {
-    projectId: string;
-    folderId: string;
-}
-
-/**
- * Tells the backend the folder the window shows (null for none) whenever it changes: it watches
- * that folder, and the palette looks in its files. One at a time, in order, so a quick switch ends
- * on the last folder. A failure is a toast.
- */
-export function useFolderOnScreen(folderId: string | null) {
-    const port = useProjectsPort();
-    const showToast = useShowToast();
-    const i18n = useTranslation();
-    const told = useRef<Promise<void>>(Promise.resolve());
-    const failed = useEffectEvent((error: unknown) =>
-        showToast(errorToast(i18n.t('projects.showFolderFailed'), error, i18n)),
-    );
-    useEffect(() => {
-        told.current = told.current.then(() => port.showProjectFolder(folderId)).catch(failed);
-    }, [port, folderId]);
-}
-
-/**
- * Asks for another folder of a project, which it then follows. A folder that is another
- * project's comes back as `inProject`, for the caller to offer the merge. A failure is the
- * caller's to show.
- */
-export function useAddProjectFolder() {
-    const port = useProjectsPort();
-    const queryClient = useQueryClient();
-    return useMutation({
-        ...projectsChange,
-        mutationFn: (projectId: string) => port.addProjectFolder(projectId),
-        onSuccess: (change) => {
-            if (change?.kind === 'changed') showList(queryClient, change.list);
-        },
-    });
-}
-
-/**
- * Stops following a folder of a project; the folder and the notes stay. A failure is the
- * caller's to show.
- */
-export function useRemoveProjectFolder() {
-    const port = useProjectsPort();
-    const queryClient = useQueryClient();
-    return useMutation({
-        ...projectsChange,
-        mutationFn: ({ projectId, folderId }: FolderOfProject) =>
-            port.removeProjectFolder(projectId, folderId),
-        onSuccess: (list) => {
-            showList(queryClient, list);
         },
     });
 }

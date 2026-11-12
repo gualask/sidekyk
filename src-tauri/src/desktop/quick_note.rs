@@ -12,11 +12,9 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::Serialize;
-use tauri::{
-    AppHandle, Emitter, LogicalSize, Manager, PhysicalPosition, PhysicalRect, PhysicalSize, Size,
-    WebviewWindow,
-};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
+use super::quick_note_frame::{quick_note_frame, restore_frame};
 use crate::infrastructure::window::{self as system, AppId};
 use sidekyk_core::shared::sync::lock;
 
@@ -27,11 +25,6 @@ const EVENT: &str = "quick-note";
 /// answers in 35-600 ms (`docs/features/quick-note.md`, Measures), so this is only for a page that
 /// broke or hangs, which would leave the window on screen and unseen.
 const PAINT_DEADLINE: Duration = Duration::from_millis(1500);
-
-/// The quick note's size, in the window's points; the page's box has it too (`QuickNote.tsx`),
-/// for a window that cannot shrink.
-const WIDTH: f64 = 560.0;
-const HEIGHT: f64 = 168.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -90,27 +83,14 @@ fn open(app: &AppHandle) {
         return;
     };
     // read before the lock: off the main thread a getter waits for it
-    let shown = window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
-    let before = Before {
-        shown,
-        focused: shown && window.is_focused().unwrap_or(false),
-        front: system::front_app(),
-        size: window.inner_size().unwrap_or_default(),
-        position: window.outer_position().unwrap_or_default(),
-        opened: Instant::now(),
-    };
+    let before = before(&window);
     let state = app.state::<QuickNoteState>();
     let mut stage = lock(&state.0);
     if matches!(*stage, Stage::Open { .. }) {
         return;
     }
     system::set_opacity(&window, 0.0);
-    let _ = window.set_min_size(None::<Size>);
-    let _ = window.set_size(LogicalSize::new(WIDTH, HEIGHT));
-    if let Some(position) = under_pointer(app) {
-        let _ = window.set_position(position);
-    }
-    system::set_buttons_hidden(&window, true);
+    quick_note_frame(app, &window);
     let opened = before.opened;
     *stage = Stage::Open {
         before,
@@ -121,6 +101,19 @@ fn open(app: &AppHandle) {
     system::bring_back(app);
     tell(app, Phase::Open);
     opaque_by_deadline(app, opened);
+}
+
+/// The window as it is, opened now.
+fn before(window: &WebviewWindow) -> Before {
+    let shown = window.is_visible().unwrap_or(false) && !window.is_minimized().unwrap_or(false);
+    Before {
+        shown,
+        focused: shown && window.is_focused().unwrap_or(false),
+        front: system::front_app(),
+        size: window.inner_size().unwrap_or_default(),
+        position: window.outer_position().unwrap_or_default(),
+        opened: Instant::now(),
+    }
 }
 
 /// Closes the quick note, if open, and says whether it was.
@@ -134,16 +127,11 @@ pub(crate) fn close(app: &AppHandle, then: Then) -> bool {
         return false;
     };
     system::set_opacity(&window, 0.0);
-    restore_frame(app, &window, &before);
-    match back_to(before.shown, before.focused, before.front, then) {
-        Back::InFront => {}
-        Back::Behind(front) => {
-            if !system::activate(front) {
-                tracing::debug!("the app in front before the quick note did not come back");
-            }
-        }
-        Back::Hidden => system::hide(app),
-    }
+    restore_frame(app, &window, before.size, before.position);
+    go_back(
+        app,
+        back_to(before.shown, before.focused, before.front, then),
+    );
     let closed = Instant::now();
     *stage = Stage::Restoring(closed);
     drop(stage);
@@ -176,6 +164,19 @@ fn back_to<App>(shown: bool, focused: bool, front: Option<App>, then: Then) -> B
     }
     // with no app known, Sidekyk keeps the focus
     front.map_or(Back::InFront, Back::Behind)
+}
+
+/// Puts the window where it goes back to.
+fn go_back(app: &AppHandle, back: Back<AppId>) {
+    match back {
+        Back::InFront => {}
+        Back::Behind(front) => {
+            if !system::activate(front) {
+                tracing::debug!("the app in front before the quick note did not come back");
+            }
+        }
+        Back::Hidden => system::hide(app),
+    }
 }
 
 /// The page painted the quick note: it shows.
@@ -215,7 +216,7 @@ pub(crate) fn forget(app: &AppHandle) {
     };
     match std::mem::take(&mut *stage) {
         Stage::Off => return,
-        Stage::Open { before, .. } => restore_frame(app, &window, &before),
+        Stage::Open { before, .. } => restore_frame(app, &window, before.size, before.position),
         Stage::Restoring(_) => {}
     }
     system::set_opacity(&window, 1.0);
@@ -256,46 +257,12 @@ fn late(stage: &Stage, since: Instant) -> bool {
     }
 }
 
-/// The window's frame, least size and buttons as before the quick note.
-fn restore_frame(app: &AppHandle, window: &WebviewWindow, before: &Before) {
-    let _ = window.set_size(before.size);
-    let _ = window.set_position(before.position);
-    let _ = window.set_min_size(min_size(app));
-    system::set_buttons_hidden(window, false);
-}
-
 fn tell(app: &AppHandle, phase: Phase) {
     if let Err(error) = app.emit(EVENT, phase) {
         tracing::warn!(%error, ?phase, "could not tell the page about the quick note");
         // the page never answers: the window, shown, must not stay unseen
         forget(app);
     }
-}
-
-/// The window's least size, as configured (`tauri.conf.json`).
-fn min_size(app: &AppHandle) -> Option<Size> {
-    let config = app
-        .config()
-        .app
-        .windows
-        .iter()
-        .find(|w| w.label == "main")?;
-    let (width, height) = (config.min_width?, config.min_height?);
-    Some(LogicalSize::new(width, height).into())
-}
-
-/// Where the quick note goes: centered on the display under the pointer, a quarter down.
-fn under_pointer(app: &AppHandle) -> Option<PhysicalPosition<i32>> {
-    let pointer = app.cursor_position().ok()?;
-    let monitor = app.monitor_from_point(pointer.x, pointer.y).ok()??;
-    Some(place(monitor.work_area(), monitor.scale_factor()))
-}
-
-fn place(area: &PhysicalRect<i32, u32>, scale: f64) -> PhysicalPosition<i32> {
-    let width = (WIDTH * scale).round() as i64;
-    let x = i64::from(area.position.x) + (i64::from(area.size.width) - width) / 2;
-    let y = i64::from(area.position.y) + i64::from(area.size.height) / 4;
-    PhysicalPosition::new(x as i32, y as i32)
 }
 
 #[cfg(test)]
@@ -351,19 +318,5 @@ mod tests {
             back_to(false, false, Some("terminal"), Then::InFront),
             Back::InFront
         );
-    }
-
-    #[test]
-    fn the_note_sits_centered_a_quarter_down_its_display() {
-        let area = PhysicalRect {
-            position: PhysicalPosition::new(-1920, 0),
-            size: PhysicalSize::new(1920, 1080),
-        };
-        assert_eq!(place(&area, 1.0), PhysicalPosition::new(-1920 + 680, 270));
-        let retina = PhysicalRect {
-            position: PhysicalPosition::new(0, 50),
-            size: PhysicalSize::new(2940, 1846),
-        };
-        assert_eq!(place(&retina, 2.0), PhysicalPosition::new(910, 50 + 461));
     }
 }

@@ -1,25 +1,19 @@
-//! The project's folder on screen, watched: what each batch of its watcher means for the caches and
-//! the app, and what is kept while nobody looks.
+//! The project's folder on screen, watched: its watcher started, and started again when the folder
+//! becomes a repository or stops being one. What a batch means is `batch`'s; what is kept while
+//! nobody looks, `visibility`'s.
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use super::batch::{Filter, Watching};
+use super::visibility::MissedPaths;
 use super::{LocalRepositories, OnChange, WatchTurn};
 use crate::modules::folder::{
-    classify, folder_kind, resolve_repository, Changed, FolderChanges, FolderKind, Hiding,
-    IgnoredPaths, RepositoryBackend, RepositoryChange, RepositoryInfo, Visible, Watch,
-    WatchedChanges, WatchedFolders,
+    folder_kind, resolve_repository, Changed, FolderChanges, FolderKind, FolderWatcher, Hiding,
+    IgnoredPaths, RepositoryBackend, RepositoryChange, RepositoryInfo, Watch, WatchedFolders,
 };
 use crate::shared::sync::lock;
-
-/// More paths than this in one batch go as "any may have changed": a burst (a checkout, a
-/// dependency install) reads what is open again anyway, and the event stays small.
-const MAX_CHANGED_PATHS: usize = 100;
-
-/// More paths than this changed while hidden: every folder is looked at again when the window
-/// shows, rather than each path kept.
-const MAX_MISSED_PATHS: usize = 1_000;
 
 /// What gets each change of the folder watched, kept to watch it again when its kind changes.
 type SharedOnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
@@ -29,114 +23,6 @@ pub(super) struct Watched {
     on_change: SharedOnChange,
     /// `None` when the watcher could not start, such as a folder moved away.
     _watch: Option<Box<dyn Send>>,
-}
-
-/// The folder a watcher watches.
-struct Watching {
-    /// As the caller names it: what is kept of the folder is by this root.
-    root: String,
-    /// As git, or the system for a folder without git, names it: where the watcher's paths are.
-    folder: PathBuf,
-    /// `None` for a folder without git.
-    git_dir: Option<PathBuf>,
-}
-
-impl Watching {
-    /// Whether a batch brought or took the `.git` at the root, so the folder is now the other
-    /// kind. No git runs.
-    fn kind_changed(&self, backend: &dyn RepositoryBackend, changed: &Changed) -> bool {
-        let watched_as = if self.git_dir.is_some() {
-            FolderKind::Repository
-        } else {
-            FolderKind::Plain
-        };
-        let git_touched = match changed {
-            Changed::Paths(paths) => paths.contains(&self.folder.join(".git")),
-            // the `.git` may have come or gone among the events dropped
-            Changed::Unknown => true,
-        };
-        git_touched && folder_kind(backend, &self.folder).is_ok_and(|kind| kind != watched_as)
-    }
-}
-
-/// Which changes show: git's answer for a repository, the walk's rules for a folder without git.
-enum Filter {
-    Git(IgnoredPaths),
-    Rules(FolderChanges),
-}
-
-impl Filter {
-    fn visible<'a>(
-        &mut self,
-        backend: &dyn RepositoryBackend,
-        changed: &'a [PathBuf],
-    ) -> Visible<'a> {
-        match self {
-            Self::Git(ignored) => ignored.visible(backend, changed),
-            Self::Rules(changes) => changes.visible(backend, changed),
-        }
-    }
-
-    /// Whether any of these changes may show, while the window is hidden: no git runs.
-    fn any_maybe_visible(&mut self, backend: &dyn RepositoryBackend, changed: &[PathBuf]) -> bool {
-        match self {
-            Self::Git(ignored) => ignored.any_maybe_visible(backend, changed),
-            Self::Rules(changes) => changes.visible(backend, changed).any(),
-        }
-    }
-
-    /// The index or the excludes may have changed what git ignores.
-    fn forget(&mut self) {
-        if let Self::Git(ignored) = self {
-            ignored.forget();
-        }
-    }
-
-    /// The system dropped events: nothing learned holds, and the rules of a folder without git
-    /// are read again.
-    fn start_over(&mut self, backend: &dyn RepositoryBackend, folder: &Path) {
-        match self {
-            Self::Git(ignored) => ignored.forget(),
-            Self::Rules(changes) => *changes = FolderChanges::new(backend, folder.to_path_buf()),
-        }
-    }
-}
-
-/// While the window is minimized, hidden or covered, as the app tells, the watcher keeps watching
-/// but reports nothing, and only marks what it saw.
-#[derive(Default)]
-pub(super) struct Visibility {
-    hidden: bool,
-    /// The folder on screen, when its watcher saw a change that may show while hidden.
-    missed: Option<String>,
-    /// Where each folder is watched on its own (inotify), what changed while hidden: the folders
-    /// it created are watched when the window shows, since no git runs before. `None` elsewhere.
-    missed_paths: Option<MissedPaths>,
-}
-
-enum MissedPaths {
-    Paths(Vec<PathBuf>),
-    /// Too many to keep, or events dropped: every folder is looked at again.
-    TooMany,
-}
-
-impl MissedPaths {
-    const NONE: Self = Self::Paths(Vec::new());
-
-    fn keep(&mut self, changes: &WatchedChanges) {
-        let paths = &changes.worktree;
-        match self {
-            Self::Paths(kept) if !changes.lost && kept.len() + paths.len() <= MAX_MISSED_PATHS => {
-                kept.extend_from_slice(paths);
-            }
-            Self::Paths(_) => *self = Self::TooMany,
-            Self::TooMany => {}
-        }
-    }
-
-    fn is_empty(&self) -> bool {
-        matches!(self, Self::Paths(paths) if paths.is_empty())
-    }
 }
 
 impl LocalRepositories {
@@ -171,17 +57,7 @@ impl LocalRepositories {
         // the previous watcher stops before the next one walks its tree
         *watched = None;
         *lock(&self.folders) = None;
-        // a folder put on screen is read in full anyway
-        let mut visibility = lock(&self.visibility);
-        visibility.missed = None;
-        visibility.missed_paths = None;
-        drop(visibility);
-        // what the previous watcher saw is gone with it: every tree is read again when asked for,
-        // and one read meanwhile is not kept
-        for cached in lock(&self.trees).values_mut() {
-            cached.tree = None;
-            cached.changes += 1;
-        }
+        self.forget_what_was_seen();
         let watch = match self.start_watch(root, generation, on_change.clone()) {
             Ok(watch) => {
                 tracing::info!(root, "project opened");
@@ -199,9 +75,23 @@ impl LocalRepositories {
         });
     }
 
+    /// What the previous watcher saw is gone with it.
+    fn forget_what_was_seen(&self) {
+        // a folder put on screen is read in full anyway
+        let mut visibility = lock(&self.visibility);
+        visibility.missed = None;
+        visibility.missed_paths = None;
+        drop(visibility);
+        // every tree is read again when asked for, and one read meanwhile is not kept
+        for cached in lock(&self.trees).values_mut() {
+            cached.tree = None;
+            cached.changes += 1;
+        }
+    }
+
     /// The folder on screen became a repository, or stopped being one: it is watched again as the
     /// other kind, then the change is told. Off the watcher's thread, which stops with its watch.
-    fn watch_other_kind(&self, generation: u64, root: &str) {
+    pub(super) fn watch_other_kind(&self, generation: u64, root: &str) {
         let repositories = self.this.clone();
         let root = root.to_string();
         let spawned = std::thread::Builder::new()
@@ -228,51 +118,6 @@ impl LocalRepositories {
         }
     }
 
-    /// `Repositories::set_visible`.
-    pub(super) fn record_visible(&self, visible: bool) -> Option<String> {
-        let mut visibility = lock(&self.visibility);
-        visibility.hidden = !visible;
-        let missed = if visible {
-            visibility.missed.take()
-        } else {
-            None
-        };
-        if visible {
-            if let Some(paths) = visibility.missed_paths.as_mut() {
-                if !paths.is_empty() {
-                    self.watch_missed_folders(std::mem::replace(paths, MissedPaths::NONE));
-                }
-            }
-        }
-        tracing::debug!(visible, missed = missed.is_some(), "window visibility");
-        missed
-    }
-
-    /// Watches the folders created while hidden, off the caller's thread: the app reports the
-    /// window showing on its main thread, and the folders wait for the watcher to start.
-    fn watch_missed_folders(&self, missed: MissedPaths) {
-        let repositories = self.this.clone();
-        let spawned = std::thread::Builder::new()
-            .name("missed-folders".to_string())
-            .spawn(move || {
-                let Some(repositories) = repositories.upgrade() else {
-                    return;
-                };
-                let backend = &*repositories.backend;
-                let mut folders = lock(&repositories.folders);
-                let Some(folders) = folders.as_mut() else {
-                    return;
-                };
-                match missed {
-                    MissedPaths::Paths(paths) => folders.add_missed(backend, &paths),
-                    MissedPaths::TooMany => folders.rescan(backend),
-                }
-            });
-        if let Err(error) = spawned {
-            tracing::warn!(%error, "the folders created while hidden are not watched");
-        }
-    }
-
     /// Watches the folder at `root`, the root the caller names it by: what is kept of it and the
     /// changes it reports go by that root, the files watched by the folder git, or the system for
     /// a folder without git, names.
@@ -282,29 +127,10 @@ impl LocalRepositories {
         generation: u64,
         on_change: SharedOnChange,
     ) -> anyhow::Result<Watch> {
-        let backend = &*self.backend;
-        let (folder, git_dir, mut filter) = match folder_kind(backend, Path::new(root))? {
-            FolderKind::Repository => {
-                let resolved = resolve_repository(backend, Path::new(root))?;
-                let folder = PathBuf::from(resolved.info.root);
-                let filter = Filter::Git(IgnoredPaths::new(folder.clone()));
-                (folder, Some(resolved.git_dir), filter)
-            }
-            FolderKind::Plain => {
-                let folder = backend
-                    .real_path(Path::new(root))
-                    .unwrap_or_else(|| PathBuf::from(root));
-                let filter = Filter::Rules(FolderChanges::new(backend, folder.clone()));
-                (folder, None, filter)
-            }
-        };
+        let (watched, mut filter) = watched_folder(&*self.backend, root)?;
+        let (folder, git_dir) = (watched.folder.clone(), watched.git_dir.clone());
         // the watch is kept in `self`: a strong reference here would keep both alive
         let repositories = self.this.clone();
-        let watched = Watching {
-            root: root.to_string(),
-            folder: folder.clone(),
-            git_dir: git_dir.clone(),
-        };
         let on_changed = move |changed: Changed| {
             if let Some(repositories) = repositories.upgrade() {
                 repositories.batch(generation, &watched, &mut filter, &changed, &*on_change);
@@ -315,134 +141,55 @@ impl LocalRepositories {
             .watch(&folder, git_dir.as_deref(), Box::new(on_changed))?;
         lock(&self.visibility).missed_paths = watch.folders.is_some().then_some(MissedPaths::NONE);
         if let Some(watcher) = watch.folders.clone() {
-            let hiding = match git_dir {
-                Some(git_dir) => Hiding::Git { git_dir },
-                None => Hiding::Rules(backend.folder_rules(&folder)),
-            };
-            // held while the folders are walked: a batch meanwhile waits to watch what it created
-            let mut folders = lock(&self.folders);
-            *folders = Some(WatchedFolders::start(backend, watcher, &folder, hiding));
+            self.watch_each_folder(watcher, &folder, git_dir);
         }
         Ok(watch)
     }
 
-    /// One batch of the watcher, on its thread; dropped once another folder is put on screen.
-    fn batch(
+    /// Where the system watches one folder at a time, walks the folder to watch each one that
+    /// shows.
+    fn watch_each_folder(
         &self,
-        generation: u64,
-        watched: &Watching,
-        filter: &mut Filter,
-        changed: &Changed,
-        on_change: &dyn Fn(RepositoryChange),
+        watcher: Arc<dyn FolderWatcher>,
+        folder: &Path,
+        git_dir: Option<PathBuf>,
     ) {
-        let root = watched.root.as_str();
-        if watched.kind_changed(&*self.backend, changed) {
-            self.watch_other_kind(generation, root);
-            return;
-        }
-        let changes = match changed {
-            Changed::Paths(paths) => classify(
-                paths.iter().map(PathBuf::as_path),
-                &watched.folder,
-                watched.git_dir.as_deref(),
-            ),
-            Changed::Unknown => WatchedChanges::lost(watched.git_dir.is_some()),
+        let backend = &*self.backend;
+        let hiding = match git_dir {
+            Some(git_dir) => Hiding::Git { git_dir },
+            None => Hiding::Rules(backend.folder_rules(folder)),
         };
-        if changes.is_empty() {
-            return;
-        }
-        if changes.lost {
-            filter.start_over(&*self.backend, &watched.folder);
-        } else if changes.git_dir {
-            // The index may now track a file in an ignored directory, or the excludes changed.
-            filter.forget();
-        }
-        // held until the batch is settled, so the window cannot show in between and miss it
-        let mut visibility = lock(&self.visibility);
-        // checked under the lock that `watch` takes after counting, so no mark lands after its reset
-        if self.generation.load(Ordering::Relaxed) != generation {
-            return;
-        }
-        // nobody looks: no `check-ignore`, no refresh, only a mark for when the window shows
-        if visibility.hidden {
-            let marked = changes.git_dir
-                || changes.lost
-                || filter.any_maybe_visible(&*self.backend, &changes.worktree);
-            if marked {
-                visibility.missed = Some(root.to_string());
-                if let Some(paths) = visibility.missed_paths.as_mut() {
-                    paths.keep(&changes);
-                }
-                self.forget_tree(root);
-                self.forget_contents();
-            }
-            tracing::debug!(
-                git_dir = changes.git_dir,
-                worktree_paths = changes.worktree.len(),
-                lost = changes.lost,
-                marked,
-                "watcher batch while hidden"
-            );
-            return;
-        }
-        drop(visibility);
-        let worktree = if changes.lost {
-            Visible::Unknown
-        } else {
-            filter.visible(&*self.backend, &changes.worktree)
-        };
-        self.watch_created_folders(&worktree);
-        let visible = changes.git_dir || worktree.any();
-        let files = self.batch_changes_tree(watched, changes.git_dir, &worktree);
-        if files {
-            self.forget_tree(root);
-        }
-        tracing::debug!(
-            git_dir = changes.git_dir,
-            worktree_paths = changes.worktree.len(),
-            lost = changes.lost,
-            visible,
-            files,
-            "watcher batch"
-        );
-        if visible {
-            self.forget_contents();
-            on_change(RepositoryChange {
-                root: root.to_string(),
-                git_dir: changes.git_dir,
-                paths: worktree.git_paths(MAX_CHANGED_PATHS),
-                kind_changed: false,
-            });
-        }
-    }
-
-    /// Where each folder is watched on its own, watches the folders a batch created, before the
-    /// change is told; every folder is looked at again when what git ignores may have changed, or
-    /// the system dropped events.
-    fn watch_created_folders(&self, worktree: &Visible) {
+        // held while the folders are walked: a batch meanwhile waits to watch what it created
         let mut folders = lock(&self.folders);
-        let Some(folders) = folders.as_mut() else {
-            return;
-        };
-        match worktree {
-            Visible::Unknown => folders.rescan(&*self.backend),
-            Visible::Paths(paths) => folders.add_created(&*self.backend, paths),
-        }
+        *folders = Some(WatchedFolders::start(backend, watcher, folder, hiding));
     }
+}
 
-    /// Whether a batch of the watcher may have added or removed a file of the tree read.
-    fn batch_changes_tree(&self, watched: &Watching, git_dir: bool, visible: &Visible) -> bool {
-        let trees = lock(&self.trees);
-        let Some(tree) = trees.get(&watched.root).and_then(|c| c.tree.as_ref()) else {
-            // nothing read, nothing to read again
-            return false;
-        };
-        git_dir
-            || match visible {
-                Visible::Unknown => true,
-                Visible::Paths(paths) => {
-                    tree.may_have_changed(&*self.backend, &watched.folder, paths)
-                }
-            }
-    }
+/// The folder at `root` as git, or the system for a folder without git, names it, and which of
+/// its changes show.
+fn watched_folder(
+    backend: &dyn RepositoryBackend,
+    root: &str,
+) -> anyhow::Result<(Watching, Filter)> {
+    let (folder, git_dir, filter) = match folder_kind(backend, Path::new(root))? {
+        FolderKind::Repository => {
+            let resolved = resolve_repository(backend, Path::new(root))?;
+            let folder = PathBuf::from(resolved.info.root);
+            let filter = Filter::Git(IgnoredPaths::new(folder.clone()));
+            (folder, Some(resolved.git_dir), filter)
+        }
+        FolderKind::Plain => {
+            let folder = backend
+                .real_path(Path::new(root))
+                .unwrap_or_else(|| PathBuf::from(root));
+            let filter = Filter::Rules(FolderChanges::new(backend, folder.clone()));
+            (folder, None, filter)
+        }
+    };
+    let watched = Watching {
+        root: root.to_string(),
+        folder,
+        git_dir,
+    };
+    Ok((watched, filter))
 }

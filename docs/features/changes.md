@@ -55,7 +55,7 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   marks follow scrolls and resizes without a render; the content's height is the one scale.
   `trackMarks` gives click rooms and joins overlaps. `Pane` owns the layout and the hunk gone to,
   shared by the list and the map.
-- Wrapping (`model/soft-wrap.ts`, `ui/code-wrap.ts`): breaks chosen in JS, so every line's height
+- Wrapping (`model/text/soft-wrap/`, `ui/viewer/text/code-wrap.ts`): breaks chosen in JS, so every line's height
   is known before it renders and the list keeps fixed-height rows (`diffLayout`). Columns: the
   width less the gutter over the width of `0` (canvas); other characters measured once each per
   session (CJK ~1.5 columns, emoji 2.3 in SF Mono). One `LineWrapper` per column count gives rows
@@ -87,7 +87,7 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
 
 - Against HEAD, not the default branch or merge base, as VS Code and Zed.
 - Summary counts without a numstat against HEAD of every path: a path not staged
-  counts against HEAD as unstaged, so only staged paths are diffed against HEAD. Zed's clone, M4,
+  counts against HEAD as unstaged, so only staged paths are diffed against HEAD. A 4,366-file repository, M4,
   CPU per snapshot: 20 files edited 225 → 152 ms, 300 edited 422 → 254 ms, 10 of 20 staged and
   edited again 222 → 200 ms; 300 staged and edited again 543 → 558 ms, wall time even (168 →
   170 ms) since `--name-status` (14 ms) lets both staged diffs run at once (`.local/snapshot-cost/`).

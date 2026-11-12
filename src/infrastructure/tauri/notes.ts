@@ -37,7 +37,7 @@ function onImageDrop(listener: (drop: ImageDrop) => void): () => void {
     );
 }
 
-/** Native notes adapter: the commands in `src-tauri/src/interfaces/tauri/notes.rs`. */
+/** Native notes adapter: the commands in `src-tauri/src/interfaces/tauri/notes/`. */
 export const tauriNotes: NotesPort = {
     getNotes: (book) => invoke('get_notes', { book }),
     addNote: (book, list, text) => invoke('add_note', { book, list, text }),
@@ -79,8 +79,8 @@ export const tauriNotes: NotesPort = {
                 type: 'image/png',
             },
         ),
-    // `note_image.rs`: the book and the file encoded whole, the book once before (an older id is
-    // a path)
+    // `notes/image_scheme.rs`: the book and the file encoded whole, the book once before (an older
+    // id is a path)
     imageUrl: (book, image, thumb) =>
         convertFileSrc(`${encodeURIComponent(book)}/${imageFile(image, thumb)}`, 'note-image'),
     onImageDrop,

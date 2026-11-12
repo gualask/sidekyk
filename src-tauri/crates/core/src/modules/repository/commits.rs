@@ -117,46 +117,52 @@ fn diff_tree_args<'a>(
     Ok(args)
 }
 
+/// A field of `-z` output, taken off `rest`; none when cut short.
+fn field(rest: &mut &[u8]) -> Option<String> {
+    let end = rest.iter().position(|&b| b == 0)?;
+    let field = String::from_utf8_lossy(&rest[..end]).into_owned();
+    *rest = &rest[end + 1..];
+    Some(field)
+}
+
+/// A raw record of `git diff-tree -z`, taken off `rest`; none when cut short.
+fn raw_record(rest: &mut &[u8]) -> Option<FileChange> {
+    let meta = field(rest)?;
+    // `:<old mode> <new mode> <old id> <new id> <status>`
+    let parts: Vec<&str> = meta.split(' ').collect();
+    let status = parts.last().and_then(|s| s.chars().next());
+    let blob = |at: usize| parts.get(at).copied().and_then(object_id);
+    let (old_blob, new_blob) = (blob(2), blob(3));
+    let first = field(rest)?;
+    let (path, orig_path) = if matches!(status, Some('R' | 'C')) {
+        (field(rest)?, Some(first))
+    } else {
+        (first, None)
+    };
+    Some(FileChange {
+        path,
+        orig_path,
+        kind: status.and_then(kind_of).unwrap_or(ChangeKind::Modified),
+        additions: None,
+        deletions: None,
+        binary: false,
+        old_blob,
+        new_blob,
+    })
+}
+
 /// The entries of `git diff-tree -z --raw --numstat`: every raw record first (`:<modes> <ids>
 /// <status>`, then the path, or the old and the new path of a rename or a copy), then the
 /// numstat records. Output `truncated` anywhere keeps its whole raw records, and drops its last
 /// numstat record, which may be cut in its path and match another file (as a snapshot does).
 fn parse_diff_tree_z(bytes: &[u8], truncated: bool) -> Vec<FileChange> {
-    fn field(rest: &mut &[u8]) -> Option<String> {
-        let end = rest.iter().position(|&b| b == 0)?;
-        let field = String::from_utf8_lossy(&rest[..end]).into_owned();
-        *rest = &rest[end + 1..];
-        Some(field)
-    }
-
     let mut rest = bytes;
     let mut files = Vec::new();
     while rest.first() == Some(&b':') {
-        let Some(meta) = field(&mut rest) else { break };
-        // `:<old mode> <new mode> <old id> <new id> <status>`
-        let parts: Vec<&str> = meta.split(' ').collect();
-        let status = parts.last().and_then(|s| s.chars().next());
-        let blob = |at: usize| parts.get(at).copied().and_then(object_id);
-        let (old_blob, new_blob) = (blob(2), blob(3));
-        let Some(first) = field(&mut rest) else { break };
-        let (path, orig_path) = if matches!(status, Some('R' | 'C')) {
-            let Some(second) = field(&mut rest) else {
-                break;
-            };
-            (second, Some(first))
-        } else {
-            (first, None)
+        let Some(file) = raw_record(&mut rest) else {
+            break;
         };
-        files.push(FileChange {
-            path,
-            orig_path,
-            kind: status.and_then(kind_of).unwrap_or(ChangeKind::Modified),
-            additions: None,
-            deletions: None,
-            binary: false,
-            old_blob,
-            new_blob,
-        });
+        files.push(file);
     }
     if rest.first() == Some(&b':') {
         // cut in the raw records: no numstat follows

@@ -60,6 +60,21 @@ struct State {
     status: GlobalShortcutStatus,
 }
 
+impl State {
+    /// Its status once the system turned its `keys` down, for the top bar's problems.
+    fn refused(&mut self, code: UserFacingErrorCode, keys: String) {
+        match code {
+            UserFacingErrorCode::ShortcutTaken => {
+                self.status = GlobalShortcutStatus::Refused { keys };
+            }
+            UserFacingErrorCode::ShortcutInUse => {
+                self.status = GlobalShortcutStatus::InUse { keys };
+            }
+            _ => {}
+        }
+    }
+}
+
 impl Shortcuts {
     /// The shortcut doing this, if built, and the keys the others registered, which it may not
     /// take.
@@ -121,16 +136,7 @@ impl GlobalShortcuts {
             };
             if let Err(code) = switch(registrar, action, state, &others, settings) {
                 tracing::warn!(keys = %settings.keys, code = code.as_str(), "no global shortcut");
-                let keys = settings.keys.clone();
-                match code {
-                    UserFacingErrorCode::ShortcutTaken => {
-                        state.status = GlobalShortcutStatus::Refused { keys };
-                    }
-                    UserFacingErrorCode::ShortcutInUse => {
-                        state.status = GlobalShortcutStatus::InUse { keys };
-                    }
-                    _ => {}
-                }
+                state.refused(code, settings.keys.clone());
             }
             state.applied = Some(settings.clone());
         }
@@ -165,9 +171,7 @@ impl GlobalShortcuts {
                 continue;
             }
             if let Err(code) = switch(registrar, action, state, &others, settings) {
-                for (action, before) in switched {
-                    restore(registrar, &mut shortcuts, action, before);
-                }
+                restore(registrar, &mut shortcuts, switched);
                 return Err(user_facing(code));
             }
             switched.push((action, state.applied.replace(settings.clone())));
@@ -194,23 +198,24 @@ impl GlobalShortcuts {
     }
 }
 
-/// Puts a shortcut back as it was before a change that failed further on.
+/// Puts the shortcuts a change switched back as they were, the change having failed further on.
 fn restore(
     registrar: &impl ShortcutRegistrar,
     shortcuts: &mut Shortcuts,
-    action: ShortcutAction,
-    before: Option<GlobalShortcut>,
+    switched: Vec<(ShortcutAction, Option<GlobalShortcut>)>,
 ) {
-    let (Some((state, others)), Some(before)) = (shortcuts.split(action), before) else {
-        return;
-    };
-    if let Err(code) = switch(registrar, action, state, &others, &before) {
-        tracing::warn!(
-            code = code.as_str(),
-            "a global shortcut could not be put back"
-        );
+    for (action, before) in switched {
+        let (Some((state, others)), Some(before)) = (shortcuts.split(action), before) else {
+            continue;
+        };
+        if let Err(code) = switch(registrar, action, state, &others, &before) {
+            tracing::warn!(
+                code = code.as_str(),
+                "a global shortcut could not be put back"
+            );
+        }
+        state.applied = Some(before);
     }
-    state.applied = Some(before);
 }
 
 /// Registers the new shortcut first, then lets the old one go, so a refusal keeps the old.
@@ -232,21 +237,34 @@ fn switch(
     if others.contains(&keys) {
         return Err(UserFacingErrorCode::ShortcutInUse);
     }
-    if state.registered.as_ref() != Some(&keys) {
-        registrar
-            .register(action, &keys)
-            .map_err(|error| match error {
-                RegisterError::Taken => UserFacingErrorCode::ShortcutTaken,
-                RegisterError::Unsupported => UserFacingErrorCode::InvalidShortcut,
-            })?;
-        if let Some(old) = state.registered.replace(keys.clone()) {
-            registrar.unregister(action, &old);
-        }
-    }
+    register_in_place(registrar, action, state, &keys)?;
     state.status = GlobalShortcutStatus::Active {
         conflict: registrar.system_uses(&keys),
         keys: keys.as_str().to_string(),
     };
+    Ok(())
+}
+
+/// Registers `keys` in place of the keys registered for `action`, unless they are those: the new
+/// first, then the old let go.
+fn register_in_place(
+    registrar: &impl ShortcutRegistrar,
+    action: ShortcutAction,
+    state: &mut State,
+    keys: &ShortcutKeys,
+) -> Result<(), UserFacingErrorCode> {
+    if state.registered.as_ref() == Some(keys) {
+        return Ok(());
+    }
+    registrar
+        .register(action, keys)
+        .map_err(|error| match error {
+            RegisterError::Taken => UserFacingErrorCode::ShortcutTaken,
+            RegisterError::Unsupported => UserFacingErrorCode::InvalidShortcut,
+        })?;
+    if let Some(old) = state.registered.replace(keys.clone()) {
+        registrar.unregister(action, &old);
+    }
     Ok(())
 }
 

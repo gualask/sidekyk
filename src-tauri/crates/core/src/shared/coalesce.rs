@@ -55,11 +55,10 @@ impl<T: Clone> Coalesced<T> {
         let mut state = self.lock();
         let needed = state.started + 1;
         loop {
-            if let Some((run, value)) = &state.last {
-                if *run >= needed {
-                    tracing::debug!(run, "coalesced into a run in flight");
-                    return value.clone();
-                }
+            let done = state.last.as_ref().filter(|(run, _)| *run >= needed);
+            if let Some((run, value)) = done {
+                tracing::debug!(run, "coalesced into a run in flight");
+                return value.clone();
             }
             if !state.running {
                 state.running = true;

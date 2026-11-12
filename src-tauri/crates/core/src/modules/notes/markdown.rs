@@ -44,30 +44,41 @@ pub struct ExportWords {
 pub fn to_markdown(name: &str, lists: &[NoteList], notes: &[Note], words: &ExportWords) -> String {
     let mut out = format!("# {name}: {}\n\n", words.notes);
     for list in lists {
-        let mut open: Vec<&Note> = notes
-            .iter()
-            .filter(|n| n.list == list.id && n.done.is_none())
-            .collect();
-        open.sort_by(|a, b| a.position.total_cmp(&b.position));
-        let mut done: Vec<&Note> = notes
-            .iter()
-            .filter(|n| n.list == list.id && n.done.is_some())
-            .collect();
-        done.sort_by_key(|n| std::cmp::Reverse(n.done));
-        out.push_str(&format!("## {}\n\n", list.name));
-        if open.is_empty() && done.is_empty() {
-            out.push_str(&format!("{}\n\n", words.no_notes));
-        }
-        if !open.is_empty() {
-            out.push_str(&format!("{}\n\n", texts(&open)));
-        }
-        if !done.is_empty() {
-            out.push_str(&format!("### {}\n\n{}\n\n", words.done, texts(&done)));
-        }
+        push_list(&mut out, list, notes, words);
     }
     out.truncate(out.trim_end().len());
     out.push('\n');
     out
+}
+
+/// A list's section: its name, then its open notes, then its done ones under their heading.
+fn push_list(out: &mut String, list: &NoteList, notes: &[Note], words: &ExportWords) {
+    let (open, done) = list_notes(list, notes);
+    out.push_str(&format!("## {}\n\n", list.name));
+    if open.is_empty() && done.is_empty() {
+        out.push_str(&format!("{}\n\n", words.no_notes));
+    }
+    if !open.is_empty() {
+        out.push_str(&format!("{}\n\n", texts(&open)));
+    }
+    if !done.is_empty() {
+        out.push_str(&format!("### {}\n\n{}\n\n", words.done, texts(&done)));
+    }
+}
+
+/// A list's open notes by place, and its done ones, the last done first.
+fn list_notes<'a>(list: &NoteList, notes: &'a [Note]) -> (Vec<&'a Note>, Vec<&'a Note>) {
+    let mut open: Vec<&Note> = notes
+        .iter()
+        .filter(|n| n.list == list.id && n.done.is_none())
+        .collect();
+    open.sort_by(|a, b| a.position.total_cmp(&b.position));
+    let mut done: Vec<&Note> = notes
+        .iter()
+        .filter(|n| n.list == list.id && n.done.is_some())
+        .collect();
+    done.sort_by_key(|n| std::cmp::Reverse(n.done));
+    (open, done)
 }
 
 #[cfg(test)]

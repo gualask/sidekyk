@@ -60,21 +60,8 @@ pub(crate) fn system_uses(keys: &ShortcutKeys) -> bool {
         let found = !keys.iter().any(|key| key.is_null())
             && CopySymbolicHotKeys(&mut hot_keys) == 0
             && !hot_keys.is_null()
-            && (0..CFArrayGetCount(hot_keys)).any(|i| {
-                let [code_key, modifiers_key, enabled_key] = keys;
-                let hot_key = CFArrayGetValueAtIndex(hot_keys, i);
-                let enabled = CFDictionaryGetValue(hot_key, enabled_key);
-                if enabled.is_null() || CFBooleanGetValue(enabled) == 0 {
-                    return false;
-                }
-                let (Some(code), Some(modifiers)) = (
-                    number(CFDictionaryGetValue(hot_key, code_key)),
-                    number(CFDictionaryGetValue(hot_key, modifiers_key)),
-                ) else {
-                    return false;
-                };
-                (code, modifiers & (CMD | SHIFT | OPTION | CONTROL)) == wanted
-            });
+            && (0..CFArrayGetCount(hot_keys))
+                .any(|i| hot_key_uses(CFArrayGetValueAtIndex(hot_keys, i), keys, wanted));
         if !hot_keys.is_null() {
             CFRelease(hot_keys);
         }
@@ -83,6 +70,26 @@ pub(crate) fn system_uses(keys: &ShortcutKeys) -> bool {
         }
         found
     }
+}
+
+/// Whether a symbolic hot key is turned on and uses the `wanted` keys, `keys` its dictionary's
+/// keys: code, modifiers, enabled.
+///
+/// # Safety
+/// `hot_key` is a symbolic hot key's dictionary; `keys` are `CFString`s.
+unsafe fn hot_key_uses(hot_key: CFTypeRef, keys: [CFTypeRef; 3], wanted: (i64, i64)) -> bool {
+    let [code_key, modifiers_key, enabled_key] = keys;
+    let enabled = CFDictionaryGetValue(hot_key, enabled_key);
+    if enabled.is_null() || CFBooleanGetValue(enabled) == 0 {
+        return false;
+    }
+    let (Some(code), Some(modifiers)) = (
+        number(CFDictionaryGetValue(hot_key, code_key)),
+        number(CFDictionaryGetValue(hot_key, modifiers_key)),
+    ) else {
+        return false;
+    };
+    (code, modifiers & (CMD | SHIFT | OPTION | CONTROL)) == wanted
 }
 
 /// A `CFNumber`'s value.

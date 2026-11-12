@@ -1,0 +1,135 @@
+import { lazy, type ReactNode, type RefObject, Suspense, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from '@/shared/i18n';
+import { shortcutKey } from '@/shared/platform/shortcut';
+import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
+import { isKeyTaken } from '@/shared/ui/keys';
+import { useMarkdownPreview, useOpenUrl } from '../../../application/queries/file-reads';
+import { hasCodeAndPreview, previewKind } from '../../../model/preview/preview';
+import { ErrorText, Notice } from '../pane/Pane';
+import { ImageView } from './ImageView';
+import type {
+    PreviewActions,
+    PreviewOpenOn,
+    PreviewPlace,
+} from './markdown-preview/MarkdownPreview';
+
+// the renderer and its blocks load with the first preview, not with the panel
+const MarkdownPreview = lazy(() => import('./markdown-preview/MarkdownPreview'));
+// a diagram's view too, with the first diagram file (a Markdown preview loads it with its blocks)
+const DiagramPane = lazy(() =>
+    import('./diagram/DiagramPane').then((module) => ({ default: module.DiagramPane })),
+);
+
+/** What a preview gives the header of the panel it is in. */
+export interface PreviewHeader {
+    /** The line of the file at the top of the preview, for its code to open on. */
+    topLine: () => number | null;
+}
+
+/**
+ * A file of the project as it reads, in a panel: the header's content (`renderHeader`), then a
+ * Markdown file's preview, read again as the file changes, a Mermaid file's diagram, or an image.
+ * `⌘F` looks through its code instead (`onFind`, with the line on screen): the preview has no find of its own.
+ */
+export function PreviewPane({
+    folderId,
+    path,
+    header,
+    renderHeader,
+    openOn,
+    openFile,
+    onFind,
+}: {
+    folderId: string;
+    path: string;
+    /** The panel's header, where the open file goes (see `PanelProps`). */
+    header: HTMLElement | null;
+    renderHeader: (preview: PreviewHeader) => ReactNode;
+    openOn: PreviewOpenOn | null;
+    /** A file of the project a link leads to, at an element of it. */
+    openFile: PreviewActions['openFile'];
+    /** Not for an image, which has no code. */
+    onFind: (line: number | null) => void;
+}) {
+    const place = useRef<PreviewPlace | null>(null);
+    const topLine = () => place.current?.topLine() ?? null;
+
+    useWindowKeys(
+        (event) => {
+            if (!hasCodeAndPreview(path) || event.defaultPrevented || isKeyTaken(event.target)) {
+                return;
+            }
+            if (shortcutKey(event) !== 'f') return;
+            event.preventDefault();
+            onFind(topLine());
+        },
+        { capture: true },
+    );
+
+    return (
+        <div className="h-full">
+            {header ? createPortal(renderHeader({ topLine }), header) : null}
+            {previewKind(path) === 'markdown' ? (
+                <MarkdownPane
+                    folderId={folderId}
+                    path={path}
+                    openOn={openOn}
+                    place={place}
+                    openFile={openFile}
+                />
+            ) : previewKind(path) === 'diagram' ? (
+                <Suspense fallback={null}>
+                    <DiagramPane folderId={folderId} path={path} />
+                </Suspense>
+            ) : (
+                <ImageView folderId={folderId} path={path} />
+            )}
+        </div>
+    );
+}
+
+/** A Markdown file's preview, or what it is instead: loading, a failure, not text. */
+function MarkdownPane({
+    folderId,
+    path,
+    openOn,
+    place,
+    openFile,
+}: {
+    folderId: string;
+    path: string;
+    openOn: PreviewOpenOn | null;
+    place: RefObject<PreviewPlace | null>;
+    openFile: PreviewActions['openFile'];
+}) {
+    const i18n = useTranslation();
+    const openUrl = useOpenUrl();
+    const preview = useMarkdownPreview(folderId, path);
+    const actions: PreviewActions = {
+        openFile,
+        openUrl,
+    };
+
+    if (preview.isPending) return <Notice>{i18n.t('view.loadingFile')}</Notice>;
+    if (preview.isError) {
+        return (
+            <Notice>
+                <ErrorText error={preview.error} />
+            </Notice>
+        );
+    }
+    if (preview.data === null) return <Notice>{i18n.t('preview.none')}</Notice>;
+    return (
+        <Suspense fallback={null}>
+            <MarkdownPreview
+                folderId={folderId}
+                path={path}
+                document={preview.data}
+                openOn={openOn}
+                place={place}
+                actions={actions}
+            />
+        </Suspense>
+    );
+}

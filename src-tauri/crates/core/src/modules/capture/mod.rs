@@ -2,13 +2,15 @@
 //! (`notes::prepare_capture`). Reading the display and the window that shows it are each
 //! system's (`infrastructure/`).
 
+mod area;
 mod selection;
 
 use serde::Serialize;
 
 use crate::modules::notes::PreparedImage;
 
-pub use selection::{Area, Grip, Handle, PixelRect, Point, Selection, Size};
+pub use area::{Area, Handle, PixelRect, Point, Size};
+pub use selection::{Grip, Selection};
 
 /// An area taken, on its display by the system's id.
 #[derive(Clone, Copy, Debug)]

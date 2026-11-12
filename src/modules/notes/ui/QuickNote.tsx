@@ -1,16 +1,24 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import {
+    type KeyboardEvent,
+    type RefObject,
+    useEffect,
+    useLayoutEffect,
+    useRef,
+    useState,
+} from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { KeyHint } from '@/shared/ui/KeyCaps';
-import { useNoteActions, useNotes } from '../application/notes.queries';
+import { type NoteActions, useNoteActions } from '../application/note-actions/note-actions';
+import { useNotes } from '../application/notes.queries';
 import { useNotesSettings } from '../application/notes-settings';
 import { type MoveState, type MoveSubject, moveOf, picked, settled } from '../model/destination';
-import { INBOX_BOOK } from '../model/notes.types';
-import { PendingList } from './Composer';
-import { DestinationField } from './DestinationField';
+import { INBOX_BOOK, type Note } from '../model/notes.types';
+import { PendingList } from './composer/Composer';
+import { useNoteDraft } from './composer/use-note-draft';
+import { DestinationField } from './destination-field/DestinationField';
+import { type Destination, useDestination } from './destination-field/use-destination';
 import { linesClass, wrapLines } from './notes-layout';
-import { useDestination } from './use-destination';
 import { useColumnImages } from './use-image-drops';
-import { useNoteDraft } from './use-note-draft';
 
 /** What the quick note writes: a new note, for the Inbox unless its destination says otherwise. */
 const NEW_NOTE: MoveSubject = { kind: 'new' };
@@ -35,53 +43,38 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
     const field = useRef<HTMLTextAreaElement>(null);
     const where = useRef<HTMLInputElement>(null);
     const destination = useDestination(NEW_NOTE);
-    const { state, setState, chipNotes, reset } = destination;
-    // the destination field has the focus; what it was when it took it, for `Esc`
-    const [choosing, setChoosing] = useState(false);
-    const before = useRef<MoveState>(state);
-    // closing the note ends a choice in progress: a field hidden with the focus may never say it
-    // lost it (the shortcut closes the note from anywhere)
-    const [wasOpen, setWasOpen] = useState(open);
-    if (open !== wasOpen) {
-        setWasOpen(open);
-        if (!open) setChoosing(false);
-    }
+    const { state, setState, reset } = destination;
+    const { choosing, start, end, restore } = useChoice(open, destination);
     // the Inbox's one list, made with it
     const list = notes?.lists[0]?.id;
-    const images = useColumnImages({
-        root: box,
-        book: INBOX_BOOK,
-        actions,
-        list: list ?? '',
-        onAdded: (note) => {
-            // the destination as it was when the note was sent
-            const move = moveOf(NEW_NOTE, state, undefined);
-            if (move) void actions.moveNote(note, move, { added: true });
-            reset();
-            onDone();
-        },
-    });
-    const draft = useNoteDraft({
-        field,
-        // until the Inbox is read, a note has nowhere to go: it waits in the field
-        onAdd: (text, pending) =>
-            list
-                ? images.composer.onAdd(text, pending)
-                : Promise.resolve({ added: false, left: [...pending] }),
-        pasted: images.composer.pasted,
-        dropInto: images.composer.dropInto,
+    const draft = useInboxDraft(box, field, actions, list, (note) => {
+        // the destination as it was when the note was sent
+        const move = moveOf(NEW_NOTE, state, undefined);
+        if (move) void actions.moveNote(note, move, { added: true });
+        reset();
+        onDone();
     });
     // long lines wrap or not as the setting says (`⌥Z` switches it); the field keeps its height
     useLayoutEffect(() => wrapLines(field.current, settings.lines), [settings.lines]);
     useEffect(() => {
         if (open) field.current?.focus();
     }, [open]);
-    // a destination left half chosen: back as it was, or a project with the list it opens on
-    useEffect(() => {
-        if (choosing) return;
-        const next = settled(state, before.current, chipNotes);
-        if (next !== state) setState(next);
-    }, [choosing, state, chipNotes, setState]);
+    /** A key in the note: `Esc` closes, `Tab` goes to the destination, the rest is the draft's. */
+    const noteKey = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            onDone();
+            return;
+        }
+        // to the destination, past the images waiting
+        const plain = !event.metaKey && !event.ctrlKey && !event.altKey;
+        if (event.key === 'Tab' && plain && !event.shiftKey) {
+            event.preventDefault();
+            where.current?.focus();
+            return;
+        }
+        draft.field.onKeyDown(event);
+    };
 
     return (
         <main
@@ -104,21 +97,7 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
                         aria-label={t('shortcuts.newNote')}
                         className={`min-h-0 flex-1 resize-none bg-transparent text-[15px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted ${linesClass(settings.lines)}`}
                         {...draft.field}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Escape') {
-                                event.preventDefault();
-                                onDone();
-                                return;
-                            }
-                            // to the destination, past the images waiting
-                            const plain = !event.metaKey && !event.ctrlKey && !event.altKey;
-                            if (event.key === 'Tab' && plain && !event.shiftKey) {
-                                event.preventDefault();
-                                where.current?.focus();
-                                return;
-                            }
-                            draft.field.onKeyDown(event);
-                        }}
+                        onKeyDown={noteKey}
                     />
                     <PendingList pending={draft.pending} onDrop={draft.dropPending} />
                 </div>
@@ -129,11 +108,8 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
                         label={t('notes.moveWhere')}
                         popup={choosing}
                         place="min-w-0 flex-1"
-                        onFocus={() => {
-                            before.current = state;
-                            setChoosing(true);
-                        }}
-                        onBlur={() => setChoosing(false)}
+                        onFocus={start}
+                        onBlur={end}
                         onEnter={(row) => {
                             // a suggestion chosen becomes a chip, as with Tab
                             if (row) {
@@ -146,49 +122,116 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
                             else field.current?.focus();
                         }}
                         onEscape={() => {
-                            setState(before.current);
+                            restore();
                             field.current?.focus();
                         }}
                     />
-                    {choosing ? (
-                        <>
-                            <span>
-                                <KeyHint
-                                    text={t('common.keysChoose')}
-                                    keys={{ up: 'ArrowUp', down: 'ArrowDown' }}
-                                />
-                            </span>
-                            <span>
-                                <KeyHint text={t('notes.moveComplete')} keys={{ tab: 'Tab' }} />
-                            </span>
-                            <span>
-                                <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
-                            </span>
-                            <span>
-                                <KeyHint text={t('quickNote.back')} keys={{ esc: 'Escape' }} />
-                            </span>
-                        </>
-                    ) : (
-                        <>
-                            <span>
-                                <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
-                            </span>
-                            <span>
-                                <KeyHint
-                                    text={t('quickNote.newLine')}
-                                    keys={{ keys: 'Shift+Enter' }}
-                                />
-                            </span>
-                            <span>
-                                <KeyHint text={t('quickNote.where')} keys={{ tab: 'Tab' }} />
-                            </span>
-                            <span>
-                                <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
-                            </span>
-                        </>
-                    )}
+                    <QuickNoteKeys choosing={choosing} />
                 </div>
             </section>
         </main>
+    );
+}
+
+/**
+ * A choice of the destination, while its field has the focus (`start`, `end`); `restore` puts back
+ * the destination as it was when it took it (`Esc`). Ended, a destination left half chosen goes
+ * back as it was, or to a project with the list it opens on. Closing the note ends a choice in
+ * progress: a field hidden with the focus may never say it lost it (the shortcut closes the note
+ * from anywhere).
+ */
+function useChoice(open: boolean, { state, setState, chipNotes }: Destination) {
+    const [choosing, setChoosing] = useState(false);
+    const before = useRef<MoveState>(state);
+    const [wasOpen, setWasOpen] = useState(open);
+    if (open !== wasOpen) {
+        setWasOpen(open);
+        if (!open) setChoosing(false);
+    }
+    useEffect(() => {
+        if (choosing) return;
+        const next = settled(state, before.current, chipNotes);
+        if (next !== state) setState(next);
+    }, [choosing, state, chipNotes, setState]);
+    return {
+        choosing,
+        start: () => {
+            before.current = state;
+            setChoosing(true);
+        },
+        end: () => setChoosing(false),
+        restore: () => setState(before.current),
+    };
+}
+
+/**
+ * The note being written for the Inbox's list (`list`, once read), its images pasted or dropped
+ * on `box`; added, `onAdded` takes it. Until the Inbox is read, a note has nowhere to go: it waits
+ * in the field.
+ */
+function useInboxDraft(
+    box: RefObject<HTMLElement | null>,
+    field: RefObject<HTMLTextAreaElement | null>,
+    actions: NoteActions,
+    list: string | undefined,
+    onAdded: (note: Note) => void,
+) {
+    const images = useColumnImages({
+        root: box,
+        book: INBOX_BOOK,
+        actions,
+        list: list ?? '',
+        onAdded,
+    });
+    return useNoteDraft({
+        field,
+        onAdd: (text, pending) =>
+            list
+                ? images.composer.onAdd(text, pending)
+                : Promise.resolve({ added: false, left: [...pending] }),
+        pasted: images.composer.pasted,
+        dropInto: images.composer.dropInto,
+    });
+}
+
+/** The keys the quick note takes, as the focus is in the note or on its destination. */
+function QuickNoteKeys({ choosing }: { choosing: boolean }) {
+    const { t } = useTranslation();
+    if (choosing) {
+        return (
+            <>
+                <span>
+                    <KeyHint
+                        text={t('common.keysChoose')}
+                        keys={{ up: 'ArrowUp', down: 'ArrowDown' }}
+                    />
+                </span>
+                <span>
+                    <KeyHint text={t('notes.moveComplete')} keys={{ tab: 'Tab' }} />
+                </span>
+                <span>
+                    <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
+                </span>
+                <span>
+                    <KeyHint text={t('quickNote.back')} keys={{ esc: 'Escape' }} />
+                </span>
+            </>
+        );
+    }
+    return (
+        <>
+            <span>
+                <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
+            </span>
+            <span>
+                <KeyHint text={t('quickNote.newLine')} keys={{ keys: 'Shift+Enter' }} />
+            </span>
+            <span>
+                <KeyHint text={t('quickNote.where')} keys={{ tab: 'Tab' }} />
+            </span>
+            <span>
+                <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
+            </span>
+        </>
     );
 }

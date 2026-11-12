@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
-import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useExportNotes, useNoteActions, useNotes } from '../application/notes.queries';
+import { type SidebarWidth, useSidebarWidth } from '@/shared/ui/sidebar-width';
+import { useNoteActions } from '../application/note-actions/note-actions';
+import { useExportNotes, useNotes } from '../application/notes.queries';
 import type { Moving } from '../model/destination';
 import { openListOf } from '../model/notes';
-import type { Note, NoteList } from '../model/notes.types';
+import type { Note, NoteList, ProjectNotes } from '../model/notes.types';
 import { type NotesShown, notesShownBy } from '../model/targets';
-import { ListSwitch } from './ListSwitch';
-import { MoveHost } from './MoveHost';
-import { NoteCards } from './NoteCards';
-import { NoteLists } from './NoteLists';
+import { NoteCards } from './cards/NoteCards';
+import { ListSwitch } from './lists/ListSwitch';
+import { NoteLists } from './lists/NoteLists';
+import { MoveHost } from './move/MoveHost';
 import { NotesMenu } from './NotesMenu';
 import { fittingListsWidth } from './notes-layout';
-import { ReorderNotes } from './ReorderNotes';
+import { ReorderNotes } from './reorder-notes/ReorderNotes';
 
 /** The lists' width by default, the same in every project, and the least it takes. */
 const LISTS_WIDTH = { initial: 200, min: 140 };
@@ -51,8 +52,9 @@ export function NotesWorkspace({
     const askMoveList = (list: NoteList) => setMoving({ kind: 'list', book, list });
 
     // a list, or a note of it, picked in the palette; or a new note (`⌘N`), its field taking the
-    // focus as it shows (out of reorder mode it is not there yet)
-    const showTarget = useEffectEvent((shown: NotesShown) => {
+    // focus as it shows (out of reorder mode it is not there yet); once the notes are read, as
+    // opening a list changes them
+    useTarget(notes !== undefined, target, targetTaken, (shown) => {
         if (!notes) return;
         setReorder(null);
         const list = shown.list ?? notes.openList;
@@ -60,19 +62,8 @@ export function NotesWorkspace({
         setReveal(shown.note);
         if (shown.write) setWriteIn(list);
     });
-    // once the notes are read, as opening a list changes them
-    const ready = notes !== undefined;
-    // once: the app forgets it then, so mounting again never applies it again
-    const take = useEffectEvent(targetTaken);
-    useEffect(() => {
-        if (!ready || !target) return;
-        const shown = notesShownBy(target);
-        if (shown) showTarget(shown);
-        take(target);
-    }, [target, ready]);
 
     const width = useSidebarWidth('notes', LISTS_WIDTH);
-    const listsBox = useRef<HTMLDivElement>(null);
     const i18n = useTranslation();
 
     if (error) {
@@ -119,25 +110,19 @@ export function NotesWorkspace({
         setWriteIn(write ? id : null);
     };
 
-    // the header: in a tile the open list's name, which opens the lists; the panel's menu, right
-    const head = header
-        ? createPortal(
-              <>
-                  {place === 'tile' ? (
-                      <ListSwitch
-                          notes={notes}
-                          list={list}
-                          actions={actions}
-                          onOpen={onListOpened}
-                          onMove={askMoveList}
-                      />
-                  ) : null}
-                  <span className="flex-1" />
-                  <NotesMenu onExport={() => void exportNotes()} />
-              </>,
-              header,
-          )
-        : null;
+    const head = (
+        <PanelHead header={header} exportNotes={exportNotes}>
+            {place === 'tile' ? (
+                <ListSwitch
+                    notes={notes}
+                    list={list}
+                    actions={actions}
+                    onOpen={onListOpened}
+                    onMove={askMoveList}
+                />
+            ) : null}
+        </PanelHead>
+    );
 
     const mover = <MoveHost moving={moving} actions={actions} onClose={() => setMoving(null)} />;
 
@@ -155,17 +140,82 @@ export function NotesWorkspace({
         <div className="flex h-full bg-ui-surface font-sans">
             {head}
             {mover}
-            <div
-                ref={listsBox}
-                className="shrink-0 overflow-auto border-r border-ui-border"
-                style={width.style}
-            >
+            <ListsSidebar width={width} notes={notes}>
                 <NoteLists
                     notes={notes}
                     actions={actions}
                     onOpen={onListOpened}
                     onMove={askMoveList}
                 />
+            </ListsSidebar>
+            {cards}
+        </div>
+    );
+}
+
+/**
+ * A target the app hands the panel, shown (`show`) once `ready`, if it is one for notes; then
+ * taken once: the app forgets it, so mounting again never applies it again.
+ */
+function useTarget(
+    ready: boolean,
+    target: PanelProps['target'],
+    targetTaken: PanelProps['targetTaken'],
+    show: (shown: NotesShown) => void,
+) {
+    const showTarget = useEffectEvent(show);
+    const take = useEffectEvent(targetTaken);
+    useEffect(() => {
+        if (!ready || !target) return;
+        const shown = notesShownBy(target);
+        if (shown) showTarget(shown);
+        take(target);
+    }, [target, ready]);
+}
+
+/**
+ * The panel's header: in a tile the open list's name (`children`), which opens the lists; the
+ * panel's menu, right.
+ */
+function PanelHead({
+    header,
+    exportNotes,
+    children,
+}: {
+    header: PanelProps['header'];
+    exportNotes: ReturnType<typeof useExportNotes>;
+    children: ReactNode;
+}) {
+    if (!header) return null;
+    return createPortal(
+        <>
+            {children}
+            <span className="flex-1" />
+            <NotesMenu onExport={() => void exportNotes()} />
+        </>,
+        header,
+    );
+}
+
+/** Full screen, the lists (`children`) on the left; their edge resizes them, as a sidebar's. */
+function ListsSidebar({
+    width,
+    notes,
+    children,
+}: {
+    width: SidebarWidth;
+    notes: ProjectNotes;
+    children: ReactNode;
+}) {
+    const listsBox = useRef<HTMLDivElement>(null);
+    return (
+        <>
+            <div
+                ref={listsBox}
+                className="shrink-0 overflow-auto border-r border-ui-border"
+                style={width.style}
+            >
+                {children}
             </div>
             <SidebarSplitter
                 width={width}
@@ -179,7 +229,6 @@ export function NotesWorkspace({
                 }
                 what="list"
             />
-            {cards}
-        </div>
+        </>
     );
 }

@@ -38,12 +38,15 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
 
 ## Frontend
 
-- `app/`: composition root: providers, shell (top bar, levels, tiles), keys and zoom gestures,
-  panels (`panels.ts`), problems.
+- `app/`: composition root: providers, shell (`app-shell/`: levels, dialogs), top bar
+  (`top-bar/`), tiles with their keys and zoom gestures (`workspace-view/`), panels
+  (`panels.ts`), problems.
 - `modules/`: `projects` (list, level 0 rows, dialogs), `repository` (Changes and Files, the
-  folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`),
-  `notes`, `search` (the palette; ranking and reading are the backend's), `settings`. Each panel
-  module one lazy chunk.
+  folder's kind; `model/` wire types and parsers, `application/` port and queries, `ui/`: the
+  viewer both panels share in `viewer/`, each panel's own in `changes/` and `files/`, the tiles'
+  summaries in `summary/`), `notes`, `search` (the palette; ranking and reading are the
+  backend's), `settings`. Each panel module one lazy chunk. Inside a module, a folder groups what
+  one owner uses; a file two of them use stays in the folder above.
 - `infrastructure/`: the two implementations of `RuntimePorts` (`runtime-ports.ts`), `tauri/` (the
   backend) and `fixtures/` (in memory, for the browser), a file per port in each; `app/` picks one, `DevModePage.tsx` the fixtures in a chunk
   loaded only in dev builds. `shared/`: tokens, primitives, session state (`useSessionState`),
@@ -84,15 +87,17 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     commands reach (`Ports`: notes storage, files given to a note, files an export writes); what
     the tray's items, the shortcuts' presses and the app's events call.
   - `interfaces/tauri/`: entry points only, each translating and delegating to the core's `app`,
-    `desktop/` or a Tauri plugin (dialog, opener): the commands and URI schemes, `tray.rs` and
+    `desktop/` or a Tauri plugin (dialog, opener): the commands and URI schemes (a capability's
+    together: `notes/`, `projects/`, each scheme beside its commands), `tray.rs` and
     `shortcuts.rs` (what an item or a press does), `cli.rs` (a folder, `--toggle`, else show),
     `lifecycle.rs` (page load, close, run events). `blocking.rs`, the one file the others import:
     work off the async runtime, logged; a folder by its id; a book's notes; the `Ports`.
   - `desktop/`: the window's session: the first show, showing and hiding it, closing into the tray
-    (`window.rs`), the quick note's stages (`quick_note.rs`), one capture at a time and the areas
-    waiting (`capture.rs`), the settings in effect (`settings.rs`), the backend's texts
-    (`texts.rs`), what a launch opened (`launch.rs`). Never imports `interfaces/`; inside it,
-    `window -> quick_note`, `capture -> window, texts`, `settings -> texts, window`.
+    (`window.rs`), the quick note's stages (`quick_note.rs`) and its frame (`quick_note_frame.rs`),
+    one capture at a time and the areas waiting (`capture.rs`), the settings in effect
+    (`settings.rs`), the backend's texts (`texts.rs`), what a launch opened (`launch.rs`). Never
+    imports `interfaces/`; inside it, `window -> quick_note -> quick_note_frame`,
+    `capture -> window, texts`, `settings -> texts, window`.
   - `infrastructure/`: every system `#[cfg]` of the crate: `settings_store.rs`, `stored_json.rs`,
     `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs` (icon, menu, whether it is up),
     `global_shortcuts/` (the plugin's registrar, Linux's command, macOS's own shortcuts),
@@ -119,15 +124,16 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   using no longer warns.
   - `modules/folder/`: a project's folder, with or without git: the `RepositoryBackend` port (git,
     reads, `walk`, `folder_rules`, `real_path`) and the `RepositoryWatcher` port to the machine
-    that holds it, its kind and root (`resolve_folder`), the tree and a file's content, path
-    checks and read limits (`reading.rs`), the ignored-paths filter, which changes matter
-    (`watched.rs`, `FolderChanges`) and which folders to watch (`folders.rs`), its wire
-    contracts. No disk of its own.
-  - `modules/repository/`: git's review over `folder`: parsers, snapshot, diffs, commits,
-    versions. `repository` imports `folder`, never the other way.
+    that holds it, its kind and root (`resolve_folder`), the tree and the recent files (`tree/`),
+    a file's content, path checks and read limits (`reading.rs`), what the watcher's changes mean
+    (`watch/`: which changes matter, the ignored-paths filter, `FolderChanges`, which folders to
+    watch), its wire contracts. No disk of its own.
+  - `modules/repository/`: git's review over `folder`: parsers, the snapshot (`snapshot/`), diffs,
+    commits, versions. `repository` imports `folder`, never the other way.
   - `modules/reader/`: one machine's folders as the app reads them, repositories or not: the
     `Repositories` port, one method per read, and `LocalRepositories` (coalesced reads, the
-    cached tree, the last content search, `ColorCache`, the watched folder, `watch.rs`).
+    cached tree, the last content search, `ColorCache`, the watched folder: `watch.rs`, its
+    batches `batch.rs`, what is kept while hidden `visibility.rs`).
   - `modules/projects`, `settings`, `search` (pure ranking), `notes` (`NotesStore` over
     `NotesStorage`), `syntax`, `preview` (Markdown to the preview's tree, pure), `diagram`
     (Mermaid to an SVG with merman, pure).
@@ -146,9 +152,10 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     folder's reader by id (`FolderReader`). `notes.rs`: the list's books, a project removed or
     merged with its notes, a note's copy, the export (`ExportFiles` port). `palette.rs`: the
     palette's search across projects, files and notes; the folders holding a file a note names.
-  - `infrastructure/`: `git_cli.rs`, `folder_walk.rs` (`ignore`), `process.rs` (a child within an
-    output size and a time), `watcher.rs` (notify), `agent/`, `machines/` (`local.rs`, `wsl.rs`,
-    `linux_helper.rs`: the adapters of `Machine`).
+  - `infrastructure/`: `git_cli.rs` (the disk read in `worktree_files.rs`), `folder_walk.rs`
+    (`ignore`), `process.rs` (a child within an output size and a time), `watcher.rs` (notify; its
+    throttled reports in `watch_reports.rs`), `agent/`, `machines/` (`local.rs`, `wsl.rs`,
+    `linux_helper.rs`: the adapters of `Machine`; `wsl_exe.rs`: the distros through `wsl.exe`).
   - `shared/`: `AppError` (`{ code, message }`; a new code needs its key in `app-error.ts` and both
     catalogs), `coalesce.rs` (one run in flight, later callers share the next), `threads.rs` (8 at
     most).
@@ -173,8 +180,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 - macOS and Windows: one recursive watch of the root (and of the git dir when outside it).
 - Linux (the app and the helper): inotify watches one folder at a time, and notify's
   recursive watch took every folder, `node_modules/` included, and gave up the project at the first
-  failure (`max_user_watches`); fanotify needs `CAP_SYS_ADMIN`. So, as VS Code
-  (`@parcel/watcher`) and Zed, `folders.rs` watches each folder git does not ignore
+  failure (`max_user_watches`); fanotify needs `CAP_SYS_ADMIN`. So, as VS Code and
+  Zed, `watch/folders.rs` watches each folder git does not ignore
   (`check-ignore` once per level), each before reading it, not inside a submodule nor through a
   link; in the git dir itself, `refs/`, `info/`. A folder a batch created is watched before the
   change is told; one created while hidden when the window shows. A `.gitignore` changed: every
@@ -182,22 +189,24 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   (8,192 before Linux 5.11, then 1% of RAM within 8,192-1,048,576).
 - Reports: while an agent writes, the debouncer gives ~8 batches a second (its next
   deadline is the oldest pending path's last event + 250 ms), each a `check-ignore` and a snapshot
-  (~165 ms CPU). `REPORT_INTERVAL` (1 s, `watcher.rs`, a thread per watch): the first batch after a
-  quiet second at once, the next ones joined and told when the second ends; no timer while idle;
-  before `check-ignore`, so in the helper too. `.local/snapshot-churn/` (M4, CPU with git): 200
-  writes in 3.7 s 5.8 → 1.4 s, one every 0.5 s for 20 s 8.4 → 4.4 s, one every 1.5 s even; first
-  change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last 1.7 s late), not
-  the debouncer's timeout at 1 s (the first in 1.4 s), not 5 s (too stale to watch an agent).
+  (~165 ms CPU). `REPORT_INTERVAL` (1 s, `watcher.rs`; a thread per watch, `watch_reports.rs`):
+  the first batch after a quiet second at once, the next ones joined and told when the second ends;
+  no timer while idle; before `check-ignore`, so in the helper too. `.local/snapshot-churn/` (M4,
+  CPU with git): 200 writes in 3.7 s 5.8 → 1.4 s, one every 0.5 s for 20 s 8.4 → 4.4 s, one every
+  1.5 s even; first change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last
+  1.7 s late), not the debouncer's timeout at 1 s (the first in 1.4 s), not 5 s (too stale to
+  watch an agent).
 - A folder without git: no git dir; `FolderChanges` drops what the walk's rules hide
   (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
-  global excludes included); on Linux `folders.rs` keeps those folders out too. An ignore file
-  changed: rules read again.
+  global excludes included); on Linux `watch/folders.rs` keeps those folders out too. An ignore
+  file changed: rules read again.
 - Kind: a batch with `<root>/.git` that no longer matches the watch restarts it as the other kind
   on its own thread and tells `kind_changed`, also while hidden (rare, no git).
 - A repository inside the root (a submodule, a clone, Claude Code's
   `.claude/worktrees/` unless ignored): `git status` shows its folder, never its files, yet
-  `check-ignore` calls them visible. `ignored.rs` drops paths under a folder holding a `.git` (the
-  disk asked once per folder of a batch, +1 ms on 5,000 paths), as Linux by not watching them.
+  `check-ignore` calls them visible. `watch/ignored.rs` drops paths under a folder holding a
+  `.git` (the disk asked once per folder of a batch, +1 ms on 5,000 paths), as Linux by not
+  watching them.
 - Events the system dropped (`IN_Q_OVERFLOW`, `MustScanSubDirs`): notify's pathless
   event, which the debouncer drops, goes as `Changed::Unknown`: git dir and any path may have
   changed, folders rescanned on Linux, the project marked if hidden. Windows: notify 8.2.1 loses

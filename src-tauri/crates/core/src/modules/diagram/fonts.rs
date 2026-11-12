@@ -112,21 +112,7 @@ fn add_text(text: &str, characters: &mut IntSet<u32>) {
         characters.extend(rest[..at].chars().map(u32::from));
         let entity = &rest[at + 1..];
         let end = entity.find(';').filter(|&end| end <= 10);
-        let character = end.and_then(|end| match &entity[..end] {
-            "amp" => Some('&'),
-            "lt" => Some('<'),
-            "gt" => Some('>'),
-            "quot" => Some('"'),
-            "apos" => Some('\''),
-            "nbsp" => Some('\u{a0}'),
-            number => number
-                .strip_prefix("#x")
-                .or_else(|| number.strip_prefix("#X"))
-                .map(|hex| u32::from_str_radix(hex, 16))
-                .or_else(|| number.strip_prefix('#').map(str::parse::<u32>))
-                .and_then(Result::ok)
-                .and_then(char::from_u32),
-        });
+        let character = end.and_then(|end| entity_character(&entity[..end]));
         match (character, end) {
             (Some(character), Some(end)) => {
                 characters.insert(u32::from(character));
@@ -141,6 +127,25 @@ fn add_text(text: &str, characters: &mut IntSet<u32>) {
     characters.extend(rest.chars().map(u32::from));
 }
 
+/// The character an entity names, between its `&` and its `;`: one of XML's, `nbsp`, or a number.
+fn entity_character(name: &str) -> Option<char> {
+    match name {
+        "amp" => Some('&'),
+        "lt" => Some('<'),
+        "gt" => Some('>'),
+        "quot" => Some('"'),
+        "apos" => Some('\''),
+        "nbsp" => Some('\u{a0}'),
+        number => number
+            .strip_prefix("#x")
+            .or_else(|| number.strip_prefix("#X"))
+            .map(|hex| u32::from_str_radix(hex, 16))
+            .or_else(|| number.strip_prefix('#').map(str::parse::<u32>))
+            .and_then(Result::ok)
+            .and_then(char::from_u32),
+    }
+}
+
 /// Standard base64, padded.
 fn base64(bytes: &[u8]) -> String {
     const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -149,15 +154,13 @@ fn base64(bytes: &[u8]) -> String {
         let triple = chunk.iter().enumerate().fold(0u32, |acc, (index, &byte)| {
             acc | u32::from(byte) << (16 - 8 * index)
         });
-        for index in 0..4 {
-            if index <= chunk.len() {
-                out.push(char::from(
-                    ALPHABET[(triple >> (18 - 6 * index)) as usize & 63],
-                ));
-            } else {
-                out.push('=');
-            }
-        }
+        // a chunk of n bytes fills n + 1 characters, `=` the rest
+        let filled = chunk.len() + 1;
+        out.extend(
+            (0..filled)
+                .map(|index| char::from(ALPHABET[(triple >> (18 - 6 * index)) as usize & 63])),
+        );
+        out.extend(std::iter::repeat_n('=', 4 - filled));
     }
     out
 }

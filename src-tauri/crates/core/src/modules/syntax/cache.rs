@@ -148,60 +148,85 @@ fn run<C: Coloring>(jobs: &mpsc::Receiver<Job>, shared: &Shared, color: Colorer<
     let mut pending: VecDeque<Job> = VecDeque::new();
     loop {
         if pending.is_empty() {
-            match jobs.recv() {
-                Ok(job) => pending.push_back(job),
-                Err(_) => return,
-            }
+            // waits for the next job; none comes once the client went
+            pending.extend(jobs.recv().ok());
+        }
+        if pending.is_empty() {
+            return;
         }
         let cancel = Arc::new(AtomicBool::new(false));
-        let job = {
-            // under the lock a caller checks it with: its job is either seen here or sees the run
-            let mut running = lock(&shared.running);
-            pending.extend(jobs.try_iter());
-            let Some(job) = pending.pop_front() else {
-                continue;
-            };
-            if let Some(lines) = shared.kept(&job.key, Some(job.hash)) {
-                let _ = job.reply.send(Some(lines));
-                continue;
-            }
-            let newer = pending
-                .iter()
-                .any(|later| later.key == job.key && later.hash != job.hash);
-            if newer {
-                let _ = job.reply.send(None);
-                continue;
-            }
-            *running = Some(Running {
-                key: job.key.clone(),
-                hash: job.hash,
-                cancel: cancel.clone(),
-            });
-            job
+        let Some(job) = next_to_color(jobs, shared, &mut pending, &cancel) else {
+            continue;
         };
         let before = states.iter().find(|(key, _)| *key == job.key);
         let before = before.map(|(_, state)| state);
-        // a grammar that panics loses this text's colors, not the thread
-        let colored = panic::catch_unwind(AssertUnwindSafe(|| {
-            color(&job.path, job.bytes, before, &cancel)
-        }))
-        .unwrap_or_else(|_| {
-            tracing::error!(path = job.path, "coloring panicked");
-            None
-        });
+        let colored = color_caught(color, &job.path, job.bytes, before, &cancel);
         *lock(&shared.running) = None;
         let Some(state) = colored else {
             let _ = job.reply.send(None);
             continue;
         };
         let lines = state.lines().clone();
-        states.retain(|(key, _)| *key != job.key);
-        states.push((job.key.clone(), state));
-        if states.len() > KEPT {
-            states.remove(0);
-        }
+        keep_state(&mut states, &job.key, state);
         shared.keep(&job.key, job.hash, lines.clone());
         let _ = job.reply.send(Some(lines));
+    }
+}
+
+/// The next job pending to color, marked as the run: none when it was answered instead, from the
+/// kept lines or with `None` behind a newer text of its file.
+fn next_to_color(
+    jobs: &mpsc::Receiver<Job>,
+    shared: &Shared,
+    pending: &mut VecDeque<Job>,
+    cancel: &Arc<AtomicBool>,
+) -> Option<Job> {
+    // under the lock a caller checks it with: its job is either seen here or sees the run
+    let mut running = lock(&shared.running);
+    pending.extend(jobs.try_iter());
+    let job = pending.pop_front()?;
+    if let Some(lines) = shared.kept(&job.key, Some(job.hash)) {
+        let _ = job.reply.send(Some(lines));
+        return None;
+    }
+    let newer = pending
+        .iter()
+        .any(|later| later.key == job.key && later.hash != job.hash);
+    if newer {
+        let _ = job.reply.send(None);
+        return None;
+    }
+    *running = Some(Running {
+        key: job.key.clone(),
+        hash: job.hash,
+        cancel: cancel.clone(),
+    });
+    Some(job)
+}
+
+/// Colors a text; a grammar that panics loses this text's colors, not the thread.
+fn color_caught<C>(
+    color: Colorer<C>,
+    path: &str,
+    bytes: Vec<u8>,
+    before: Option<&C>,
+    cancel: &AtomicBool,
+) -> Option<C> {
+    panic::catch_unwind(AssertUnwindSafe(|| color(path, bytes, before, cancel))).unwrap_or_else(
+        |_| {
+            tracing::error!(path, "coloring panicked");
+            None
+        },
+    )
+}
+
+/// Keeps what a text of `key` left in place of the one before, the least recently colored going
+/// past `KEPT`.
+fn keep_state<C>(states: &mut Vec<(String, C)>, key: &str, state: C) {
+    states.retain(|(k, _)| k != key);
+    states.push((key.to_string(), state));
+    if states.len() > KEPT {
+        states.remove(0);
     }
 }
 

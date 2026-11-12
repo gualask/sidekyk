@@ -47,9 +47,9 @@ Markdown file or their own: `diagrams.md`.
 - Read where the tree is: `Repositories::markdown_preview` (the helper parses for a WSL project);
   `get_markdown_preview`, null when the file is not text.
 - Images: `project-file://localhost/<folderId>/<path>` (`http://project-file.localhost/…` on
-  Windows; `interfaces/tauri/project_file.rs`), an asynchronous URI scheme off the main thread:
-  the tree, an image's extension, `MAX_IMAGE_BYTES`; answered with its type, `nosniff`, a policy
-  allowing no script, a year's cache. The URL carries the file's stamp (`get_file_stamp`: size,
+  Windows; `interfaces/tauri/projects/file_scheme.rs`), an asynchronous URI scheme off the main
+  thread: the tree, an image's extension, `MAX_IMAGE_BYTES`; answered with its type, `nosniff`, a
+  policy allowing no script, a year's cache. The URL carries the file's stamp (`get_file_stamp`: size,
   mtime), so a changed file is another URL. CSP: `img-src 'self' data: project-file:
   http://project-file.localhost`. Through the helper the bytes follow their message as a raw frame
   (`wsl.md`).
@@ -68,14 +68,14 @@ Markdown file or their own: `diagrams.md`.
   the node's kind; top-level blocks virtualized and measured (`@tanstack/react-virtual`); every
   element is ours, so no `dangerouslySetInnerHTML`. Code blocks ask `useSyntaxColors` for the
   blocks of lines on screen.
-- Measured (release, M4): parse plus JSON of Zed's `all-settings.md` (144 KB) 2.9 ms; a 2 MiB
+- Measured (release, M4): parse plus JSON of a 144 KB settings reference 2.9 ms; a 2 MiB
   file 37 ms, 41 MB peak, 5 MB of JSON; a README 0.05 ms (`.local/markdown-renderers/`).
 
 ## Decisions
 
 - `pulldown-cmark` over `comrak` (3x slower, twice the memory: 37 ms and 29 MB against 11.6 ms and
   13 MB on 2 MiB) once the frontend renders a tree: comrak's safe HTML writer goes unused.
-  `markdown-rs` out: panics on Zed's docs, 6 s on 50,000 nested brackets. `markdown-it` in the
+  `markdown-rs` out: panics on a real docs folder, 6 s on 50,000 nested brackets. `markdown-it` in the
   WebView out: heavy work stays in Rust.
 - A tree, not HTML: Biome refuses `dangerouslySetInnerHTML`, and links, images and code are our
   components anyway. `hast-util-to-jsx-runtime` not taken (it saves only the one-line cases, for

@@ -163,7 +163,13 @@ fn local_path<'a>(url: &'a str, file: &str) -> Option<(String, Option<&'a str>)>
     if rest.is_empty() {
         return None;
     }
-    let relative = percent_decoded(rest);
+    let path = resolved(&percent_decoded(rest), file)?;
+    Some((path, anchor))
+}
+
+/// A decoded relative path as a path of the project: from the folder of `file`, or from the root
+/// after a leading `/`; none above the root, or for the root itself.
+fn resolved(relative: &str, file: &str) -> Option<String> {
     let mut parts: Vec<&str> = if relative.starts_with('/') {
         Vec::new()
     } else {
@@ -180,7 +186,7 @@ fn local_path<'a>(url: &'a str, file: &str) -> Option<(String, Option<&'a str>)>
             part => parts.push(part),
         }
     }
-    (!parts.is_empty()).then(|| (parts.join("/"), anchor))
+    (!parts.is_empty()).then(|| parts.join("/"))
 }
 
 #[cfg(test)]

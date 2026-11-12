@@ -58,14 +58,7 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
         select(projectId);
         then();
     };
-    // the project asked about as the list has it now, which its folders may have changed, with
-    // the folders offered
-    const found = picking ? list?.projects.find((p) => p.id === picking.projectId) : undefined;
-    const among = picking?.among;
-    const asked =
-        found && among
-            ? { ...found, folders: found.folders.filter((f) => among.includes(f.id)) }
-            : found;
+    const asked = picking ? askedProject(list, picking) : undefined;
 
     return {
         folder,
@@ -90,4 +83,16 @@ export function useProjectEntry(list: ProjectList | undefined, project: ProjectI
                   }
                 : null,
     };
+}
+
+/**
+ * The project asked about as the list has it now, which its folders may have changed, with the
+ * folders offered; none once it is gone.
+ */
+function askedProject(list: ProjectList | undefined, picking: Picking): ProjectInfo | undefined {
+    const found = list?.projects.find((p) => p.id === picking.projectId);
+    const among = picking.among;
+    return found && among
+        ? { ...found, folders: found.folders.filter((f) => among.includes(f.id)) }
+        : found;
 }

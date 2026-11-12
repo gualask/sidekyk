@@ -6,7 +6,9 @@ mod folder_walk;
 pub mod git_cli;
 pub mod machines;
 mod process;
+mod watch_reports;
 pub mod watcher;
+mod worktree_files;
 
 use std::process::Command;
 

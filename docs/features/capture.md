@@ -43,10 +43,11 @@ An area of the screen captured from any app becomes a new note, its marks open a
   would be dead code there; the event (`capture`: `taken`, `refused`, `failed`). Tested; each
   system's overlay only forwards the pointer and draws. The crop's pixels become the note's
   image in `notes::prepare_capture`: PNG and thumbnail encoded once, never decoded again.
-- macOS, `infrastructure/capture/macos.rs`: ScreenCaptureKit (`SCShareableContent`, a filter of
-  the display without our process, `SCScreenshotManager`); a non-activating `NSPanel` at the
-  screen saver level (`CanJoinAllSpaces`, `FullScreenAuxiliary`), its view hosting CoreAnimation
-  layers: the frame dimmed (0.35), the same `CGImage` bright through the area's `contentsRect`,
+- macOS, `infrastructure/capture/macos/` (`mod.rs` the reading, `panel.rs`, `view.rs`,
+  `layers.rs`, `image.rs` the crop): ScreenCaptureKit
+  (`SCShareableContent`, a filter of the display without our process, `SCScreenshotManager`); a
+  non-activating `NSPanel` at the screen saver level (`CanJoinAllSpaces`, `FullScreenAuxiliary`),
+  its view hosting CoreAnimation layers: the frame dimmed (0.35), the same `CGImage` bright through the area's `contentsRect`,
   the border, the handles, a `CATextLayer` label and button; an `NSTrackingArea` for the
   pointer's shape. Nothing redrawn but those layers. The crop is drawn into an sRGB RGBA bitmap
   and encoded off the main thread. The area last taken, given at the start, shows picked on its

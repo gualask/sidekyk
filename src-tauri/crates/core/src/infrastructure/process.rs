@@ -1,8 +1,8 @@
 //! A child process run within limits: its output read up to a size, the whole within a time.
 
 use std::io::{Read, Write};
-use std::process::{Child, Command, Stdio};
-use std::sync::mpsc;
+use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
+use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
 use anyhow::Context;
@@ -28,6 +28,29 @@ pub(crate) fn run(
     timeout: Duration,
 ) -> anyhow::Result<ProcessOutput> {
     let deadline = Instant::now() + timeout;
+    let mut child = spawn_with_input(command, input)?;
+    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
+        kill(&mut child);
+        anyhow::bail!("the output is not piped");
+    };
+    let pipes = read_on_threads(stdout, stderr, max_stdout);
+    let (stdout, stderr) = wait_for_pipes(&mut child, &pipes, deadline)?;
+    let code = if stdout.truncated {
+        -1
+    } else {
+        // both pipes closed: the child has ended, or is ending, so this wait is short
+        child.wait()?.code().unwrap_or(-1)
+    };
+    Ok(ProcessOutput {
+        code,
+        stdout: stdout.bytes,
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        truncated: stdout.truncated,
+    })
+}
+
+/// Starts `command`, `input` written to it on a thread of its own.
+fn spawn_with_input(command: &mut Command, input: Option<&[u8]>) -> std::io::Result<Child> {
     let mut child = command
         .stdin(if input.is_some() {
             Stdio::piped()
@@ -41,57 +64,53 @@ pub(crate) fn run(
         let input = input.to_vec();
         std::thread::spawn(move || stdin.write_all(&input));
     }
-    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take()) else {
-        kill(&mut child);
-        anyhow::bail!("the output is not piped");
-    };
+    Ok(child)
+}
+
+/// Reads each pipe on a thread of its own, which sends it whole once read.
+fn read_on_threads(stdout: ChildStdout, stderr: ChildStderr, max_stdout: usize) -> Receiver<Pipe> {
     let (sender, pipes) = mpsc::channel();
     let to_stdout = sender.clone();
     std::thread::spawn(move || to_stdout.send(Pipe::Stdout(read_stdout(stdout, max_stdout))));
     std::thread::spawn(move || sender.send(Pipe::Stderr(read_stderr(stderr))));
+    pipes
+}
 
+/// Both pipes as read, until `deadline`: stdout cut short stops the child and the wait at once.
+/// The child is killed on every failure.
+fn wait_for_pipes(
+    child: &mut Child,
+    pipes: &Receiver<Pipe>,
+    deadline: Instant,
+) -> anyhow::Result<(Stdout, Vec<u8>)> {
     let mut stdout = None;
     let mut stderr = Vec::new();
     let mut stderr_done = false;
     while stdout.is_none() || !stderr_done {
         match pipes.recv_timeout(deadline.saturating_duration_since(Instant::now())) {
-            Ok(Pipe::Stdout(read)) => {
-                let read = read.inspect_err(|_| kill(&mut child))?;
-                let truncated = read.truncated;
+            // nobody reads the rest: the child stops here, and so does the wait for stderr
+            Ok(Pipe::Stdout(Ok(read))) if read.truncated => {
+                kill(child);
                 stdout = Some(read);
-                // nobody reads the rest: the child stops here, and so does the wait for stderr
-                if truncated {
-                    kill(&mut child);
-                    break;
-                }
+                break;
             }
+            Ok(Pipe::Stdout(read)) => stdout = Some(read.inspect_err(|_| kill(child))?),
             Ok(Pipe::Stderr(read)) => {
                 stderr = read;
                 stderr_done = true;
             }
             Err(mpsc::RecvTimeoutError::Timeout) => {
-                kill(&mut child);
+                kill(child);
                 return Err(TimedOut.into());
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
-                kill(&mut child);
+                kill(child);
                 anyhow::bail!("the output could not be read");
             }
         }
     }
     let stdout = stdout.context("the output was not read")?;
-    let code = if stdout.truncated {
-        -1
-    } else {
-        // both pipes closed: the child has ended, or is ending, so this wait is short
-        child.wait()?.code().unwrap_or(-1)
-    };
-    Ok(ProcessOutput {
-        code,
-        stdout: stdout.bytes,
-        stderr: String::from_utf8_lossy(&stderr).into_owned(),
-        truncated: stdout.truncated,
-    })
+    Ok((stdout, stderr))
 }
 
 /// A pipe of the child, read to its end on a thread of its own.

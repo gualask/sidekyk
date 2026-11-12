@@ -3,18 +3,20 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useCaptureMarks, useNoteActions, useNotes } from '../application/notes.queries';
+import { useCaptureMarks } from '../application/captures';
+import { useNoteActions } from '../application/note-actions/note-actions';
+import { useNotes } from '../application/notes.queries';
 import type { Moving } from '../model/destination';
 import { openNotes } from '../model/notes';
 import { INBOX_BOOK } from '../model/notes.types';
-import { CardRows } from './CardRows';
-import { Composer } from './Composer';
-import { MoveHost } from './MoveHost';
-import { NoteCard } from './NoteCard';
-import { useCardRows } from './use-card-rows';
-import { useCardStates } from './use-card-states';
+import { CardRows } from './cards/CardRows';
+import { NoteCard } from './cards/note-card/NoteCard';
+import { useCardRows } from './cards/use-card-rows';
+import { useCardStates } from './cards/use-card-states';
+import { useRevealedNote } from './cards/use-revealed-note';
+import { Composer } from './composer/Composer';
+import { MoveHost } from './move/MoveHost';
 import { useColumnImages } from './use-image-drops';
-import { useRevealedNote } from './use-revealed-note';
 
 /**
  * The column's width until first dragged, a share of the window, and the least it takes: the
@@ -48,8 +50,7 @@ export function InboxColumn({
     const [moving, setMoving] = useState<Moving | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
-    const i18n = useTranslation();
-    const { t } = i18n;
+    const { t } = useTranslation();
 
     // its one list, never shown, made with the Inbox
     const list = notes?.lists[0];
@@ -85,13 +86,7 @@ export function InboxColumn({
                 className="flex flex-col bg-ui-surface font-sans"
                 style={{ ...width.style, minWidth: INBOX_WIDTH.min }}
             >
-                <header className="px-4 pt-3.5 pb-1">
-                    <h2 className="text-[15px] font-bold">{t('inbox.title')}</h2>
-                    <p className="text-xs text-ui-text-muted">{t('inbox.what')}</p>
-                </header>
-                {error ? (
-                    <p className="px-4 py-2 text-sm text-ui-danger">{errorMessage(error, i18n)}</p>
-                ) : null}
+                <InboxHead error={error} />
                 {list ? (
                     <>
                         <Composer
@@ -138,6 +133,23 @@ export function InboxColumn({
                 fitting={() => null}
                 what="inbox"
             />
+        </>
+    );
+}
+
+/** The column's title, what it is for, and why its notes could not be read, if so. */
+function InboxHead({ error }: { error: unknown }) {
+    const i18n = useTranslation();
+    const { t } = i18n;
+    return (
+        <>
+            <header className="px-4 pt-3.5 pb-1">
+                <h2 className="text-[15px] font-bold">{t('inbox.title')}</h2>
+                <p className="text-xs text-ui-text-muted">{t('inbox.what')}</p>
+            </header>
+            {error ? (
+                <p className="px-4 py-2 text-sm text-ui-danger">{errorMessage(error, i18n)}</p>
+            ) : null}
         </>
     );
 }

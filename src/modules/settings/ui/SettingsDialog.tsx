@@ -101,119 +101,67 @@ export function SettingsDialog({
                         </p>
                     ) : null}
                     <Section title={t('settings.appearance')}>
-                        <Setting
+                        <ChoiceSetting
                             label={t('settings.theme.label')}
                             description={t('settings.theme.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(THEMES)}
-                                    value={settings.theme}
-                                    current={current}
-                                    onChange={(theme) => update.mutate({ ...settings, theme })}
-                                />
-                            )}
-                        </Setting>
-                        <Setting
+                            options={translated(THEMES)}
+                            value={settings.theme}
+                            current={current}
+                            onChange={(theme) => update.mutate({ ...settings, theme })}
+                        />
+                        <ChoiceSetting
                             label={t('settings.language.label')}
                             description={t('settings.language.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={LANGUAGES}
-                                    value={i18n.locale}
-                                    onChange={(language) =>
-                                        update.mutate({ ...settings, language })
-                                    }
-                                />
-                            )}
-                        </Setting>
+                            options={LANGUAGES}
+                            value={i18n.locale}
+                            onChange={(language) => update.mutate({ ...settings, language })}
+                        />
                     </Section>
                     <Section title={t('settings.diff')}>
-                        <Setting
+                        <ChoiceSetting
                             label={t('settings.diffView.label')}
                             description={t('settings.diffView.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(DIFF_VIEWS)}
-                                    value={settings.diffView}
-                                    onChange={(diffView) =>
-                                        update.mutate({ ...settings, diffView })
-                                    }
-                                />
-                            )}
-                        </Setting>
-                        <Setting
+                            options={translated(DIFF_VIEWS)}
+                            value={settings.diffView}
+                            onChange={(diffView) => update.mutate({ ...settings, diffView })}
+                        />
+                        <ChoiceSetting
                             label={t('settings.scrollbar.label')}
                             description={t('settings.scrollbar.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(DIFF_SCROLLBARS)}
-                                    value={settings.diffScrollbar}
-                                    onChange={(diffScrollbar) =>
-                                        update.mutate({ ...settings, diffScrollbar })
-                                    }
-                                />
-                            )}
-                        </Setting>
-                        <Setting
+                            options={translated(DIFF_SCROLLBARS)}
+                            value={settings.diffScrollbar}
+                            onChange={(diffScrollbar) =>
+                                update.mutate({ ...settings, diffScrollbar })
+                            }
+                        />
+                        <ChoiceSetting
                             label={t('settings.lines.label')}
                             description={t('settings.codeLines.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(CODE_LINES)}
-                                    value={settings.codeLines}
-                                    onChange={(codeLines) =>
-                                        update.mutate({ ...settings, codeLines })
-                                    }
-                                />
-                            )}
-                        </Setting>
+                            options={translated(CODE_LINES)}
+                            value={settings.codeLines}
+                            onChange={(codeLines) => update.mutate({ ...settings, codeLines })}
+                        />
                         <CopyTemplateSetting />
                     </Section>
                     <Section title={t('panel.files')}>
-                        <Setting
+                        <ChoiceSetting
                             label={t('settings.fileView.label')}
                             description={t('settings.fileView.description')}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(FILE_VIEWS)}
-                                    value={settings.fileView}
-                                    onChange={(fileView) =>
-                                        update.mutate({ ...settings, fileView })
-                                    }
-                                />
-                            )}
-                        </Setting>
+                            options={translated(FILE_VIEWS)}
+                            value={settings.fileView}
+                            onChange={(fileView) => update.mutate({ ...settings, fileView })}
+                        />
                     </Section>
                     <Section title={t('panel.notes')}>
-                        <Setting
+                        <ChoiceSetting
                             label={t('settings.lines.label')}
                             description={t('settings.noteLines.description', {
                                 key: keysLabel('Alt+KeyZ'),
                             })}
-                        >
-                            {(labelId) => (
-                                <Choice
-                                    labelId={labelId}
-                                    options={translated(NOTE_LINES)}
-                                    value={settings.noteLines}
-                                    onChange={(noteLines) =>
-                                        update.mutate({ ...settings, noteLines })
-                                    }
-                                />
-                            )}
-                        </Setting>
+                            options={translated(NOTE_LINES)}
+                            value={settings.noteLines}
+                            onChange={(noteLines) => update.mutate({ ...settings, noteLines })}
+                        />
                     </Section>
                     <Section title={t('common.shortcuts')}>
                         <GlobalShortcutSetting action="toggle" />
@@ -251,39 +199,45 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 /**
- * One value among a few, as segments; `current`, if given, gets the one chosen, for the dialog's
- * focus.
+ * A setting that takes one value among a few, as segments; `current`, if given, gets the one
+ * chosen, for the dialog's focus.
  */
-function Choice<T extends string>({
-    labelId,
+function ChoiceSetting<T extends string>({
+    label,
+    description,
     options,
     value,
     current,
     onChange,
 }: {
-    labelId: string;
+    label: string;
+    description: string;
     options: { value: T; label: string }[];
     value: T;
     current?: RefObject<HTMLElement | null>;
     onChange: (value: T) => void;
 }) {
     return (
-        <RadioGroup
-            aria-labelledby={labelId}
-            className="seg"
-            value={value}
-            onValueChange={onChange}
-        >
-            {options.map((option) => (
-                <Radio.Root
-                    key={option.value}
-                    value={option.value}
-                    className="seg-item"
-                    ref={option.value === value ? current : undefined}
+        <Setting label={label} description={description}>
+            {(labelId) => (
+                <RadioGroup
+                    aria-labelledby={labelId}
+                    className="seg"
+                    value={value}
+                    onValueChange={onChange}
                 >
-                    {option.label}
-                </Radio.Root>
-            ))}
-        </RadioGroup>
+                    {options.map((option) => (
+                        <Radio.Root
+                            key={option.value}
+                            value={option.value}
+                            className="seg-item"
+                            ref={option.value === value ? current : undefined}
+                        >
+                            {option.label}
+                        </Radio.Root>
+                    ))}
+                </RadioGroup>
+            )}
+        </Setting>
     );
 }

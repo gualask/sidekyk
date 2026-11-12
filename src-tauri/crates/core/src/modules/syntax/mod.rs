@@ -4,7 +4,7 @@
 //! through.
 
 mod cache;
-mod colors;
+mod coloring;
 mod contracts;
 
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -13,14 +13,14 @@ use std::time::Instant;
 
 use cache::{Coloring, Lines};
 #[cfg(test)]
-pub use colors::line_check;
+pub use coloring::line_check;
 pub use contracts::{SyntaxColors, SyntaxRequest};
 
 use crate::modules::folder::{RepositoryBackend, RepositoryInfo};
 use crate::modules::repository::{load_version_text, FileVersion, VersionText};
 
 /// The colors of the last versions colored, and the thread that colors them, in the app's state.
-pub type ColorCache = cache::ColorThread<colors::Colored>;
+pub type ColorCache = cache::ColorThread<coloring::Colored>;
 
 impl Default for ColorCache {
     fn default() -> Self {
@@ -33,13 +33,13 @@ impl Default for ColorCache {
 fn color_logged(
     path: &str,
     bytes: Vec<u8>,
-    before: Option<&colors::Colored>,
+    before: Option<&coloring::Colored>,
     cancelled: &AtomicBool,
-) -> Option<colors::Colored> {
+) -> Option<coloring::Colored> {
     let started = Instant::now();
     let text = String::from_utf8(bytes)
         .unwrap_or_else(|error| String::from_utf8_lossy(error.as_bytes()).into_owned());
-    let colored = colors::color_text(path, text, before, cancelled)?;
+    let colored = coloring::color_text(path, text, before, cancelled)?;
     let ms = started.elapsed().as_millis() as u64;
     let (lines, recolored) = (colored.lines().len(), colored.recolored);
     tracing::debug!(path, ms, lines, recolored, "colored");
@@ -72,13 +72,7 @@ pub fn load_syntax_colors(
         request.first,
         request.count
     );
-    let version = match &request.version {
-        FileVersion::Worktree => "worktree",
-        FileVersion::Index => "index",
-        FileVersion::Head => "head",
-        FileVersion::Commit { sha } => sha,
-    };
-    let key = format!("{}\0{}\0{version}", repository.root, request.path);
+    let key = cache_key(repository, request);
     for _ in 0..ATTEMPTS {
         let bytes = match load_version_text(
             backend,
@@ -96,9 +90,7 @@ pub fn load_syntax_colors(
             }
             VersionText::Binary | VersionText::Missing => return Ok(SyntaxColors::default()),
         };
-        let mut hasher = DefaultHasher::new();
-        bytes.hash(&mut hasher);
-        if let Some(lines) = cache.colored(&key, hasher.finish(), &request.path, bytes) {
+        if let Some(lines) = cache.colored(&key, hash_of(&bytes), &request.path, bytes) {
             return Ok(block(&lines, request));
         }
     }
@@ -106,6 +98,23 @@ pub fn load_syntax_colors(
         .latest(&key)
         .map(|lines| block(&lines, request))
         .unwrap_or_default())
+}
+
+/// What the colors of a version of a file are kept under: its repository, path and version.
+fn cache_key(repository: &RepositoryInfo, request: &SyntaxRequest) -> String {
+    let version = match &request.version {
+        FileVersion::Worktree => "worktree",
+        FileVersion::Index => "index",
+        FileVersion::Head => "head",
+        FileVersion::Commit { sha } => sha,
+    };
+    format!("{}\0{}\0{version}", repository.root, request.path)
+}
+
+fn hash_of(bytes: &[u8]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
 
 /// The lines asked for, fewer past the end.

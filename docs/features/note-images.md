@@ -78,7 +78,7 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   with the note (sweep, move, `note-image:`). Points in the image's pixels, whole; the label's
   size follows the image's longest side (`markSize`), the color is `--ui-mark`, the same in both
   themes.
-- Frontend: `NoteImages` (thumbnails, viewer), `MarkEditor` (marks over the image fitted, a canvas
+- Frontend: `NoteImages` (thumbnails), `ImageViewer` (the image large), `MarkEditor` (marks over the image fitted, a canvas
   at its size on screen; geometry in `model/marks.ts`), `Composer` (the waiting images, their object URLs
   revoked when added or left out), `useColumnImages` (drops, the target lit up). Thumbnails have
   their box before they load (`thumbBox`): a card's measured height never moves.

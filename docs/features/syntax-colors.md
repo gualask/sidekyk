@@ -4,7 +4,7 @@ Both sides of a diff, and any file shown, colored from their whole versions.
 
 ## Behaviour
 
-- One Dark / One Light (Zed's `one.json`, from Atom's One, MIT) as `--ui-syntax-*` tokens. Unknown
+- One Dark / One Light (Atom's One themes, MIT) as `--ui-syntax-*` tokens. Unknown
   files stay in the text's color, as in Zed and VS Code.
 - A Markdown file's fenced code takes its language's tones (two-face's grammar embeds them), its
   plain words the text's color (`markup.raw.code-fence`, not a string's `markup.raw`), in the
@@ -27,19 +27,19 @@ Both sides of a diff, and any file shown, colored from their whole versions.
   was colored meanwhile is answered from the table; a newer text of a file stops the older run and
   its caller reads again (3 times, then gets the last colors, which `lineCheck` filters). A panic
   loses that text's colors, not the thread.
-- A changed version is colored from the last (`colors.rs`, as VS Code): the state kept every 64
-  lines; from the last one at or before the first changed line until, in the unchanged tail, the
-  state equals one kept there, whose lines are reused, shifted.
+- A changed version is colored from the last (`coloring/incremental.rs`, as VS Code): the state
+  kept every 64 lines; from the last one at or before the first changed line until, in the
+  unchanged tail, the state equals one kept there, whose lines are reused, shifted.
 - Frontend: `DiffList` asks for the 256-line blocks on screen (`useSyntaxColors`); a line takes its
   colors only when `lineCheck(text)` matches, so colors never land on other text. Worktree blocks
   are invalidated by every change, index and HEAD ones when the git dir changed, commit ones never.
-- Measured: Zed's largest source file (885 KiB, 23,205 lines) 0.64 s, a kept block 0.4 ms, one line
+- Measured: an 885 KiB Rust file (23,205 lines) 0.64 s, a kept block 0.4 ms, one line
   edited 8-9 ms.
 
 ## Decisions
 
 - `syntect` 5.3 (oniguruma) with `two-face` (bat's ~220 grammars), one engine for every language.
-  Tree-sitter is 4-10x faster (Zed's `editor.rs`, 13,291 lines: 74 vs 344 ms) but a grammar crate
+  Tree-sitter is 4-10x faster (a 13,291-line Rust file: 74 vs 344 ms) but a grammar crate
   per language and 4-25 MB per grammar on first use; two-face 7-16 MB whatever the language,
   ~2 ms to load. Not: tree-sitter plus a two-face fallback (41 crates, two engines); `giallo` (as
   slow, 42-98 MB, young); `tree-sitter-language-pack` (26 MB of native libraries a hardened app

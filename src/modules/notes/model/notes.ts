@@ -59,7 +59,7 @@ export function noteMeta(note: Note, now: number, i18n: Translator): string {
         lines > SHOWN_LINES ? t('notes.lines', { count: lines }) : '',
     ]
         .filter(Boolean)
-        .join(' · ');
+        .join(', ');
 }
 
 /** The notes with those changed in place; one no longer there stays gone. */

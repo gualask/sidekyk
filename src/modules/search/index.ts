@@ -9,7 +9,8 @@ export type {
     SearchRequest,
     SearchResults,
 } from './model/search.types';
-export type { PaletteActions, PaletteMode } from './ui/CommandPalette';
+export type { PaletteActions } from './ui/CommandPalette';
+export type { PaletteMode } from './ui/PaletteField';
 
 /** The command palette, loaded once the window is idle after the first paint, or on first use. */
 export const loadCommandPalette = () => import('./ui/CommandPalette');

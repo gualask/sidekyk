@@ -1,6 +1,7 @@
 import { type RefObject, useEffect, useRef, useState } from 'react';
+import type { NoteActions } from '../application/note-actions/note-actions';
 import { type ImageDrop, useNotesPort } from '../application/notes.port';
-import { type NoteActions, type PendingImages, pastedImages } from '../application/notes.queries';
+import { type PendingImages, pastedImages } from '../application/pending-images';
 import type { Note } from '../model/notes.types';
 
 /** The attribute a card is told by, holding its note's id. */
@@ -49,17 +50,18 @@ function useImageDrops(
                 setOver(null);
                 if (target === null) return;
                 const { actions, onField } = latest.current;
-                const pending: PendingImages = {
-                    names: drop.names,
-                    previews: [],
-                    add: (to) => drop.add(book, to),
-                };
+                const pending = droppedImages(drop, book);
                 if (target === 'field') onField(pending);
                 else void actions.addImages(pending, { kind: 'note', id: target.card });
             }),
         [port, book, root],
     );
     return over;
+}
+
+/** Files dropped, as images to add to `book`: named, without previews. */
+function droppedImages(drop: Extract<ImageDrop, { kind: 'drop' }>, book: string): PendingImages {
+    return { names: drop.names, previews: [], add: (to) => drop.add(book, to) };
 }
 
 /**

@@ -99,15 +99,7 @@ pub(crate) fn init(dir: &Path) {
         limit: PROFILE.max_bytes,
     });
 
-    let level = level(std::env::var(LEVEL_VAR).ok().as_deref());
-    // Sidekyk's own events at `level` (the app, its core, the lines of its helper); dependencies
-    // (Tauri plugins) only when something is wrong.
-    let filter = Targets::new()
-        .with_default(LevelFilter::WARN)
-        .with_target(env!("CARGO_CRATE_NAME"), level)
-        .with_target("sidekyk_core", level)
-        .with_target("helper", level);
-
+    let filter = targets(level(std::env::var(LEVEL_VAR).ok().as_deref()));
     let writer = file.and(io::stderr.with_filter(|_| PROFILE.stderr));
     let layer = tracing_subscriber::fmt::layer()
         .with_ansi(false)
@@ -123,6 +115,21 @@ pub(crate) fn init(dir: &Path) {
     }
 
     log_panics();
+    log_started();
+}
+
+/// Sidekyk's own events at `level` (the app, its core, the lines of its helper); dependencies
+/// (Tauri plugins) only when something is wrong.
+fn targets(level: LevelFilter) -> Targets {
+    Targets::new()
+        .with_default(LevelFilter::WARN)
+        .with_target(env!("CARGO_CRATE_NAME"), level)
+        .with_target("sidekyk_core", level)
+        .with_target("helper", level)
+}
+
+/// The session's first line: what runs, where.
+fn log_started() {
     let webview = tauri::webview_version().unwrap_or_else(|error| format!("unknown ({error})"));
     tracing::info!(
         version = env!("CARGO_PKG_VERSION"),

@@ -58,8 +58,10 @@ fn colors(dark: bool) -> DiagramColors {
         tokens.extend(tokens_after(media, ":root {"));
     }
     let names: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(src().join("modules/repository/model/diagram-tokens.json"))
-            .unwrap(),
+        &std::fs::read_to_string(
+            src().join("modules/repository/model/preview/diagram-tokens.json"),
+        )
+        .unwrap(),
     )
     .unwrap();
     let mut json = serde_json::Map::new();

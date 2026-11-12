@@ -4,6 +4,7 @@
 
 mod book;
 mod contracts;
+mod files;
 mod images;
 mod markdown;
 mod ports;

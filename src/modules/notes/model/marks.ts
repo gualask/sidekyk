@@ -29,29 +29,30 @@ export function markShape(mark: Mark, size: number, measure: MeasureText): MarkS
     const width = text === '' ? height : Math.max(height, measure(text) + size);
     const label = { x: mark.x - width / 2, y: mark.y - height / 2, width, height };
     const line = Math.max(2, size * 0.16);
+    return { label, tail: markTail(mark, size), line };
+}
+
+/** A mark's tail to its tip, with the head's corners: none without a tip, or on the mark itself. */
+function markTail(mark: Mark, size: number): MarkShape['tail'] {
     const tip = mark.tail;
-    if (!tip) return { label, tail: null, line };
+    if (!tip) return null;
     const dx = tip.x - mark.x;
     const dy = tip.y - mark.y;
     const length = Math.hypot(dx, dy);
-    if (length === 0) return { label, tail: null, line };
+    if (length === 0) return null;
     const ux = dx / length;
     const uy = dy / length;
     const headLength = Math.min(size * 0.9, length);
     const half = size * 0.45;
     const base = { x: tip.x - ux * headLength, y: tip.y - uy * headLength };
     return {
-        label,
-        line,
-        tail: {
-            from: { x: mark.x, y: mark.y },
-            to: base,
-            head: [
-                { x: tip.x, y: tip.y },
-                { x: base.x - uy * half, y: base.y + ux * half },
-                { x: base.x + uy * half, y: base.y - ux * half },
-            ],
-        },
+        from: { x: mark.x, y: mark.y },
+        to: base,
+        head: [
+            { x: tip.x, y: tip.y },
+            { x: base.x - uy * half, y: base.y + ux * half },
+            { x: base.x + uy * half, y: base.y - ux * half },
+        ],
     };
 }
 

@@ -1,8 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use super::contracts::RepositoryInfo;
+use super::name_order::compare_names;
 use super::ports::RepositoryBackend;
-use super::tree::compare_names;
 use super::{folder_kind, FolderKind};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 

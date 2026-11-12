@@ -7,7 +7,7 @@ import {
 } from '@/modules/projects';
 import { onTauriEvent } from './events';
 
-/** Native projects adapter: commands in `src-tauri/src/interfaces/tauri/projects.rs`. */
+/** Native projects adapter: commands in `src-tauri/src/interfaces/tauri/projects/`. */
 export const tauriProjects: ProjectsPort = {
     getProjects: () => invoke('get_projects'),
     takeOpened: () => invoke('take_opened'),

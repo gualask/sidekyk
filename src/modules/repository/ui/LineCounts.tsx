@@ -1,5 +1,5 @@
 import { useTranslation } from '@/shared/i18n';
-import { compactCount } from '../model/summary';
+import { compactCount } from '../model/history/summary';
 
 /**
  * `+12 −3` (`+1.2k −340` when `compact`); `binary` for a binary file; a dash when the lines were not counted (a very large new

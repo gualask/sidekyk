@@ -1,0 +1,271 @@
+import type { DiffRow } from '../../../model/diff/diff-rows';
+
+/**
+ * Known heights, so the virtualized diff knows every row's place without measuring it: a hunk's
+ * header, and each row a line shows in, one unless long lines wrap (`soft-wrap.ts`).
+ */
+export const HUNK_ROW_HEIGHT = 24;
+export const LINE_ROW_HEIGHT = 20;
+
+/** The font of the lines' text, which wrapping measures its characters in. */
+export const CODE_TEXT = 'font-mono text-xs';
+
+/** A line's parts, in pixels, left to right: `DiffLineRow` lays them out with these. */
+export const BRACKET_WIDTH = 16;
+export const NUMBER_WIDTH = 56;
+export const SIGN_WIDTH = 20;
+export const TEXT_PADDING_LEFT = 4;
+export const TEXT_PADDING_RIGHT = 24;
+/** How far the find bar floats from the viewer's top and right edges, and its height. */
+export const FIND_BAR_INSET = 8;
+export const FIND_BAR_HEIGHT = 34;
+/** The room the viewer leaves above its rows while the find bar floats over them. */
+export const FIND_BAR_SPACE = FIND_BAR_INSET + FIND_BAR_HEIGHT + FIND_BAR_INSET;
+
+/** The gutter and padding around a line's text. */
+export const LINE_CHROME_WIDTH =
+    BRACKET_WIDTH + NUMBER_WIDTH + SIGN_WIDTH + TEXT_PADDING_LEFT + TEXT_PADDING_RIGHT;
+
+/** Lines left above what a viewer opens on (a change, lines a note names): where it sits. */
+export const LINES_ABOVE = 3;
+
+/** Rows `first` to `last` of the list. */
+export interface Span {
+    first: number;
+    last: number;
+}
+
+/** Where each row of a diff starts, and the rows of each hunk, from the rows' known heights. */
+export interface DiffLayout {
+    starts: readonly number[];
+    /** Per hunk, in order, its rows: its header, if any, and its lines. */
+    hunks: readonly Span[];
+    /** The hunks' first and last rows apart, for binary searches on scroll. */
+    hunkFirsts: readonly number[];
+    hunkLasts: readonly number[];
+    total: number;
+}
+
+/** The layout of `rows`, line `index` taking `linesOf(index)` rows: one unless lines wrap. */
+export function diffLayout(
+    rows: readonly DiffRow[],
+    linesOf: (index: number) => number = () => 1,
+): DiffLayout {
+    const starts: number[] = [];
+    const hunks: Span[] = [];
+    let offset = 0;
+    rows.forEach((row, index) => {
+        starts.push(offset);
+        offset += row.kind === 'hunk' ? HUNK_ROW_HEIGHT : LINE_ROW_HEIGHT * linesOf(index);
+        if (row.hunkIndex < 0) return;
+        const span = hunks[row.hunkIndex];
+        if (span) span.last = index;
+        else hunks[row.hunkIndex] = { first: index, last: index };
+    });
+    return {
+        starts,
+        hunks,
+        hunkFirsts: hunks.map((span) => span.first),
+        hunkLasts: hunks.map((span) => span.last),
+        total: offset,
+    };
+}
+
+/** A part of the list: from `top`, `height` pixels. */
+export interface Box {
+    top: number;
+    height: number;
+}
+
+/** Where row `line` of those the line at row `index` shows in is: the first, unless it wraps. */
+export function lineRowBox(layout: DiffLayout, index: number, line: number): Box {
+    return { top: (layout.starts[index] ?? 0) + line * LINE_ROW_HEIGHT, height: LINE_ROW_HEIGHT };
+}
+
+/** Whether a box shows whole between offsets `top` and `bottom` of the list. */
+export function shownWhole(box: Box, top: number, bottom: number): boolean {
+    return box.top >= top && box.top + box.height <= bottom;
+}
+
+/** How tall row `index` is. */
+export function heightOf({ starts, total }: DiffLayout, index: number): number {
+    return (starts[index + 1] ?? total) - (starts[index] ?? total);
+}
+
+/** Where rows `first` to `last` are in the list. */
+export function spanBox(layout: DiffLayout, { first, last }: Span): Box {
+    const top = layout.starts[first] ?? 0;
+    return { top, height: (layout.starts[last] ?? top) + heightOf(layout, last) - top };
+}
+
+/** The first index whose value is past `value`, in values that only grow. */
+function firstPast(values: readonly number[], value: number): number {
+    let low = 0;
+    let high = values.length;
+    while (low < high) {
+        const middle = (low + high) >> 1;
+        if ((values[middle] ?? 0) > value) high = middle;
+        else low = middle + 1;
+    }
+    return low;
+}
+
+/** The row at `offset` from the top of the list. */
+export function rowAt({ starts }: DiffLayout, offset: number): number {
+    return Math.max(0, firstPast(starts, offset) - 1);
+}
+
+/**
+ * The hunks with a line among rows `from` to `to`, each with its lines only (in the Changes view
+ * a hunk starts with its header): those the gutter marks on screen.
+ */
+export function hunksBetween(
+    layout: DiffLayout,
+    rows: readonly DiffRow[],
+    from: number,
+    to: number,
+): { hunk: number; lines: Span }[] {
+    const found: { hunk: number; lines: Span }[] = [];
+    for (let hunk = firstPast(layout.hunkLasts, from - 1); hunk < layout.hunks.length; hunk++) {
+        const span = layout.hunks[hunk];
+        if (!span || span.first > to) break;
+        const first = rows[span.first]?.kind === 'hunk' ? span.first + 1 : span.first;
+        if (first <= span.last) found.push({ hunk, lines: { first, last: span.last } });
+    }
+    return found;
+}
+
+/**
+ * Where the list opens on hunk `hunk` (the first if null), `linesAbove` lines above it: lines of
+ * the file, each as tall as it wraps.
+ */
+export function openingOffset(layout: DiffLayout, hunk: number | null, linesAbove: number): number {
+    // a hunk counted from the end (-1, the last): `p` goes into a file from its bottom
+    const index = hunk === null ? 0 : hunk < 0 ? layout.hunks.length + hunk : hunk;
+    const span = layout.hunks[index];
+    if (!span) return 0;
+    return layout.starts[Math.max(0, span.first - linesAbove)] ?? 0;
+}
+
+/**
+ * The offset `lines` rows below offset `offset`, as far into its row: where the line being read
+ * is, `lines` below the top of the screen.
+ */
+export function offsetBelow(layout: DiffLayout, offset: number, lines: number): number {
+    const top = rowAt(layout, offset);
+    const row = Math.min(top + lines, layout.starts.length - 1);
+    const into = offset - (layout.starts[top] ?? 0);
+    return (layout.starts[row] ?? 0) + Math.min(into, heightOf(layout, row) - 1);
+}
+
+/** The hunk at row `row`, or the next one below it, or the last: the change being read there. */
+export function hunkFrom(layout: DiffLayout, rows: readonly DiffRow[], row: number): number {
+    const at = rows[row]?.hunkIndex ?? -1;
+    if (at >= 0) return at;
+    return Math.min(firstPast(layout.hunkFirsts, row), layout.hunks.length - 1);
+}
+
+/**
+ * The hunk `n` (`step` 1) or `p` (-1) goes to from the line being read, at offset `reading`, when
+ * none was gone to yet: the first starting on it or below (a file just opened: its first change,
+ * marked), or the last starting above it; null when there is none that way.
+ */
+export function hunkStepped(layout: DiffLayout, reading: number, step: 1 | -1): number | null {
+    const starts = layout.hunks.map((span) => layout.starts[span.first] ?? 0);
+    if (step > 0) {
+        const next = starts.findIndex((start) => start >= reading - 1);
+        return next < 0 ? null : next;
+    }
+    const previous = starts.findLastIndex((start) => start < reading - 1);
+    return previous < 0 ? null : previous;
+}
+
+/** A change on the scrollbar's map: a hunk's changed lines, where they sit in the list. */
+export interface ChangeMark {
+    hunk: number;
+    top: number;
+    height: number;
+    kind: 'add' | 'del' | 'mixed';
+}
+
+/** The marks of a diff's changes: one per hunk, from its first changed line to its last. */
+export function changeMarks(layout: DiffLayout, rows: readonly DiffRow[]): ChangeMark[] {
+    const marks: ChangeMark[] = [];
+    rows.forEach((row, index) => {
+        if (row.kind !== 'line' || (row.line.kind !== 'add' && row.line.kind !== 'del')) return;
+        const top = layout.starts[index] ?? 0;
+        const bottom = top + heightOf(layout, index);
+        const kind = row.line.kind;
+        const mark = marks.at(-1);
+        if (mark?.hunk === row.hunkIndex) {
+            mark.height = bottom - mark.top;
+            if (mark.kind !== kind) mark.kind = 'mixed';
+        } else {
+            marks.push({ hunk: row.hunkIndex, top, height: bottom - top, kind });
+        }
+    });
+    return marks;
+}
+
+/** The least height a mark can be clicked on, in pixels: small changes are thin on the track. */
+const MARK_HIT = 12;
+
+/** A mark on the track, in pixels: one change, or several too close to click apart. */
+export interface TrackMark {
+    /** The first change it stands for, where a click goes. */
+    hunk: number;
+    /** What shows. */
+    top: number;
+    height: number;
+    /** Where it takes a click: at least `MARK_HIT` tall, around what shows. */
+    hitTop: number;
+    hitHeight: number;
+    kind: ChangeMark['kind'];
+}
+
+/** The part of the track a mark from `top` to `bottom` takes clicks on. */
+function hitOf(top: number, bottom: number): [number, number] {
+    const middle = (top + bottom) / 2;
+    return [Math.min(top, middle - MARK_HIT / 2), Math.max(bottom, middle + MARK_HIT / 2)];
+}
+
+/** Takes into `last` a mark ending at `bottom` whose clicks, to `hitBottom`, overlap its own. */
+function joinMark(last: TrackMark, kind: TrackMark['kind'], bottom: number, hitBottom: number) {
+    last.height = Math.max(last.height, bottom - last.top);
+    last.hitHeight = Math.max(last.hitTop + last.hitHeight, hitBottom) - last.hitTop;
+    if (last.kind !== kind) last.kind = 'mixed';
+}
+
+/**
+ * The marks as a track `height` pixels tall shows them, for `total` pixels of content. Each takes
+ * clicks on at least `MARK_HIT` pixels; marks whose clicks would overlap are one, going to its
+ * first change.
+ */
+export function trackMarks(
+    marks: readonly ChangeMark[],
+    total: number,
+    height: number,
+): TrackMark[] {
+    if (total <= 0 || height <= 0) return [];
+    const scale = height / total;
+    const shown: TrackMark[] = [];
+    for (const mark of marks) {
+        const top = mark.top * scale;
+        const bottom = top + mark.height * scale;
+        const [hitTop, hitBottom] = hitOf(top, bottom);
+        const last = shown.at(-1);
+        if (last && hitTop < last.hitTop + last.hitHeight) {
+            joinMark(last, mark.kind, bottom, hitBottom);
+        } else {
+            shown.push({
+                hunk: mark.hunk,
+                top,
+                height: bottom - top,
+                hitTop,
+                hitHeight: hitBottom - hitTop,
+                kind: mark.kind,
+            });
+        }
+    }
+    return shown;
+}

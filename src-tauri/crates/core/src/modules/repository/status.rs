@@ -55,6 +55,44 @@ fn tracked_entry(fields: &[&str], path: &str, orig_path: Option<String>) -> Stat
     }
 }
 
+/// `1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>`, without its tag.
+fn ordinary_entry(rest: &str) -> Option<StatusEntry> {
+    let fields: Vec<&str> = rest.splitn(8, ' ').collect();
+    fields.last().map(|path| tracked_entry(&fields, path, None))
+}
+
+/// `2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>`, without its tag; `orig_path` the
+/// record after it.
+fn renamed_entry(rest: &str, orig_path: Option<String>) -> Option<StatusEntry> {
+    let fields: Vec<&str> = rest.splitn(9, ' ').collect();
+    fields
+        .last()
+        .map(|path| tracked_entry(&fields, path, orig_path))
+}
+
+fn untracked_entry(path: &str) -> StatusEntry {
+    StatusEntry {
+        path: path.to_string(),
+        orig_path: None,
+        staged: None,
+        unstaged: Some(ChangeKind::Untracked),
+        head_blob: None,
+        index_blob: None,
+    }
+}
+
+fn conflicted_entry(path: &str) -> StatusEntry {
+    StatusEntry {
+        path: path.to_string(),
+        orig_path: None,
+        staged: None,
+        unstaged: Some(ChangeKind::Conflicted),
+        // the index holds the stages, not one version
+        head_blob: None,
+        index_blob: None,
+    }
+}
+
 fn read_header(branch: &mut BranchStatus, header: &str) {
     let Some((key, value)) = header.split_once(' ') else {
         return;
@@ -65,16 +103,19 @@ fn read_header(branch: &mut BranchStatus, header: &str) {
         }
         "branch.head" if value != "(detached)" => branch.head = Some(value.to_string()),
         "branch.upstream" => branch.upstream = Some(value.to_string()),
-        "branch.ab" => {
-            for part in value.split(' ') {
-                if let Some(n) = part.strip_prefix('+') {
-                    branch.ahead = n.parse().unwrap_or(0);
-                } else if let Some(n) = part.strip_prefix('-') {
-                    branch.behind = n.parse().unwrap_or(0);
-                }
-            }
-        }
+        "branch.ab" => read_ahead_behind(branch, value),
         _ => {}
+    }
+}
+
+/// `+<ahead> -<behind>`.
+fn read_ahead_behind(branch: &mut BranchStatus, value: &str) {
+    for part in value.split(' ') {
+        if let Some(n) = part.strip_prefix('+') {
+            branch.ahead = n.parse().unwrap_or(0);
+        } else if let Some(n) = part.strip_prefix('-') {
+            branch.behind = n.parse().unwrap_or(0);
+        }
     }
 }
 
@@ -89,43 +130,17 @@ pub(super) fn parse_porcelain_v2(bytes: &[u8]) -> StatusReport {
         };
         match tag {
             "#" => read_header(&mut report.branch, rest),
-            // 1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>
-            "1" => {
-                let fields: Vec<&str> = rest.splitn(8, ' ').collect();
-                if let [.., path] = fields.as_slice() {
-                    report.entries.push(tracked_entry(&fields, path, None));
-                }
-            }
-            // 2 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <X><score> <path>, then <origPath> as its own record
+            "1" => report.entries.extend(ordinary_entry(rest)),
+            // <origPath> follows as its own record
             "2" => {
-                let fields: Vec<&str> = rest.splitn(9, ' ').collect();
                 let orig_path = records.next().map(str::to_string);
-                if let [.., path] = fields.as_slice() {
-                    report.entries.push(tracked_entry(&fields, path, orig_path));
-                }
+                report.entries.extend(renamed_entry(rest, orig_path));
             }
             // u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
-            "u" => {
-                if let Some(path) = rest.splitn(10, ' ').nth(9) {
-                    report.entries.push(StatusEntry {
-                        path: path.to_string(),
-                        orig_path: None,
-                        staged: None,
-                        unstaged: Some(ChangeKind::Conflicted),
-                        // the index holds the stages, not one version
-                        head_blob: None,
-                        index_blob: None,
-                    });
-                }
-            }
-            "?" => report.entries.push(StatusEntry {
-                path: rest.to_string(),
-                orig_path: None,
-                staged: None,
-                unstaged: Some(ChangeKind::Untracked),
-                head_blob: None,
-                index_blob: None,
-            }),
+            "u" => report
+                .entries
+                .extend(rest.splitn(10, ' ').nth(9).map(conflicted_entry)),
+            "?" => report.entries.push(untracked_entry(rest)),
             _ => {}
         }
     }

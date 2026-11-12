@@ -6,6 +6,7 @@
 pub(crate) mod capture;
 pub(crate) mod launch;
 pub(crate) mod quick_note;
+mod quick_note_frame;
 pub(crate) mod settings;
 pub(crate) mod texts;
 pub(crate) mod window;

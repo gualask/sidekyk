@@ -1,10 +1,10 @@
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
-import { useRepositorySummaries, useRepositorySummary } from '../application/repository.queries';
+import { useRepositorySummaries, useRepositorySummary } from '../application/queries/snapshot';
+import { changedLabel } from '../model/history/summary';
 import type { RepositorySummary } from '../model/repository.types';
-import { changedLabel } from '../model/summary';
-import { BranchName } from './BranchName';
 import { TrackedLines } from './LineCounts';
+import { BranchName } from './summary/BranchName';
 
 /** The project's facts, next to its name in the breadcrumb: its branch and what changed. */
 export function ProjectFacts({

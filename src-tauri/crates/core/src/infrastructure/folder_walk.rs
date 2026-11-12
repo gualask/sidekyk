@@ -5,7 +5,7 @@ use std::path::{Component, Path};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use ignore::{IncrementalIgnore, WalkBuilder, WalkState};
+use ignore::{DirEntry, IncrementalIgnore, WalkBuilder, WalkState};
 
 use crate::modules::folder::{always_hidden, FolderRules, Walked};
 use crate::shared::sync::lock;
@@ -31,35 +31,57 @@ fn walker(root: &Path) -> WalkBuilder {
 /// `RepositoryBackend::walk`: in parallel, stopped once `max` files are found, so past it which
 /// files are kept may differ from one walk to the next.
 pub fn walk(root: &Path, max: usize) -> Walked {
-    let paths = Mutex::new(Vec::new());
-    let found = AtomicUsize::new(0);
-    let truncated = AtomicBool::new(false);
+    let found = Found::new(max);
     walker(root)
         .threads(threads())
         .filter_entry(|entry| !always_hidden(entry.file_name()))
         .build_parallel()
-        .run(|| {
-            Box::new(|entry| {
-                let Ok(entry) = entry else {
-                    return WalkState::Continue;
-                };
-                // a link is listed as a file, whatever it points to
-                if entry.file_type().is_none_or(|kind| kind.is_dir()) {
-                    return WalkState::Continue;
-                }
-                if found.fetch_add(1, Ordering::Relaxed) >= max {
-                    truncated.store(true, Ordering::Relaxed);
-                    return WalkState::Quit;
-                }
-                if let Ok(path) = entry.path().strip_prefix(root) {
-                    lock(&paths).push(slash_path(path));
-                }
-                WalkState::Continue
-            })
-        });
-    Walked {
-        paths: paths.into_inner().unwrap_or_else(|e| e.into_inner()),
-        truncated: truncated.into_inner(),
+        .run(|| Box::new(|entry| found.visit(root, entry)));
+    found.into_walked()
+}
+
+/// The files a parallel walk finds, from each of its threads, up to `max`.
+struct Found {
+    max: usize,
+    paths: Mutex<Vec<String>>,
+    found: AtomicUsize,
+    truncated: AtomicBool,
+}
+
+impl Found {
+    fn new(max: usize) -> Self {
+        Self {
+            max,
+            paths: Mutex::new(Vec::new()),
+            found: AtomicUsize::new(0),
+            truncated: AtomicBool::new(false),
+        }
+    }
+
+    /// Keeps `entry` if it is a file, relative to `root`; the walk quits past `max`.
+    fn visit(&self, root: &Path, entry: Result<DirEntry, ignore::Error>) -> WalkState {
+        let Ok(entry) = entry else {
+            return WalkState::Continue;
+        };
+        // a link is listed as a file, whatever it points to
+        if entry.file_type().is_none_or(|kind| kind.is_dir()) {
+            return WalkState::Continue;
+        }
+        if self.found.fetch_add(1, Ordering::Relaxed) >= self.max {
+            self.truncated.store(true, Ordering::Relaxed);
+            return WalkState::Quit;
+        }
+        if let Ok(path) = entry.path().strip_prefix(root) {
+            lock(&self.paths).push(slash_path(path));
+        }
+        WalkState::Continue
+    }
+
+    fn into_walked(self) -> Walked {
+        Walked {
+            paths: self.paths.into_inner().unwrap_or_else(|e| e.into_inner()),
+            truncated: self.truncated.into_inner(),
+        }
     }
 }
 

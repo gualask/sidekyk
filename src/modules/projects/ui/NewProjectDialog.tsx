@@ -1,6 +1,4 @@
 import { Dialog } from '@base-ui/react/dialog';
-import { Radio } from '@base-ui/react/radio';
-import { RadioGroup } from '@base-ui/react/radio-group';
 import { type FormEvent, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
@@ -8,23 +6,18 @@ import { useChooseProjectFolder, useCreateProject } from '../application/project
 import {
     freeRepositories,
     isParent,
-    type ParentFolder,
-    type ParentUse,
     type PickedFolder,
     parentFolders,
     withFolder,
 } from '../model/new-project';
 import type { FolderChoice } from '../model/project.types';
+import {
+    FolderMessage,
+    type FolderNotice,
+    ParentChoice,
+    type PickedParent,
+} from './new-project-fields';
 import { FolderRow, NameField } from './project-fields';
-
-/** What the folder picked was, said under the folders, when it was not taken. */
-type FolderNotice = Extract<FolderChoice, { kind: 'inProject' }>;
-
-/** A parent of repositories picked first, and what it becomes. */
-interface PickedParent {
-    folder: ParentFolder;
-    use: ParentUse;
-}
 
 /**
  * New project, the same for everyone: a name, and folders if wanted (any folder, inside a
@@ -98,24 +91,11 @@ export function NewProjectDialog({
     const submit = async (event: FormEvent) => {
         event.preventDefault();
         if (blank || create.isPending) return;
-        let made: string | null = null;
+        let made: string | null;
         try {
-            if (parent && each) {
-                // one after the other: the last made is the one on screen
-                for (const repository of freeRepositories(parent.folder)) {
-                    const list = await create.mutateAsync({
-                        name: repository.name,
-                        folders: [repository.path],
-                    });
-                    made = list.active;
-                }
-            } else {
-                const list = await create.mutateAsync({
-                    name,
-                    folders: shown.map((folder) => folder.path),
-                });
-                made = list.active;
-            }
+            made = await makeInTurn(projectsToMake(name, shown, each ? parent : null), (project) =>
+                create.mutateAsync(project),
+            );
         } catch {
             // said in the dialog, still open
             return;
@@ -158,21 +138,7 @@ export function NewProjectDialog({
                                     onUse={(use) => setParent({ ...parent, use })}
                                 />
                             ) : null}
-                            {shown.length > 0 ? (
-                                <ul className="flex flex-col gap-1">
-                                    {shown.map((folder) => (
-                                        <FolderRow
-                                            key={folder.path}
-                                            location={folder.location}
-                                            onRemove={each ? null : () => removeFolder(folder)}
-                                        />
-                                    ))}
-                                </ul>
-                            ) : each ? null : (
-                                <p className="text-[13px] text-ui-text-muted">
-                                    {t('projects.noFolder')}
-                                </p>
-                            )}
+                            <FolderList shown={shown} onRemove={each ? null : removeFolder} />
                             {each ? null : (
                                 <div>
                                     <button
@@ -220,83 +186,63 @@ export function NewProjectDialog({
     );
 }
 
-/**
- * A parent of repositories picked: which repositories are inside (those of another project said
- * so, and left out), and what it becomes.
- */
-function ParentChoice({
-    parent,
-    onUse,
-}: {
-    parent: PickedParent;
-    onUse: (use: ParentUse) => void;
-}) {
-    const { t, tp } = useTranslation();
-    const { folder } = parent;
-    const names = folder.repositories.map((repository) =>
-        repository.inProject === null
-            ? repository.name
-            : t('projects.repositoryInProject', {
-                  name: repository.name,
-                  project: repository.inProject,
-              }),
-    );
-    const options: { use: ParentUse; label: string }[] = [
-        { use: 'together', label: t('projects.parentTogether') },
-        { use: 'each', label: t('projects.parentEach') },
-        { use: 'folder', label: t('projects.parentFolder') },
-    ];
-    return (
-        <div className="flex flex-col gap-2 rounded-lg bg-ui-surface-subtle p-2.5">
-            <p className="text-[13px]">
-                {tp('projects.parentHolds', folder.repositories.length, { name: folder.name })}{' '}
-                <span className="text-ui-text-muted">{names.join(', ')}</span>
-            </p>
-            <RadioGroup
-                aria-label={t('projects.parentUse')}
-                className="seg self-start"
-                value={parent.use}
-                onValueChange={(value) => onUse(value as ParentUse)}
-            >
-                {options.map((option) => (
-                    <Radio.Root key={option.use} value={option.use} className="seg-item">
-                        {option.label}
-                    </Radio.Root>
-                ))}
-            </RadioGroup>
-        </div>
-    );
+/** A project to make: its name and its folders' paths. */
+interface NewProject {
+    name: string;
+    folders: string[];
 }
 
-/** Why the folder picked was not taken, or why picking failed: under the folders. */
-function FolderMessage({
-    notice,
-    error,
-    onOpen,
+/** The project named `name` with the folders `shown`, or one per free repository of `each`. */
+function projectsToMake(
+    name: string,
+    shown: PickedFolder[],
+    each: PickedParent | null,
+): NewProject[] {
+    if (!each) return [{ name, folders: shown.map((folder) => folder.path) }];
+    return freeRepositories(each.folder).map((repository) => ({
+        name: repository.name,
+        folders: [repository.path],
+    }));
+}
+
+/** Makes `projects` one after the other, so the last made is the one on screen: that one. */
+async function makeInTurn(
+    projects: NewProject[],
+    make: (project: NewProject) => Promise<{ active: string | null }>,
+): Promise<string | null> {
+    let made: string | null = null;
+    for (const project of projects) {
+        made = (await make(project)).active;
+    }
+    return made;
+}
+
+/**
+ * The folders of the new project, each removable unless `onRemove` is null (a project per
+ * repository); without folders, a line that says so, but there.
+ */
+function FolderList({
+    shown,
+    onRemove,
 }: {
-    notice: FolderNotice | null;
-    error: string | null;
-    onOpen: (projectId: string) => void;
+    shown: PickedFolder[];
+    onRemove: ((folder: PickedFolder) => void) | null;
 }) {
     const { t } = useTranslation();
-    if (error) {
+    if (shown.length > 0) {
         return (
-            <p role="alert" className="text-xs text-ui-danger">
-                {error}
-            </p>
+            <ul className="flex flex-col gap-1">
+                {shown.map((folder) => (
+                    <FolderRow
+                        key={folder.path}
+                        location={folder.location}
+                        onRemove={onRemove ? () => onRemove(folder) : null}
+                    />
+                ))}
+            </ul>
         );
     }
-    if (!notice) return null;
-    return (
-        <p role="alert" className="flex items-center gap-2 text-xs text-ui-warning-soft-text">
-            {t('projects.alreadyProject', { name: notice.name })}
-            <button
-                type="button"
-                className="btn-ghost-sm min-h-6 py-0.5"
-                onClick={() => onOpen(notice.id)}
-            >
-                {t('common.open')}
-            </button>
-        </p>
-    );
+    return onRemove ? (
+        <p className="text-[13px] text-ui-text-muted">{t('projects.noFolder')}</p>
+    ) : null;
 }

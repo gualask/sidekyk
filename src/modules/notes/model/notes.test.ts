@@ -64,12 +64,12 @@ describe('notes', () => {
         expect(noteMeta(note('a', 0, { edited: now - 3 * 3600_000 }), now, en)).toBe('3h ago');
         expect(
             noteMeta(note('a', 0, { done: now - 120_000, text: '1\n2\n3\n4\n5' }), now, en),
-        ).toBe('done 2m ago · 5 lines');
+        ).toBe('done 2m ago, 5 lines');
         const it_ = createTranslator('it', 'it');
         expect(noteMeta(note('a', 0, { edited: now - 1000 }), now, it_)).toBe('adesso');
         expect(
             noteMeta(note('a', 0, { done: now - 120_000, text: '1\n2\n3\n4\n5' }), now, it_),
-        ).toBe('completata 2 min fa · 5 righe');
+        ).toBe('completata 2 min fa, 5 righe');
     });
 
     it('updates notes in place, never bringing back one deleted', () => {

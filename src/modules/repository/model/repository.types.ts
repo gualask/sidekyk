@@ -3,7 +3,7 @@
  * (`src-tauri/crates/core/src/modules/repository/contracts.rs`). Change both sides together.
  */
 
-import type { ChangeArea } from '@/shared/git/change-area';
+import type { ChangeArea } from './change-area';
 
 export type { ChangeArea };
 

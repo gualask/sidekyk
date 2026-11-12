@@ -61,9 +61,9 @@ problems. Why semantic zoom: `../product.md`.
 
 ## How it is built
 
-- `AppShell` owns the level, the selected tile or full-screen panel and the pending target; every
-  level change goes through `zoom` in a view transition. The level shown is as deep as the project
-  goes; another project opens at the level seen. A target (`⌘N`, a file from the palette) names its
+- `AppShell` (`app/app-shell/`) owns the level, the selected tile or full-screen panel and the
+  pending target (`useNavigation`); every level change goes through `zoom` in a view transition.
+  The level shown is as deep as the project goes; another project opens at the level seen. A target (`⌘N`, a file from the palette) names its
   project, so a switch leaves it behind. Level 0 composes `InboxColumn` and `ProjectsOverview`,
   both in the first chunk. Panel chunks start loading in `main.tsx`, before the first render. A
   `preloadable` part, shown by `Preloaded`, renders at once once loaded, so a transition never
@@ -78,7 +78,7 @@ problems. Why semantic zoom: `../product.md`.
   order, the main tile (the first, Notes without git), its row's summaries and what opens full
   screen. A tile's panel can open itself full screen (`PanelProps.zoomIn`). A panel asked for that the project
   lacks gives way to its main one.
-- Keys: `app/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with
+- Keys: `app/workspace-view/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with
   `useWindowKeys`, and the workspace skips handled keys. The shortcuts card (`ShortcutsHelp`, lazy)
   is kept by hand. The wheel listener exists only while `⌘`/`Ctrl` is held.
 - Key names only in `shared/platform/keys.ts` (`keysLabel`, `withKeys`), from combinations as a

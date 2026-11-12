@@ -74,13 +74,7 @@ export function ProjectsOverview({
     onAskedTaken: () => void;
 }) {
     const { t } = useTranslation();
-    // the New project dialog open, on a folder already picked or none
-    const [creating, setCreating] = useState<{ picked: FolderChoice | null } | null>(null);
-    useEffect(() => {
-        if (!asked) return;
-        setCreating({ picked: asked });
-        onAskedTaken();
-    }, [asked, onAskedTaken]);
+    const [creating, setCreating] = useCreating(asked, onAskedTaken);
     const rows = useRef<HTMLUListElement>(null);
 
     useEffect(() => {
@@ -143,6 +137,20 @@ export function ProjectsOverview({
 }
 
 /**
+ * The New project dialog open, on a folder already picked or none: opened on `asked` as soon as
+ * one comes.
+ */
+function useCreating(asked: FolderChoice | null, onAskedTaken: () => void) {
+    const [creating, setCreating] = useState<{ picked: FolderChoice | null } | null>(null);
+    useEffect(() => {
+        if (!asked) return;
+        setCreating({ picked: asked });
+        onAskedTaken();
+    }, [asked, onAskedTaken]);
+    return [creating, setCreating] as const;
+}
+
+/**
  * A project: its avatar, its name and the line under it, then the week of commits at the row's
  * end. Tinted under the pointer; the project on screen marked by an accent bar on its left
  * edge.
@@ -165,7 +173,6 @@ function ProjectRow({
     onRemove: () => void;
     summary: (part: SummaryPart) => ReactNode;
 }) {
-    const { t } = useTranslation();
     const folder = projectFolder(project);
     return (
         <article
@@ -199,29 +206,48 @@ function ProjectRow({
             </div>
             {/* one width, so that the rows' ends line up */}
             <div className="w-32 shrink-0">{summary('end')}</div>
-            <Menu.Root>
-                <Menu.Trigger
-                    className="btn-icon relative h-7 w-7 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text data-popup-open:opacity-100"
-                    title={t('common.more')}
-                    aria-label={t('projects.moreFor', { name: project.name })}
-                >
-                    <IconDots size={16} />
-                </Menu.Trigger>
-                <Menu.Portal>
-                    <Menu.Positioner sideOffset={4} align="end">
-                        <Menu.Popup className="menu-popup">
-                            <Menu.Item className="menu-item" onClick={onEdit}>
-                                <IconPencil size={14} />
-                                {t('projects.editMenu')}
-                            </Menu.Item>
-                            <Menu.Item className="menu-item danger" onClick={onRemove}>
-                                <IconTrash size={14} />
-                                {t('common.remove')}
-                            </Menu.Item>
-                        </Menu.Popup>
-                    </Menu.Positioner>
-                </Menu.Portal>
-            </Menu.Root>
+            <ProjectMenu name={project.name} onEdit={onEdit} onRemove={onRemove} />
         </article>
+    );
+}
+
+/**
+ * A row's ⋯, shown under the pointer or focused: edit the project's name and folders, or remove
+ * it.
+ */
+function ProjectMenu({
+    name,
+    onEdit,
+    onRemove,
+}: {
+    name: string;
+    onEdit: () => void;
+    onRemove: () => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <Menu.Root>
+            <Menu.Trigger
+                className="btn-icon relative h-7 w-7 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 data-popup-open:bg-ui-surface-hover data-popup-open:text-ui-text data-popup-open:opacity-100"
+                title={t('common.more')}
+                aria-label={t('projects.moreFor', { name })}
+            >
+                <IconDots size={16} />
+            </Menu.Trigger>
+            <Menu.Portal>
+                <Menu.Positioner sideOffset={4} align="end">
+                    <Menu.Popup className="menu-popup">
+                        <Menu.Item className="menu-item" onClick={onEdit}>
+                            <IconPencil size={14} />
+                            {t('projects.editMenu')}
+                        </Menu.Item>
+                        <Menu.Item className="menu-item danger" onClick={onRemove}>
+                            <IconTrash size={14} />
+                            {t('common.remove')}
+                        </Menu.Item>
+                    </Menu.Popup>
+                </Menu.Positioner>
+            </Menu.Portal>
+        </Menu.Root>
     );
 }

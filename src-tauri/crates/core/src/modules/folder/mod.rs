@@ -5,32 +5,28 @@
 //! (`RepositoryBackend::walk`, `folder_rules`). `repository` (git's review) builds on it, never
 //! the other way.
 
-mod changes;
 mod contracts;
 #[cfg(test)]
 mod fake;
-mod folders;
-mod ignored;
+mod name_order;
 mod open;
 mod ports;
 mod reading;
-mod recent;
 mod tree;
-mod watched;
+mod watch;
 
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
-pub use changes::FolderChanges;
 pub use contracts::{
     Directory, FileContent, FileStamp, RecentFile, RecentFiles, RepositoryChange,
     RepositoryChangedEvent, RepositoryInfo, TreeEntry, REPOSITORY_CHANGED_EVENT,
 };
+
 #[cfg(test)]
 pub(crate) use fake::FakeBackend;
-pub use folders::{Hiding, WatchedFolders};
-pub use ignored::{IgnoredPaths, Visible};
+pub use name_order::compare_names;
 pub use open::{
     existing_folder, existing_root, repositories_inside, repository_name, resolve_folder,
     resolve_repository,
@@ -40,14 +36,13 @@ pub use ports::{
     RepositoryBackend, RepositoryWatcher, Walked, Watch, WorktreeEntry, LITERAL_PATHSPECS,
 };
 pub use reading::{
-    checked_path, cut_at_line, looks_binary, MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS,
+    checked_path, cut_at_line, load_file_content, load_file_stamp, load_image, looks_binary,
+    MAX_FILE_BYTES, MAX_IMAGE_BYTES, MAX_TREE_PATHS,
 };
-pub use recent::load_recent_files;
-pub use tree::{
-    compare_names, load_file_content, load_file_stamp, load_file_tree, load_folder_tree,
-    load_image, FileTree,
+pub use tree::{load_file_tree, load_folder_tree, load_recent_files, FileTree};
+pub use watch::{
+    classify, FolderChanges, Hiding, IgnoredPaths, Visible, WatchedChanges, WatchedFolders,
 };
-pub use watched::{classify, WatchedChanges};
 
 /// What a project's folder is, found where it is read and never stored: a `git init` in it, or
 /// its `.git` removed, changes it while the app runs.

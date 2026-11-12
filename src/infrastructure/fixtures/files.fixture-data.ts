@@ -48,7 +48,7 @@ function largePaths(): string[] {
 
 /**
  * The folder entries a list of paths makes, as
- * `src-tauri/crates/core/src/modules/folder/tree.rs`.
+ * `src-tauri/crates/core/src/modules/folder/tree/`.
  */
 class FixtureTree {
     private readonly folders = new Map<string, { folders: Set<string>; files: string[] }>();

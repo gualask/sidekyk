@@ -4,7 +4,7 @@ import { createTranslator, detectLocale, formatTag } from '@/shared/i18n';
 import { CrashNotice } from '@/shared/ui/CrashNotice';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
-import { AppShell } from './AppShell';
+import { AppShell } from './app-shell/AppShell';
 
 const DevModePage = import.meta.env.DEV
     ? lazy(() => import('./DevModePage').then((module) => ({ default: module.DevModePage })))

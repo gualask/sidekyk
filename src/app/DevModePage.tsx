@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createBrowserRuntime } from '@/infrastructure/fixtures/runtime';
 import { isScenario, SCENARIOS } from '@/infrastructure/fixtures/scenario';
-import { AppShell } from './AppShell';
+import { AppShell } from './app-shell/AppShell';
 import { AppProviders } from './providers';
 
 /**

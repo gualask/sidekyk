@@ -37,9 +37,10 @@ fn snippet(text: &str, at: usize, len: usize) -> Snippet {
         if i == at {
             found[0] = utf16(&shown);
         }
-        let space = c.is_whitespace();
-        if !(space && shown.last().is_some_and(|l: &char| l.is_whitespace())) {
-            shown.push(if space { ' ' } else { c });
+        if !c.is_whitespace() {
+            shown.push(c);
+        } else if !shown.last().is_some_and(|l: &char| l.is_whitespace()) {
+            shown.push(' ');
         }
         if i + 1 == at + len {
             found[1] = utf16(&shown);
@@ -130,10 +131,32 @@ fn found_in(
     lists: &[NoteList],
     notes: &[Note],
 ) -> (Vec<ListMatch>, Vec<(NoteMatch, bool)>) {
+    let list_matches = rank_lists(query, book, lists);
+    let query = query.trim();
+    if query.chars().count() < MIN_QUERY {
+        return (list_matches, Vec::new());
+    }
+    let ordered = in_users_order(lists, notes);
+    let mut words = Ranker::new(query, Texts::Prose);
+    let texts: Vec<&str> = ordered.iter().map(|n| n.text.as_str()).collect();
+    let (best, _) = words.best(&texts, NOTE_LIMIT);
+    let matches = best
+        .into_iter()
+        .map(|found| {
+            let note = ordered[found.index];
+            let shown = shown_note(&mut words, book, note, lists, found.score);
+            (shown, note.done.is_some())
+        })
+        .collect();
+    (list_matches, matches)
+}
+
+/// The lists of a book whose names match, best first.
+fn rank_lists(query: &str, book: &str, lists: &[NoteList]) -> Vec<ListMatch> {
     let mut names = Ranker::new(query, Texts::Names);
     let list_names: Vec<&str> = lists.iter().map(|l| l.name.as_str()).collect();
     let (ranked, _) = names.rank(&list_names, usize::MAX);
-    let list_matches = ranked
+    ranked
         .into_iter()
         .map(|r| ListMatch {
             book: book.into(),
@@ -142,14 +165,12 @@ fn found_in(
             score: r.score,
             highlights: r.highlights,
         })
-        .collect();
+        .collect()
+}
 
-    let query = query.trim();
-    if query.chars().count() < MIN_QUERY {
-        return (list_matches, Vec::new());
-    }
-    // the user's order: open notes before done ones, list by list, open ones by place within
-    // their list (a place means nothing across lists), done ones the last done first
+/// The notes in the user's order: open notes before done ones, list by list, open ones by place
+/// within their list (a place means nothing across lists), done ones the last done first.
+fn in_users_order<'a>(lists: &[NoteList], notes: &'a [Note]) -> Vec<&'a Note> {
     let mut ordered: Vec<(Option<usize>, &Note)> = notes
         .iter()
         .map(|note| (lists.iter().position(|l| l.id == note.list), note))
@@ -164,30 +185,30 @@ fn found_in(
                 _ => a.position.total_cmp(&b.position),
             })
     });
-    let ordered: Vec<&Note> = ordered.into_iter().map(|(_, note)| note).collect();
-    let mut words = Ranker::new(query, Texts::Prose);
-    let texts: Vec<&str> = ordered.iter().map(|n| n.text.as_str()).collect();
-    let (best, _) = words.best(&texts, NOTE_LIMIT);
-    let matches = best
-        .into_iter()
-        .map(|found| {
-            let note = ordered[found.index];
-            let mut found = note_match(book, note, lists, found.score);
-            if let Some(highlights) = words.highlights(&found.title) {
-                found.highlights = highlights;
-            } else if let Some((at, len)) = words.matched(&note.text).as_deref().and_then(first_run)
-            {
-                // every word the part shows, or the first alone
-                let mut part = snippet(&note.text, at, len);
-                if let Some(highlights) = words.highlights(&part.text) {
-                    part.highlights = highlights;
-                }
-                found.snippet = Some(part);
-            }
-            (found, note.done.is_some())
-        })
-        .collect();
-    (list_matches, matches)
+    ordered.into_iter().map(|(_, note)| note).collect()
+}
+
+/// A note found, as the palette shows it: its title with the words in it, or else the part around
+/// the first word, with every word that part shows.
+fn shown_note(
+    words: &mut Ranker,
+    book: &str,
+    note: &Note,
+    lists: &[NoteList],
+    score: u32,
+) -> NoteMatch {
+    let mut found = note_match(book, note, lists, score);
+    if let Some(highlights) = words.highlights(&found.title) {
+        found.highlights = highlights;
+    } else if let Some((at, len)) = words.matched(&note.text).as_deref().and_then(first_run) {
+        // every word the part shows, or the first alone
+        let mut part = snippet(&note.text, at, len);
+        if let Some(highlights) = words.highlights(&part.text) {
+            part.highlights = highlights;
+        }
+        found.snippet = Some(part);
+    }
+    found
 }
 
 #[cfg(test)]

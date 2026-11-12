@@ -24,6 +24,11 @@ enum TrayItem {
 impl TrayItem {
     const ALL: [Self; 4] = [Self::Show, Self::Capture, Self::Note, Self::Quit];
 
+    /// The item named by a menu event's id.
+    fn with_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|candidate| candidate.id() == id)
+    }
+
     fn id(self) -> &'static str {
         match self {
             Self::Show => "show",
@@ -105,19 +110,8 @@ fn built(item: TrayItem) -> bool {
 }
 
 fn build(app: &AppHandle, labels: TrayLabels, actions: TrayActions) -> tauri::Result<Tray> {
-    let items = TrayItem::ALL
-        .into_iter()
-        .filter(|item| built(*item))
-        .map(|item| {
-            let entry = MenuItem::with_id(app, item.id(), labels.of(item), true, None::<&str>)?;
-            Ok((item, entry))
-        })
-        .collect::<tauri::Result<Vec<_>>>()?;
-    let entries: Vec<&dyn IsMenuItem<tauri::Wry>> = items
-        .iter()
-        .map(|(_, entry)| entry as &dyn IsMenuItem<tauri::Wry>)
-        .collect();
-    let menu = Menu::with_items(app, &entries)?;
+    let items = menu_items(app, labels)?;
+    let menu = menu(app, &items)?;
     let click = actions.click;
     TrayIconBuilder::new()
         .icon(icon(app))
@@ -129,25 +123,55 @@ fn build(app: &AppHandle, labels: TrayLabels, actions: TrayActions) -> tauri::Re
         // Linux the appindicator reports no clicks, so every click opens the menu
         .show_menu_on_left_click(false)
         .on_menu_event(move |app, event| {
-            let chosen = TrayItem::ALL
-                .into_iter()
-                .find(|candidate| candidate.id() == event.id.as_ref());
-            if let Some(chosen) = chosen {
+            if let Some(chosen) = TrayItem::with_id(event.id.as_ref()) {
                 actions.of(chosen)(app);
             }
         })
         .on_tray_icon_event(move |tray, event| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
+            if is_left_click(&event) {
                 click(tray.app_handle());
             }
         })
         .build(app)?;
     Ok(Tray(items))
+}
+
+/// The menu's items this system builds, in the language of `labels`.
+fn menu_items(
+    app: &AppHandle,
+    labels: TrayLabels,
+) -> tauri::Result<Vec<(TrayItem, MenuItem<tauri::Wry>)>> {
+    TrayItem::ALL
+        .into_iter()
+        .filter(|item| built(*item))
+        .map(|item| {
+            let entry = MenuItem::with_id(app, item.id(), labels.of(item), true, None::<&str>)?;
+            Ok((item, entry))
+        })
+        .collect()
+}
+
+fn menu(
+    app: &AppHandle,
+    items: &[(TrayItem, MenuItem<tauri::Wry>)],
+) -> tauri::Result<Menu<tauri::Wry>> {
+    let entries: Vec<&dyn IsMenuItem<tauri::Wry>> = items
+        .iter()
+        .map(|(_, entry)| entry as &dyn IsMenuItem<tauri::Wry>)
+        .collect();
+    Menu::with_items(app, &entries)
+}
+
+/// A click of the left button, once released.
+fn is_left_click(event: &TrayIconEvent) -> bool {
+    matches!(
+        event,
+        TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        }
+    )
 }
 
 /// A monochrome glyph on macOS, where the menu bar wants a template; the app's icon elsewhere.

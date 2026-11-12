@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { Commit, FileChange } from '../model/repository.types';
-import { useCommitFiles } from './repository.queries';
+import { useCommitFiles } from './queries/commits';
 
 const NO_FILES: readonly FileChange[] = [];
 

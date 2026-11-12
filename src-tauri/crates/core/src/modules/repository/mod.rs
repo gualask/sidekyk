@@ -6,6 +6,7 @@ mod activity;
 mod commits;
 mod contracts;
 mod diff;
+mod diff_counts;
 mod limits;
 mod numstat;
 mod snapshot;

@@ -22,16 +22,16 @@ export function RemoveProjectDialog({
 }) {
     const client = useQueryClient();
     const exportNotes = useExportNotes(project.id);
-    const [exporting, setExporting] = useState(false);
     const count = useNotesCount(project.id);
     const { t, tp } = useTranslation();
 
-    const remove = useEffectEvent(() => {
+    const removeProject = () => {
         // what was read of its notes goes too: added again, it starts with none
         client.removeQueries({ queryKey: notesKey(project.id) });
         onRemove();
         onClose();
-    });
+    };
+    const remove = useEffectEvent(removeProject);
     // none to lose: it goes at once
     useEffect(() => {
         if (count.data === 0) remove();
@@ -57,34 +57,48 @@ export function RemoveProjectDialog({
                         {/* a project without folder has no repository to leave as it is */}
                         {projectFolder(project) ? ` ${t('remove.folderStays')}` : null}
                     </AlertDialog.Description>
-                    <div className="mt-4 flex flex-wrap justify-end gap-2">
-                        <AlertDialog.Close className="btn-ghost-sm">
-                            {t('common.cancel')}
-                        </AlertDialog.Close>
-                        <button
-                            type="button"
-                            className="btn-ghost-sm"
-                            disabled={exporting}
-                            onClick={async () => {
-                                setExporting(true);
-                                const path = await exportNotes();
-                                setExporting(false);
-                                if (path) remove();
-                            }}
-                        >
-                            {t('notes.export')}
-                        </button>
-                        <button
-                            type="button"
-                            className="btn-ghost-sm text-ui-danger hover:bg-ui-danger-soft hover:text-ui-danger-soft-text"
-                            disabled={exporting}
-                            onClick={remove}
-                        >
-                            {t('remove.confirm')}
-                        </button>
-                    </div>
+                    <RemoveChoices exportNotes={exportNotes} onRemove={removeProject} />
                 </AlertDialog.Popup>
             </AlertDialog.Portal>
         </AlertDialog.Root>
+    );
+}
+
+/** Cancel, export the notes then remove, or remove with them; none while the export runs. */
+function RemoveChoices({
+    exportNotes,
+    onRemove,
+}: {
+    /** Exports the notes: the path written, or nothing when cancelled or failed. */
+    exportNotes: ReturnType<typeof useExportNotes>;
+    onRemove: () => void;
+}) {
+    const [exporting, setExporting] = useState(false);
+    const { t } = useTranslation();
+    return (
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <AlertDialog.Close className="btn-ghost-sm">{t('common.cancel')}</AlertDialog.Close>
+            <button
+                type="button"
+                className="btn-ghost-sm"
+                disabled={exporting}
+                onClick={async () => {
+                    setExporting(true);
+                    const path = await exportNotes();
+                    setExporting(false);
+                    if (path) onRemove();
+                }}
+            >
+                {t('notes.export')}
+            </button>
+            <button
+                type="button"
+                className="btn-ghost-sm text-ui-danger hover:bg-ui-danger-soft hover:text-ui-danger-soft-text"
+                disabled={exporting}
+                onClick={onRemove}
+            >
+                {t('remove.confirm')}
+            </button>
+        </div>
     );
 }

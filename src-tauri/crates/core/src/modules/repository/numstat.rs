@@ -56,19 +56,23 @@ pub(super) fn parse_numstat_z(bytes: &[u8]) -> Vec<LineCounts> {
         };
         counts.push(LineCounts {
             path: path.to_string(),
-            counts: if added == "-" && deleted == "-" {
-                Counts::BINARY
-            } else {
-                Counts {
-                    additions: added.parse().ok(),
-                    deletions: deleted.parse().ok(),
-                    binary: false,
-                }
-            },
+            counts: record_counts(added, deleted),
         });
     }
 
     counts
+}
+
+/// The counts of a record's `<added>` and `<deleted>` fields: `-` both for a binary file.
+fn record_counts(added: &str, deleted: &str) -> Counts {
+    if added == "-" && deleted == "-" {
+        return Counts::BINARY;
+    }
+    Counts {
+        additions: added.parse().ok(),
+        deletions: deleted.parse().ok(),
+        binary: false,
+    }
 }
 
 /// Every path `git diff --name-status -z` names: a status, then the path, or for a rename or a

@@ -1,5 +1,5 @@
 import { IconX } from '@tabler/icons-react';
-import { type MessageKey, useTranslation } from '@/shared/i18n';
+import { type MessageKey, type Translator, useTranslation } from '@/shared/i18n';
 import { withKeys } from '@/shared/platform/keys';
 import { MACOS } from '@/shared/platform/macos';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
@@ -99,18 +99,6 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
         { capture: true },
     );
     const { t } = useTranslation();
-    const rowOf = (shortcut: Shortcut | 'panels') =>
-        shortcut === 'panels'
-            ? {
-                  label: PANEL_KEYS.map((panel) => t(panel.title)).join(', '),
-                  keys: PANEL_KEYS.map((panel) => panel.shortcut),
-                  also: undefined,
-              }
-            : {
-                  label: t(shortcut.label),
-                  keys: shortcut.keys,
-                  also: shortcut.also ? t(shortcut.also) : undefined,
-              };
 
     return (
         <aside
@@ -132,36 +120,61 @@ export function ShortcutsHelp({ onClose }: { onClose: () => void }) {
             {/* two columns of sections, each kept whole */}
             <div className="columns-[320px] gap-x-8">
                 {SECTIONS.map((section) => (
-                    <section key={section.title} className="break-inside-avoid pt-2.5">
-                        <h3 className="mb-1 flex items-center gap-2.5 text-[11px] font-semibold tracking-[.04em] text-ui-text-muted uppercase">
-                            {t(section.title)}
-                            <span aria-hidden className="h-px flex-1 bg-ui-border" />
-                        </h3>
-                        <dl>
-                            {section.shortcuts.map(rowOf).map((shortcut) => (
-                                <div
-                                    key={shortcut.label}
-                                    className="flex items-baseline justify-between gap-3 py-1"
-                                >
-                                    <dt className="min-w-0 text-ui-text-secondary">
-                                        {shortcut.label}
-                                        {shortcut.also ? (
-                                            <div className="text-xs text-ui-text-muted">
-                                                {shortcut.also}
-                                            </div>
-                                        ) : null}
-                                    </dt>
-                                    <dd className="flex shrink-0 items-baseline gap-1">
-                                        {shortcut.keys.map((keys) => (
-                                            <KeyCap key={keys} keys={keys} />
-                                        ))}
-                                    </dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </section>
+                    <ShortcutsSection key={section.title} section={section} />
                 ))}
             </div>
         </aside>
     );
+}
+
+/** A section of the card: its title, then each shortcut with its key caps. */
+function ShortcutsSection({ section }: { section: Section }) {
+    const { t } = useTranslation();
+    return (
+        <section className="break-inside-avoid pt-2.5">
+            <h3 className="mb-1 flex items-center gap-2.5 text-[11px] font-semibold tracking-[.04em] text-ui-text-muted uppercase">
+                {t(section.title)}
+                <span aria-hidden className="h-px flex-1 bg-ui-border" />
+            </h3>
+            <dl>
+                {section.shortcuts
+                    .map((shortcut) => shortcutRow(shortcut, t))
+                    .map((shortcut) => (
+                        <div
+                            key={shortcut.label}
+                            className="flex items-baseline justify-between gap-3 py-1"
+                        >
+                            <dt className="min-w-0 text-ui-text-secondary">
+                                {shortcut.label}
+                                {shortcut.also ? (
+                                    <div className="text-xs text-ui-text-muted">
+                                        {shortcut.also}
+                                    </div>
+                                ) : null}
+                            </dt>
+                            <dd className="flex shrink-0 items-baseline gap-1">
+                                {shortcut.keys.map((keys) => (
+                                    <KeyCap key={keys} keys={keys} />
+                                ))}
+                            </dd>
+                        </div>
+                    ))}
+            </dl>
+        </section>
+    );
+}
+
+/** A shortcut as the card shows it, in the UI's language; `panels` lists every panel's key. */
+function shortcutRow(shortcut: Shortcut | 'panels', t: Translator['t']) {
+    return shortcut === 'panels'
+        ? {
+              label: PANEL_KEYS.map((panel) => t(panel.title)).join(', '),
+              keys: PANEL_KEYS.map((panel) => panel.shortcut),
+              also: undefined,
+          }
+        : {
+              label: t(shortcut.label),
+              keys: shortcut.keys,
+              also: shortcut.also ? t(shortcut.also) : undefined,
+          };
 }

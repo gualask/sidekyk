@@ -3,13 +3,8 @@ import { type FormEvent, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
-import {
-    useAddProjectFolder,
-    useMergeProjects,
-    useProjects,
-    useRemoveProjectFolder,
-    useRenameProject,
-} from '../application/projects.queries';
+import { useAddProjectFolder, useRemoveProjectFolder } from '../application/project-folders';
+import { useMergeProjects, useProjects, useRenameProject } from '../application/projects.queries';
 import { FolderRow, NameField } from './project-fields';
 
 /** Another project that has the folder picked: merged into this one if the user says so. */
@@ -82,27 +77,13 @@ export function EditProjectDialog({
                             <legend className="mb-1 text-xs font-semibold">
                                 {t('projects.folders')}
                             </legend>
-                            {project.folders.length > 0 ? (
-                                <ul className="flex flex-col gap-1">
-                                    {project.folders.map((folder) => (
-                                        <FolderRow
-                                            key={folder.id}
-                                            location={folder}
-                                            disabled={remove.isPending}
-                                            onRemove={() =>
-                                                remove.mutate({
-                                                    projectId: project.id,
-                                                    folderId: folder.id,
-                                                })
-                                            }
-                                        />
-                                    ))}
-                                </ul>
-                            ) : (
-                                <p className="text-[13px] text-ui-text-muted">
-                                    {t('projects.noFolder')}
-                                </p>
-                            )}
+                            <ProjectFolders
+                                project={project}
+                                removing={remove.isPending}
+                                onRemove={(folderId) =>
+                                    remove.mutate({ projectId: project.id, folderId })
+                                }
+                            />
                             <div>
                                 <button
                                     type="button"
@@ -114,39 +95,18 @@ export function EditProjectDialog({
                                 </button>
                             </div>
                             {mergeable ? (
-                                <div
-                                    role="alert"
-                                    className="flex flex-col gap-2 rounded-lg bg-ui-surface-subtle p-2.5 text-[13px]"
-                                >
-                                    <p>
-                                        {t('projects.mergeAsk', {
-                                            name: mergeable.name,
-                                            into: project.name,
-                                        })}
-                                    </p>
-                                    <div className="flex justify-end gap-2">
-                                        <button
-                                            type="button"
-                                            className="btn-ghost-sm"
-                                            onClick={() => setMergeable(null)}
-                                        >
-                                            {t('projects.keepApart')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            className="btn-primary-sm"
-                                            disabled={merge.isPending}
-                                            onClick={() =>
-                                                merge.mutate(
-                                                    { into: project.id, from: mergeable.id },
-                                                    { onSuccess: () => setMergeable(null) },
-                                                )
-                                            }
-                                        >
-                                            {t('projects.merge')}
-                                        </button>
-                                    </div>
-                                </div>
+                                <MergeAsk
+                                    from={mergeable.name}
+                                    into={project.name}
+                                    merging={merge.isPending}
+                                    onKeepApart={() => setMergeable(null)}
+                                    onMerge={() =>
+                                        merge.mutate(
+                                            { into: project.id, from: mergeable.id },
+                                            { onSuccess: () => setMergeable(null) },
+                                        )
+                                    }
+                                />
                             ) : null}
                         </fieldset>
                         {error ? (
@@ -170,5 +130,71 @@ export function EditProjectDialog({
                 </Dialog.Popup>
             </Dialog.Portal>
         </Dialog.Root>
+    );
+}
+
+/** The project's folders, each with × to leave it out, or a line saying it has none. */
+function ProjectFolders({
+    project,
+    removing,
+    onRemove,
+}: {
+    project: ProjectInfo;
+    removing: boolean;
+    onRemove: (folderId: string) => void;
+}) {
+    const { t } = useTranslation();
+    if (project.folders.length === 0) {
+        return <p className="text-[13px] text-ui-text-muted">{t('projects.noFolder')}</p>;
+    }
+    return (
+        <ul className="flex flex-col gap-1">
+            {project.folders.map((folder) => (
+                <FolderRow
+                    key={folder.id}
+                    location={folder}
+                    disabled={removing}
+                    onRemove={() => onRemove(folder.id)}
+                />
+            ))}
+        </ul>
+    );
+}
+
+/** The folder added is another project's: merge that project into this one, or keep them apart. */
+function MergeAsk({
+    from,
+    into,
+    merging,
+    onKeepApart,
+    onMerge,
+}: {
+    from: string;
+    into: string;
+    merging: boolean;
+    onKeepApart: () => void;
+    onMerge: () => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <div
+            role="alert"
+            className="flex flex-col gap-2 rounded-lg bg-ui-surface-subtle p-2.5 text-[13px]"
+        >
+            <p>{t('projects.mergeAsk', { name: from, into })}</p>
+            <div className="flex justify-end gap-2">
+                <button type="button" className="btn-ghost-sm" onClick={onKeepApart}>
+                    {t('projects.keepApart')}
+                </button>
+                <button
+                    type="button"
+                    className="btn-primary-sm"
+                    disabled={merging}
+                    onClick={onMerge}
+                >
+                    {t('projects.merge')}
+                </button>
+            </div>
+        </div>
     );
 }

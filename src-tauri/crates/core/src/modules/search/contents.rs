@@ -4,17 +4,16 @@
 //! NUL and stops past what the viewer shows. Not tied to git: any list of files will do.
 
 use std::io::Read;
-use std::ops::Range;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use grep_matcher::Matcher;
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
 use grep_searcher::{BinaryDetection, Searcher, SearcherBuilder, Sink, SinkMatch};
 
-use super::contracts::{ContentFile, ContentLine, Highlight};
+use super::content_line::content_line;
+use super::contracts::{ContentFile, ContentLine};
 use crate::modules::folder::{RepositoryBackend, MAX_FILE_BYTES};
 use crate::shared::sync::lock;
 use crate::shared::threads::threads;
@@ -24,12 +23,6 @@ const MIN_QUERY_CHARS: usize = 2;
 
 /// Lines sent at most: a common text stops the search there instead of reading every file.
 const MAX_LINES: usize = 2_000;
-
-/// A line's text sent at most, in characters, around its first match.
-const MAX_LINE_CHARS: usize = 300;
-
-/// Characters kept before a long line's first match.
-const CHARS_BEFORE: usize = 40;
 
 /// Files found are sent in batches at most this often, so a search with many does not flood the
 /// window with messages.
@@ -52,7 +45,7 @@ pub struct Searched {
 }
 
 /// The text as typed, literally; case is ignored unless it has a capital letter (smart case, as
-/// ripgrep and Zed). None for a text too short to search.
+/// ripgrep). None for a text too short to search.
 fn matcher(query: &str) -> Option<RegexMatcher> {
     if query.chars().count() < MIN_QUERY_CHARS {
         return None;
@@ -74,63 +67,112 @@ pub fn search_contents(
     let Some(matcher) = matcher(search.query) else {
         return Searched::default();
     };
-    let next = AtomicUsize::new(0);
-    let lines = AtomicUsize::new(0);
-    let cut = AtomicBool::new(false);
-    let found = Mutex::new(Found {
-        unsent: Vec::new(),
-        sent_at: Instant::now(),
-        files: Vec::new(),
-    });
-
+    let shared = Shared::new();
     std::thread::scope(|scope| {
         for _ in 0..threads().min(search.files.len()) {
-            scope.spawn(|| {
-                let mut searcher = SearcherBuilder::new()
-                    .binary_detection(BinaryDetection::quit(0))
-                    .line_number(true)
-                    .build();
-                while !cut.load(Ordering::Relaxed) && !cancelled() {
-                    let Some(path) = search.files.get(next.fetch_add(1, Ordering::Relaxed)) else {
-                        break;
-                    };
-                    let Some(file) = search.backend.open_file(search.root, Path::new(path)) else {
-                        continue;
-                    };
-                    let mut sink = FileSink {
-                        matcher: &matcher,
-                        lines: Vec::new(),
-                        total: &lines,
-                        cut: &cut,
-                        cancelled,
-                    };
-                    // past what the viewer shows, a match could not be opened
-                    let head = file.take(MAX_FILE_BYTES as u64);
-                    // an unreadable file is left out, as a binary one is
-                    let _ = searcher.search_reader(&matcher, head, &mut sink);
-                    if sink.lines.is_empty() {
-                        continue;
-                    }
-                    // sent out of the lock, so the other threads do not wait on the window
-                    let ready = lock(&found).add(path, sink.lines);
-                    if let Some(files) = ready {
-                        send(files);
-                    }
-                }
-            });
+            scope.spawn(|| search_files(search, &matcher, &shared, cancelled, send));
         }
     });
+    shared.finish(send)
+}
 
-    let mut found = found
-        .into_inner()
-        .unwrap_or_else(|poison| poison.into_inner());
-    if !found.unsent.is_empty() {
-        send(std::mem::take(&mut found.unsent));
+/// What the threads of a search share.
+struct Shared {
+    /// The index of the next file to take.
+    next: AtomicUsize,
+    /// The lines found so far, up to `MAX_LINES`.
+    lines: AtomicUsize,
+    /// Past `MAX_LINES`: every thread stops.
+    cut: AtomicBool,
+    found: Mutex<Found>,
+}
+
+impl Shared {
+    fn new() -> Self {
+        Self {
+            next: AtomicUsize::new(0),
+            lines: AtomicUsize::new(0),
+            cut: AtomicBool::new(false),
+            found: Mutex::new(Found {
+                unsent: Vec::new(),
+                sent_at: Instant::now(),
+                files: Vec::new(),
+            }),
+        }
     }
-    Searched {
-        files: found.files,
-        cut: cut.into_inner(),
+
+    /// How the search went, once its threads ended: what they found and did not send yet is
+    /// sent now.
+    fn finish(self, send: &(dyn Fn(Vec<ContentFile>) + Sync)) -> Searched {
+        let mut found = self
+            .found
+            .into_inner()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if !found.unsent.is_empty() {
+            send(std::mem::take(&mut found.unsent));
+        }
+        Searched {
+            files: found.files,
+            cut: self.cut.into_inner(),
+        }
     }
+}
+
+/// One thread of a search: takes the next file until none is left, the search is cut or a newer
+/// one took over.
+fn search_files(
+    search: &ContentSearch,
+    matcher: &RegexMatcher,
+    shared: &Shared,
+    cancelled: &(dyn Fn() -> bool + Sync),
+    send: &(dyn Fn(Vec<ContentFile>) + Sync),
+) {
+    let mut searcher = SearcherBuilder::new()
+        .binary_detection(BinaryDetection::quit(0))
+        .line_number(true)
+        .build();
+    while !shared.cut.load(Ordering::Relaxed) && !cancelled() {
+        let Some(path) = search
+            .files
+            .get(shared.next.fetch_add(1, Ordering::Relaxed))
+        else {
+            break;
+        };
+        let Some(file) = search.backend.open_file(search.root, Path::new(path)) else {
+            continue;
+        };
+        let lines = file_lines(&mut searcher, matcher, shared, cancelled, file);
+        if lines.is_empty() {
+            continue;
+        }
+        // sent out of the lock, so the other threads do not wait on the window
+        let ready = lock(&shared.found).add(path, lines);
+        if let Some(files) = ready {
+            send(files);
+        }
+    }
+}
+
+/// The lines of a file where the text is, as many as the search still sends.
+fn file_lines(
+    searcher: &mut Searcher,
+    matcher: &RegexMatcher,
+    shared: &Shared,
+    cancelled: &(dyn Fn() -> bool + Sync),
+    file: Box<dyn Read + Send>,
+) -> Vec<ContentLine> {
+    let mut sink = FileSink {
+        matcher,
+        lines: Vec::new(),
+        total: &shared.lines,
+        cut: &shared.cut,
+        cancelled,
+    };
+    // past what the viewer shows, a match could not be opened
+    let head = file.take(MAX_FILE_BYTES as u64);
+    // an unreadable file is left out, as a binary one is
+    let _ = searcher.search_reader(matcher, head, &mut sink);
+    sink.lines
 }
 
 /// What the threads found, and what of it is not sent yet.
@@ -183,60 +225,6 @@ impl Sink for FileSink<'_> {
             found.bytes(),
         ));
         Ok(true)
-    }
-}
-
-/// A matching line as the palette lists it: without its end of line and its indentation, cut
-/// around its first match when long, with where the text is in it.
-fn content_line(matcher: &RegexMatcher, number: u32, bytes: &[u8]) -> ContentLine {
-    let bytes = bytes.strip_suffix(b"\n").unwrap_or(bytes);
-    let bytes = bytes.strip_suffix(b"\r").unwrap_or(bytes);
-    let Ok(line) = std::str::from_utf8(bytes) else {
-        // not UTF-8: shown as it can be, nothing to point at
-        let text: String = String::from_utf8_lossy(bytes)
-            .trim_start()
-            .chars()
-            .take(MAX_LINE_CHARS)
-            .collect();
-        return ContentLine {
-            number,
-            text,
-            highlights: Vec::new(),
-        };
-    };
-    let mut matches: Vec<Range<usize>> = Vec::new();
-    let _ = matcher.find_iter(line.as_bytes(), |found| {
-        matches.push(found.start()..found.end());
-        true
-    });
-
-    let indent = line.len() - line.trim_start().len();
-    let first = matches.first().map_or(indent, |found| found.start);
-    let start = line[..first]
-        .char_indices()
-        .rev()
-        .nth(CHARS_BEFORE - 1)
-        .map_or(0, |(at, _)| at)
-        .max(indent);
-    let end = line[start..]
-        .char_indices()
-        .nth(MAX_LINE_CHARS)
-        .map_or(line.len(), |(at, _)| start + at);
-    let before = if start > indent { "…" } else { "" };
-    let after = if end < line.len() { "…" } else { "" };
-
-    // UTF-16 offsets, as JavaScript counts, in the text sent
-    let lead = before.encode_utf16().count();
-    let offset = |at: usize| (lead + line[start..at].encode_utf16().count()) as u32;
-    let highlights = matches
-        .into_iter()
-        .filter(|found| found.end > start && found.start < end)
-        .map(|found| -> Highlight { [offset(found.start.max(start)), offset(found.end.min(end))] })
-        .collect();
-    ContentLine {
-        number,
-        text: format!("{before}{}{after}", &line[start..end]),
-        highlights,
     }
 }
 
@@ -339,23 +327,6 @@ mod tests {
     fn a_short_text_or_a_binary_file_finds_nothing() {
         assert_eq!(run(&[("a.ts", "aaa\n")], "a").1, Searched::default());
         assert!(run(&[("logo.png", "png\0total\n")], "total").0.is_empty());
-    }
-
-    #[test]
-    fn a_long_line_is_cut_around_its_first_match() {
-        let line = format!("{}needle{}", "x".repeat(100), "y".repeat(400));
-        let (sent, _) = run(&[("a.ts", line.as_str())], "needle");
-        let found = &sent[0].lines[0];
-        assert!(found.text.starts_with('…') && found.text.ends_with('…'));
-        assert_eq!(found.text.chars().count(), MAX_LINE_CHARS + 2);
-        // "…" and the 40 characters kept before the match
-        assert_eq!(found.highlights, [[41, 47]]);
-    }
-
-    #[test]
-    fn highlights_count_utf16_units() {
-        let (sent, _) = run(&[("a.ts", "é𝒳 needle\n")], "needle");
-        assert_eq!(sent[0].lines[0].highlights, [[4, 10]]);
     }
 
     #[test]

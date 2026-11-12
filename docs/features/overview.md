@@ -26,8 +26,8 @@ project is: `projects.md`; the levels: `workspace.md`.
 ## How it is built
 
 - Only the folder on screen of the project on screen is watched (`changes.md`). The rows show a
-  summary (`load_summary`: status + numstat vs HEAD, new files counted not read, 52 ms on Zed's
-  clone), read when level 0 shows, and on show only if older than 30 s; inactive caches expire
+  summary (`load_summary`: status + numstat vs HEAD, new files counted not read, 52 ms on
+  a 4,366-file Rust repository), read when level 0 shows, and on show only if older than 30 s; inactive caches expire
   (`gcTime`).
 - Row parts: each panel's summary fills `lead` (under the name) or `end` (`SummaryPart`): Changes
   both, Files `lead` without git (`FilesSummary`), Notes `end` without a repository (open notes,
@@ -35,7 +35,7 @@ project is: `projects.md`; the levels: `workspace.md`.
 - Week of commits (`get_commit_activity`): `git log --since=@<local midnight 6 days ago>
   --no-merges --shortstat -n 501 HEAD`, `LC_ALL=C`, at most 500 commits and 256 KiB, summed by
   local day in the frontend (`activityDays`). Keyed by HEAD and first day, outside the repository's
-  keys: changes on disk leave it alone. 80 ms here (68 commits), 0.5 s on Zed's clone (129). The
+  keys: changes on disk leave it alone. 80 ms here (68 commits), 0.5 s on a 4,366-file Rust repository (129). The
   line (`model/sparkline.ts`) is a monotone cubic (Steffen's): never under the baseline nor past
   the busiest day.
 

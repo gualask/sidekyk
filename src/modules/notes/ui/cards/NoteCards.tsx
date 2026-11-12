@@ -1,0 +1,185 @@
+import { IconChevronDown } from '@tabler/icons-react';
+import { useMemo, useRef, useState } from 'react';
+import { useTranslation } from '@/shared/i18n';
+import { useCaptureMarks } from '../../application/captures';
+import type { NoteActions } from '../../application/note-actions/note-actions';
+import { doneNotes, openNotes } from '../../model/notes';
+import type { Note, NoteList, ProjectNotes } from '../../model/notes.types';
+import { Composer } from '../composer/Composer';
+import { useColumnImages } from '../use-image-drops';
+import { CardRows } from './CardRows';
+import { NoteCard } from './note-card/NoteCard';
+import type { NoteOrder } from './note-card/NoteMenu';
+import { useCardRows } from './use-card-rows';
+import { useCardStates } from './use-card-states';
+import { useRevealedNote } from './use-revealed-note';
+
+/** A note's row (its place among the open ones; -1 when done), or the done ones' toggle. */
+type NoteItem = { kind: 'note'; note: Note; index: number };
+type Item = NoteItem | { kind: 'done'; count: number };
+
+/**
+ * The open list: a field on top to write or paste a note, then its cards in the user's order, the
+ * done ones folded under "Done (n)". Only the cards on screen render.
+ */
+export function NoteCards({
+    book,
+    notes,
+    list,
+    actions,
+    focusComposer,
+    onComposerFocused,
+    reveal,
+    onRevealed,
+    place,
+    onReorder,
+    onMove,
+}: {
+    /** The book the notes are in. */
+    book: string;
+    notes: ProjectNotes;
+    list: NoteList;
+    actions: NoteActions;
+    /** The field to write in takes the focus (as it shows): a list just made, `⌘N`. */
+    focusComposer: boolean;
+    onComposerFocused: () => void;
+    /** A note of the list to bring into view, and light up for a moment (one found in the palette). */
+    reveal: string | null;
+    onRevealed: () => void;
+    /** Where the notes are, as the marks of a capture name it: the project's name. */
+    place: string;
+    /** Starts reordering the open notes, on one of them. */
+    onReorder: (id: string) => void;
+    /** Opens the Move dialog for a note. */
+    onMove: (note: Note) => void;
+}) {
+    const [showDone, setShowDone] = useState(false);
+    const { cardState, edit } = useCardStates(book);
+    const { marks, end: endMarks } = useCaptureMarks();
+    const box = useRef<HTMLDivElement>(null);
+    const { t } = useTranslation();
+
+    const open = useMemo(() => openNotes(notes.notes, list.id), [notes.notes, list.id]);
+    const done = useMemo(() => doneNotes(notes.notes, list.id), [notes.notes, list.id]);
+    const items = useMemo(() => cardItems(open, done, showDone), [open, done, showDone]);
+
+    const rows = useCardRows(items.length, (index) => {
+        const item = items[index];
+        return item.kind === 'note' ? item.note.id : 'done';
+    });
+    const { virtualizer } = rows;
+    const images = useColumnImages({
+        root: box,
+        book,
+        actions,
+        list: list.id,
+        onAdded: (note) => {
+            virtualizer.scrollToOffset(0);
+            // a note of images alone opens, for its text
+            if (note.text === '') edit(note.id);
+        },
+    });
+
+    // the note brought into view, lit up for a moment; a done one unfolds its group first
+    const flash = useRevealedNote({
+        reveal,
+        index: items.findIndex((item) => item.kind === 'note' && item.note.id === reveal),
+        folded: !showDone && done.some((note) => note.id === reveal),
+        unfold: () => setShowDone(true),
+        virtualizer,
+        onRevealed,
+    });
+
+    const empty = open.length === 0 && done.length === 0;
+    /** An open note among others moves to the top, or starts the reorder mode on it. */
+    const orderOf = (item: NoteItem): NoteOrder | null =>
+        item.index < 0 || open.length < 2
+            ? null
+            : {
+                  top: item.index === 0,
+                  moveToTop: () => {
+                      void actions.place(item.note, list.id, 0);
+                      virtualizer.scrollToOffset(0);
+                  },
+                  reorder: () => onReorder(item.note.id),
+              };
+
+    return (
+        <div ref={box} className="flex h-full min-w-0 flex-1 flex-col">
+            <Composer
+                book={book}
+                focus={focusComposer}
+                onFocused={onComposerFocused}
+                placeholder={t('notes.composer')}
+                label={t('notes.newNoteIn', { list: list.name })}
+                hint={empty ? t('notes.composerHint') : null}
+                {...images.composer}
+            />
+            <CardRows rows={rows}>
+                {(index) => {
+                    const item = items[index];
+                    return item.kind === 'done' ? (
+                        <DoneToggle
+                            shown={showDone}
+                            count={item.count}
+                            onToggle={() => setShowDone((shown) => !shown)}
+                        />
+                    ) : (
+                        <NoteCard
+                            book={book}
+                            note={item.note}
+                            flash={flash === item.note.id}
+                            actions={actions}
+                            {...cardState(item.note)}
+                            marks={marks}
+                            place={place}
+                            onMarked={endMarks}
+                            onDone={(done) => void actions.setDone(item.note, done)}
+                            order={orderOf(item)}
+                            onMove={() => onMove(item.note)}
+                            dropping={images.overCard === item.note.id}
+                        />
+                    );
+                }}
+            </CardRows>
+        </div>
+    );
+}
+
+/** The rows: the open notes, then the done ones' toggle, and the done notes while unfolded. */
+function cardItems(open: readonly Note[], done: readonly Note[], showDone: boolean): Item[] {
+    const rows: Item[] = open.map((note, index) => ({ kind: 'note', note, index }));
+    if (done.length === 0) return rows;
+    rows.push({ kind: 'done', count: done.length });
+    if (showDone) rows.push(...done.map((note): Item => ({ kind: 'note', note, index: -1 })));
+    return rows;
+}
+
+/** "Done (n)", which folds or unfolds the done notes. */
+function DoneToggle({
+    shown,
+    count,
+    onToggle,
+}: {
+    shown: boolean;
+    count: number;
+    onToggle: () => void;
+}) {
+    const { t } = useTranslation();
+    return (
+        <button
+            type="button"
+            className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs font-semibold text-ui-text-muted hover:bg-ui-surface-hover hover:text-ui-text-secondary"
+            aria-expanded={shown}
+            onClick={onToggle}
+        >
+            <IconChevronDown
+                size={12}
+                className={`transition-transform motion-reduce:transition-none ${
+                    shown ? '' : '-rotate-90'
+                }`}
+            />
+            {t('notes.doneCount', { count })}
+        </button>
+    );
+}

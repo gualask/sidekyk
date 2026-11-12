@@ -103,33 +103,40 @@ function isAllowedImport(fromLayer, fromFile, specifier) {
     return true;
 }
 
+/** The boundaries one source file crosses. */
+async function violationsOf(file) {
+    const violations = [];
+    const relative = relativePath(file);
+    const fromLayer = sourceLayer(file);
+    const source = await fs.readFile(file, 'utf8');
+
+    for (const match of source.matchAll(IMPORT_PATTERN)) {
+        const specifier = match[1];
+        const line = source.slice(0, match.index).split('\n').length;
+
+        if (specifier.startsWith('@tauri-apps/') && !relative.startsWith('src/infrastructure/tauri/')) {
+            violations.push(`${relative}:${line}: direct Tauri import outside infrastructure/tauri`);
+        }
+
+        if (!isAllowedImport(fromLayer, file, specifier)) {
+            violations.push(`${relative}:${line}: ${fromLayer} cannot import ${specifier}`);
+        }
+    }
+
+    if (readsLocations(relative)) return violations;
+    for (const match of source.matchAll(LOCATION_VARIANT)) {
+        const line = source.slice(0, match.index).split('\n').length;
+        violations.push(`${relative}:${line}: a location's variant read outside shared/projects`);
+    }
+    return violations;
+}
+
 async function main() {
     const violations = [];
 
     const files = await collectSourceFiles(SOURCE_DIR);
     for (const file of files) {
-        const relative = relativePath(file);
-        const fromLayer = sourceLayer(file);
-        const source = await fs.readFile(file, 'utf8');
-
-        for (const match of source.matchAll(IMPORT_PATTERN)) {
-            const specifier = match[1];
-            const line = source.slice(0, match.index).split('\n').length;
-
-            if (specifier.startsWith('@tauri-apps/') && !relative.startsWith('src/infrastructure/tauri/')) {
-                violations.push(`${relative}:${line}: direct Tauri import outside infrastructure/tauri`);
-            }
-
-            if (!isAllowedImport(fromLayer, file, specifier)) {
-                violations.push(`${relative}:${line}: ${fromLayer} cannot import ${specifier}`);
-            }
-        }
-
-        if (readsLocations(relative)) continue;
-        for (const match of source.matchAll(LOCATION_VARIANT)) {
-            const line = source.slice(0, match.index).split('\n').length;
-            violations.push(`${relative}:${line}: a location's variant read outside shared/projects`);
-        }
+        violations.push(...(await violationsOf(file)));
     }
 
     if (violations.length > 0) {

@@ -253,7 +253,7 @@ export type FixtureNotes = NotesPort & {
 };
 
 /**
- * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store.rs`):
+ * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store/`):
  * each book starts with the scenario's notes (the scenario's project with the mock's notes, the
  * Inbox with a few in `review` and `clean`, the project without folder with its topic's, any other
  * book with none). As the backend, a book is the Inbox or a project in the list, not its

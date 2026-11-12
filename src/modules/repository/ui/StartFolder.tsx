@@ -3,7 +3,7 @@ import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import type { ProjectFolder } from '@/shared/projects/project-info';
 import { remoteMachine } from '@/shared/projects/project-place';
-import { useStartFolder } from '../application/repository.queries';
+import { useStartFolder } from '../application/queries/folder-kind';
 import { projectErrorMessage } from '../model/project-error';
 
 /**

@@ -3,6 +3,7 @@
 
 mod colors;
 mod contracts;
+mod css_color;
 mod fonts;
 
 use std::time::{Duration, Instant};
@@ -30,6 +31,15 @@ pub fn render_diagram(request: &DiagramRequest) -> anyhow::Result<Diagram> {
         request.source.len()
     );
     let started = Instant::now();
+    let diagram = draw(request)?;
+    let ms = started.elapsed().as_millis() as u64;
+    let drawn = matches!(diagram, Diagram::Drawn { .. });
+    tracing::debug!(ms, bytes = request.source.len(), drawn, "diagram");
+    Ok(diagram)
+}
+
+/// merman's drawing of the source, in the app's colors and measured with its font.
+fn draw(request: &DiagramRequest) -> anyhow::Result<Diagram> {
     let config = MermaidConfig::from_value(colors::theme_config(&request.colors)?);
     let renderer = Renderer::new().with_engine(Engine::new().with_site_config(config));
     let environment = SvgEnvironment::deterministic()
@@ -44,17 +54,13 @@ pub fn render_diagram(request: &DiagramRequest) -> anyhow::Result<Diagram> {
         OperationControl::new().with_deadline(DEADLINE),
         svg_request,
     ));
-    let diagram = match rendered {
+    Ok(match rendered {
         Ok(RenderOutput::Svg(Some(svg))) => finished(svg.svg())?,
         Ok(_) => Diagram::Invalid { detail: None },
         Err(error) => Diagram::Invalid {
             detail: Some(error.to_string()),
         },
-    };
-    let ms = started.elapsed().as_millis() as u64;
-    let drawn = matches!(diagram, Diagram::Drawn { .. });
-    tracing::debug!(ms, bytes = request.source.len(), drawn, "diagram");
-    Ok(diagram)
+    })
 }
 
 /// merman's SVG as an image shows it: its size from its view box (as an image an SVG sized
@@ -65,6 +71,24 @@ fn finished(svg: &str) -> anyhow::Result<Diagram> {
         .filter(|_| svg.starts_with("<svg"))
         .ok_or_else(|| anyhow::anyhow!("merman's output is not an SVG"))?;
     let root = &svg[..root_end];
+    let (width, height) = view_box_size(root)?;
+
+    // the root's own width and style (`max-width`) leave; its size is the view box's
+    let root = without_attribute(&without_attribute(root, "width"), "style");
+    let font = fonts::style(svg)?;
+    let mut out = String::with_capacity(svg.len() + font.len() + 64);
+    out.push_str(&root);
+    out.push_str(&format!(" width=\"{width}\" height=\"{height}\">"));
+    push_body_with_font(&mut out, &svg[root_end + 1..], &font);
+    Ok(Diagram::Drawn {
+        svg: out,
+        width,
+        height,
+    })
+}
+
+/// The size of the SVG whose root tag is `root`, from its view box: whole pixels, 1 at least.
+fn view_box_size(root: &str) -> anyhow::Result<(u32, u32)> {
     let view_box = attribute(root, "viewBox")
         .ok_or_else(|| anyhow::anyhow!("merman's SVG has no view box"))?;
     let numbers: Vec<f64> = view_box
@@ -75,33 +99,25 @@ fn finished(svg: &str) -> anyhow::Result<Diagram> {
     let [_, _, width, height] = numbers[..] else {
         anyhow::bail!("merman's view box {view_box:?} does not read");
     };
-    let (width, height) = (width.ceil().max(1.0) as u32, height.ceil().max(1.0) as u32);
+    Ok((width.ceil().max(1.0) as u32, height.ceil().max(1.0) as u32))
+}
 
-    // the root's own width and style (`max-width`) leave; its size is the view box's
-    let root = without_attribute(&without_attribute(root, "width"), "style");
-    let font = fonts::style(svg)?;
-    let mut out = String::with_capacity(svg.len() + font.len() + 64);
-    out.push_str(&root);
-    out.push_str(&format!(" width=\"{width}\" height=\"{height}\">"));
-    let body = &svg[root_end + 1..];
+/// The SVG's `body`, after its root, with `font` first in its style: in the `<style>` it opens
+/// with, else in one of its own.
+fn push_body_with_font(out: &mut String, body: &str, font: &str) {
     match body.strip_prefix("<style>") {
         Some(styles) => {
             out.push_str("<style>");
-            out.push_str(&font);
+            out.push_str(font);
             out.push_str(styles);
         }
         None => {
             out.push_str("<style>");
-            out.push_str(&font);
+            out.push_str(font);
             out.push_str("</style>");
             out.push_str(body);
         }
     }
-    Ok(Diagram::Drawn {
-        svg: out,
-        width,
-        height,
-    })
 }
 
 /// The value of an attribute of a tag, written `name="value"`.

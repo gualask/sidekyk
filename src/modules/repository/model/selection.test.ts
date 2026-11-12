@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { orderedFiles } from './file-groups';
 import type { ChangedFile } from './repository.types';
 import { FIRST_CHANGE, selectedFile, selectionOf } from './selection';
+import { orderedFiles } from './tree/file-groups';
 
 function file(path: string, kind: ChangedFile['kind'] = 'modified'): ChangedFile {
     return {

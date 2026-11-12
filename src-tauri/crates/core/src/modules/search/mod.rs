@@ -4,6 +4,7 @@
 //! what the caller hands over; contents are read through the repository's port. The Move dialog
 //! ranks its projects and lists the same way (`rank_names`).
 
+mod content_line;
 mod contents;
 mod contracts;
 mod notes;
@@ -52,32 +53,12 @@ pub fn search(
     every_notes: impl FnOnce() -> (Vec<ListMatch>, Vec<NoteMatch>),
 ) -> SearchResults {
     let mut names = Ranker::new(&request.query, Texts::Names);
-
     let projects = if request.project_id.is_some() {
         Vec::new()
     } else {
-        let project_names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
-        let (ranked, _) = names.rank(&project_names, usize::MAX);
-        ranked
-            .into_iter()
-            .map(|r| ProjectMatch {
-                project: projects[r.index].clone(),
-                score: r.score,
-                highlights: r.highlights,
-            })
-            .collect()
+        rank_projects(&mut names, projects)
     };
-
-    let panel_titles: Vec<&str> = request.panels.iter().map(String::as_str).collect();
-    let (ranked, _) = names.rank(&panel_titles, usize::MAX);
-    let panels = ranked
-        .into_iter()
-        .map(|r| PanelMatch {
-            index: r.index as u32,
-            score: r.score,
-            highlights: r.highlights,
-        })
-        .collect();
+    let panels = rank_panels(&mut names, &request.panels);
 
     let typed = !names.is_empty();
     let project = request.project_id.as_deref().filter(|_| typed);
@@ -101,6 +82,34 @@ pub fn search(
     }
 }
 
+/// The projects whose names match, best first.
+fn rank_projects(names: &mut Ranker, projects: &[Project]) -> Vec<ProjectMatch> {
+    let project_names: Vec<&str> = projects.iter().map(|p| p.name.as_str()).collect();
+    let (ranked, _) = names.rank(&project_names, usize::MAX);
+    ranked
+        .into_iter()
+        .map(|r| ProjectMatch {
+            project: projects[r.index].clone(),
+            score: r.score,
+            highlights: r.highlights,
+        })
+        .collect()
+}
+
+/// The panels whose titles match, best first, by their index in `panels`.
+fn rank_panels(names: &mut Ranker, panels: &[String]) -> Vec<PanelMatch> {
+    let panel_titles: Vec<&str> = panels.iter().map(String::as_str).collect();
+    let (ranked, _) = names.rank(&panel_titles, usize::MAX);
+    ranked
+        .into_iter()
+        .map(|r| PanelMatch {
+            index: r.index as u32,
+            score: r.score,
+            highlights: r.highlights,
+        })
+        .collect()
+}
+
 /// The names that match `query`, best first, as the palette ranks projects: where to move notes
 /// (the Move dialog's projects and lists). With nothing typed, every name in its order.
 pub fn rank_names(query: &str, names: &[&str]) -> Vec<usize> {
@@ -119,15 +128,7 @@ pub fn note_files(mut found: FileMatches) -> FileMatches {
 /// The files of a project that match `query` best, and how many more did. A deleted file is not
 /// in the tree, but Changes lists it: it is searched too.
 pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
-    let mut deleted: Vec<&str> = files
-        .changed
-        .iter()
-        .filter(|f| f.kind == ChangeKind::Deleted && !files.tree.contains_file(&f.path))
-        .map(|f| f.path.as_str())
-        .collect();
-    // sorted as the tree's files, so equal scores always come in the same order
-    deleted.sort_unstable();
-    deleted.dedup();
+    let deleted = deleted_outside_tree(files);
     let paths: Vec<&str> = files
         .tree
         .files()
@@ -148,6 +149,20 @@ pub fn search_files(query: &str, files: &ProjectFiles) -> FileMatches {
         })
         .collect();
     FileMatches { files, more }
+}
+
+/// The files Changes lists as deleted that the tree has not, each once, sorted as the tree's
+/// files are, so equal scores always come in the same order.
+fn deleted_outside_tree(files: &ProjectFiles) -> Vec<&str> {
+    let mut deleted: Vec<&str> = files
+        .changed
+        .iter()
+        .filter(|f| f.kind == ChangeKind::Deleted && !files.tree.contains_file(&f.path))
+        .map(|f| f.path.as_str())
+        .collect();
+    deleted.sort_unstable();
+    deleted.dedup();
+    deleted
 }
 
 /// How each changed path changed, the strongest of its areas: an edit over a new file over a

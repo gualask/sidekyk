@@ -53,26 +53,30 @@ pub(super) async fn blocking<T: Send + 'static>(
             lock(&LOGGED).succeeded(command);
             tracing::debug!(command, ms, "command");
         }
-        Err(error) => {
-            let error_text = format!("{error:#}");
-            if !lock(&LOGGED).is_new(command, &error_text) {
-                tracing::debug!(command, ms, error = error_text, "command failed again");
-            } else if let Some(code) = user_facing_code(error) {
-                // Expected states such as a folder outside any repository: the UI shows them,
-                // with their cause, such as why a WSL helper did not start.
-                tracing::info!(
-                    command,
-                    ms,
-                    code = code.as_str(),
-                    error = error_text,
-                    "command refused"
-                );
-            } else {
-                tracing::error!(command, ms, error = error_text, "command failed");
-            }
-        }
+        Err(error) => log_failure(command, ms, error),
     }
     result.map_err(AppError::from)
+}
+
+/// Logs a command's failure: at `debug` when it repeats, at `info` when the UI shows it, else at
+/// `error`.
+fn log_failure(command: &'static str, ms: u64, error: &anyhow::Error) {
+    let error_text = format!("{error:#}");
+    if !lock(&LOGGED).is_new(command, &error_text) {
+        tracing::debug!(command, ms, error = error_text, "command failed again");
+    } else if let Some(code) = user_facing_code(error) {
+        // Expected states such as a folder outside any repository: the UI shows them,
+        // with their cause, such as why a WSL helper did not start.
+        tracing::info!(
+            command,
+            ms,
+            code = code.as_str(),
+            error = error_text,
+            "command refused"
+        );
+    } else {
+        tracing::error!(command, ms, error = error_text, "command failed");
+    }
 }
 
 /// Runs `work` off the async runtime on a folder of a project the user added, with what reads it,

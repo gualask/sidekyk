@@ -19,7 +19,7 @@ machine. The other previews: `previews.md`.
   again at each size, so sharp.
 - The file written while shown: drawn again. A source that no longer reads keeps the last diagram
   drawn, the reason under it: an agent halfway through writing it.
-- Colors: the app's tokens in the theme on screen (`model/diagram-tokens.json`): the preview's
+- Colors: the app's tokens in the theme on screen (`model/preview/diagram-tokens.json`): the preview's
   background, nodes as code blocks, notes as warnings, a series (mind map branches, pie slices,
   git branches) the avatars' colors (`--ui-series-*`). A change of theme draws them again. The
   file's own `style`, `classDef` and `%%{init}%%` win.
@@ -49,8 +49,8 @@ machine. The other previews: `previews.md`.
   so a source that never drew shows as that text, in a code block's frame.
 - Frontend: `useShownDiagram` (keyed by colors and source, never drawn again; the last diagram
   drawn kept while the source does not read), `useDiagramColors` (tokens read once per theme,
-  `matchMedia`), `ui/Diagram.tsx` (`DiagramBlock`, `DiagramView`, `DiagramPane`, which loads
-  with the first diagram file); shown as `<img src="data:image/svg+xml,…">` (CSP `img-src
+  `matchMedia`), `ui/viewer/preview/diagram/` (`DiagramBlock`, `DiagramView` placed by `useDiagramPlacement`,
+  `DiagramPane`, which loads with the first diagram file); shown as `<img src="data:image/svg+xml,…">` (CSP `img-src
   data:`). The diagram open over a Markdown preview is its place among the file's diagrams
   (`diagramBlocks`), its source read from the document as the file changes: closed when the file
   no longer has it.

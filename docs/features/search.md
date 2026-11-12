@@ -32,7 +32,7 @@ The palette is the only search; panels have no filter.
   folder on screen's, none while its distro is stopped), or the projects when none is. Files: the cached tree plus
   deleted files, marked from the last snapshot. Words match independently, case ignored; matched
   letters as UTF-16 offsets; at most 500 files, the best picked without sorting the rest; from
-  20,000 paths on up to 8 threads (Zed's 4,366 paths 0.37 ms; 200,000 synthetic 80 → 14 ms).
+  20,000 paths on up to 8 threads (a real repository's 4,366 paths 0.37 ms; 200,000 synthetic 80 → 14 ms).
   Names score fuzzy (`nucleo` default), paths and notes in path mode; for one word a list or
   panel ranks over a file over a note (`rank.rs` test). `palette-rows.ts` mixes kinds by score.
 - Notes (`modules/search/notes.rs`): ranked where `NotesStore` keeps them, no copy. Lists by name
@@ -51,13 +51,13 @@ The palette is the only search; panels have no filter.
 - `search_contents` (`modules/search/contents.rs`, `grep-searcher`): the tree's files through
   `open_file` (no links, no git), up to 8 threads, binary skipped at the first NUL, UTF-16 by BOM,
   the first 2 MiB per file. Literal, smart case, 2 characters at least, 2,000 lines at most, long
-  lines cut to 300 characters around the match. Batches every 50 ms through a `Channel`; a newer
+  lines cut to 300 characters around the match (`content_line.rs`). Batches every 50 ms through a `Channel`; a newer
   search (or `stop_content_search`) stops the older. A complete search is kept so a longer text
   reads only the files it found; any watcher batch drops it. The frontend waits 150 ms after
   typing.
 - Measured (release): notes, 1,000 of ~470 characters, 0.07-0.42 ms a key; every book at level 0,
   worst case (almost every note matching), 1,000 / 9,000 / 30,000 notes 1.5-2.7 / 6-13 / 17-38 ms,
-  nothing found 0.1 / 1.1 / 4.8 ms; contents 43-50 ms on Zed's clone, ~5 MB.
+  nothing found 0.1 / 1.1 / 4.8 ms; contents 43-50 ms on a 4,366-file Rust repository, ~5 MB.
 
 ## Decisions
 
@@ -65,7 +65,7 @@ The palette is the only search; panels have no filter.
   covers the file.
 - In contents, in-process over a file list, not `git grep`: it serves folders without git and
   notes too. `grep-searcher` + `grep-regex` over our own loop on `regex` + `memchr`: the same time
-  on Zed's clone (36-41 ms, ~0.28 s CPU on 8 threads; the cost is reading files), 4.7-5.8 MB peak
+  on a 4,366-file Rust repository (36-41 ms, ~0.28 s CPU on 8 threads; the cost is reading files), 4.7-5.8 MB peak
   against 20-25 MB, other encodings.
 - Fuzzy matching: `nucleo-matcher` 0.3 (fzf scoring, path mode; MPL-2.0 per file,
   unmodified, notice shipped), used by Zed, nushell, Rerun. Not `frizbee` (monthly breaking

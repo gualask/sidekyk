@@ -14,30 +14,11 @@ const SAVE_AFTER_MS = 400;
  * back the default.
  */
 export function CopyTemplateSetting() {
-    const settings = useSettings().data;
-    const update = useUpdateSettings();
+    const [draft, setDraft] = useTemplateDraft();
     const id = useId();
     const errorId = useId();
     const { t } = useTranslation();
-    const [draft, setDraft] = useState(settings.copyTemplate);
     const valid = isCopyTemplate(draft);
-
-    const save = useEffectEvent((template: string) => {
-        if (isCopyTemplate(template) && template !== settings.copyTemplate) {
-            update.mutate({ ...settings, copyTemplate: template });
-        }
-    });
-    // stored once typing pauses
-    useEffect(() => {
-        const timer = window.setTimeout(() => save(draft), SAVE_AFTER_MS);
-        return () => window.clearTimeout(timer);
-    }, [draft]);
-    // and when the dialog closes before that
-    const latest = useRef(draft);
-    useEffect(() => {
-        latest.current = draft;
-    });
-    useEffect(() => () => save(latest.current), []);
 
     return (
         <div className="py-2">
@@ -68,26 +49,60 @@ export function CopyTemplateSetting() {
                     valid ? 'border-ui-border' : 'border-ui-warning'
                 }`}
             />
-            {valid ? null : (
-                <p
-                    id={errorId}
-                    role="alert"
-                    className="mt-2 flex items-start gap-1.5 text-xs text-ui-warning-soft-text"
-                >
-                    <IconAlertTriangle size={14} className="mt-px shrink-0 text-ui-warning" />
-                    <span>
-                        <RichText text={t('copyTemplate.missing')} parts={PLACEHOLDERS} />
-                    </span>
-                </p>
-            )}
+            {valid ? null : <MissingPlaceholder id={errorId} />}
         </div>
     );
+}
+
+/**
+ * The template as typed, stored once typing pauses and when the setting goes before that, if it
+ * holds a placeholder and differs from the one stored.
+ */
+function useTemplateDraft() {
+    const settings = useSettings().data;
+    const update = useUpdateSettings();
+    const [draft, setDraft] = useState(settings.copyTemplate);
+
+    const save = useEffectEvent((template: string) => {
+        if (isCopyTemplate(template) && template !== settings.copyTemplate) {
+            update.mutate({ ...settings, copyTemplate: template });
+        }
+    });
+    // stored once typing pauses
+    useEffect(() => {
+        const timer = window.setTimeout(() => save(draft), SAVE_AFTER_MS);
+        return () => window.clearTimeout(timer);
+    }, [draft]);
+    // and when the dialog closes before that
+    const latest = useRef(draft);
+    useEffect(() => {
+        latest.current = draft;
+    });
+    useEffect(() => () => save(latest.current), []);
+    return [draft, setDraft] as const;
 }
 
 const PLACEHOLDERS = {
     row: <code className="font-mono">{'{row}'}</code>,
     text: <code className="font-mono">{'{text}'}</code>,
 };
+
+/** Under a template without a placeholder: it is not stored until one is in. */
+function MissingPlaceholder({ id }: { id: string }) {
+    const { t } = useTranslation();
+    return (
+        <p
+            id={id}
+            role="alert"
+            className="mt-2 flex items-start gap-1.5 text-xs text-ui-warning-soft-text"
+        >
+            <IconAlertTriangle size={14} className="mt-px shrink-0 text-ui-warning" />
+            <span>
+                <RichText text={t('copyTemplate.missing')} parts={PLACEHOLDERS} />
+            </span>
+        </p>
+    );
+}
 
 /** What the placeholders become, with examples, in a tooltip of the app's own. */
 function PlaceholdersHelp() {

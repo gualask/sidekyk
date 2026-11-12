@@ -63,40 +63,50 @@ pub fn folders_holding(
 ) -> anyhow::Result<Vec<String>> {
     let project = projects.project(project_id)?;
     let first = first.and_then(|id| project.folders.iter().find(|f| f.id == id));
-    let on_screen_holds = |folder: &ProjectFolder| {
-        projects
-            .reader(&folder.id, Start::Never)
-            .and_then(|on| on.reader.file_stamp(&on.info, path))
-            .is_ok()
-    };
-    if let Some(folder) = first.filter(|f| on_screen_holds(f)) {
+    if let Some(folder) = first.filter(|f| on_screen_holds(projects, f, path)) {
         return Ok(vec![folder.id.clone()]);
     }
-    let holds = |folder: &ProjectFolder| {
-        projects
-            .reader(&folder.id, Start::Never)
-            .and_then(|on| on.reader.tree_holds_now(&on.info, path))
-            .unwrap_or(false)
-    };
     let others: Vec<&ProjectFolder> = project
         .folders
         .iter()
         .filter(|f| first.is_none_or(|first| first.id != f.id))
         .collect();
+    Ok(holding_now(projects, others, path))
+}
+
+/// Whether the cached tree of `folder`, the one on screen, holds `path`.
+fn on_screen_holds(projects: &Projects, folder: &ProjectFolder, path: &str) -> bool {
+    projects
+        .reader(&folder.id, Start::Never)
+        .and_then(|on| on.reader.file_stamp(&on.info, path))
+        .is_ok()
+}
+
+/// The ids of `folders` whose tree holds `path` now, in their order: the trees read again side
+/// by side, and not kept.
+fn holding_now(projects: &Projects, folders: Vec<&ProjectFolder>, path: &str) -> Vec<String> {
     let held: Vec<bool> = std::thread::scope(|scope| {
-        let checks: Vec<_> = others
+        let checks: Vec<_> = folders
             .iter()
-            .map(|folder| scope.spawn(|| holds(folder)))
+            .map(|folder| scope.spawn(move || holds_now(projects, folder, path)))
             .collect();
         checks
             .into_iter()
             .map(|check| check.join().unwrap_or(false))
             .collect()
     });
-    Ok(others
+    folders
         .into_iter()
         .zip(held)
         .filter(|(_, held)| *held)
         .map(|(folder, _)| folder.id.clone())
-        .collect())
+        .collect()
+}
+
+/// Whether the tree of `folder`, read again, holds `path`; not when it cannot be read.
+fn holds_now(projects: &Projects, folder: &ProjectFolder, path: &str) -> bool {
+    projects
+        .reader(&folder.id, Start::Never)
+        .and_then(|on| on.reader.tree_holds_now(&on.info, path))
+        .unwrap_or(false)
 }

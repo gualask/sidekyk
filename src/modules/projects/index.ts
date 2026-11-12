@@ -1,13 +1,11 @@
+export { useFolderOnScreen, useRelocateFolder } from './application/project-folders';
+export { DEFAULT_TILES_LAYOUT, useProjectLayout } from './application/project-layout';
 export { type ProjectsPort, ProjectsProvider } from './application/projects.port';
 export {
-    DEFAULT_TILES_LAYOUT,
     useActivateProject,
     useCurrentProjects,
-    useFolderOnScreen,
-    useProjectLayout,
     useProjects,
     useProjectsChangeSubscription,
-    useRelocateFolder,
     useRemoveProject,
 } from './application/projects.queries';
 export {

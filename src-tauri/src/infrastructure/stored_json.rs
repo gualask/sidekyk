@@ -49,14 +49,18 @@ fn take_what_reads(
                     value = %path.iter().chain([key]).cloned().collect::<Vec<_>>().join("."),
                     "a stored value does not read: its default in use, the stored one kept"
                 );
-                let at = object_at(read, path);
-                match before {
-                    Some(before) => at.insert(key.clone(), before),
-                    None => at.remove(key),
-                };
+                put_back(object_at(read, path), key, before);
             }
         }
     }
+}
+
+/// Puts back what `object` held at `key` before, or nothing.
+fn put_back(object: &mut Map<String, Value>, key: &str, before: Option<Value>) {
+    match before {
+        Some(before) => object.insert(key.to_string(), before),
+        None => object.remove(key),
+    };
 }
 
 /// The object at `path` in `value`: `take_what_reads` goes only into objects.

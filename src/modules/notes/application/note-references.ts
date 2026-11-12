@@ -1,6 +1,6 @@
 import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
-import type { Matched } from '@/shared/format/highlight-parts';
 import { type NamedLines, type NoteEntity, noteEntities } from '../model/entities';
+import type { Matched } from '../model/highlight-parts';
 
 /** A file a note's `@` suggests: its path, and where the letters typed are in it. */
 export interface SuggestedFile {

@@ -4,7 +4,7 @@ type Branch = RepositorySummary['branch'];
 
 /**
  * The summary the backend would build from these files (`summarize` in
- * `src-tauri/crates/core/src/modules/repository/snapshot.rs`): every path counted once, line
+ * `src-tauri/crates/core/src/modules/repository/snapshot/`): every path counted once, line
  * counts only for tracked files.
  */
 export function fixtureSummary(branch: Branch, files: readonly ChangedFile[]): RepositorySummary {

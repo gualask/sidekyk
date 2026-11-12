@@ -179,14 +179,19 @@ fn highlights(text: &str, indices: &[u32]) -> Vec<Highlight> {
     for (index, char) in (0u32..).zip(text.chars()) {
         let width = char.len_utf16() as u32;
         if wanted.next_if_eq(&index).is_some() {
-            match runs.last_mut() {
-                Some(run) if run[1] == offset => run[1] += width,
-                _ => runs.push([offset, offset + width]),
-            }
+            push_run(&mut runs, offset, width);
         }
         offset += width;
     }
     runs
+}
+
+/// `width` units from `offset`, joined to the last run when it goes on from it.
+fn push_run(runs: &mut Vec<Highlight>, offset: u32, width: u32) {
+    match runs.last_mut() {
+        Some(run) if run[1] == offset => run[1] += width,
+        _ => runs.push([offset, offset + width]),
+    }
 }
 
 #[cfg(test)]

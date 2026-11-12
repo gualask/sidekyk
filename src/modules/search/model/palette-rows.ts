@@ -198,8 +198,7 @@ export function paletteRows(
                 found: panelsFound,
             },
         ];
-        for (const { label, found } of groups) {
-            if (found.length === 0) continue;
+        for (const { label, found } of groups.filter((group) => group.found.length > 0)) {
             rows.push({ kind: 'group', label });
             found.forEach(add);
         }

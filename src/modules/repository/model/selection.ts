@@ -1,6 +1,6 @@
-import { changeOf, fileKey } from './file-groups';
 import type { ChangedFile } from './repository.types';
 import type { FileLines } from './targets';
+import { changeOf, fileKey } from './tree/file-groups';
 
 /**
  * The file shown of a project, one for both panels: the Changes list selects it, the tree reveals

@@ -41,9 +41,10 @@ async function collectSourceFiles(directory) {
     const files = [];
     for (const entry of entries) {
         const entryPath = path.join(directory, entry.name);
-        if (entry.isDirectory()) {
-            if (relativePath(entryPath) !== 'src/infrastructure/fixtures') files.push(...(await collectSourceFiles(entryPath)));
+        if (entry.isDirectory() && relativePath(entryPath) !== 'src/infrastructure/fixtures') {
+            files.push(...(await collectSourceFiles(entryPath)));
         } else if (
+            !entry.isDirectory() &&
             SOURCE_EXTENSIONS.has(path.extname(entry.name)) &&
             !/\.test\.tsx?$/.test(entry.name)
         ) {
@@ -70,8 +71,7 @@ function walk(node, ancestors, visit) {
     ancestors.push(node);
     for (const [key, child] of Object.entries(node)) {
         if (key === 'loc' || key === 'range') continue;
-        if (Array.isArray(child)) for (const item of child) walk(item, ancestors, visit);
-        else walk(child, ancestors, visit);
+        for (const item of Array.isArray(child) ? child : [child]) walk(item, ancestors, visit);
     }
     ancestors.pop();
 }
@@ -82,11 +82,7 @@ function lineAt(text, offset) {
 
 /** Every string the code holds that is a key, or a plural's base; template keys passed to `t`. */
 async function scanSources(keys) {
-    const pluralKeys = new Map();
-    for (const key of keys) {
-        const base = key.match(/^(.*)\.(one|other)$/)?.[1];
-        if (base) pluralKeys.set(base, [...(pluralKeys.get(base) ?? []), key]);
-    }
+    const pluralKeys = pluralKeysByBase(keys);
     const used = new Set();
     const mark = (value) => {
         if (keys.has(value)) used.add(value);
@@ -96,29 +92,56 @@ async function scanSources(keys) {
 
     for (const file of await collectSourceFiles(SOURCE_DIR)) {
         const text = await fs.readFile(file, 'utf8');
-        const lang = path.extname(file) === '.tsx' ? 'tsx' : 'ts';
-        const result = parseSync(file, text, { astType: 'ts', lang, sourceType: 'module' });
-        if (result.errors.length > 0) {
-            throw new Error(`${relativePath(file)}: ${result.errors.map((e) => e.message).join('\n')}`);
-        }
-        walk(result.program, [], (node, ancestors) => {
-            if (node.type === 'Literal' && typeof node.value === 'string') {
-                if (ancestors.at(-1)?.type !== 'TSLiteralType') mark(node.value);
-                return;
-            }
-            if (node.type !== 'TemplateLiteral') return;
-            if (node.expressions.length === 0) {
-                mark(node.quasis[0].value.cooked);
-                return;
-            }
-            const call = ancestors.findLast(isTranslateCall);
-            if (call && call.arguments[0]?.start <= node.start && node.end <= call.arguments[0].end) {
+        walk(parseSource(file, text), [], (node, ancestors) => {
+            const value = staticString(node, ancestors);
+            if (value !== undefined) {
+                mark(value);
+            } else if (isBuiltKey(node, ancestors)) {
                 const source = text.slice(node.start, node.end).replaceAll('\n', ' ');
                 dynamic.push(`${relativePath(file)}:${lineAt(text, node.start)} ${source}`);
             }
         });
     }
     return { unused: [...keys].filter((key) => !used.has(key)).sort(), dynamic };
+}
+
+/** The keys of each plural (`<base>.one`, `<base>.other`) by its base. */
+function pluralKeysByBase(keys) {
+    const pluralKeys = new Map();
+    for (const key of keys) {
+        const base = key.match(/^(.*)\.(one|other)$/)?.[1];
+        if (base) pluralKeys.set(base, [...(pluralKeys.get(base) ?? []), key]);
+    }
+    return pluralKeys;
+}
+
+/** A source file's program; a file that does not parse stops the check. */
+function parseSource(file, text) {
+    const lang = path.extname(file) === '.tsx' ? 'tsx' : 'ts';
+    const result = parseSync(file, text, { astType: 'ts', lang, sourceType: 'module' });
+    if (result.errors.length > 0) {
+        throw new Error(`${relativePath(file)}: ${result.errors.map((e) => e.message).join('\n')}`);
+    }
+    return result.program;
+}
+
+/** The string a literal or a template without expressions holds; a literal type names no key. */
+function staticString(node, ancestors) {
+    if (node.type === 'Literal' && typeof node.value === 'string') {
+        return ancestors.at(-1)?.type === 'TSLiteralType' ? undefined : node.value;
+    }
+    if (node.type === 'TemplateLiteral' && node.expressions.length === 0) {
+        return node.quasis[0].value.cooked;
+    }
+    return undefined;
+}
+
+/** A template with expressions given as the key of a `t` or `tp` call: a key built at runtime. */
+function isBuiltKey(node, ancestors) {
+    if (node.type !== 'TemplateLiteral' || node.expressions.length === 0) return false;
+    const call = ancestors.findLast(isTranslateCall);
+    const key = call?.arguments[0];
+    return key !== undefined && key.start <= node.start && node.end <= key.end;
 }
 
 function report(title, lines) {
@@ -136,23 +159,7 @@ async function main() {
     let problems = 0;
 
     for (const [locale, messages] of catalogs) {
-        if (locale === BASE_LOCALE) continue;
-        const keys = new Set(Object.keys(messages));
-        problems += report(
-            `Missing in ${locale}`,
-            baseKeys.filter((key) => !keys.has(key)),
-        );
-        problems += report(
-            `Not in ${BASE_LOCALE}, extra in ${locale}`,
-            [...keys].filter((key) => !(key in base)),
-        );
-        problems += report(
-            `Placeholders of ${locale} unlike ${BASE_LOCALE}'s`,
-            baseKeys
-                .filter((key) => keys.has(key))
-                .filter((key) => placeholders(base[key]).join() !== placeholders(messages[key]).join())
-                .map((key) => `${key}: {${placeholders(messages[key]).join('}, {')}}`),
-        );
+        if (locale !== BASE_LOCALE) problems += reportCatalog(locale, messages, base);
     }
 
     const { unused, dynamic } = await scanSources(new Set(baseKeys));
@@ -164,6 +171,28 @@ async function main() {
         return;
     }
     console.log(`i18n ok: ${catalogs.size} languages, ${baseKeys.length} keys, none unused.`);
+}
+
+/** A catalog against English's: its keys missing and extra, its placeholders unlike; how many. */
+function reportCatalog(locale, messages, base) {
+    const baseKeys = Object.keys(base);
+    const keys = new Set(Object.keys(messages));
+    let problems = report(
+        `Missing in ${locale}`,
+        baseKeys.filter((key) => !keys.has(key)),
+    );
+    problems += report(
+        `Not in ${BASE_LOCALE}, extra in ${locale}`,
+        [...keys].filter((key) => !(key in base)),
+    );
+    problems += report(
+        `Placeholders of ${locale} unlike ${BASE_LOCALE}'s`,
+        baseKeys
+            .filter((key) => keys.has(key))
+            .filter((key) => placeholders(base[key]).join() !== placeholders(messages[key]).join())
+            .map((key) => `${key}: {${placeholders(messages[key]).join('}, {')}}`),
+    );
+    return problems;
 }
 
 main().catch((error) => {

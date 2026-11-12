@@ -36,7 +36,7 @@ describe('ChangeQueue', () => {
         expect(await queue.run(async () => 1)).toEqual({ kind: 'apply', value: 1 });
     });
 
-    // a failure reads the notes again by itself (`useNoteActions`): nothing is skipped
+    // a failure reads the notes again by itself (`bookChanges`): nothing is skipped
     it('goes on after a change that failed', async () => {
         const queue = new ChangeQueue();
         const failed = queue.run(async () => {

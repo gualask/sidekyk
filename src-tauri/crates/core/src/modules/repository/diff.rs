@@ -23,15 +23,22 @@ pub fn load_file_diff(
     let root = existing_root(backend, repository)?;
     let path = checked_path(&request.path)?;
     let orig_path = request.orig_path.as_deref().map(checked_path).transpose()?;
-    let base = [
-        "--no-color",
-        "--no-ext-diff",
-        context_option(request.whole_file),
-    ];
+    let (args, ok_codes) = diff_args(request.area, path, orig_path, request.whole_file);
+    let out = git_checked(backend, root, &args, &ok_codes, MAX_DIFF_BYTES)?;
+    Ok(unified_diff(out))
+}
 
+/// The arguments of the diff of `path` in `area`, and the exit codes that are not a failure.
+fn diff_args<'a>(
+    area: ChangeArea,
+    path: &'a str,
+    orig_path: Option<&'a str>,
+    whole_file: bool,
+) -> (Vec<&'a str>, Vec<i32>) {
+    let base = ["--no-color", "--no-ext-diff", context_option(whole_file)];
     let mut args = vec![LITERAL_PATHSPECS, "diff"];
     let mut ok_codes = vec![0];
-    match request.area {
+    match area {
         ChangeArea::Unstaged => {
             args.extend(base);
             args.extend(["--", path]);
@@ -52,9 +59,7 @@ pub fn load_file_diff(
             ok_codes.push(1);
         }
     }
-
-    let out = git_checked(backend, root, &args, &ok_codes, MAX_DIFF_BYTES)?;
-    Ok(unified_diff(out))
+    (args, ok_codes)
 }
 
 /// A diff git printed, cut back to its last whole line when its output was cut.

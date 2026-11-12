@@ -1,14 +1,11 @@
-export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
+export { useFoldersHolding, useOpenUrl } from './application/queries/file-reads';
+export { type FolderFailure, useFolderFailures } from './application/queries/folder-failures';
+export { useFolderKind, useProjectKind } from './application/queries/folder-kind';
 export {
-    type FolderFailure,
-    useFolderFailures,
-    useFolderKind,
-    useFoldersHolding,
-    useOpenUrl,
-    useProjectKind,
     useReadFolderAgain,
     useRepositoryChangeSubscription,
-} from './application/repository.queries';
+} from './application/queries/repository-changes';
+export { type RepositoryPort, RepositoryProvider } from './application/repository.port';
 export { RepositorySettingsProvider } from './application/repository-settings';
 export { useShownFile } from './application/selection';
 export {
@@ -37,9 +34,9 @@ export {
     type TreeEntry,
     type UnifiedDiff,
 } from './model/repository.types';
-export { lineCheck } from './model/syntax';
 export { fileTarget } from './model/targets';
+export { lineCheck } from './model/text/syntax';
 export { changesPanel, filesPanel, startPanel } from './panel';
+export { FILES_TREE_WIDTH } from './ui/files/tree-layout';
 export { FOLDER_COLUMNS } from './ui/folder-columns';
 export { FolderFacts, ProjectFacts } from './ui/ProjectFacts';
-export { FILES_TREE_WIDTH } from './ui/tree-layout';

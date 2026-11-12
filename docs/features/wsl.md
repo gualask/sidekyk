@@ -50,7 +50,7 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   `build.yml`). Installed on first use as `~/.sidekyk-server/sidekyk-agent-<version>-<hash>`
   (`wslpath -u` + `cp` from `/mnt/…`, stdin as fallback; a temp name, `chmod 755`, `mv`); `version`
   checked at each start; the helper removes older ones. Started as `wsl.exe --distribution <d> --cd
-  ~ --exec .sidekyk-server/<name> serve`, no shell (`infrastructure/machines/wsl.rs`, `linux_helper.rs` over
+  ~ --exec .sidekyk-server/<name> serve`, no shell (`infrastructure/machines/wsl_exe.rs`, `linux_helper.rs` over
   a `LinuxMachine`, which the container fixture also implements).
 - Protocol (`infrastructure/agent/`): frames of a u32 LE length and a JSON envelope `{ id, … }`,
   several in flight; one request per method of the `Repositories` port, and `linuxPath` (a
@@ -72,13 +72,13 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   started again for 10 s. No acks, replay, heartbeat or reconnection: over a local pipe a dead
   helper is end of file.
 - Measured (2026-10-18, release): through the helper on the Mac (`agent_timings`), a round trip
-  20-35 µs, a snapshot unchanged (Zed's clone 36.2 ms), the palette's files 173 → 254 µs, a 2 MiB
+  20-35 µs, a snapshot unchanged (a 4,366-file Rust repository 36.2 ms), the palette's files 173 → 254 µs, a 2 MiB
   diff 32.2 → 36.9 ms. In the container fixture (aarch64, 1 CPU): installed and first answer
   292 ms, a snapshot 4.4 ms, started again 119 ms.
 
 ## Decisions
 
-- A helper in the distro, as Zed's `remote_server` and VS Code Server, not
+- A helper in the distro, as Zed's remote server and VS Code Server, not
   `\\wsl.localhost`: `ReadDirectoryChangesW` is not supported there (Everything's author,
   Syncthing), Microsoft advises against working across the two file systems, and Windows git
   refuses a repository the Linux user owns until `safe.directory`. Not `wsl.exe git` per call: a

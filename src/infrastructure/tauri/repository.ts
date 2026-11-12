@@ -29,8 +29,8 @@ export const tauriRepository: RepositoryPort = {
         invoke('folders_holding', { projectId, first, path }),
     getFileStamp: (folderId, path) => invoke('get_file_stamp', { folderId, path }),
     getBlobSize: (folderId, blob) => invoke('get_blob_size', { folderId, blob }),
-    // `project_file.rs`: the project and the path encoded whole, the id once before (an older one
-    // is a path), the stamp or the object as a query
+    // `projects/file_scheme.rs`: the project and the path encoded whole, the id once before (an
+    // older one is a path), the stamp or the object as a query
     projectFileUrl: (folderId, path, source) =>
         `${convertFileSrc(`${encodeURIComponent(folderId)}/${path}`, 'project-file')}?${
             source.kind === 'blob'

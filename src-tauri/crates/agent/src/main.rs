@@ -20,34 +20,41 @@ fn main() -> ExitCode {
             println!("{}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Some("serve") => {
-            tracing_subscriber::fmt()
-                .with_writer(std::io::stderr)
-                // the app's log has the time; the level comes first, for the app to read it
-                .without_time()
-                .with_target(false)
-                .with_max_level(tracing::Level::DEBUG)
-                .init();
-            if let Err(error) =
-                std::env::current_exe().and_then(|this| older::remove_other_helpers(&this))
-            {
-                tracing::warn!(%error, "could not remove older helpers");
-            }
-            let repositories = LocalRepositories::new(
-                Arc::new(LocalRepositoryBackend::default()),
-                Arc::new(LocalRepositoryWatcher::default()),
-            );
-            match serve(repositories, std::io::stdin(), std::io::stdout()) {
-                Ok(()) => ExitCode::SUCCESS,
-                Err(error) => {
-                    tracing::error!(error = %format!("{error:#}"), "stopped serving");
-                    ExitCode::FAILURE
-                }
-            }
-        }
+        Some("serve") => serve_app(),
         _ => {
             eprintln!("usage: sidekyk-agent version | serve");
             ExitCode::from(2)
         }
     }
+}
+
+/// `serve`: logs on stderr, removes the older helpers, then answers the app until it closes stdin.
+fn serve_app() -> ExitCode {
+    log_to_stderr();
+    if let Err(error) = std::env::current_exe().and_then(|this| older::remove_other_helpers(&this))
+    {
+        tracing::warn!(%error, "could not remove older helpers");
+    }
+    let repositories = LocalRepositories::new(
+        Arc::new(LocalRepositoryBackend::default()),
+        Arc::new(LocalRepositoryWatcher::default()),
+    );
+    match serve(repositories, std::io::stdin(), std::io::stdout()) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            tracing::error!(error = %format!("{error:#}"), "stopped serving");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+/// Every event from `debug` on stderr, which the app writes to its own log.
+fn log_to_stderr() {
+    tracing_subscriber::fmt()
+        .with_writer(std::io::stderr)
+        // the app's log has the time; the level comes first, for the app to read it
+        .without_time()
+        .with_target(false)
+        .with_max_level(tracing::Level::DEBUG)
+        .init();
 }

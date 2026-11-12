@@ -1,16 +1,16 @@
 import { IconFolder, IconGitCompare } from '@tabler/icons-react';
 import { definePanel } from '@/shared/panels/panel';
-import { FILES_TREE_WIDTH } from './ui/tree-layout';
+import { FILES_TREE_WIDTH } from './ui/files/tree-layout';
 
 export const changesPanel = definePanel({
     id: 'changes',
     title: 'panel.changes',
     icon: IconGitCompare,
     needs: 'repository',
-    load: () => import('./ui/ChangesWorkspace'),
+    load: () => import('./ui/changes/ChangesWorkspace'),
     pick: (module) => module.ChangesWorkspace,
     summary: {
-        load: () => import('./ui/ChangesSummary'),
+        load: () => import('./ui/summary/ChangesSummary'),
         pick: (module) => module.ChangesSummary,
     },
 });
@@ -21,10 +21,10 @@ export const filesPanel = definePanel({
     icon: IconFolder,
     needs: 'folder',
     tileMinWidth: FILES_TREE_WIDTH.min,
-    load: () => import('./ui/FilesWorkspace'),
+    load: () => import('./ui/files/FilesWorkspace'),
     pick: (module) => module.FilesWorkspace,
     summary: {
-        load: () => import('./ui/FilesSummary'),
+        load: () => import('./ui/summary/FilesSummary'),
         pick: (module) => module.FilesSummary,
     },
 });

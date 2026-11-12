@@ -3,7 +3,9 @@
 
 mod contracts;
 mod list;
+mod list_folders;
 mod place;
+mod stored;
 
 pub use contracts::{
     FolderChange, FolderChoice, Location, Opened, Project, ProjectFolder, ProjectList,

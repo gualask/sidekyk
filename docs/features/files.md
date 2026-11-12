@@ -35,7 +35,7 @@ change.
   different files each time. The kind is read at each tree read.
 - `FileTree` (Rust) sorts as VS Code (folders first, case ignored, numbers by value) and resolves
   compact folders; `get_directory` serves one folder from memory, at most 10,000 entries plus a
-  count. Measured (release, warm cache): Zed's clone 48 ms with git, walked 14 ms (4,365 files); a
+  count. Measured (release, warm cache): a 4,365-file Rust repository 48 ms with git, walked 14 ms; a
   folder 3 µs; Sidekyk walked 3.6 ms against `ls-files`' 15 ms; 200,000 files of `~/Library`
   261 ms.
 - Only the tree of the project on screen is cached, read on first request, never at level 0. A
@@ -48,7 +48,7 @@ change.
   folder on the way checked once against links (a link's own time, never followed), sorted newest
   first, path order within a time; at most 10,000 plus a count. Read only while Recent shows,
   again at any change on disk and when the window shows after one; grouped as of the read, no
-  timer. Measured (release, warm cache): Zed's clone 4.2 ms (4,366 files, JSON included);
+  timer. Measured (release, warm cache): a 4,366-file Rust repository 4.2 ms (JSON included);
   200,000 files of `~/Library` 230-250 ms warm, 1.45 s cold, 1.5 MB of JSON; `file_stamp` per file
   on one thread 2.9 s.
 - `get_file_content`: files of the tree only. `read_entry` refuses a path through a linked folder,
