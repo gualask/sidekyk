@@ -18,12 +18,12 @@ import {
 import { sourceImage } from '../../model/notes';
 import type { Mark, MarkPoint, NoteImage } from '../../model/notes.types';
 import { DiscardDialog } from './DiscardDialog';
-import { markInk, textMeasure } from './draw-marks';
+import { markInk, textMeasure } from './drawing/draw-marks';
+import { useMarksDrawing } from './drawing/use-marks-drawing';
 import { EditorHeader } from './EditorHeader';
 import { MarkField } from './MarkField';
 import { markUnder, pressMarks } from './mark-press';
 import { useFontReady } from './use-font-ready';
-import { useMarksDrawing } from './use-marks-drawing';
 import { useRoom } from './use-room';
 
 const NO_MARKS: Mark[] = [];

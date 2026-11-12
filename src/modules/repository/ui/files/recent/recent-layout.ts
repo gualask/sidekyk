@@ -1,5 +1,5 @@
-import { splitPath } from '../../model/tree/file-groups';
-import type { RecentGroup, RecentRow } from '../../model/tree/recent-files';
+import { splitPath } from '../../../model/tree/file-groups';
+import type { RecentGroup, RecentRow } from '../../../model/tree/recent-files';
 
 /** Recent's rows: their room on each side, before the folder and before the time, in pixels. */
 export const RECENT_PADDING_X = 12;

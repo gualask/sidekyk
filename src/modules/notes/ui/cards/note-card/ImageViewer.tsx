@@ -14,7 +14,7 @@ import type { NoteActions } from '../../../application/note-actions/note-actions
 import { useNotesPort } from '../../../application/notes.port';
 import { sourceImage } from '../../../model/notes';
 import type { Mark, Note, NoteImage } from '../../../model/notes.types';
-import { drawnPng } from '../../mark-editor/draw-marks';
+import { drawnPng } from '../../mark-editor/drawing/draw-marks';
 import { MarkEditor } from '../../mark-editor/MarkEditor';
 
 /**

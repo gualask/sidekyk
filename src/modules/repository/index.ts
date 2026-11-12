@@ -37,6 +37,6 @@ export {
 export { fileTarget } from './model/targets';
 export { lineCheck } from './model/text/syntax';
 export { changesPanel, filesPanel, startPanel } from './panel';
-export { FILES_TREE_WIDTH } from './ui/files/tree-layout';
+export { FILES_TREE_WIDTH } from './ui/files/tree/tree-layout';
 export { FOLDER_COLUMNS } from './ui/folder-columns';
 export { FolderFacts, ProjectFacts } from './ui/ProjectFacts';

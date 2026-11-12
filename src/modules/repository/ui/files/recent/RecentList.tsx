@@ -1,10 +1,11 @@
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
-import { splitPath } from '../../model/tree/file-groups';
-import { RECENT_GROUP_LABEL, type RecentRow } from '../../model/tree/recent-files';
-import { LIST_HEADING, LIST_MORE } from '../lists/list-styles';
-import { useVirtualRows } from '../lists/use-virtual-rows';
-import { VirtualItems } from '../lists/VirtualItems';
+import { splitPath } from '../../../model/tree/file-groups';
+import { RECENT_GROUP_LABEL, type RecentRow } from '../../../model/tree/recent-files';
+import { LIST_HEADING, LIST_MORE } from '../../lists/list-styles';
+import { useVirtualRows } from '../../lists/use-virtual-rows';
+import { VirtualItems } from '../../lists/VirtualItems';
+import { TREE_ROW_HEIGHT } from '../tree/tree-layout';
 import {
     RECENT_DIR_GAP,
     RECENT_PADDING_X,
@@ -12,7 +13,6 @@ import {
     RECENT_TIME_GAP,
     type TimeFormats,
 } from './recent-layout';
-import { TREE_ROW_HEIGHT } from './tree-layout';
 
 const GROUP_ROW_HEIGHT = 26;
 /** Space above every group heading but the first. */

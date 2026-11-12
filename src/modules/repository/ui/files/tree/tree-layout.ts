@@ -1,4 +1,4 @@
-import type { TreeRow } from '../../model/tree/file-tree';
+import type { TreeRow } from '../../../model/tree/file-tree';
 
 /**
  * The tree's width by default and the least it takes: one width in a tile (the side column's)

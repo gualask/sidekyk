@@ -15,11 +15,11 @@ import { changeMarks } from '../../model/tree/file-tree';
 import { FilesActions, type FilesView } from './FilesActions';
 import { FilesListing, TooManyFiles } from './FilesListing';
 import { FileViewer } from './FileViewer';
-import { recentFittingWidth } from './recent-layout';
-import { FILES_TREE_WIDTH, fittingWidth } from './tree-layout';
-import { useFileTree } from './use-file-tree';
+import { recentFittingWidth } from './recent/recent-layout';
+import { useRecentList } from './recent/use-recent-list';
+import { FILES_TREE_WIDTH, fittingWidth } from './tree/tree-layout';
+import { useFileTree } from './tree/use-file-tree';
 import { useFilesKeys } from './use-files-keys';
-import { useRecentList } from './use-recent-list';
 
 /**
  * The Files panel: the project's files as a tree, or by their last change (Recent). The file shown

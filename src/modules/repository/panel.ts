@@ -1,6 +1,6 @@
 import { IconFolder, IconGitCompare } from '@tabler/icons-react';
 import { definePanel } from '@/shared/panels/panel';
-import { FILES_TREE_WIDTH } from './ui/files/tree-layout';
+import { FILES_TREE_WIDTH } from './ui/files/tree/tree-layout';
 
 export const changesPanel = definePanel({
     id: 'changes',

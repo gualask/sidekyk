@@ -1,6 +1,6 @@
-import { tableCells } from '../../../../model/preview/preview';
-import type { MarkdownBlock } from '../../../../model/repository.types';
-import { Inlines } from './Inlines';
+import { tableCells } from '../../../../../model/preview/preview';
+import type { MarkdownBlock } from '../../../../../model/repository.types';
+import { Inlines } from '../Inlines';
 
 const ALIGN_CLASS = { none: '', left: 'text-left', center: 'text-center', right: 'text-right' };
 

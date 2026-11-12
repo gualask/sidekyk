@@ -1,9 +1,9 @@
 import { type RefObject, useLayoutEffect, useMemo } from 'react';
-import { tailHandle, withMark } from '../../model/marks';
-import type { Mark } from '../../model/notes.types';
+import { tailHandle, withMark } from '../../../model/marks';
+import type { Mark } from '../../../model/notes.types';
+import type { Size } from '../use-room';
 import { drawMarks, type MarkInk } from './draw-marks';
 import { drawSelection, selectionInk } from './draw-selection';
-import type { Size } from './use-room';
 
 /** What the canvas shows: the marks, the one selected, the one whose text is being written. */
 interface MarksView {

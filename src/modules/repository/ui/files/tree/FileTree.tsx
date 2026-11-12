@@ -1,10 +1,10 @@
 import { IconChevronRight } from '@tabler/icons-react';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
-import type { TreeRow } from '../../model/tree/file-tree';
-import { LIST_MORE } from '../lists/list-styles';
-import { useVirtualRows } from '../lists/use-virtual-rows';
-import { VirtualItems } from '../lists/VirtualItems';
+import type { TreeRow } from '../../../model/tree/file-tree';
+import { LIST_MORE } from '../../lists/list-styles';
+import { useVirtualRows } from '../../lists/use-virtual-rows';
+import { VirtualItems } from '../../lists/VirtualItems';
 import {
     TREE_INDENT,
     TREE_PADDING_LEFT,

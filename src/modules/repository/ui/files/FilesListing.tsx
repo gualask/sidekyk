@@ -2,10 +2,10 @@ import { errorMessage } from '@/shared/errors/app-error';
 import type { ChangeMark } from '@/shared/git/change-mark';
 import { useTranslation } from '@/shared/i18n';
 import type { FilesView } from './FilesActions';
-import { FileTree } from './FileTree';
-import { RecentList } from './RecentList';
-import type { FileTreeState } from './use-file-tree';
-import type { RecentListState } from './use-recent-list';
+import { RecentList } from './recent/RecentList';
+import type { RecentListState } from './recent/use-recent-list';
+import { FileTree } from './tree/FileTree';
+import type { FileTreeState } from './tree/use-file-tree';
 
 /**
  * The files listed in the view shown, the tree or Recent, under what their read has to say: a

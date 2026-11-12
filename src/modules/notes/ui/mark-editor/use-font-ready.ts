@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { markFont } from './draw-marks';
+import { markFont } from './drawing/draw-marks';
 
 /** Whether the marks' font at `size` is loaded. */
 export function useFontReady(size: number, family: string): boolean {

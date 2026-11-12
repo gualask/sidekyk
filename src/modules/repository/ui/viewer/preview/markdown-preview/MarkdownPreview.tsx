@@ -10,7 +10,7 @@ import {
 } from '../../../../model/preview/preview';
 import type { MarkdownBlock, MarkdownDocument } from '../../../../model/repository.types';
 import { DiagramView } from '../diagram/DiagramView';
-import { Block } from './Blocks';
+import { Block } from './blocks/Blocks';
 import { type DiagramBlockOf, PreviewContext, type PreviewContextValue } from './preview-context';
 
 /** Where a preview is read: its first line on screen, for the code to open on. */

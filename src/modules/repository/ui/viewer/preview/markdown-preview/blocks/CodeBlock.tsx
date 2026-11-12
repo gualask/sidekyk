@@ -1,11 +1,11 @@
 import { type ReactNode, useMemo } from 'react';
-import { useSyntaxColors } from '../../../../application/queries/syntax-colors';
-import type { DiffLine } from '../../../../model/diff/diff-parser';
-import { fileSides } from '../../../../model/diff/sides';
-import type { MarkdownCodeLine } from '../../../../model/repository.types';
-import { blocksOf, type LineSpans, textParts } from '../../../../model/text/syntax';
-import { TONE_CLASS } from '../../text/syntax-tones';
-import { usePreview } from './preview-context';
+import { useSyntaxColors } from '../../../../../application/queries/syntax-colors';
+import type { DiffLine } from '../../../../../model/diff/diff-parser';
+import { fileSides } from '../../../../../model/diff/sides';
+import type { MarkdownCodeLine } from '../../../../../model/repository.types';
+import { blocksOf, type LineSpans, textParts } from '../../../../../model/text/syntax';
+import { TONE_CLASS } from '../../../text/syntax-tones';
+import { usePreview } from '../preview-context';
 
 /** The frame of a block of code: wrapped as the settings say, or scrolled sideways. */
 export function CodeFrame({ children }: { children: ReactNode }) {

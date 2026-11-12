@@ -12,7 +12,7 @@ import {
 } from '../../model/marks';
 import type { Mark, MarkPoint } from '../../model/notes.types';
 import { draftDrag } from './draft-drag';
-import { HANDLE } from './draw-selection';
+import { HANDLE } from './drawing/draw-selection';
 
 /**
  * In CSS pixels: how near a pointer is on a mark, and how near a tail's handle (`HANDLE`) it

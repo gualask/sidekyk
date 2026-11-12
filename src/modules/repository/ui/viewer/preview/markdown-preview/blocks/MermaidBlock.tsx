@@ -1,6 +1,6 @@
-import { DiagramBlock } from '../diagram/DiagramBlock';
+import { DiagramBlock } from '../../diagram/DiagramBlock';
+import { type DiagramBlockOf, usePreview } from '../preview-context';
 import { CodeFrame } from './CodeBlock';
-import { type DiagramBlockOf, usePreview } from './preview-context';
 
 /** A ` ```mermaid ` block: its diagram, which opens over the preview; its source while it never drew. */
 export function MermaidBlock({ block }: { block: DiagramBlockOf }) {

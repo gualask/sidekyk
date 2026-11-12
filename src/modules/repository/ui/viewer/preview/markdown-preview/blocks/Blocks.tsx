@@ -7,12 +7,12 @@ import {
     IconMessageReport,
 } from '@tabler/icons-react';
 import { type MessageKey, useTranslation } from '@/shared/i18n';
-import { footnoteId, footnoteRefId, kindKeys } from '../../../../model/preview/preview';
-import type { MarkdownAlert, MarkdownBlock } from '../../../../model/repository.types';
+import { footnoteId, footnoteRefId, kindKeys } from '../../../../../model/preview/preview';
+import type { MarkdownAlert, MarkdownBlock } from '../../../../../model/repository.types';
+import { Inlines } from '../Inlines';
+import { usePreview } from '../preview-context';
 import { CodeBlock } from './CodeBlock';
-import { Inlines } from './Inlines';
 import { MermaidBlock } from './MermaidBlock';
-import { usePreview } from './preview-context';
 import { TableBlock } from './TableBlock';
 
 type BlockOf<Kind extends MarkdownBlock['kind']> = Extract<MarkdownBlock, { kind: Kind }>;

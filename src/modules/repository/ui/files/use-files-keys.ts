@@ -4,8 +4,8 @@ import { isOwnKey } from '@/shared/ui/keys';
 import { treeMove } from '../../model/tree/file-tree';
 import { recentMove } from '../../model/tree/recent-files';
 import type { FilesView } from './FilesActions';
-import type { FileTreeState } from './use-file-tree';
-import type { RecentListState } from './use-recent-list';
+import type { RecentListState } from './recent/use-recent-list';
+import type { FileTreeState } from './tree/use-file-tree';
 
 /**
  * The keys the tree takes: in a tile `j`/`k` and `Space`, the arrows moving among tiles and `↵`

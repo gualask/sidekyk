@@ -1,5 +1,5 @@
-import { type MarkShape, type MeasureText, markShape, markSize } from '../../model/marks';
-import type { Mark } from '../../model/notes.types';
+import { type MarkShape, type MeasureText, markShape, markSize } from '../../../model/marks';
+import type { Mark } from '../../../model/notes.types';
 
 /**
  * Marks drawn on a canvas, in the image's pixels: the editor draws them over the image fitted,

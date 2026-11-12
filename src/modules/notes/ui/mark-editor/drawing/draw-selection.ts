@@ -1,5 +1,5 @@
-import type { MarkShape } from '../../model/marks';
-import type { MarkPoint } from '../../model/notes.types';
+import type { MarkShape } from '../../../model/marks';
+import type { MarkPoint } from '../../../model/notes.types';
 
 /** The radius of a tail's handle, in CSS pixels. */
 export const HANDLE = 6;

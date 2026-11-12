@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useSessionState } from '@/shared/ui/session-state';
-import { useTreeDirectories } from '../../application/queries/file-reads';
-import { foldersAbove, treeRows } from '../../model/tree/file-tree';
+import { useTreeDirectories } from '../../../application/queries/file-reads';
+import { foldersAbove, treeRows } from '../../../model/tree/file-tree';
 
 /** The tree of a project, kept for the session. */
 interface TreeState {

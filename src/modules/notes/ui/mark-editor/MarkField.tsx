@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { MAX_MARK_TEXT, markShape } from '../../model/marks';
 import type { Mark } from '../../model/notes.types';
-import { type MarkInk, textMeasure } from './draw-marks';
+import { type MarkInk, textMeasure } from './drawing/draw-marks';
 
 /**
  * The field writing a mark's text, over its label and as wide as its text. It takes the focus,

@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { useSessionState } from '@/shared/ui/session-state';
-import { useRecentFiles } from '../../application/queries/file-reads';
-import { recentRows } from '../../model/tree/recent-files';
+import { useRecentFiles } from '../../../application/queries/file-reads';
+import { recentRows } from '../../../model/tree/recent-files';
 import { timeFormats } from './recent-layout';
 
 /**
