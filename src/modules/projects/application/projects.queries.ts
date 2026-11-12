@@ -1,6 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useEffectEvent } from 'react';
 import { useTranslation } from '@/shared/i18n';
+import type { ProjectAvatar } from '@/shared/projects/project-info';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import type { Opened, ProjectList } from '../model/project.types';
 import { type ProjectsPort, useProjectsPort } from './projects.port';
@@ -98,14 +99,21 @@ export function useCreateProject() {
     });
 }
 
-/** Names a project anew. A failure is the dialog's to show: it is still open. */
-export function useRenameProject() {
+/** Gives a project a name and an avatar. A failure is the dialog's to show: it is still open. */
+export function useEditProject() {
     const port = useProjectsPort();
     const queryClient = useQueryClient();
     return useMutation({
         ...projectsChange,
-        mutationFn: ({ projectId, name }: { projectId: string; name: string }) =>
-            port.renameProject(projectId, name),
+        mutationFn: ({
+            projectId,
+            name,
+            avatar,
+        }: {
+            projectId: string;
+            name: string;
+            avatar: ProjectAvatar;
+        }) => port.editProject(projectId, name, avatar),
         onSuccess: (list) => {
             showList(queryClient, list);
         },

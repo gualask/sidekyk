@@ -11,6 +11,17 @@ export interface ProjectInfo {
     name: string;
     /** The folders it follows, in the order they were added: none, one, or several on one machine. */
     folders: ProjectFolder[];
+    avatar: ProjectAvatar;
+}
+
+/**
+ * A project's avatar: its color, given once and changed by the user, and the letters the user
+ * wrote, null for the name's (`avatarLetters`).
+ */
+export interface ProjectAvatar {
+    /** 1 to `AVATAR_COLORS`, the `--ui-avatar-*` token it shows in. */
+    color: number;
+    letters: string | null;
 }
 
 /**

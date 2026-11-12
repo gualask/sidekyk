@@ -7,7 +7,7 @@ type SingleColors = Omit<DiagramColors, 'dark' | 'series'>;
 /**
  * The `--ui-*` token each of a diagram's colors takes (`diagram-tokens.json`, which the backend's
  * fixture test reads too): the preview's background, nodes as the code blocks' surface, notes as
- * a warning, the series as the avatars. Typed, so a color the file misses does not compile.
+ * a warning, the series in turn. Typed, so a color the file misses does not compile.
  */
 const DIAGRAM_TOKENS: Record<keyof SingleColors, string> & { series: string[] } = tokens;
 

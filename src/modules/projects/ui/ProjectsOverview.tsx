@@ -11,12 +11,12 @@ import {
 } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { SummaryPart } from '@/shared/panels/panel';
+import { ProjectAvatar } from '@/shared/projects/ProjectAvatar';
 import { type ProjectInfo, projectFolder } from '@/shared/projects/project-info';
 import { placeName } from '@/shared/projects/project-place';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import type { FolderChoice, ProjectList } from '../model/project.types';
-import { ProjectAvatar } from './ProjectAvatar';
 
 /** Loaded when first asked for: the first paint does not show it. */
 const NewProjectDialog = lazy(() =>

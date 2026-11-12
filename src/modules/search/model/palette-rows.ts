@@ -1,7 +1,11 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { Translator } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
-import { type ProjectLocation, projectFolder } from '@/shared/projects/project-info';
+import {
+    type ProjectAvatar,
+    type ProjectLocation,
+    projectFolder,
+} from '@/shared/projects/project-info';
 import type { ContentFile, Highlight, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
@@ -30,6 +34,8 @@ export type PaletteItem =
           projectId: string;
           /** Its folder, under the name; its machine the row's hint when not this one. */
           folder: ProjectLocation | null;
+          /** In place of the other rows' icon. */
+          avatar: ProjectAvatar;
           label: string;
           highlights: Highlight[];
       }
@@ -140,6 +146,7 @@ function foundProjects(found: SearchResults['projects']): Ranked[] {
             kind: 'project',
             projectId: project.id,
             folder: projectFolder(project),
+            avatar: project.avatar,
             label: project.name,
             highlights: project.highlights,
         },

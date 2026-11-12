@@ -207,7 +207,7 @@ mod tests {
         let few = note_files(found(3, 0));
         assert_eq!((few.files.len(), few.more), (3, 0));
     }
-    use crate::modules::projects::Location;
+    use crate::modules::projects::{AvatarColor, Location};
     use crate::modules::repository::ChangeArea;
 
     fn project(name: &str) -> Project {
@@ -216,6 +216,7 @@ mod tests {
             [Location::Local {
                 root: format!("/dev/{name}"),
             }],
+            AvatarColor::FIRST,
         )
     }
 

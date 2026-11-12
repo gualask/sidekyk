@@ -6,6 +6,7 @@ const project = (...ids: string[]): ProjectInfo => ({
     id: 'shop',
     name: 'Shop',
     folders: ids.map(folder),
+    avatar: { color: 1, letters: null },
 });
 
 describe('folderOnScreen', () => {

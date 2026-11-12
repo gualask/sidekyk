@@ -168,7 +168,7 @@ fn commands() -> impl Fn(::tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         tauri_commands::projects::take_opened,
         tauri_commands::projects::choose_project_folder,
         tauri_commands::projects::create_project,
-        tauri_commands::projects::rename_project,
+        tauri_commands::projects::edit_project,
         tauri_commands::projects::activate_project,
         tauri_commands::projects::remove_project,
         tauri_commands::projects::set_project_layout,

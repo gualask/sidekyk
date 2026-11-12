@@ -17,13 +17,20 @@ import {
 } from './destination';
 import { INBOX_BOOK, type Note, type ProjectNotes } from './notes.types';
 
+const avatar = { color: 1, letters: null };
 const projects: ProjectInfo[] = [
-    { id: 'casa', name: 'Casa', folders: [] },
-    { id: 'shop', name: 'shop', folders: [{ id: 'f1', kind: 'local', root: '/dev/shop' }] },
+    { id: 'casa', name: 'Casa', folders: [], avatar },
+    {
+        id: 'shop',
+        name: 'shop',
+        folders: [{ id: 'f1', kind: 'local', root: '/dev/shop' }],
+        avatar,
+    },
     {
         id: 'shop2',
         name: 'Shop',
         folders: [{ id: 'f2', kind: 'wsl', distro: 'Ubuntu', root: '/dev/shop' }],
+        avatar,
     },
 ];
 

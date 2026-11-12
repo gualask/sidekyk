@@ -10,9 +10,9 @@ The palette is the only search; panels have no filter.
   (`changes.md`). `⌘K`/`⌘F` switch mode inside the palette, keeping the text.
 - Nothing typed: where to go (Projects, or Panels in a project). Typed: one list by score, no
   titles, the best 2 of each kind first so no kind hides another; equal scores:
-  project, panel or list, then file, then note. Every row starts with the icon of what it opens. A
-  project shows its folder under its name and its machine's tag (`wsl.md`), as Zed's recent
-  projects.
+  project, panel or list, then file, then note. Every row starts with the icon of what it opens,
+  a project with its avatar (`projects.md`). A project shows its folder under its name and its
+  machine's tag (`wsl.md`), as Zed's recent projects.
 - Files: every file of the project on screen (the tree plus deleted files), a change marked by a
   quiet word; `↵` through the shared selection (`files.md`).
 - Notes by the words typed, anywhere in them (letters scattered over a sentence match almost any

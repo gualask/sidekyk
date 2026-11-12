@@ -23,6 +23,7 @@ const LIST: ProjectList = {
                 { id: 'shop', kind: 'local', root: '/dev/shop' },
                 { id: 'web', kind: 'local', root: '/dev/shop-web' },
             ],
+            avatar: { color: 1, letters: null },
         },
     ],
     active: null,

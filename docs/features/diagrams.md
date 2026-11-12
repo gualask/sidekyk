@@ -21,7 +21,7 @@ machine. The other previews: `previews.md`.
   drawn, the reason under it: an agent halfway through writing it.
 - Colors: the app's tokens in the theme on screen (`model/preview/diagram-tokens.json`): the preview's
   background, nodes as code blocks, notes as warnings, a series (mind map branches, pie slices,
-  git branches) the avatars' colors (`--ui-series-*`). A change of theme draws them again. The
+  git branches) six colors in turn (`--ui-series-*`). A change of theme draws them again. The
   file's own `style`, `classDef` and `%%{init}%%` win.
 - Labels at the preview's text size (14.5 px): Mermaid's main text (16 px, a sequence diagram's
   messages, an architecture's labels) takes it; its smaller sizes (actors, notes, ER attributes)

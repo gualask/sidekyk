@@ -4,7 +4,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use super::stored::{readable_projects, StoredProject};
+use super::avatar::{Avatar, AvatarColor};
+use super::stored::readable_projects;
 use crate::modules::folder::RepositoryInfo;
 use crate::shared::id::new_id;
 
@@ -25,9 +26,10 @@ pub struct ProjectList {
     pub layouts: BTreeMap<String, TilesLayout>,
 }
 
-/// A project: a name, its notes, and the folders it follows (`docs/features/projects.md`).
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", try_from = "StoredProject")]
+/// A project: a name, its avatar, its notes, and the folders it follows
+/// (`docs/features/projects.md`). Read from storage by `readable_projects`, every older form too.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
     /// What the frontend and the app data (notes, layouts) know the project by. Made once and
     /// kept: a project whose folder moves keeps its id.
@@ -36,20 +38,27 @@ pub struct Project {
     /// The folders it follows, in the order they were added: none, one, or several on one
     /// machine, none inside another.
     pub folders: Vec<ProjectFolder>,
+    pub avatar: Avatar,
 }
 
 impl Project {
-    /// A new project, with a new id, following `folders`, each with a new id.
-    pub fn new(name: String, folders: impl IntoIterator<Item = Location>) -> Self {
+    /// A new project, with a new id, following `folders`, each with a new id; its avatar of
+    /// `color`, its letters from the name.
+    pub fn new(
+        name: String,
+        folders: impl IntoIterator<Item = Location>,
+        color: AvatarColor,
+    ) -> Self {
         Self {
             id: new_id(),
             name,
             folders: folders.into_iter().map(ProjectFolder::new).collect(),
+            avatar: Avatar::of_color(color),
         }
     }
 
     /// A project as stored before ids were made: its id is its location's, and its folder's too.
-    pub fn stored_before_ids(name: String, location: Location) -> Self {
+    pub fn stored_before_ids(name: String, location: Location, color: AvatarColor) -> Self {
         let id = location.id_before_made_ids();
         Self {
             folders: vec![ProjectFolder {
@@ -58,6 +67,7 @@ impl Project {
             }],
             id,
             name,
+            avatar: Avatar::of_color(color),
         }
     }
 
@@ -263,6 +273,7 @@ pub(super) mod tests {
                     id: "0123456789abcdef".into(),
                     name: "r".into(),
                     folders: vec![folder("0123456789abcdef", local("/r"))],
+                    avatar: Avatar::of_color(AvatarColor::FIRST),
                 },
                 Project {
                     id: "fedcba9876543210".into(),
@@ -271,11 +282,16 @@ pub(super) mod tests {
                         folder("aaaaaaaaaaaaaaaa", wsl("Ubuntu", "/home/ale/shop/api")),
                         folder("bbbbbbbbbbbbbbbb", wsl("Ubuntu", "/home/ale/shop/web")),
                     ],
+                    avatar: Avatar {
+                        color: AvatarColor::try_from(10).unwrap(),
+                        letters: Some("SW".into()),
+                    },
                 },
                 Project {
                     id: "00112233445566ff".into(),
                     name: "Home".into(),
                     folders: vec![],
+                    avatar: Avatar::of_color(AvatarColor::try_from(2).unwrap()),
                 },
             ],
             active: Some("0123456789abcdef".into()),
@@ -292,7 +308,8 @@ pub(super) mod tests {
                 {
                     "id": "0123456789abcdef",
                     "name": "r",
-                    "folders": [{ "id": "0123456789abcdef", "kind": "local", "root": "/r" }]
+                    "folders": [{ "id": "0123456789abcdef", "kind": "local", "root": "/r" }],
+                    "avatar": { "color": 1, "letters": null }
                 },
                 {
                     "id": "fedcba9876543210",
@@ -310,9 +327,15 @@ pub(super) mod tests {
                             "distro": "Ubuntu",
                             "root": "/home/ale/shop/web"
                         }
-                    ]
+                    ],
+                    "avatar": { "color": 10, "letters": "SW" }
                 },
-                { "id": "00112233445566ff", "name": "Home", "folders": [] }
+                {
+                    "id": "00112233445566ff",
+                    "name": "Home",
+                    "folders": [],
+                    "avatar": { "color": 2, "letters": null }
+                }
             ],
             "active": "0123456789abcdef",
             "layouts": { "0123456789abcdef": { "minimized": ["files"], "split": 0.4 } }
@@ -323,13 +346,14 @@ pub(super) mod tests {
 
     #[test]
     fn a_new_project_gets_an_id_of_its_own() {
-        let a = Project::new("shop".into(), [local("/shop")]);
-        let b = Project::new("shop".into(), [local("/shop")]);
+        let a = Project::new("shop".into(), [local("/shop")], AvatarColor::FIRST);
+        let b = Project::new("shop".into(), [local("/shop")], AvatarColor::FIRST);
         assert_ne!(a.id, b.id);
         assert_ne!(a.folders[0].id, b.folders[0].id);
         assert_ne!(a.folders[0].id, a.id);
         assert_eq!(a.folders[0].repository(&a).root, "/shop");
-        assert!(Project::new("Home".into(), []).folders.is_empty());
+        let home = Project::new("Home".into(), [], AvatarColor::FIRST);
+        assert!(home.folders.is_empty());
     }
 
     #[test]

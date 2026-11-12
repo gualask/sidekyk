@@ -4,7 +4,9 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { useAddProjectFolder, useRemoveProjectFolder } from '../application/project-folders';
-import { useMergeProjects, useProjects, useRenameProject } from '../application/projects.queries';
+import { useEditProject, useMergeProjects, useProjects } from '../application/projects.queries';
+import { writtenLetters } from '../model/avatar-letters';
+import { AvatarField } from './avatar-field';
 import { FolderRow, NameField } from './project-fields';
 
 /** Another project that has the folder picked: merged into this one if the user says so. */
@@ -14,9 +16,9 @@ interface Mergeable {
 }
 
 /**
- * A project's name and folders. A folder added or left out changes the project at once, as VS
- * Code's "Add Folder to Workspace" (the folder is left as it is, the notes stay); the name is kept
- * with Save. A folder that is another project's offers to merge that project into this one: its
+ * A project's name, avatar and folders. A folder added or left out changes the project at once, as
+ * VS Code's "Add Folder to Workspace" (the folder is left as it is, the notes stay); the name and
+ * the avatar are kept with Save. A folder that is another project's offers to merge that project into this one: its
  * folders and lists of notes come here, and it goes. Loaded with its first opening.
  */
 export function EditProjectDialog({
@@ -32,8 +34,10 @@ export function EditProjectDialog({
     // the project as the list has it now, its folders changing while the dialog is open
     const project = useProjects().data?.projects.find((p) => p.id === opened.id) ?? opened;
     const [name, setName] = useState(project.name);
+    const [letters, setLetters] = useState(project.avatar.letters ?? '');
+    const [color, setColor] = useState(project.avatar.color);
     const [mergeable, setMergeable] = useState<Mergeable | null>(null);
-    const rename = useRenameProject();
+    const save = useEditProject();
     const add = useAddProjectFolder();
     const remove = useRemoveProjectFolder();
     const merge = useMergeProjects(onMerged);
@@ -47,13 +51,20 @@ export function EditProjectDialog({
         if (change?.kind === 'inProject') setMergeable({ id: change.id, name: change.name });
     };
     const blank = name.trim() === '';
+    const written = writtenLetters(letters);
+    const cannotSave = blank || written === false || save.isPending;
     const submit = (event: FormEvent) => {
         event.preventDefault();
-        if (blank || rename.isPending) return;
-        if (name === project.name) onClose();
-        else rename.mutate({ projectId: project.id, name }, { onSuccess: onClose });
+        if (cannotSave) return;
+        const avatar = { color, letters: written };
+        const same =
+            name === project.name &&
+            color === project.avatar.color &&
+            written === project.avatar.letters;
+        if (same) onClose();
+        else save.mutate({ projectId: project.id, name, avatar }, { onSuccess: onClose });
     };
-    const error = [rename, add, remove, merge].find((change) => change.isError)?.error;
+    const error = [save, add, remove, merge].find((change) => change.isError)?.error;
 
     return (
         <Dialog.Root
@@ -73,6 +84,14 @@ export function EditProjectDialog({
                     </Dialog.Title>
                     <form className="mt-3 flex flex-col gap-3" onSubmit={submit}>
                         <NameField value={name} onChange={setName} inputRef={nameField} />
+                        <AvatarField
+                            name={name}
+                            letters={letters}
+                            color={color}
+                            invalid={written === false}
+                            onLetters={setLetters}
+                            onColor={setColor}
+                        />
                         <fieldset className="flex min-w-0 flex-col gap-1.5">
                             <legend className="mb-1 text-xs font-semibold">
                                 {t('projects.folders')}
@@ -118,11 +137,7 @@ export function EditProjectDialog({
                             <Dialog.Close className="btn-ghost-sm">
                                 {t('common.cancel')}
                             </Dialog.Close>
-                            <button
-                                type="submit"
-                                className="btn-primary-sm"
-                                disabled={blank || rename.isPending}
-                            >
+                            <button type="submit" className="btn-primary-sm" disabled={cannotSave}>
                                 {t('projects.save')}
                             </button>
                         </div>

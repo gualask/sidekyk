@@ -9,7 +9,7 @@ use sidekyk_core::app::projects::{Projects, ProjectsStorage};
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::machines::local::LocalMachine;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
-use sidekyk_core::modules::projects::{Location, Project, ProjectList};
+use sidekyk_core::modules::projects::{AvatarColor, Location, Project, ProjectList};
 use sidekyk_core::modules::reader::LocalRepositories;
 
 /// A list kept in memory.
@@ -64,6 +64,7 @@ fn a_file_a_note_names_is_looked_for_on_screen_first_then_in_the_other_folders()
             Location::Local { root: api_root },
             Location::Local { root: web_root },
         ],
+        AvatarColor::FIRST,
     );
     let (id, api, web) = (
         project.id.clone(),

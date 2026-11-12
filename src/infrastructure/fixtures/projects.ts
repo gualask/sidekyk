@@ -1,24 +1,29 @@
 import type { FolderChoice, Opened, ProjectList, ProjectsPort } from '@/modules/projects';
 import type { ProjectFolder, ProjectInfo, ProjectLocation } from '@/shared/projects/project-info';
-import { localProject, wslProject } from './projects.fixture';
+import { localProject, newAvatar, wslProject } from './projects.fixture';
 import { FIXTURE_REPOSITORY } from './review.fixture-data';
 import { failure, type Scenario } from './scenario';
 
 /** Projects with a clean working tree, next to the scenario's own. */
 export const CLEAN_PROJECTS: ProjectInfo[] = [
-    localProject('/Users/dev/Projects/docs-site', 'docs-site'),
-    localProject('/Users/dev/Projects/api-gateway', 'api-gateway'),
+    localProject('/Users/dev/Projects/docs-site', 'docs-site', 2),
+    localProject('/Users/dev/Projects/api-gateway', 'api-gateway', 6),
 ];
 
 /** In `review`: a clone of the scenario's repository in a WSL distro, clean, of the same name. */
-const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop');
+const WSL_PROJECT = wslProject('Ubuntu', '/home/dev/shop', 'shop', 3);
 
 /** In `review` and `clean`: a project without folder, notes on a topic. */
-export const TOPIC_PROJECT: ProjectInfo = { id: 'b0000000000000a1', name: 'Thesis', folders: [] };
+export const TOPIC_PROJECT: ProjectInfo = {
+    id: 'b0000000000000a1',
+    name: 'Thesis',
+    folders: [],
+    avatar: { color: 5, letters: null },
+};
 
 /** In `review` and `clean`: a folder without git, notes in Markdown (`sidekykDev.gitInit`). */
 const VAULT_ROOT = '/Users/dev/Notes/vault';
-const VAULT_PROJECT = localProject(VAULT_ROOT, 'Vault');
+const VAULT_PROJECT = localProject(VAULT_ROOT, 'Vault', 4);
 
 /** The repository the folder picker finds, a folder inside it picked. */
 const PICKED_REPOSITORY = {
@@ -100,15 +105,19 @@ const ADDED_FOLDERS: readonly { location: ProjectLocation }[] = [
 ];
 
 /** In `problems`: a project whose repository was moved or deleted after it was added. */
-export const MISSING_PROJECT = localProject('/Users/dev/Projects/old-prototype', 'old-prototype');
+export const MISSING_PROJECT = localProject(
+    '/Users/dev/Projects/old-prototype',
+    'old-prototype',
+    2,
+);
 
 /**
  * In `problems`, WSL projects: a distro that does not run (until the project opens), one gone, one
  * without git.
  */
-const STOPPED_PROJECT = wslProject('Debian', '/home/dev/api', 'api');
-export const GONE_PROJECT = wslProject('Arch', '/home/dev/dotfiles', 'dotfiles');
-export const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools');
+const STOPPED_PROJECT = wslProject('Debian', '/home/dev/api', 'api', 3);
+export const GONE_PROJECT = wslProject('Arch', '/home/dev/dotfiles', 'dotfiles', 4);
+export const NO_GIT_PROJECT = wslProject('Alpine', '/home/dev/tools', 'tools', 5);
 
 /**
  * In `review`: the scenario's project with a second repository beside its own, clean, to switch
@@ -265,6 +274,7 @@ export function fixtureProjectsPort(
             id: newId(),
             name,
             folders: [newFolder({ kind: 'local', root: `/Users/dev/Projects/${name}` })],
+            avatar: newAvatar(list().projects),
         };
         const all = found ? list().projects : [...list().projects, shown];
         update({ ...list(), projects: all, active: shown.id });
@@ -298,15 +308,17 @@ export function fixtureProjectsPort(
                 id: newId(),
                 name: name.trim(),
                 folders: locations.map(newFolder),
+                avatar: newAvatar(list().projects),
             };
             return update({ ...list(), projects: [...list().projects, made], active: made.id });
         },
-        renameProject: async (projectId, name) => {
-            const renamed = project(projectId);
+        editProject: async (projectId, name, avatar) => {
+            const edited = project(projectId);
+            const letters = avatar.letters?.trim() || null;
             return update({
                 ...list(),
                 projects: list().projects.map((p) =>
-                    p === renamed ? { ...p, name: name.trim() } : p,
+                    p === edited ? { ...p, name: name.trim(), avatar: { ...avatar, letters } } : p,
                 ),
             });
         },

@@ -11,7 +11,7 @@ import { CHECKOUT_TS, type LongFile, ORDERS_TS } from './long.fixture-data';
 import { localProject } from './projects.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
 
-export const FIXTURE_REPOSITORY: ProjectInfo = localProject('/Users/dev/Projects/shop', 'shop');
+export const FIXTURE_REPOSITORY: ProjectInfo = localProject('/Users/dev/Projects/shop', 'shop', 1);
 
 /** A Markdown file changed: its diff, and its preview from the working tree's text. */
 const README_MD = `diff --git a/README.md b/README.md

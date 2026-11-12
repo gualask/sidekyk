@@ -162,7 +162,7 @@ pub struct SearchResults {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::projects::{Location, ProjectFolder};
+    use crate::modules::projects::{Avatar, AvatarColor, Location, ProjectFolder};
 
     #[test]
     fn request_and_results_use_the_frontend_field_names() {
@@ -193,6 +193,10 @@ mod tests {
                             root: "/r".into(),
                         },
                     }],
+                    avatar: Avatar {
+                        color: AvatarColor::FIRST,
+                        letters: Some("R".into()),
+                    },
                 },
                 score: 30,
                 highlights: vec![[0, 1]],
@@ -245,6 +249,7 @@ mod tests {
                     "id": "/r",
                     "name": "r",
                     "folders": [{ "id": "/r", "kind": "wsl", "distro": "Ubuntu", "root": "/r" }],
+                    "avatar": { "color": 1, "letters": "R" },
                     "score": 30,
                     "highlights": [[0, 1]]
                 }],

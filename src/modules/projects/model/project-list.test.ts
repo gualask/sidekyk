@@ -6,6 +6,7 @@ const project = (name: string): ProjectInfo => ({
     id: `/p/${name}`,
     name,
     folders: [{ id: `/p/${name}`, kind: 'local', root: `/p/${name}` }],
+    avatar: { color: 1, letters: null },
 });
 const list = (active: string | null, ...names: string[]) => ({
     projects: names.map(project),

@@ -228,7 +228,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
-    use crate::modules::projects::{Location, Project};
+    use crate::modules::projects::{AvatarColor, Location, Project};
     use crate::modules::reader::{LocalRepositories, Repositories};
     use crate::modules::syntax::{line_check, load_syntax_colors, ColorCache, SyntaxRequest};
     use serde_json::json;
@@ -1815,6 +1815,7 @@ mod tests {
             [Location::Local {
                 root: repo.info.root.clone(),
             }],
+            AvatarColor::FIRST,
         );
         let palette: SearchRequest = serde_json::from_value(json!({
             "query": "srcmod",

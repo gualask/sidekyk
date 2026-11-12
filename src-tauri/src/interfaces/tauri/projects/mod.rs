@@ -12,7 +12,7 @@ use crate::desktop::{launch, texts};
 use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::repository_name;
 use sidekyk_core::modules::projects::{
-    FolderChange, FolderChoice, Opened, Project, ProjectList, TilesLayout,
+    Avatar, FolderChange, FolderChoice, Opened, Project, ProjectList, TilesLayout,
 };
 use sidekyk_core::shared::error::AppError;
 
@@ -78,15 +78,16 @@ pub(crate) async fn create_project(
 }
 
 #[tauri::command]
-/// Names a project anew.
-pub(crate) async fn rename_project(
+/// Gives a project a name and an avatar.
+pub(crate) async fn edit_project(
     app: tauri::AppHandle,
     project_id: String,
     name: String,
+    avatar: Avatar,
 ) -> Result<ProjectList, AppError> {
-    blocking("rename_project", app, move |app| {
+    blocking("edit_project", app, move |app| {
         app.state::<Projects>()
-            .update_stored(|list| list.rename(&project_id, &name))
+            .update_stored(|list| list.edit(&project_id, &name, avatar))
     })
     .await
 }

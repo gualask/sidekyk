@@ -1,4 +1,5 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
+import type { ProjectAvatar } from '@/shared/projects/project-info';
 import type {
     FolderChange,
     FolderChoice,
@@ -22,7 +23,8 @@ export interface ProjectsPort {
      * `chooseProjectFolder` gave them; none, one or several), and shows it.
      */
     createProject(name: string, folders: string[]): Promise<ProjectList>;
-    renameProject(projectId: string, name: string): Promise<ProjectList>;
+    /** Gives a project a name and an avatar. */
+    editProject(projectId: string, name: string, avatar: ProjectAvatar): Promise<ProjectList>;
     activateProject(projectId: string): Promise<ProjectList>;
     /** Forgets a project and deletes its notes; its repository is left as it is. */
     removeProject(projectId: string): Promise<ProjectList>;

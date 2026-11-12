@@ -1,6 +1,7 @@
-//! The list of projects: found, added, merged, renamed, laid out, put on screen and removed. A
+//! The list of projects: found, added, merged, edited, laid out, put on screen and removed. A
 //! project's folders change in `list_folders`.
 
+use super::avatar::{Avatar, AvatarColor};
 use super::contracts::{Location, Opened, Project, ProjectFolder, ProjectList, TilesLayout};
 use super::place::{FoundFolder, NameCase};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
@@ -80,7 +81,7 @@ impl ProjectList {
         let (id, folder) = match self.folder_at(&found.location, case) {
             Some((project, folder)) => (project.id.clone(), folder.id.clone()),
             None => {
-                let project = Project::new(found.name, [found.location]);
+                let project = Project::new(found.name, [found.location], self.next_color());
                 let ids = (project.id.clone(), project.folders[0].id.clone());
                 self.projects.push(project);
                 ids
@@ -109,7 +110,7 @@ impl ProjectList {
             }
             checked_beside(folder, &folders[..index], case)?;
         }
-        let project = Project::new(name, folders);
+        let project = Project::new(name, folders, self.next_color());
         self.projects.push(project.clone());
         if self.active.is_none() {
             self.active = Some(project.id.clone());
@@ -152,10 +153,18 @@ impl ProjectList {
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))
     }
 
-    /// Names a project anew; two projects may share a name.
-    pub fn rename(&mut self, id: &str, name: &str) -> anyhow::Result<()> {
+    /// The color of a new project: the one fewest projects have.
+    fn next_color(&self) -> AvatarColor {
+        AvatarColor::least_used(self.projects.iter().map(|p| p.avatar.color))
+    }
+
+    /// Gives a project a name and an avatar; two projects may share a name, or a color.
+    pub fn edit(&mut self, id: &str, name: &str, avatar: Avatar) -> anyhow::Result<()> {
         let name = checked_name(name)?;
-        self.project_mut(id)?.name = name;
+        let avatar = avatar.checked()?;
+        let project = self.project_mut(id)?;
+        project.name = name;
+        project.avatar = avatar;
         Ok(())
     }
 
@@ -238,6 +247,7 @@ pub(super) mod tests {
         Project::stored_before_ids(
             root.trim_start_matches('/').into(),
             Location::Local { root: root.into() },
+            AvatarColor::FIRST,
         )
     }
 
@@ -404,17 +414,38 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn a_project_is_renamed_trimmed_and_never_blank() {
+    fn a_project_is_edited_its_name_trimmed_and_never_blank() {
         let mut projects = list(&["/a", "/b"], Some("/a"));
-        projects.rename("/b", " Shop ").unwrap();
+        let color = AvatarColor::try_from(4).unwrap();
+        let avatar = |letters: &str| Avatar {
+            color,
+            letters: Some(letters.into()),
+        };
+        projects.edit("/b", " Shop ", avatar(" SW ")).unwrap();
         assert_eq!(projects.projects[1].name, "Shop");
-        assert!(projects.rename("/b", " ").is_err());
+        assert_eq!(projects.projects[1].avatar, avatar("SW"));
+        assert!(projects.edit("/b", " ", avatar("S")).is_err());
+        assert!(projects.edit("/b", "Store", avatar("SWX")).is_err());
         assert_eq!(projects.projects[1].name, "Shop");
-        let error = projects.rename("/gone", "x").unwrap_err();
+        let error = projects.edit("/gone", "x", avatar("X")).unwrap_err();
         assert_eq!(
             user_facing_code(&error),
             Some(UserFacingErrorCode::ProjectNotFound)
         );
+    }
+
+    #[test]
+    fn a_new_project_takes_the_color_fewest_projects_have() {
+        let mut projects = list(&["/a"], Some("/a"));
+        let added = projects.add("Casa", vec![], CASE).unwrap();
+        assert_eq!(added.avatar.letters, None);
+        projects.open_folder(found("/c"), CASE);
+        let colors: Vec<u8> = projects
+            .projects
+            .iter()
+            .map(|p| p.avatar.color.into())
+            .collect();
+        assert_eq!(colors, [1, 2, 3]);
     }
 
     #[test]

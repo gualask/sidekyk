@@ -1,9 +1,10 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
-import { IconFile, IconFolderCode, IconList, IconNote } from '@tabler/icons-react';
+import { IconFile, IconList, IconNote } from '@tabler/icons-react';
 import type { CSSProperties } from 'react';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { FolderPath } from '@/shared/projects/FolderPath';
+import { ProjectAvatar } from '@/shared/projects/ProjectAvatar';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { KeyCap } from '@/shared/ui/KeyCaps';
 import { MatchedText } from '@/shared/ui/MatchedText';
@@ -108,13 +109,7 @@ function ItemRow({
                 onClick={() => onOpen(item)}
                 className="pick-row group h-full"
             >
-                {item.kind === 'line' ? (
-                    <span className="w-9 shrink-0 text-right font-mono text-[11px] text-ui-text-muted tabular-nums group-data-highlighted:text-ui-accent-on-soft">
-                        {item.number}
-                    </span>
-                ) : (
-                    <KindIcon item={item} />
-                )}
+                <RowStart item={item} />
                 {item.kind === 'project' ? (
                     <span className="flex min-w-0 flex-col">
                         <Label text={item.label} highlights={item.highlights} mono={false} />
@@ -135,10 +130,30 @@ function ItemRow({
     );
 }
 
-const KIND_ICONS = { project: IconFolderCode, file: IconFile, list: IconList, note: IconNote };
+/** What a row opens, at a glance: a line's number, a project's avatar, else its kind's icon. */
+function RowStart({ item }: { item: PaletteItem }) {
+    if (item.kind === 'line') {
+        return (
+            <span className="w-9 shrink-0 text-right font-mono text-[11px] text-ui-text-muted tabular-nums group-data-highlighted:text-ui-accent-on-soft">
+                {item.number}
+            </span>
+        );
+    }
+    if (item.kind === 'project') {
+        return (
+            <ProjectAvatar
+                project={{ name: item.label, avatar: item.avatar }}
+                className="h-6 w-6 rounded-md text-[10.5px]"
+            />
+        );
+    }
+    return <KindIcon item={item} />;
+}
 
-/** What a row opens, at a glance: a project, a panel (its tile's icon), a file, a list, a note. */
-function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' }> }) {
+const KIND_ICONS = { file: IconFile, list: IconList, note: IconNote };
+
+/** A panel (its tile's icon), a file, a list, a note. */
+function KindIcon({ item }: { item: Exclude<PaletteItem, { kind: 'line' | 'project' }> }) {
     const Icon = item.kind === 'panel' ? item.icon : KIND_ICONS[item.kind];
     return (
         <Icon

@@ -227,7 +227,7 @@ mod tests {
 
     use super::*;
     use crate::app::fake::{Here, Told};
-    use crate::modules::projects::Project;
+    use crate::modules::projects::{AvatarColor, Project};
     use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
     use crate::shared::sync::lock;
 
@@ -298,12 +298,13 @@ mod tests {
     fn a_project_without_folder_is_never_routed_to_a_machine() {
         let local = Arc::new(Told::default());
         let machines = Machines::new(Arc::new(Here(local.clone())), NameCase::Kept, Vec::new());
-        let home = Project::new("Home".into(), []);
+        let home = Project::new("Home".into(), [], AvatarColor::FIRST);
         let shop = Project::new(
             "shop".into(),
             [Location::Local {
                 root: "/shop".into(),
             }],
+            AvatarColor::FIRST,
         );
 
         machines.watch(None, Box::new(|_| {}));

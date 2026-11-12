@@ -13,7 +13,9 @@ use tauri::Manager;
 
 use sidekyk_core::app::projects::ProjectsStorage;
 use sidekyk_core::modules::folder::repository_name;
-use sidekyk_core::modules::projects::{Location, Project, ProjectList};
+use sidekyk_core::modules::projects::{
+    leave_out_made_on_reading, AvatarColor, Location, Project, ProjectList,
+};
 use sidekyk_core::modules::settings::Settings;
 use sidekyk_core::shared::sync::lock;
 
@@ -117,6 +119,7 @@ impl SettingsFile {
         if let Some(list) = self.read(PROJECTS_KEY, |stored| {
             read_lenient::<ProjectList>(stored).normalized()
         }) {
+            self.avatars_given_on_reading();
             return list;
         }
         let last = self.get(LAST_REPOSITORY_KEY);
@@ -128,6 +131,7 @@ impl SettingsFile {
             Location::Local {
                 root: root.to_string(),
             },
+            AvatarColor::FIRST,
         );
         let list = ProjectList {
             active: Some(project.id.clone()),
@@ -138,6 +142,16 @@ impl SettingsFile {
             tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
         }
         list
+    }
+
+    /// Leaves out of what was read of the list what reading made instead (`made_on_reading`): the
+    /// next write of the list stores it.
+    fn avatars_given_on_reading(&self) {
+        let mut contents = lock(&self.contents);
+        let Contents { values, read, .. } = &mut *contents;
+        if let (Some(stored), Some(read)) = (values.get(PROJECTS_KEY), read.get_mut(PROJECTS_KEY)) {
+            leave_out_made_on_reading(stored, read);
+        }
     }
 
     fn write_projects(&self, list: &ProjectList) -> anyhow::Result<()> {
@@ -328,6 +342,36 @@ mod tests {
         assert_eq!(SettingsFile::open(dir.path()).settings(), settings);
     }
 
+    /// Projects stored before avatars take colors on reading, which the next write stores: one
+    /// removed leaves the others' colors as they were.
+    #[test]
+    fn colors_given_on_reading_are_stored_by_the_next_write() {
+        let dir = tempfile::tempdir().unwrap();
+        let project = |id: &str| serde_json::json!({ "id": id, "name": id, "folders": [] });
+        let list = serde_json::json!({ "projects": {
+            "projects": [project("a"), project("b")],
+            "active": "a",
+        }});
+        fs::write(dir.path().join(STORE_FILE), list.to_string()).unwrap();
+        let file = SettingsFile::open(dir.path());
+        let mut list = file.projects();
+        let colors = |list: &ProjectList| -> Vec<u8> {
+            list.projects
+                .iter()
+                .map(|p| p.avatar.color.into())
+                .collect()
+        };
+        assert_eq!(colors(&list), [1, 2]);
+
+        list.remove("a").unwrap();
+        file.write_projects(&list).unwrap();
+        assert_eq!(
+            stored(dir.path())["projects"]["projects"][0]["avatar"]["color"],
+            2
+        );
+        assert_eq!(colors(&SettingsFile::open(dir.path()).projects()), [2]);
+    }
+
     /// A project of a newer version (a kind of folder this one does not know) is not shown, and
     /// stays stored, with its layout; a project read keeps the values this version does not know.
     #[test]
@@ -368,6 +412,7 @@ mod tests {
             [Location::Local {
                 root: "/docs".into(),
             }],
+            AvatarColor::FIRST,
         ));
         file.write_projects(&list).unwrap();
         let written = &stored(dir.path())["projects"];

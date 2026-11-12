@@ -241,6 +241,7 @@ impl Projects {
 pub(crate) mod tests {
     use super::*;
     use crate::app::fake::{Here, Kept, Told};
+    use crate::modules::projects::{Avatar, AvatarColor};
     use crate::shared::error::{user_facing_code, UserFacingErrorCode};
 
     pub(crate) fn shop() -> Project {
@@ -249,6 +250,7 @@ pub(crate) mod tests {
             [Location::Local {
                 root: "/dev/shop".into(),
             }],
+            AvatarColor::FIRST,
         )
     }
 
@@ -292,8 +294,9 @@ pub(crate) mod tests {
         assert_eq!(lock(&told.retained).last().unwrap(), &["/dev/shop"]);
 
         *lock(&storage.refuse) = true;
+        let avatar = Avatar::of_color(AvatarColor::FIRST);
         let renamed = projects
-            .update_stored(|list| list.rename(&shop.id, "store"))
+            .update_stored(|list| list.edit(&shop.id, "store", avatar))
             .unwrap();
         assert_eq!(renamed.projects[0].name, "store");
         assert_eq!(projects.project(&shop.id).unwrap().name, "store");
