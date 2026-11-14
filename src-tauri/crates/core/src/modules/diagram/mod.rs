@@ -10,7 +10,8 @@ use std::time::{Duration, Instant};
 
 use merman::svg::SvgEnvironment;
 use merman::{
-    Engine, MermaidConfig, OperationControl, RenderOutput, RenderRequest, Renderer, SvgRequest,
+    MermaidConfig, OperationControl, RenderOutput, RenderRequest, Renderer, SemanticParser,
+    SvgRequest,
 };
 
 pub use contracts::{Diagram, DiagramColors, DiagramRequest};
@@ -41,7 +42,9 @@ pub fn render_diagram(request: &DiagramRequest) -> anyhow::Result<Diagram> {
 /// merman's drawing of the source, in the app's colors and measured with its font.
 fn draw(request: &DiagramRequest) -> anyhow::Result<Diagram> {
     let config = MermaidConfig::from_value(colors::theme_config(&request.colors)?);
-    let renderer = Renderer::new().with_engine(Engine::new().with_site_config(config));
+    // the site's config, read by the parser; the drawing takes it from there
+    let renderer =
+        Renderer::new().with_semantic_parser(SemanticParser::new().with_site_config(config));
     let environment = SvgEnvironment::deterministic()
         .with_native_font_context(fonts::measured()?.clone())
         .map_err(|error| anyhow::anyhow!("the diagrams' font: {error}"))?;

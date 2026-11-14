@@ -70,8 +70,11 @@ machine. The other previews: `previews.md`.
   thread and 116-439 MB of WebContent for one diagram (empty page 30 MB). Mermaid 13 runs without
   a DOM, in a worker, but is an alpha with 9 diagram types: to watch. beautiful-mermaid draws 5
   types; mermaid-rs-renderer takes 388 ms on a flowchart of 60 nodes and fails class diagrams.
-- merman pinned (`=0.9.3`): its API changes between minor versions. Without ELK (EPL-2.0), the
-  layout merman's default features add.
+- merman pinned (`=0.10.0`, Mermaid 12.3's syntax): its API changes between minor versions.
+  Taken for compatibility over speed: a diagram in newer syntax drawn rather than invalid, for
+  0.6 ms more (2.9-3.4 ms against 0.9's 2.2-2.8 ms on the fixtures, M4 release build). `math`
+  named, as 0.9's `complete-svg` held it: a label's formula is drawn, not refused. Without ELK
+  (EPL-2.0), the layout merman's default features add.
 - An image, not inline SVG: nothing in it runs, as an SVG file's preview; no
   `dangerouslySetInnerHTML`.
 - Labels measured with the font drawn: merman's default measure is a heuristic, which an image
