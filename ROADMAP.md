@@ -68,18 +68,15 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
       macOS: one universal `.dmg` (`--target universal-apple-darwin`: Intel Macs too,
       which stop at macOS 26, at no runtime cost, since only the native slice loads)
 - [ ] Verify on the packaged app and other systems:
-  - macOS, capture (`docs/features/capture.md`): over a full screen app and on another Space,
-    two displays (the one under the pointer), the monthly "bypass the system private window
-    picker" prompt, the permission kept across an update of a signed build
-  - macOS, capture window (`docs/features/capture-window.md`): two displays, over a full screen
-    app, three captures in a row into one note, `⌘↵` pasted into Claude Code, the focus back to
-    the app in front, `⌃⌥C` over the quick note, `⌘W`
-  - macOS, quick note (`docs/features/quick-note.md`): on a second display, over a full screen
-    app and on another Space, Sidekyk itself in full screen, from minimized, no frame of the
-    other layout on the packaged app
-  - macOS: traffic lights position, pinch in WKWebView, tray glyph light/dark, a click on the tray
-    icon shows the window, `⌘W` hides and `⌘Q` quits, hidden while full screen (closed or by
-    the shortcut) no black Space left, no blank frame at startup; without the Command Line
+  - macOS, capture (`docs/features/capture.md`): on another Space, two displays (the one under
+    the pointer), the monthly "bypass the system private window picker" prompt, the permission
+    kept across an update of a signed build
+  - macOS, capture window (`docs/features/capture-window.md`): two displays, the pointer moved
+    to another before `↵`; `⌘↵` pasted into Claude Code
+  - macOS, quick note (`docs/features/quick-note.md`): on a second display, on another Space, no
+    frame of the other layout on the packaged app
+  - macOS: pinch in WKWebView, tray glyph light/dark, hidden while full screen (closed or by the
+    shortcut) no black Space left, no blank frame at startup; without the Command Line
     Tools, a folder without git picked asks nothing to install
   - Windows: global shortcut; watcher paths (`C:\…`) vs git's (`C:/…`) in the ignored filter and
     git-dir check, case included; a folder without git (`real_path` as given, its walk and

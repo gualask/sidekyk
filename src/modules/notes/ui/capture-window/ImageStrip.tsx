@@ -1,9 +1,16 @@
 import { IconPlus, IconX } from '@tabler/icons-react';
+import type { MouseEvent } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { DraftImage } from '../../model/capture-draft';
 
 /** A thumbnail's height in the strip, in CSS pixels. */
 const THUMB_HEIGHT = 48;
+
+/**
+ * A button that takes no focus at a press: the focus stays where it was (the image, the text),
+ * where `↵` writes the note, not this button's action again.
+ */
+const keepFocus = (event: MouseEvent) => event.preventDefault();
 
 /**
  * The draft's images as thumbnails, the selected one lit, then the + tile that captures another
@@ -63,6 +70,7 @@ export function ImageStrip({
                                   className="absolute top-1 right-1 grid h-5 w-5 place-items-center rounded-full bg-ui-surface text-ui-text-secondary opacity-0 group-hover/image:opacity-100 hover:text-ui-danger"
                                   title={t('notes.removeImage')}
                                   aria-label={t('notes.removeImage')}
+                                  onMouseDown={keepFocus}
                                   onClick={() => onRemove(index)}
                               >
                                   <IconX size={12} stroke={2.5} />
@@ -79,6 +87,7 @@ export function ImageStrip({
                     style={{ height: THUMB_HEIGHT + 4, width: THUMB_HEIGHT + 4 }}
                     title={t('notes.captureAnother')}
                     aria-label={t('notes.captureAnother')}
+                    onMouseDown={keepFocus}
                     onClick={onCapture}
                 >
                     <IconPlus size={18} />

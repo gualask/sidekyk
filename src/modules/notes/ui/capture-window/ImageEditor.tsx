@@ -9,10 +9,12 @@ import { enterKeys } from './enter-keys';
 /**
  * The image selected in the capture window, its marks over it (`MarkStage`), their history the
  * draft's. `⌫` takes the selected mark out, `↵` writes its text, `⌘Z`/`⇧⌘Z` undo and redo; any
- * other key goes to `onKey`, told whether a mark is selected.
+ * other key goes to `onKey`, told whether a mark is selected. One editor for every image of the
+ * draft: its root keeps the focus while the image changes.
  */
 export function ImageEditor({
     root,
+    id,
     src,
     width,
     height,
@@ -23,6 +25,8 @@ export function ImageEditor({
     onKey,
 }: {
     root: RefObject<HTMLDivElement | null>;
+    /** The image's own id: another starts its marks' session anew. */
+    id: string;
     src: string;
     width: number;
     height: number;
@@ -33,7 +37,7 @@ export function ImageEditor({
     disabled: boolean;
     onKey: (event: KeyboardEvent<HTMLDivElement>, selected: boolean) => void;
 }) {
-    const image = useMemo(() => ({ width, height }), [width, height]);
+    const image = useMemo(() => ({ id, width, height }), [id, width, height]);
     const session = useMarkSession(history, onHistory, image);
     const selected = session.selected !== null && session.present[session.selected] !== undefined;
 

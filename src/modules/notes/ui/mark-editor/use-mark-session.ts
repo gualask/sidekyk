@@ -25,17 +25,30 @@ interface Editing {
 /** How the marks' history changes: as a state setter's update. */
 export type HistoryChange = (change: (history: MarkHistory) => MarkHistory) => void;
 
+/** The image marked: its id, and its size in pixels. */
+export interface MarkedImage extends Size {
+    id: string;
+}
+
 /**
- * The marks of an image of `image`'s size, their history held by the caller (`history`,
- * `onHistory`): the draft a drag shows over them, the mark selected and the text being written,
- * their labels' size and ink.
+ * The marks of `image`, their history held by the caller (`history`, `onHistory`): the draft a
+ * drag shows over them, the mark selected and the text being written, their labels' size and
+ * ink. Another image starts them anew, so an editor that goes through images stays mounted, and
+ * keeps the focus.
  */
-export function useMarkSession(history: MarkHistory, onHistory: HistoryChange, image: Size) {
+export function useMarkSession(history: MarkHistory, onHistory: HistoryChange, image: MarkedImage) {
     const ink = useMemo(markInk, []);
     const size = markSize(image.width, image.height);
     const [draft, setDraft] = useState<Mark[] | null>(null);
     const [selected, setSelected] = useState<number | null>(null);
     const [editing, setEditing] = useState<Editing | null>(null);
+    const [marking, setMarking] = useState(image.id);
+    if (marking !== image.id) {
+        setMarking(image.id);
+        setDraft(null);
+        setSelected(null);
+        setEditing(null);
+    }
     const present = history.present;
 
     /** The shapes of `list`, to find what a pointer is on: of the marks it acts on, not of the
