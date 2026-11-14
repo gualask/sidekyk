@@ -14,10 +14,11 @@ import { useNoteDraft } from './use-note-draft';
  * The field on top of notes: `↵` adds the note, `⇧↵` breaks the line, a paste into the empty field
  * adds it at once; images as `useNoteDraft` says, files and addresses as `useReferenceField`.
  * `⌘N` (the app's key) brings the focus here, as its placeholder says. Where the system captures,
- * an icon at its right starts a capture, which becomes a note of its own.
+ * an icon at its right starts a capture for a new note in this list.
  */
 export function Composer({
     book,
+    list,
     focus,
     onFocused,
     placeholder,
@@ -30,6 +31,8 @@ export function Composer({
 }: {
     /** The book the notes go into, whose files it suggests after `@`. */
     book: string;
+    /** The list of `book` the notes go into, a capture started here too. */
+    list: string;
     /** The field takes the focus (as it shows). */
     focus: boolean;
     onFocused: () => void;
@@ -92,15 +95,15 @@ export function Composer({
                 }}
             />
             {references.layer}
-            {canCapture ? <CaptureButton /> : null}
+            {canCapture ? <CaptureButton book={book} list={list} /> : null}
             <PendingList pending={draft.pending} onDrop={draft.dropPending} />
             {hint ? <p className="px-0.5 pt-1 text-[11.5px] text-ui-text-muted">{hint}</p> : null}
         </div>
     );
 }
 
-/** At the field's right, where the system captures: starts a capture, a note of its own. */
-function CaptureButton() {
+/** At the field's right, where the system captures: starts a capture for a new note in `list`. */
+function CaptureButton({ book, list }: { book: string; list: string }) {
     const { t } = useTranslation();
     const port = useNotesPort();
     return (
@@ -109,7 +112,9 @@ function CaptureButton() {
             className="btn-icon absolute top-[13px] right-4 h-7 w-7"
             title={t('notes.capture')}
             aria-label={t('notes.capture')}
-            onClick={() => void port.startCapture()}
+            onClick={() =>
+                void port.startCapture({ kind: 'into', book, target: { kind: 'new', list } })
+            }
         >
             <IconScreenshot size={16} />
         </button>

@@ -3,7 +3,6 @@ import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { useCaptureMarks } from '../application/captures';
 import { useNoteActions } from '../application/note-actions/note-actions';
 import { useNotes } from '../application/notes.queries';
 import type { Moving } from '../model/destination';
@@ -46,7 +45,6 @@ export function InboxColumn({
     const { data: notes, error } = useNotes(INBOX_BOOK);
     const actions = useNoteActions(INBOX_BOOK);
     const { cardState, edit } = useCardStates(INBOX_BOOK);
-    const { marks, end: endMarks } = useCaptureMarks();
     const [moving, setMoving] = useState<Moving | null>(null);
     const width = useSidebarWidth('inbox', INBOX_WIDTH);
     const box = useRef<HTMLElement>(null);
@@ -91,6 +89,7 @@ export function InboxColumn({
                     <>
                         <Composer
                             book={INBOX_BOOK}
+                            list={list.id}
                             focus={focusComposer}
                             onFocused={onComposerFocused}
                             placeholder={t('notes.composer')}
@@ -111,9 +110,6 @@ export function InboxColumn({
                                         onDone={null}
                                         order={null}
                                         dropping={images.overCard === note.id}
-                                        marks={marks}
-                                        place={t('inbox.title')}
-                                        onMarked={endMarks}
                                         onMove={() =>
                                             setMoving({ kind: 'note', book: INBOX_BOOK, note })
                                         }

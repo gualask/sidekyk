@@ -8,13 +8,13 @@
 pub(crate) mod blocking;
 pub(crate) mod capture;
 pub(crate) mod cli;
+pub(crate) mod compact_window;
 pub(crate) mod diagnostics;
 pub(crate) mod diagram;
 pub(crate) mod lifecycle;
 pub(crate) mod links;
 pub(crate) mod notes;
 pub(crate) mod projects;
-pub(crate) mod quick_note;
 pub(crate) mod repository;
 pub(crate) mod search;
 pub(crate) mod settings;

@@ -9,8 +9,8 @@ use ::tauri::path::BaseDirectory;
 use ::tauri::{Emitter, Manager};
 
 use crate::desktop::capture::CaptureSession;
+use crate::desktop::compact_window::CompactWindow;
 use crate::desktop::launch::Launch;
-use crate::desktop::quick_note::QuickNoteState;
 use crate::desktop::settings::{apply_language, AppliedSettings};
 use crate::desktop::window::{self, FirstShow};
 use crate::infrastructure::files::HostFiles;
@@ -91,6 +91,16 @@ pub(crate) fn run() {
             },
         )
         .register_asynchronous_uri_scheme_protocol(
+            tauri_commands::capture::image_scheme::SCHEME,
+            |context, request, responder| {
+                tauri_commands::capture::image_scheme::respond(
+                    context.app_handle(),
+                    request.uri().path(),
+                    responder,
+                )
+            },
+        )
+        .register_asynchronous_uri_scheme_protocol(
             tauri_commands::notes::image_scheme::SCHEME,
             |context, request, responder| {
                 tauri_commands::notes::image_scheme::respond(
@@ -104,7 +114,7 @@ pub(crate) fn run() {
         .manage(Launch::default())
         .manage(FirstShow::default())
         .manage(CaptureSession::default())
-        .manage(QuickNoteState::default())
+        .manage(CompactWindow::default())
         .setup(setup)
         .on_page_load(lifecycle::page_loading)
         .on_window_event(lifecycle::window_event)
@@ -205,13 +215,14 @@ fn commands() -> impl Fn(::tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         tauri_commands::notes::images::mark_note_image,
         tauri_commands::notes::images::remove_note_image,
         tauri_commands::notes::copy_note,
-        tauri_commands::quick_note::quick_note_shown,
-        tauri_commands::quick_note::close_quick_note,
-        tauri_commands::quick_note::quick_note_restored,
+        tauri_commands::compact_window::compact_shown,
+        tauri_commands::compact_window::close_compact,
+        tauri_commands::compact_window::compact_restored,
         tauri_commands::capture::can_capture,
         tauri_commands::capture::start_capture,
-        tauri_commands::capture::add_capture,
-        tauri_commands::capture::set_marking,
+        tauri_commands::capture::write_capture,
+        tauri_commands::capture::drop_crops,
+        tauri_commands::capture::crop_png,
         tauri_commands::capture::open_capture_settings,
         tauri_commands::notes::images::note_image_png,
         tauri_commands::notes::place_note,

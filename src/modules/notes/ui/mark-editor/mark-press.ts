@@ -26,6 +26,8 @@ export interface PressContext {
     image: { width: number; height: number };
     scale: number;
     selected: number | null;
+    /** The marks of the note's other images: a new letter comes after theirs too. */
+    taken: readonly Mark[];
     /** A pointer's place in the image's pixels. */
     toImage: (event: { clientX: number; clientY: number }) => MarkPoint;
     shapesOf: (marks: readonly Mark[]) => MarkShape[];
@@ -135,16 +137,16 @@ function dragMark(
 }
 
 /**
- * Places the next letter: at `start` on a click, at the release of a drag with its tail pointing
+ * Places the next letter of the note: at `start` on a click, at the release of a drag with its tail pointing
  * back to `start`.
  */
 function placeMark(
     event: PointerEvent<HTMLCanvasElement>,
     base: Mark[],
     start: MarkPoint,
-    { image, toImage, commit, setDraft, setSelected }: PressContext,
+    { image, taken, toImage, commit, setDraft, setSelected }: PressContext,
 ) {
-    const letter = nextLetter(base);
+    const letter = nextLetter([...taken, ...base]);
     const spot = inImage(start, image.width, image.height);
     draftDrag(
         event,

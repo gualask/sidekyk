@@ -99,7 +99,6 @@ export function NotesWorkspace({
                 onComposerFocused={() => setWriteIn(null)}
                 reveal={reveal}
                 onRevealed={revealed}
-                place={project.name}
                 onReorder={setReorder}
                 onMove={askMoveNote}
             />

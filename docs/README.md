@@ -23,7 +23,8 @@ the others point to it.
   - `notes.md`: cards, lists, the Inbox, moving, storage.
   - `note-images.md`: images in notes: in, thumbnails, copy, export, files.
   - `note-references.md`: files and addresses in a note's text, `@` suggesting files.
-  - `capture.md`: an area of the screen captured into a note: overlay, entries, per system.
+  - `capture.md`: an area of the screen captured: overlay, entries, per system.
+  - `capture-window.md`: the step after it: the crops of a note, marks, text, where it goes.
   - `quick-note.md`: a note for the Inbox from any app, the window shrunk to a field.
   - `background.md`: tray, global shortcuts, hidden window, the app icon.
   - `languages.md`: English and Italian, catalogs, `i18n:check`.

@@ -175,7 +175,7 @@ pub struct MarkPoint {
 }
 
 /// The note images go to, as the frontend names it: one there, or a new one on top of a list.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum ImageTarget {
     Note { id: String },

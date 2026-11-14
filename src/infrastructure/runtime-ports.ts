@@ -3,7 +3,7 @@ import type { ProjectsPort } from '@/modules/projects';
 import type { RepositoryPort } from '@/modules/repository';
 import type { SearchPort } from '@/modules/search';
 import type { SettingsPort } from '@/modules/settings';
-import type { QuickNotePort } from '@/shared/platform/quick-note';
+import type { CompactWindowPort } from '@/shared/platform/compact-window';
 import type { TitleBarPort } from '@/shared/platform/title-bar';
 
 /**
@@ -17,7 +17,7 @@ export type RuntimePorts = {
     search: SearchPort;
     settings: SettingsPort;
     titleBar: TitleBarPort;
-    quickNote: QuickNotePort;
+    compactWindow: CompactWindowPort;
     /** Records an uncaught frontend error where problems are investigated (the app's log). */
     reportError: (message: string) => void;
     /** Shows the window, created hidden so that startup shows no blank frame. */

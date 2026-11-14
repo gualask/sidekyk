@@ -259,7 +259,11 @@ export type FixtureNotes = NotesPort & {
  * book with none). As the backend, a book is the Inbox or a project in the list, not its
  * repository: a moved one's notes stay.
  */
-export function fixtureNotes(scenario: Scenario, projects: FixtureProjects): FixtureNotes {
+export function fixtureNotes(
+    scenario: Scenario,
+    projects: FixtureProjects,
+    onTaken: (width: number, height: number) => void,
+): FixtureNotes {
     const books = new Map<string, Book>();
     const book = (key: string): Book => {
         if (key !== INBOX_BOOK) projects.project(key);
@@ -367,7 +371,7 @@ export function fixtureNotes(scenario: Scenario, projects: FixtureProjects): Fix
         found.edited = now;
         return { ...found };
     };
-    return {
+    const port: FixtureNotes = {
         /** The notes as they are, for the palette's search. */
         peek: (key) => snapshot(book(key)),
         /** A project removed takes its notes, as the backend's `remove_project`. */
@@ -568,26 +572,66 @@ export function fixtureNotes(scenario: Scenario, projects: FixtureProjects): Fix
         imagePng: async (_key, image) => (await fetch(IMAGE_URLS.get(image.id) ?? '')).blob(),
         imageUrl: (_key, image) => IMAGE_URLS.get(image.id) ?? '',
         onImageDrop: (listener) => onBrowserImageDrop(addImage, listener),
-        // a capture picks the hero image a moment later, as if an area had been dragged
+        // a capture picks the hero image a moment later, as if an area had been dragged; the
+        // capture window opens on it, as the backend opens it
         canCapture: async () => true,
-        startCapture: async () => {
+        startCapture: async (into) => {
+            const area = await fetch(REPOSITORY_IMAGES['public/hero.png'].url);
+            const bytes = new Uint8Array(await area.arrayBuffer());
+            const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+            const { width, height } = bitmap;
+            bitmap.close();
+            const crop = newId();
+            CROPS.set(crop, bytes);
             setTimeout(() => {
-                for (const listener of captureListeners) listener({ kind: 'taken' });
+                for (const listener of captureListeners) {
+                    listener({ kind: 'taken', crop, width, height, into });
+                }
+                onTaken(width, height);
             }, 300);
         },
         onCapture: (listener) => {
             captureListeners.add(listener);
             return () => captureListeners.delete(listener);
         },
-        addCapture: async (key) => {
-            const area = await fetch(REPOSITORY_IMAGES['public/hero.png'].url);
-            const bytes = new Uint8Array(await area.arrayBuffer());
-            return addImage(key, { kind: 'new', list: book(key).openList }, bytes);
+        // as the backend's `write_capture`, step by step: the note with its first crop, the
+        // others after it, the marks, the text
+        writeCapture: async ({ book: key, target, text, images }) => {
+            let found = target.kind === 'note' ? note(book(key), target.id) : null;
+            for (const image of images) {
+                const before = found?.images.length ?? 0;
+                if (image.kind === 'crop') {
+                    const bytes = CROPS.get(image.crop);
+                    if (!bytes) throw failure('unknown');
+                    found = await addImage(
+                        key,
+                        found ? { kind: 'note', id: found.id } : target,
+                        bytes,
+                    );
+                }
+                const id = image.kind === 'crop' ? found?.images[before]?.id : image.id;
+                if (found && id && (image.marks.length > 0 || image.kind === 'image')) {
+                    found = await port.markImage(key, found.id, id, image.marks, image.drawn);
+                }
+            }
+            if (!found) throw failure('unknown');
+            if (text !== null) found = await port.setNoteText(key, found.id, text);
+            for (const image of images) if (image.kind === 'crop') CROPS.delete(image.crop);
+            return found;
         },
-        setMarking: async () => undefined,
+        dropCrops: async (crops) => {
+            for (const crop of crops) CROPS.delete(crop);
+        },
+        cropPng: async (crop) =>
+            new Blob([CROPS.get(crop) ?? new Uint8Array()], { type: 'image/png' }),
+        cropUrl: () => REPOSITORY_IMAGES['public/hero.png'].url,
         openCaptureSettings: async () => undefined,
     };
+    return port;
 }
+
+/** The crops a draft holds, by id: the hero image's bytes. */
+const CROPS = new Map<string, Uint8Array<ArrayBuffer>>();
 
 /** Who follows the fixture's captures. */
 const captureListeners = new Set<(event: CaptureEvent) => void>();

@@ -20,4 +20,4 @@ pub use images::{
 };
 pub use markdown::{to_markdown, ExportWords, EXPORT_IMAGES};
 pub use ports::{GivenFiles, NotesStorage};
-pub use store::{BookNotes, NotesStore};
+pub use store::{BookNotes, CaptureImage, CaptureWrite, NotesStore};

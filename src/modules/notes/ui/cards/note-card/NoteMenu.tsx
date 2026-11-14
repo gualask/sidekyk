@@ -7,15 +7,18 @@ export type NoteOrder = { top: boolean; moveToTop: () => void; reorder: () => vo
 
 /**
  * A note's ⋯: move it to the top and reorder (an open note among others), move it to another list
- * or book, delete it.
+ * or book, add a capture (where the system captures), delete it.
  */
 export function NoteMenu({
     order,
     onMove,
+    onCapture,
     onDelete,
 }: {
     order: NoteOrder | null;
     onMove: () => void;
+    /** Captures an area into the note; null where the system does not capture. */
+    onCapture: (() => void) | null;
     onDelete: () => void;
 }) {
     const { t } = useTranslation();
@@ -35,6 +38,11 @@ export function NoteMenu({
                         <Menu.Item className="menu-item" onClick={onMove}>
                             {t('notes.move')}
                         </Menu.Item>
+                        {onCapture ? (
+                            <Menu.Item className="menu-item" onClick={onCapture}>
+                                {t('notes.addCapture')}
+                            </Menu.Item>
+                        ) : null}
                         <Menu.Separator className="mx-1.5 my-1 h-px bg-ui-border" />
                         <Menu.Item className="menu-item danger" onClick={onDelete}>
                             <IconTrash size={14} />

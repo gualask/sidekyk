@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { CopyIcon } from '@/shared/ui/CopyIcon';
 import { type CopyState, copyLabel } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import type { PendingMarks } from '../../../application/captures';
+import { useCanCapture } from '../../../application/captures';
 import type { NoteActions } from '../../../application/note-actions/note-actions';
+import { useNotesPort } from '../../../application/notes.port';
 import { noteMeta } from '../../../model/notes';
 import type { Note } from '../../../model/notes.types';
 import { DROP_ATTRIBUTE } from '../../use-image-drops';
@@ -44,9 +45,6 @@ export function NoteCard({
     order,
     onMove,
     dropping,
-    marks,
-    place,
-    onMarked,
 }: {
     /** The book the note is in. */
     book: string;
@@ -66,18 +64,19 @@ export function NoteCard({
     onMove: () => void;
     /** Files are dragged over it. */
     dropping: boolean;
-    /**
-     * A capture's marks waiting for their card, which opens them if they are this note's; then
-     * the note opens for its text, unless the capture was discarded.
-     */
-    marks: PendingMarks | null;
-    /** Where the note is, as the capture's marks name it: the project's name, the Inbox. */
-    place: string;
-    /** The capture's marks ended. */
-    onMarked: () => void;
 }) {
     const done = note.done !== null;
     const { t } = useTranslation();
+    const port = useNotesPort();
+    // the capture window opens on the note, its images and text in it
+    const capture = useCanCapture()
+        ? () =>
+              void port.startCapture({
+                  kind: 'into',
+                  book,
+                  target: { kind: 'note', id: note.id },
+              })
+        : null;
 
     return (
         <article
@@ -108,17 +107,13 @@ export function NoteCard({
                     book={book}
                     note={note}
                     actions={actions}
-                    annotate={marks?.note === note.id ? marks.image : null}
-                    place={place}
-                    onAnnotated={(kept) => {
-                        onMarked();
-                        if (kept) onEdit(true);
-                    }}
+                    onCapture={editing ? capture : null}
                 />
                 <CardFoot note={note} editing={editing} copied={copied} onCopy={onCopy}>
                     <NoteMenu
                         order={order}
                         onMove={onMove}
+                        onCapture={capture}
                         onDelete={() => void actions.remove(note)}
                     />
                 </CardFoot>

@@ -1,12 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import {
-    INBOX_BOOK,
-    NoteReferencesProvider,
-    newNoteTarget,
-    notesPanel,
-    notesTarget,
-    useCaptures,
-} from '@/modules/notes';
+import { NoteReferencesProvider, newNoteTarget, notesPanel, useCaptures } from '@/modules/notes';
 import {
     activeProject,
     useProjectLayout,
@@ -26,12 +19,12 @@ import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
 import { whenIdle } from '@/shared/ui/when-idle';
 import { zoomControlAt } from '@/shared/ui/zoom-transition';
+import { CompactHost } from '../CompactHost';
 import { useAppNoteReferences } from '../note-references';
 import { deepestLevel, projectTiles, SUMMARIES } from '../panels';
 import { useProblems } from '../problems';
 import { useProjectEntry } from '../project-entry';
 import { useShowWindowWhen } from '../providers';
-import { QuickNoteHost } from '../QuickNoteHost';
 import { TopBar } from '../top-bar/TopBar';
 import type { ZoomLevel } from '../workspace';
 import { useWorkspaceKeys } from '../workspace-view/workspace-keys';
@@ -99,15 +92,9 @@ export function AppShell() {
     );
     const problems = useProblems(projects.data, dialogs.openSettings, fixProject);
 
-    // a capture becomes a note of the project whose panels show, else of the Inbox; it comes into
-    // view, where its card opens its marks
-    useCaptures(
-        () => (level > 0 && project ? project.id : INBOX_BOOK),
-        (book, note) => {
-            if (book === INBOX_BOOK) asks.revealInboxNote(note.id);
-            else show(notesPanel.id, notesTarget(note.list, note.id));
-        },
-    );
+    // a capture with no place of its own goes to the project whose panels show, before any is
+    // chosen
+    useCaptures(() => (level > 0 && project ? project.id : null));
 
     // a file a note names: in Files full screen, at its lines; in another folder of the project
     // when only that one has it, which comes on screen first (asked which, when several do)
@@ -193,7 +180,7 @@ export function AppShell() {
     );
 
     return (
-        <QuickNoteHost>
+        <CompactHost>
             <div className="flex h-full flex-col">
                 <TopBar
                     level={level}
@@ -259,6 +246,6 @@ export function AppShell() {
                 </main>
                 <ShellDialogs dialogs={dialogs} picker={entry.picker} palette={palette} />
             </div>
-        </QuickNoteHost>
+        </CompactHost>
     );
 }

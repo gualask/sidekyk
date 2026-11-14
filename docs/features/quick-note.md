@@ -33,15 +33,21 @@ and the Move dialog: `notes.md`.
 - Then the window goes back as it was: in front stays in front; on screen behind another app
   stays behind, and the app that was in front gets the focus back; hidden or minimized goes
   hidden (a minimized window is no longer in the Dock after a note).
-- Any other way of showing the window (its shortcut, the tray's Show, the Dock, a capture's marks)
-  closes the note and leaves the layout in front. Closing the window (`⌘W`) closes the note.
+- Any other way of showing the window (its shortcut, the tray's Show, the Dock) closes the note
+  and leaves the layout in front. Closing the window (`⌘W`) closes the note. A capture
+  (`⌃⌥C`) closes it as `Esc`, its draft kept; while the capture window is open
+  (`capture-window.md`) the note's shortcut does nothing.
 - The layout under the note keeps its state (level, project, scroll) and none of its keys act
   while the note shows.
 
 ## How it is built
 
-- One window, one WebView: the main window's own page switches between the note and the layout,
-  kept mounted and hidden (`QuickNoteHost`, `notes/ui/QuickNote.tsx`). The note shares the Inbox
+- One window, one WebView: the main window's own page switches between a compact view (the note,
+  or the capture window) and the layout, kept mounted and hidden (`CompactHost`,
+  `notes/ui/QuickNote.tsx`). One owner for the window's views and their policies
+  (`desktop/compact_window.rs`: a stage `Off | Open { view, before, painted } | Restoring`): a way
+  of showing the window closes the note but leaves the capture window in front; `⌘W` closes the
+  note, and is the capture window's `Esc` (`closeAsked`). The note shares the Inbox
   field's logic (`useNoteDraft`) and drops (`useColumnImages`), and Move's destination field
   (`DestinationField`, `useDestination`, `model/destination.ts`: subject `new`, `settled` when
   the field is left).
@@ -49,12 +55,12 @@ and the Move dialog: `notes.md`.
   `Move` they make (`moveOf`): a list to make, the images and the toast with Undo are Move's,
   the toast saying "Added to …". Undo and a failed move leave the note in the Inbox.
 - A hidden webview never paints, and a window shown before its page painted shows the frame
-  before it. So the backend (`desktop/quick_note.rs`) turns the window transparent
-  (`NSWindow.alphaValue` 0), changes its frame and shows it, then tells the page (`quick-note`:
-  `open`); the page, two animation frames later, says it painted (`quick_note_shown`) and the
-  window turns opaque. Closing is the same the other way (`close_quick_note`, `close`,
-  `quick_note_restored`); a layout put back while the window is hidden paints and turns opaque
-  at its next show.
+  before it. So the backend (`desktop/compact_window.rs`) turns the window transparent
+  (`NSWindow.alphaValue` 0), changes its frame (`compact_frame.rs`) and shows it, then tells the
+  page (`compact-window`: `open`, the view and its size); the page, two animation frames later,
+  says it painted (`compact_shown`) and the window turns opaque. Closing is the same the other
+  way (`close_compact`, `close`, `compact_restored`); a layout put back while the window is
+  hidden paints and turns opaque at its next show.
 - Before the note: shown, focused, frame, the app in front (`NSWorkspace.frontmostApplication`);
   where the window goes back is a pure function of them (`back_to`, tested). Behind another app:
   that app is activated again (`NSRunningApplication`); hidden: `NSApp.hide`.
@@ -67,8 +73,12 @@ and the Move dialog: `notes.md`.
   a later one or the page's answer makes moot.
 - The window's getters run before the state's lock: off the main thread a getter waits for it,
   which a press holding the lock on the main thread would never answer.
-- System parts in `infrastructure/window/` (opacity, traffic lights, the app in front); no new
-  crate, five `objc2-app-kit` features.
+- System parts in `infrastructure/window/` (opacity, traffic lights, the app in front, the
+  display under the pointer or a capture's); no new crate, five `objc2-app-kit` features.
+- The display is found by global points on macOS (`NSEvent.mouseLocation`, `CGDisplayBounds`):
+  Tauri's `monitor_from_point` takes points there, its `cursor_position` gives physical pixels,
+  which on a Retina display land past it (measured: (500, 612) pt finds the display, (1001, 1224)
+  none).
 - The note's keys stop at its root: the layout's window listeners, which skip fields but not
   `⌘K`, `⌘,`, `⌘N`, never see them.
 

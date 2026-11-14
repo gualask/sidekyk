@@ -54,15 +54,41 @@ export interface Mark extends MarkPoint {
     tail: MarkPoint | null;
 }
 
-/**
- * How a capture ended (`modules/capture` in the backend, `CaptureEvent`): an area picked, which
- * `addCapture` makes a note; the system not letting Sidekyk read the screen; a failure. A cancel
- * tells nothing.
- */
-export type CaptureEvent = { kind: 'taken' } | { kind: 'refused' } | { kind: 'failed' };
-
 /** The note images go to: one there, or a new one on top of a list. */
 export type ImageTarget = { kind: 'note'; id: string } | { kind: 'new'; list: string };
+
+/**
+ * Where a capture goes, as the entry that started it says (`modules/capture`, `CaptureInto`): the
+ * place last chosen for a capture (the global shortcut, the tray, the capture window's +), or a
+ * list or a note of a book (a Notes field, a note's "Add capture").
+ */
+export type CaptureInto = { kind: 'last' } | { kind: 'into'; book: string; target: ImageTarget };
+
+/**
+ * How a capture ended (`modules/capture` in the backend, `CaptureEvent`): an area picked, a crop
+ * the backend holds until a note takes it (`writeCapture`) or its draft drops it; the system not
+ * letting Sidekyk read the screen; a failure. A cancel tells nothing.
+ */
+export type CaptureEvent =
+    | { kind: 'taken'; crop: string; width: number; height: number; into: CaptureInto }
+    | { kind: 'refused' }
+    | { kind: 'failed' };
+
+/**
+ * An image of a capture's note, as written: a crop, or one of the note's own marked anew; `drawn`
+ * the PNG of `marks` over the image under them, none without marks.
+ */
+export type CaptureImage =
+    | { kind: 'crop'; crop: string; marks: Mark[]; drawn: Uint8Array<ArrayBuffer> | null }
+    | { kind: 'image'; id: string; marks: Mark[]; drawn: Uint8Array<ArrayBuffer> | null };
+
+/** A capture's note, written in one step: where, its text (none: unchanged), its images. */
+export interface CaptureWrite {
+    book: string;
+    target: ImageTarget;
+    text: string | null;
+    images: CaptureImage[];
+}
 
 /**
  * One note: a card of plain text in a list of a book, its images below the text. Times are

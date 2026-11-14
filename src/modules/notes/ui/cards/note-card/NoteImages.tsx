@@ -1,5 +1,5 @@
-import { IconX } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { IconScreenshot, IconX } from '@tabler/icons-react';
+import { useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { NoteActions } from '../../../application/note-actions/note-actions';
 import { useNotesPort } from '../../../application/notes.port';
@@ -9,43 +9,23 @@ import { ImageViewer } from './ImageViewer';
 
 /**
  * A note's images below its text: thumbnails of a fixed height, so the card's never moves while
- * they load. A click opens the image large; on hover a × takes it out (with Undo). A capture's
- * opens large with its marks at once; when they end the viewer closes (`onAnnotated`): Done keeps
- * the note, Cancel discards the capture, the note deleted (with Undo).
+ * they load. A click opens the image large; on hover a × takes it out (with Undo). While the note
+ * is edited, an icon after them captures an area into it (`onCapture`).
  */
 export function NoteImages({
     book,
     note,
     actions,
-    annotate = null,
-    place = '',
-    onAnnotated = () => undefined,
+    onCapture,
 }: {
     book: string;
     note: Note;
     actions: NoteActions;
-    /** A capture's image, just made a note, whose marks open at once. */
-    annotate?: string | null;
-    /** Where the note went, as the capture's marks name it. */
-    place?: string;
-    onAnnotated?: (kept: boolean) => void;
+    onCapture: (() => void) | null;
 }) {
     const [open, setOpen] = useState<number | null>(null);
-    // where a capture's note went, while its marks are open
-    const [captured, setCaptured] = useState<string | null>(null);
     const { t } = useTranslation();
-    const index = annotate ? note.images.findIndex((image) => image.id === annotate) : -1;
-    useEffect(() => {
-        if (index < 0) return;
-        setOpen(index);
-        setCaptured(place);
-    }, [index, place]);
-    const endCapture = (kept: boolean) => {
-        setOpen(null);
-        setCaptured(null);
-        onAnnotated(kept);
-    };
-    if (note.images.length === 0) return null;
+    if (note.images.length === 0 && !onCapture) return null;
     return (
         <>
             <ul className="mt-1 flex flex-wrap gap-1.5" aria-label={t('notes.images')}>
@@ -58,22 +38,30 @@ export function NoteImages({
                         onRemove={() => void actions.removeImage(note, image)}
                     />
                 ))}
+                {onCapture ? (
+                    <li className="self-center">
+                        <button
+                            type="button"
+                            className="btn-icon h-7 w-7"
+                            title={t('notes.addCapture')}
+                            aria-label={t('notes.addCapture')}
+                            // the card stays edited: a click here is no click outside it
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={onCapture}
+                        >
+                            <IconScreenshot size={16} />
+                        </button>
+                    </li>
+                ) : null}
             </ul>
             {open !== null && note.images[open] ? (
                 <ImageViewer
-                    // a capture's marks start a viewer of their own
-                    key={captured === null ? 'viewer' : 'capture'}
                     book={book}
                     note={note}
                     actions={actions}
                     index={open}
-                    captured={captured}
                     onIndex={setOpen}
-                    onClose={() => (captured === null ? setOpen(null) : endCapture(true))}
-                    onDiscard={() => {
-                        void actions.remove(note);
-                        endCapture(false);
-                    }}
+                    onClose={() => setOpen(null)}
                 />
             ) : null}
         </>

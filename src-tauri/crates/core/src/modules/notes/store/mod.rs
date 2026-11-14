@@ -10,9 +10,12 @@
 //! finds them; a note moved to another book takes copies of them.
 
 mod books;
+mod capture;
 mod images;
 mod lists;
 mod notes;
+
+pub use capture::{CaptureImage, CaptureWrite};
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;

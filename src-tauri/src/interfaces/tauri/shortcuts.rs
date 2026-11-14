@@ -3,15 +3,16 @@
 
 use tauri::AppHandle;
 
-use crate::desktop::{capture, quick_note, settings, window};
+use crate::desktop::{capture, compact_window, settings, window};
+use sidekyk_core::modules::capture::CaptureInto;
 use sidekyk_core::modules::settings::{GlobalShortcutStatuses, ShortcutAction};
 
 /// A global shortcut pressed, from any app.
 pub(crate) fn pressed(app: &AppHandle, action: ShortcutAction) {
     match action {
         ShortcutAction::Toggle => window::toggle(app),
-        ShortcutAction::Capture => capture::capture(app),
-        ShortcutAction::Note => quick_note::toggle(app),
+        ShortcutAction::Capture => capture::capture(app, CaptureInto::Last),
+        ShortcutAction::Note => compact_window::toggle_quick_note(app),
     }
 }
 

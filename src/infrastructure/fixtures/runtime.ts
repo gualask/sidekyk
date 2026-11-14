@@ -34,10 +34,10 @@ export interface BrowserRuntime {
 /** Browser-safe ports for `?dev=…` fixtures: fixed data, no native backend. */
 export function createBrowserRuntime(scenario: Scenario): BrowserRuntime {
     const projects = fixtureProjectList(scenario);
-    const notes = fixtureNotes(scenario, projects);
+    const shownWindow = fixtureWindow();
+    const notes = fixtureNotes(scenario, projects, shownWindow.openCapture);
     const projectsPort = fixtureProjectsPort(projects, notes);
     const repository = fixtureRepository(scenario, projects);
-    const shownWindow = fixtureWindow();
     return {
         ports: {
             notes,

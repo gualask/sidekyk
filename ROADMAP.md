@@ -36,7 +36,8 @@ has. Built: `docs/features/project-folders.md` (several folders, one on screen).
 `.cflow/plans/capture.md`.
 
 Built: `docs/features/note-images.md` (images in notes, marks), `docs/features/capture.md`
-(capture on macOS), `docs/features/quick-note.md` (a note for the Inbox from any app, macOS).
+(capture on macOS), `docs/features/capture-window.md` (the note a capture makes, macOS),
+`docs/features/quick-note.md` (a note for the Inbox from any app, macOS).
 
 - [ ] Capture on Windows: Windows.Graphics.Capture (GDI as fallback) and a Win32 overlay, tried
       on a machine
@@ -70,6 +71,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - macOS, capture (`docs/features/capture.md`): over a full screen app and on another Space,
     two displays (the one under the pointer), the monthly "bypass the system private window
     picker" prompt, the permission kept across an update of a signed build
+  - macOS, capture window (`docs/features/capture-window.md`): two displays, over a full screen
+    app, three captures in a row into one note, `⌘↵` pasted into Claude Code, the focus back to
+    the app in front, `⌃⌥C` over the quick note, `⌘W`
   - macOS, quick note (`docs/features/quick-note.md`): on a second display, over a full screen
     app and on another Space, Sidekyk itself in full screen, from minimized, no frame of the
     other layout on the packaged app

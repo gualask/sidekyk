@@ -93,11 +93,12 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     `lifecycle.rs` (page load, close, run events). `blocking.rs`, the one file the others import:
     work off the async runtime, logged; a folder by its id; a book's notes; the `Ports`.
   - `desktop/`: the window's session: the first show, showing and hiding it, closing into the tray
-    (`window.rs`), the quick note's stages (`quick_note.rs`) and its frame (`quick_note_frame.rs`),
-    one capture at a time and the areas waiting (`capture.rs`), the settings in effect
+    (`window.rs`), the compact window's views and stages, the quick note and the capture window
+    (`compact_window.rs`), and their frames (`compact_frame.rs`), one capture at a time and its
+    crops (`capture.rs`), the settings in effect
     (`settings.rs`), the backend's texts (`texts.rs`), what a launch opened (`launch.rs`). Never
-    imports `interfaces/`; inside it, `window -> quick_note -> quick_note_frame`,
-    `capture -> window, texts`, `settings -> texts, window`.
+    imports `interfaces/`; inside it, `window -> compact_window -> compact_frame`,
+    `capture -> compact_window, window, texts`, `settings -> texts, window`.
   - `infrastructure/`: every system `#[cfg]` of the crate: `settings_store.rs`, `stored_json.rs`,
     `notes_files.rs`, `files.rs`, `logging.rs`, `tray.rs` (icon, menu, whether it is up),
     `global_shortcuts/` (the plugin's registrar, Linux's command, macOS's own shortcuts),

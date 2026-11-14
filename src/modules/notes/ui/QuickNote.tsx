@@ -1,22 +1,16 @@
-import {
-    type KeyboardEvent,
-    type RefObject,
-    useEffect,
-    useLayoutEffect,
-    useRef,
-    useState,
-} from 'react';
+import { type KeyboardEvent, type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { KeyHint } from '@/shared/ui/KeyCaps';
 import { type NoteActions, useNoteActions } from '../application/note-actions/note-actions';
 import { useNotes } from '../application/notes.queries';
 import { useNotesSettings } from '../application/notes-settings';
-import { type MoveState, type MoveSubject, moveOf, picked, settled } from '../model/destination';
+import { type MoveSubject, moveOf, picked } from '../model/destination';
 import { INBOX_BOOK, type Note } from '../model/notes.types';
 import { PendingList } from './composer/Composer';
 import { useNoteDraft } from './composer/use-note-draft';
 import { DestinationField } from './destination-field/DestinationField';
-import { type Destination, useDestination } from './destination-field/use-destination';
+import { useChoice } from './destination-field/use-choice';
+import { useDestination } from './destination-field/use-destination';
 import { linesClass, wrapLines } from './notes-layout';
 import { useColumnImages } from './use-image-drops';
 
@@ -84,7 +78,7 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
             // the layout, hidden under the note, keeps its window keys: the note's are its own
             onKeyDown={(event) => event.stopPropagation()}
         >
-            {/* the window's size as the backend makes it (`quick_note.rs`), for a larger one */}
+            {/* the window's size as the backend makes it (`compact_frame.rs`), for a larger one */}
             <section
                 ref={box}
                 className="flex h-[min(100vh,168px)] w-full max-w-[560px] flex-col bg-ui-surface min-[600px]:rounded-xl"
@@ -131,37 +125,6 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
             </section>
         </main>
     );
-}
-
-/**
- * A choice of the destination, while its field has the focus (`start`, `end`); `restore` puts back
- * the destination as it was when it took it (`Esc`). Ended, a destination left half chosen goes
- * back as it was, or to a project with the list it opens on. Closing the note ends a choice in
- * progress: a field hidden with the focus may never say it lost it (the shortcut closes the note
- * from anywhere).
- */
-function useChoice(open: boolean, { state, setState, chipNotes }: Destination) {
-    const [choosing, setChoosing] = useState(false);
-    const before = useRef<MoveState>(state);
-    const [wasOpen, setWasOpen] = useState(open);
-    if (open !== wasOpen) {
-        setWasOpen(open);
-        if (!open) setChoosing(false);
-    }
-    useEffect(() => {
-        if (choosing) return;
-        const next = settled(state, before.current, chipNotes);
-        if (next !== state) setState(next);
-    }, [choosing, state, chipNotes, setState]);
-    return {
-        choosing,
-        start: () => {
-            before.current = state;
-            setChoosing(true);
-        },
-        end: () => setChoosing(false),
-        restore: () => setState(before.current),
-    };
 }
 
 /**

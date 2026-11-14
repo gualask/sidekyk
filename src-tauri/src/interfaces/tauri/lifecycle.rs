@@ -3,15 +3,16 @@
 use tauri::webview::{PageLoadEvent, PageLoadPayload};
 use tauri::{AppHandle, Manager, RunEvent, Webview, Window, WindowEvent};
 
-use crate::desktop::{quick_note, settings, window};
+use crate::desktop::{capture, compact_window, settings, window};
 
-/// A page loaded again (a crashed webview) forgets a shortcut its predecessor was recording and a
-/// quick note it had open; logged, so a second load of a webview tells a crash.
+/// A page loaded again (a crashed webview) forgets a shortcut its predecessor was recording, a
+/// compact view it had open and its draft's crops; logged, so a second load of a webview tells a crash.
 pub(crate) fn page_loading(webview: &Webview, payload: &PageLoadPayload<'_>) {
     if payload.event() == PageLoadEvent::Started {
         tracing::info!(webview = webview.label(), "page loading");
         settings::set_shortcut_recording(webview.app_handle(), false);
-        quick_note::forget(webview.app_handle());
+        compact_window::forget(webview.app_handle());
+        capture::forget(webview.app_handle());
     }
 }
 

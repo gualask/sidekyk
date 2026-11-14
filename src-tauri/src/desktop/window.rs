@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewWindowBuilder, Window, WindowEvent};
 
-use super::quick_note::{self, Then};
+use super::compact_window;
 use crate::infrastructure::{tray, window as system};
 use sidekyk_core::modules::settings::Theme;
 
@@ -97,9 +97,9 @@ fn show_first(app: &AppHandle) -> bool {
 }
 
 /// Brings the window back, minimized, hidden or behind others; the first time, also at startup.
-/// A quick note open goes, the window staying in front with its layout.
+/// A compact view open has its say (`compact_window::on_show_request`).
 pub(crate) fn show(app: &AppHandle) {
-    if quick_note::close(app, Then::InFront) {
+    if compact_window::on_show_request(app) {
         return;
     }
     record_show(app);
@@ -120,9 +120,9 @@ fn record_show(app: &AppHandle) -> bool {
 }
 
 /// The global shortcut and `sidekyk --toggle`: the window in front hides; minimized, hidden or
-/// behind others, it comes back to the front. A quick note open gives way to the layout, in front.
+/// behind others, it comes back to the front. A compact view open has its say, as at `show`.
 pub(crate) fn toggle(app: &AppHandle) {
-    if quick_note::close(app, Then::InFront) {
+    if compact_window::on_show_request(app) {
         return;
     }
     let Some(window) = app.get_webview_window("main") else {
@@ -139,10 +139,11 @@ pub(crate) fn toggle(app: &AppHandle) {
 }
 
 /// Closing the window hides it while the tray can bring it back; quitting is in the tray's menu
-/// (and `⌘Q` on macOS). Without a tray, closing quits. A quick note open only closes, as `Esc`.
+/// (and `⌘Q` on macOS). Without a tray, closing quits. A compact view open has its say
+/// (`compact_window::on_close_request`).
 pub(crate) fn on_close(window: &Window, event: &WindowEvent) {
     if let WindowEvent::CloseRequested { api, .. } = event {
-        if quick_note::close(window.app_handle(), Then::AsBefore) {
+        if compact_window::on_close_request(window.app_handle()) {
             api.prevent_close();
             return;
         }

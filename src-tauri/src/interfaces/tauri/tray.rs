@@ -4,7 +4,8 @@
 
 use tauri::AppHandle;
 
-use crate::desktop::{capture, quick_note, window};
+use crate::desktop::{capture, compact_window, window};
+use sidekyk_core::modules::capture::CaptureInto;
 
 /// A click on the icon, or the menu's Show.
 pub(crate) fn show(app: &AppHandle) {
@@ -13,12 +14,12 @@ pub(crate) fn show(app: &AppHandle) {
 
 /// The menu's Capture.
 pub(crate) fn capture(app: &AppHandle) {
-    capture::capture(app);
+    capture::capture(app, CaptureInto::Last);
 }
 
 /// The menu's New Note.
 pub(crate) fn note(app: &AppHandle) {
-    quick_note::toggle(app);
+    compact_window::toggle_quick_note(app);
 }
 
 /// The menu's Quit.

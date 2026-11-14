@@ -1,9 +1,11 @@
 //! macOS: the window's opacity and buttons through its `NSWindow`, the app in front through
-//! `NSWorkspace`.
+//! `NSWorkspace`, the points `monitor_from_point` takes.
 
 use objc2_app_kit::{
-    NSApplicationActivationOptions, NSRunningApplication, NSWindow, NSWindowButton, NSWorkspace,
+    NSApplicationActivationOptions, NSEvent, NSRunningApplication, NSWindow, NSWindowButton,
+    NSWorkspace,
 };
+use objc2_core_graphics::{CGDisplayBounds, CGMainDisplayID};
 use tauri::WebviewWindow;
 
 /// An app running, by its process.
@@ -58,4 +60,26 @@ pub(crate) fn front_app() -> Option<AppId> {
 pub(crate) fn activate(app: AppId) -> bool {
     NSRunningApplication::runningApplicationWithProcessIdentifier(app.0)
         .is_some_and(|running| running.activateWithOptions(NSApplicationActivationOptions::empty()))
+}
+
+/// The pointer, in the space Tauri's `monitor_from_point` takes here: the displays' global points,
+/// from the main display's top left (`CGDisplayBounds`). Tauri's `cursor_position` gives physical
+/// pixels instead, which on a Retina display land past it.
+pub(super) fn pointer() -> (f64, f64) {
+    let point = NSEvent::mouseLocation();
+    let main = CGDisplayBounds(CGMainDisplayID());
+    // AppKit counts up from the main display's bottom
+    (point.x, main.size.height - point.y)
+}
+
+/// The middle of the display `display` (its `CGDirectDisplayID`), in `pointer`'s space; none for
+/// a display gone.
+pub(super) fn display_middle(display: u32) -> Option<(f64, f64)> {
+    let bounds = CGDisplayBounds(display);
+    (bounds.size.width > 0.0 && bounds.size.height > 0.0).then(|| {
+        (
+            bounds.origin.x + bounds.size.width / 2.0,
+            bounds.origin.y + bounds.size.height / 2.0,
+        )
+    })
 }

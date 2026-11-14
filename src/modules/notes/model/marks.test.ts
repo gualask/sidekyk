@@ -7,6 +7,7 @@ import {
     markHistory,
     markShape,
     markSize,
+    marksBesides,
     nextLetter,
     redone,
     sameMarks,
@@ -108,6 +109,16 @@ describe('nextLetter', () => {
         expect(nextLetter([mark('Z'), mark('A')])).toBe('B');
         const all = Array.from({ length: 26 }, (_, n) => mark(String.fromCharCode(65 + n)));
         expect(nextLetter(all)).toBe('A');
+    });
+});
+
+describe('marksBesides', () => {
+    it("gives the other images' marks, so a note's letters continue across its images", () => {
+        const byImage = [[mark('A'), mark('B')], [], [mark('C')]];
+        expect(marksBesides(byImage, 2).map((m) => m.text)).toEqual(['A', 'B']);
+        // the second image's next letter, after the first's and the third's
+        expect(nextLetter([...marksBesides(byImage, 1), ...byImage[1]])).toBe('D');
+        expect(marksBesides([], 0)).toEqual([]);
     });
 });
 

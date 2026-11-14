@@ -16,9 +16,9 @@ use crate::shared::id::new_id;
 use crate::shared::sync::lock;
 
 /// A new id no image of `book` has, nor one of `taken`.
-fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
+pub(super) fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
     let used = |id: &str| {
-        taken.iter().any(|i| i.id == id)
+        taken.iter().any(|i| i.ids().any(|used| used == id))
             || book
                 .notes
                 .iter()
@@ -33,17 +33,6 @@ fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
 }
 
 impl NotesStore {
-    /// A captured area, a new note on top of the book's open list.
-    pub fn add_capture(
-        &self,
-        storage: &dyn NotesStorage,
-        book: &Book,
-        image: PreparedImage,
-    ) -> anyhow::Result<Note> {
-        let list = self.notes(storage, book)?.open_list;
-        self.add_images(storage, book, ImageTarget::New { list }, vec![image])
-    }
-
     /// Adds images to a note, or to a new one on top of a list: their files first, then the note
     /// that names them. Files written for a change that fails are removed at the next session.
     pub fn add_images(
@@ -58,9 +47,7 @@ impl NotesStore {
             let folder = self.folder(storage, book, kept)?;
             let mut added: Vec<NoteImage> = Vec::with_capacity(images.len());
             for image in &images {
-                let note_image = image.note_image(new_image_id(&kept.notes, &added));
-                storage.write(&folder, &image_file(&note_image), &image.original)?;
-                storage.write(&folder, &thumb_file(&note_image.id), &image.thumb)?;
+                let note_image = write_image(storage, &folder, &kept.notes, &added, image)?;
                 added.push(note_image);
             }
             let notes = &mut kept.notes;
@@ -108,39 +95,10 @@ impl NotesStore {
             } else {
                 let marked =
                     marked.ok_or_else(|| anyhow::anyhow!("marks come with their image"))?;
-                self.write_marked(storage, book, kept, source, marks, marked)?
+                let folder = self.folder(storage, book, kept)?;
+                write_marked(storage, &folder, &kept.notes, &[], source, marks, marked)?
             };
             kept.notes.replace_image(id, image, replacement, now())
-        })
-    }
-
-    /// Writes the files of `marked`, drawn with `marks` over `source`: the image that takes
-    /// `source`'s place, kept under the marks.
-    fn write_marked(
-        &self,
-        storage: &dyn NotesStorage,
-        book: &Book,
-        kept: &mut KeptBook,
-        source: NoteImage,
-        marks: Vec<Mark>,
-        marked: PreparedImage,
-    ) -> anyhow::Result<NoteImage> {
-        anyhow::ensure!(
-            marked.kind == ImageKind::Png
-                && (marked.width, marked.height) == (source.width, source.height),
-            "a marked image is a PNG as large as the image under it"
-        );
-        check_marks(&marks, source.width, source.height)?;
-        let folder = self.folder(storage, book, kept)?;
-        let drawn = marked.note_image(new_image_id(&kept.notes, &[]));
-        storage.write(&folder, &image_file(&drawn), &marked.original)?;
-        storage.write(&folder, &thumb_file(&drawn.id), &marked.thumb)?;
-        Ok(NoteImage {
-            marked: Some(MarkedImage {
-                source: SourceImage::of(source),
-                marks,
-            }),
-            ..drawn
         })
     }
 
@@ -244,8 +202,55 @@ impl NotesStore {
     }
 }
 
+/// Writes in `folder` the files of `marked`, drawn with `marks` over `source`: the image that
+/// takes `source`'s place, kept under the marks; its id none of `book`'s images has nor one of
+/// `taken`, the images the same change writes.
+pub(super) fn write_marked(
+    storage: &dyn NotesStorage,
+    folder: &str,
+    book: &NoteBook,
+    taken: &[NoteImage],
+    source: NoteImage,
+    marks: Vec<Mark>,
+    marked: PreparedImage,
+) -> anyhow::Result<NoteImage> {
+    anyhow::ensure!(
+        marked.kind == ImageKind::Png
+            && (marked.width, marked.height) == (source.width, source.height),
+        "a marked image is a PNG as large as the image under it"
+    );
+    check_marks(&marks, source.width, source.height)?;
+    let drawn = write_image(storage, folder, book, taken, &marked)?;
+    Ok(NoteImage {
+        marked: Some(MarkedImage {
+            source: SourceImage::of(source),
+            marks,
+        }),
+        ..drawn
+    })
+}
+
+/// Writes `image`'s file and thumbnail in `folder`, under an id none of `book`'s images has nor
+/// one of `taken`: the image a note keeps of it.
+pub(super) fn write_image(
+    storage: &dyn NotesStorage,
+    folder: &str,
+    book: &NoteBook,
+    taken: &[NoteImage],
+    image: &PreparedImage,
+) -> anyhow::Result<NoteImage> {
+    let note_image = image.note_image(new_image_id(book, taken));
+    storage.write(folder, &image_file(&note_image), &image.original)?;
+    storage.write(folder, &thumb_file(&note_image.id), &image.thumb)?;
+    Ok(note_image)
+}
+
 /// The image `image` of the note `id` in `book`.
-fn image_of_note<'a>(book: &'a NoteBook, id: &str, image: &str) -> anyhow::Result<&'a NoteImage> {
+pub(super) fn image_of_note<'a>(
+    book: &'a NoteBook,
+    id: &str,
+    image: &str,
+) -> anyhow::Result<&'a NoteImage> {
     book.find(id)?
         .images
         .iter()
@@ -254,7 +259,7 @@ fn image_of_note<'a>(book: &'a NoteBook, id: &str, image: &str) -> anyhow::Resul
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::atomic::Ordering;
 
     use super::super::tests::*;
@@ -262,12 +267,15 @@ mod tests {
     use crate::modules::notes::contracts::ListTarget;
     use crate::modules::notes::files::{note_file, LISTS_FILE, PROJECT_FILE};
 
-    fn screenshot() -> PreparedImage {
+    pub(in crate::modules::notes) fn screenshot() -> PreparedImage {
         let png = crate::modules::notes::images::tests::encoded(64, 32, image::ImageFormat::Png);
         crate::modules::notes::images::prepare(png).unwrap()
     }
 
-    fn files_of(storage: &MemoryStorage, image: &NoteImage) -> Vec<String> {
+    pub(in crate::modules::notes) fn files_of(
+        storage: &MemoryStorage,
+        image: &NoteImage,
+    ) -> Vec<String> {
         storage
             .names()
             .into_iter()
@@ -500,7 +508,7 @@ mod tests {
     }
 
     /// `screenshot()` drawn over: a PNG as large, with other pixels.
-    fn marked_screenshot() -> PreparedImage {
+    pub(in crate::modules::notes) fn marked_screenshot() -> PreparedImage {
         let mut png = std::io::Cursor::new(Vec::new());
         image::DynamicImage::ImageRgb8(image::RgbImage::from_pixel(
             64,
@@ -512,7 +520,7 @@ mod tests {
         crate::modules::notes::images::prepare(png.into_inner()).unwrap()
     }
 
-    fn letter(text: &str) -> Mark {
+    pub(in crate::modules::notes) fn letter(text: &str) -> Mark {
         Mark {
             x: 10,
             y: 10,

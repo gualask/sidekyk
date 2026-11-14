@@ -84,11 +84,32 @@ export const tauriNotes: NotesPort = {
     imageUrl: (book, image, thumb) =>
         convertFileSrc(`${encodeURIComponent(book)}/${imageFile(image, thumb)}`, 'note-image'),
     onImageDrop,
-    // `capture.rs`
+    // `capture/`
     canCapture: () => invoke('can_capture'),
-    startCapture: () => invoke('start_capture'),
+    startCapture: (into) => invoke('start_capture', { into }),
     onCapture: (listener) => onTauriEvent<CaptureEvent>('capture', listener),
-    addCapture: (book) => invoke('add_capture', { book }),
-    setMarking: (marking) => invoke('set_marking', { marking }),
+    // `write_capture`: the note as a line of JSON, each image's PNG told by its length, then the
+    // PNGs raw, back to back
+    writeCapture: ({ book, target, text, images }) => {
+        const told = images.map(({ drawn, ...image }) => ({ ...image, png: drawn?.length ?? 0 }));
+        const line = new TextEncoder().encode(
+            `${JSON.stringify({ book, target, text, images: told })}\n`,
+        );
+        const pngs = images.flatMap((image) => (image.drawn ? [image.drawn] : []));
+        const body = new Uint8Array(line.length + pngs.reduce((sum, png) => sum + png.length, 0));
+        body.set(line);
+        let at = line.length;
+        for (const png of pngs) {
+            body.set(png, at);
+            at += png.length;
+        }
+        return invoke('write_capture', body);
+    },
+    dropCrops: (crops) => invoke('drop_crops', { crops }),
+    cropPng: async (crop) =>
+        new Blob([await invoke<ArrayBuffer>('crop_png', { crop })], { type: 'image/png' }),
+    // `capture/image_scheme.rs`
+    cropUrl: (crop, thumb) =>
+        convertFileSrc(`${crop}${thumb ? '.thumb.png' : '.png'}`, 'capture-image'),
     openCaptureSettings: () => invoke('open_capture_settings'),
 };

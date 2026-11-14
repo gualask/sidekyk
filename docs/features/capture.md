@@ -1,14 +1,16 @@
 # Capture
 
-An area of the screen captured from any app becomes a new note, its marks open at once
-(`note-images.md`). Built on macOS (14 at least); Windows and Linux next (`../../ROADMAP.md`).
+An area of the screen captured from any app, the crop for a note in the capture window
+(`capture-window.md`). Built on macOS (14 at least); Windows and Linux next
+(`../../ROADMAP.md`).
 
 ## Behaviour
 
 - Entries: the global shortcut "Capture an area of the screen" (Settings, default `⌃⌥C`,
-  provisional), the tray's Capture, an icon at the right of the Notes field (the Inbox's too).
-  A capture already on: the shortcut does nothing. An image's marks open: the shortcut and the
-  tray only show the window, since the capture's marks would open in their place.
+  provisional), the tray's Capture, an icon at the right of a Notes field (the Inbox's too),
+  "Add capture" in a note's ⋯ and an icon after the images of a card being edited, the capture
+  window's +. Where each one's note goes: `capture-window.md`. A capture already on: the shortcut
+  does nothing.
 - The display under the pointer, read at its pixels without Sidekyk's windows, shows frozen and
   dimmed over everything, full screen apps and every Space included. A drag draws the area: it
   shows bright, with a 1 px white border, 8 handles and, below its right edge (above it near the
@@ -24,10 +26,7 @@ An area of the screen captured from any app becomes a new note, its marks open a
   the same spot again is `⌃⌥C` then `↵`; it starts empty when it no longer fits the display.
 - Only the crop is kept, as PNG (RGB, a screen being opaque); the frozen frame is dropped. Not
   held to the 25 MiB a pasted image is: a 5K photo-like screen may pass it.
-- Then Sidekyk shows: the crop is a new note on top of the open list of the project last on
-  screen, hidden or not, or of the Inbox when none was open. Its marks open, the editor naming
-  where it went ("In shop"). Done keeps it, marked or not, and opens the note for its text;
-  Cancel or `Esc` discards the capture: the note goes, with Undo (the maintainer).
+- Then the capture window opens on the crop, or the crop joins it, open (`capture-window.md`).
 - Without the Screen Recording permission, nothing freezes: macOS asks once, and the app's toast
   says capture needs it, with "Open Settings" (Privacy & Security › Screen Recording). macOS
   adds Sidekyk to that list by itself. A failure is a toast too.
@@ -41,8 +40,9 @@ An area of the screen captured from any app becomes a new note, its marks open a
   display's scale, its label and where it goes; how a capture ends (`Outcome`, the area `Taken`
   on its display), here so a system without capture builds no outcome it never makes, which
   would be dead code there; the event (`capture`: `taken`, `refused`, `failed`). Tested; each
-  system's overlay only forwards the pointer and draws. The crop's pixels become the note's
-  image in `notes::prepare_capture`: PNG and thumbnail encoded once, never decoded again.
+  system's overlay only forwards the pointer and draws. The crop's pixels become an image in
+  `notes::prepare_capture`: PNG and thumbnail encoded once, never decoded again. `CaptureInto`:
+  where a capture goes, as its entry says (`Last`, or a book and an `ImageTarget`).
 - macOS, `infrastructure/capture/macos/` (`mod.rs` the reading, `panel.rs`, `view.rs`,
   `layers.rs`, `image.rs` the crop): ScreenCaptureKit
   (`SCShareableContent`, a filter of the display without our process, `SCScreenshotManager`); a
@@ -55,16 +55,14 @@ An area of the screen captured from any app becomes a new note, its marks open a
 - `infrastructure/capture/`: whether capture is built here (`CAPTURE_BUILT`, which the frontend
   reads through `can_capture`), the system's settings for the permission, `start` on every system
   (elsewhere it ends at once, never reached).
-- `desktop/capture.rs`: one capture at a time, from its start until its outcome, another
-  start ignored and logged at `info`, so a capture that never ends (ScreenCaptureKit silent)
-  shows in the release log; the area last taken, by display, for the session. Each crop waits
-  in a queue until the frontend, told `taken`, names the book (`add_capture`;
-  `NotesStore::add_capture`: a new note on top of its open list), so two captures in a row each
-  find their own. `set_marking` holds captures while marks are edited; a page loaded again resets it. The button's text is
-  read without the settings' lock (`texts::current`), on the main thread a settings change may
-  wait on.
-- Frontend: the capture's marks wait for its card (`useCaptureMarks`) and open once, apart from
-  the panel's target, which comes back each time the panel shows.
+- `desktop/capture.rs`: one capture at a time, with its `CaptureInto`, from its start until its
+  outcome, another start ignored and logged at `info`, so a capture that never ends
+  (ScreenCaptureKit silent) shows in the release log; the area last taken, by display, for the
+  session. Each crop is held by an id until a note takes it or its draft drops it (`drop_crops`,
+  a page loaded again); `taken` tells the page the crop, its size and `CaptureInto`, then the
+  capture window opens (`compact_window::open_capture`; `compact_frame::capture_frame`). The
+  quick note open closes first. The button's text is read without the settings' lock
+  (`texts::current`), on the main thread a settings change may wait on.
 - Global shortcuts (`background.md`): the window's and capture's, each its own keys, switch,
   status and problem; one may not take the other's keys (`shortcut_in_use`; at startup the
   second is `inUse`, a problem). A change failing on one shortcut puts the other back. The
@@ -89,9 +87,6 @@ An area of the screen captured from any app becomes a new note, its marks open a
   obsoletes, and pulls dozens of crates on Linux. One direct path per system; only
   `objc2-screen-capture-kit` is new, the rest is in the tree through Tauri.
 - macOS 14 at least (`bundle.macOS.minimumSystemVersion`): `SCScreenshotManager`.
-- A capture always makes a new note; paste and drop add to one.
-- It lands in the project last on screen, hidden or not: an agent's bug captured
-  in the browser belongs to its project.
 - The capture shortcut on by default, as the window's.
 - An area adjusted, then confirmed, and remembered (the maintainer), not captured on release:
   one step more per capture, but a precise area, and the same spot again, as an agent fixes what
@@ -100,6 +95,3 @@ An area of the screen captured from any app becomes a new note, its marks open a
 - Sidekyk always left out of the frame (the maintainer): a capture is nearly always
   of something else, and started from Sidekyk its window would cover it. Sidekyk's own UI: the
   system's screenshot to the clipboard (`⌃⇧⌘4`) pasted into a note. No setting for it.
-- No Move in the marks editor (KISS): it names where the note went, and after Done
-  the note is open with Move… in its ⋯; a move meanwhile would leave the editor saving to the
-  old place.

@@ -1,7 +1,6 @@
 import { IconChevronDown } from '@tabler/icons-react';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import { useCaptureMarks } from '../../application/captures';
 import type { NoteActions } from '../../application/note-actions/note-actions';
 import { doneNotes, openNotes } from '../../model/notes';
 import type { Note, NoteList, ProjectNotes } from '../../model/notes.types';
@@ -31,7 +30,6 @@ export function NoteCards({
     onComposerFocused,
     reveal,
     onRevealed,
-    place,
     onReorder,
     onMove,
 }: {
@@ -46,8 +44,6 @@ export function NoteCards({
     /** A note of the list to bring into view, and light up for a moment (one found in the palette). */
     reveal: string | null;
     onRevealed: () => void;
-    /** Where the notes are, as the marks of a capture name it: the project's name. */
-    place: string;
     /** Starts reordering the open notes, on one of them. */
     onReorder: (id: string) => void;
     /** Opens the Move dialog for a note. */
@@ -55,7 +51,6 @@ export function NoteCards({
 }) {
     const [showDone, setShowDone] = useState(false);
     const { cardState, edit } = useCardStates(book);
-    const { marks, end: endMarks } = useCaptureMarks();
     const box = useRef<HTMLDivElement>(null);
     const { t } = useTranslation();
 
@@ -108,6 +103,7 @@ export function NoteCards({
         <div ref={box} className="flex h-full min-w-0 flex-1 flex-col">
             <Composer
                 book={book}
+                list={list.id}
                 focus={focusComposer}
                 onFocused={onComposerFocused}
                 placeholder={t('notes.composer')}
@@ -131,9 +127,6 @@ export function NoteCards({
                             flash={flash === item.note.id}
                             actions={actions}
                             {...cardState(item.note)}
-                            marks={marks}
-                            place={place}
-                            onMarked={endMarks}
                             onDone={(done) => void actions.setDone(item.note, done)}
                             order={orderOf(item)}
                             onMove={() => onMove(item.note)}

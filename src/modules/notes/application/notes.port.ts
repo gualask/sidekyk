@@ -1,6 +1,8 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
     CaptureEvent,
+    CaptureInto,
+    CaptureWrite,
     DeletedList,
     ImageTarget,
     ListTarget,
@@ -94,14 +96,18 @@ export interface NotesPort {
     onImageDrop(listener: (drop: ImageDrop) => void): () => void;
     /** Whether this system captures an area of the screen, as the backend has it. */
     canCapture(): Promise<boolean>;
-    /** Starts a capture of the display under the pointer, as the global shortcut does. */
-    startCapture(): Promise<void>;
+    /** Starts a capture of the display under the pointer, going `into` a place. */
+    startCapture(into: CaptureInto): Promise<void>;
     /** Follows how captures end; gives back what stops following. */
     onCapture(listener: (event: CaptureEvent) => void): () => void;
-    /** Makes the area last captured a new note, on top of the book's open list. */
-    addCapture(book: string): Promise<Note>;
-    /** An image's marks are edited, or no longer are: meanwhile a capture only shows Sidekyk. */
-    setMarking(marking: boolean): Promise<void>;
+    /** Writes a capture's note in one step; its crops go once written, and stay on a failure. */
+    writeCapture(write: CaptureWrite): Promise<Note>;
+    /** Lets crops a draft holds go (its ×, `Esc`). */
+    dropCrops(crops: string[]): Promise<void>;
+    /** A crop as PNG, for its marks to be drawn over it. */
+    cropPng(crop: string): Promise<Blob>;
+    /** Where the webview loads a crop, or its thumbnail. */
+    cropUrl(crop: string, thumb: boolean): string;
     /** Opens the system's settings that let Sidekyk read the screen. */
     openCaptureSettings(): Promise<void>;
 }

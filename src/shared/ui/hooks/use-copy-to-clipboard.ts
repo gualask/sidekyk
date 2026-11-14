@@ -39,6 +39,23 @@ export function useCopyToClipboard(resetMs = 1400) {
             run(id, async () => navigator.clipboard.writeText(await text)),
         [run],
     );
+    /**
+     * Copies text that comes later (a note still being written): the write starts in the key's
+     * handler, as the clipboard asks, and takes the text once it is there.
+     */
+    const copyLater = useCallback(
+        (id: string, text: Promise<string>) =>
+            run(id, () =>
+                navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/plain': text.then(
+                            (value) => new Blob([value], { type: 'text/plain' }),
+                        ),
+                    }),
+                ]),
+            ),
+        [run],
+    );
     /** Copies a PNG image; the promise lets the click's handler write while it is made. */
     const copyImage = useCallback(
         (id: string, png: Promise<Blob>) =>
@@ -46,5 +63,5 @@ export function useCopyToClipboard(resetMs = 1400) {
         [run],
     );
 
-    return { copied: state, copy, copyImage };
+    return { copied: state, copy, copyLater, copyImage };
 }

@@ -10,7 +10,7 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   the middle beyond), in the order they came in. A note may be images alone: its text reads
   "Add text…" and closing it empty keeps it; without images an empty note still goes (Undo).
 - In: an image pasted or dropped into the empty field on top adds a note at once, opened to write
-  its text (Capture will reuse this). With text in the field, it waits below it (previews when
+  its text. With text in the field, it waits below it (previews when
   pasted, names when dropped, × leaves one out) until `↵`; images that fail to be added wait there
   too, the text's note made. Dropped on a card, it joins that note.
   Several files dropped at once: one note. The Inbox takes images too.
@@ -31,8 +31,9 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   the session changed, as `Esc` cancels everywhere in the app; with changes, it asks first.
 - A label stays whole inside the image, moved in from an edge, so the PNG never cuts it; at most
   100 marks of 200 characters, the backend's limits.
-- A letter placed never changes: the next is the one after the highest (B deleted, D after C),
-  since the message names them; past Z, the first free one.
+- A letter placed never changes: the next is the one after the highest on any image of the note
+  (B deleted, D after C; A, B on the first image, C next on the second), since the message names
+  them; past Z, the first free one.
 - Copy: the note's text, then each image's absolute path on a line of its own, so an agent reads
   the file (Claude Code and Codex read it pasted bare, `Application Support`'s space included,
   outside their folder; 2026-11-01). A WSL project's note gives the paths as its distro names
@@ -78,8 +79,9 @@ paths for an agent, marked with letters and arrows. The notes themselves:
   with the note (sweep, move, `note-image:`). Points in the image's pixels, whole; the label's
   size follows the image's longest side (`markSize`), the color is `--ui-mark`, the same in both
   themes.
-- Frontend: `NoteImages` (thumbnails), `ImageViewer` (the image large), `MarkEditor` (marks over the image fitted, a canvas
-  at its size on screen; geometry in `model/marks.ts`), `Composer` (the waiting images, their object URLs
+- Frontend: `NoteImages` (thumbnails), `ImageViewer` (the image large), `MarkEditor` (Annotate: header, Done,
+  Cancel) over `MarkStage` (marks over the image fitted, a canvas at its size on screen, shared
+  with the capture window; geometry in `model/marks.ts`), `Composer` (the waiting images, their object URLs
   revoked when added or left out), `useColumnImages` (drops, the target lit up). Thumbnails have
   their box before they load (`thumbBox`): a card's measured height never moves.
 

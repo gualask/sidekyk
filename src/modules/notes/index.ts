@@ -29,6 +29,7 @@ export {
 } from './model/notes.types';
 export { newNoteTarget, notesTarget } from './model/targets';
 export { notesPanel } from './panel';
+export { CaptureWindow } from './ui/capture-window/CaptureWindow';
 export { InboxColumn } from './ui/InboxColumn';
 export { QuickNote } from './ui/QuickNote';
 

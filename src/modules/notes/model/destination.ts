@@ -63,7 +63,7 @@ function noteHome(subject: MoveSubject, book: string): boolean {
 }
 
 /** A list chosen of the chosen project: one it has, or one to make. */
-type ListChoice = { kind: 'list'; list: NoteList } | { kind: 'newList'; name: string };
+export type ListChoice = { kind: 'list'; list: NoteList } | { kind: 'newList'; name: string };
 
 /** A suggestion: a book, a list, or a list to make of a text that names none. */
 export type MoveRow = { kind: 'book'; book: MoveBook } | ListChoice;
@@ -216,7 +216,7 @@ export interface Move {
     name: string;
 }
 
-function listTarget(list: ListChoice | null): ListTarget {
+export function listTarget(list: ListChoice | null): ListTarget {
     if (!list) return { kind: 'open' };
     return list.kind === 'list'
         ? { kind: 'list', id: list.list.id }

@@ -1,4 +1,4 @@
 export { AppProviders } from './AppProviders';
-export { useQuickNotePort } from './quick-note';
+export { useCompactWindowPort } from './compact-window';
 export { useShowWindowWhen } from './show-window';
 export { useTitleBarOverlaid } from './title-bar';

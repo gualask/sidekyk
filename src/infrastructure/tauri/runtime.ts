@@ -1,8 +1,8 @@
 import type { RuntimePorts } from '@/infrastructure/runtime-ports';
+import { tauriCompactWindow } from './compact-window';
 import { reportFrontendError } from './diagnostics';
 import { tauriNotes } from './notes';
 import { tauriProjects } from './projects';
-import { tauriQuickNote } from './quick-note';
 import { tauriRepository } from './repository';
 import { tauriSearch } from './search';
 import { tauriSettings } from './settings';
@@ -16,7 +16,7 @@ export const tauriRuntimePorts: RuntimePorts = {
     search: tauriSearch,
     settings: tauriSettings,
     titleBar: tauriTitleBar,
-    quickNote: tauriQuickNote,
+    compactWindow: tauriCompactWindow,
     reportError: reportFrontendError,
     showWindow,
 };

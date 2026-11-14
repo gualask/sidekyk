@@ -12,6 +12,7 @@ import { useTranslation } from '@/shared/i18n';
 import { copyLabel, useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
 import type { NoteActions } from '../../../application/note-actions/note-actions';
 import { useNotesPort } from '../../../application/notes.port';
+import { marksBesides } from '../../../model/marks';
 import { sourceImage } from '../../../model/notes';
 import type { Mark, Note, NoteImage } from '../../../model/notes.types';
 import { drawnPng } from '../../mark-editor/drawing/draw-marks';
@@ -20,34 +21,28 @@ import { MarkEditor } from '../../mark-editor/MarkEditor';
 /**
  * A note's image large, over the app: fitted, never scaled up; `←`/`→` go through the note's
  * images, `Esc` or a click outside closes. "Copy image" puts it on the clipboard as PNG;
- * "Annotate" opens its marks (`MarkEditor`), which keep the viewer open until they end. A capture's
- * (`captured`, where its note went) opens on its marks, and closes when they end: Done keeps it,
- * Cancel discards it (`onDiscard`).
+ * "Annotate" opens its marks (`MarkEditor`), which keep the viewer open until they end.
  */
 export function ImageViewer({
     book,
     note,
     actions,
     index,
-    captured,
     onIndex,
     onClose,
-    onDiscard,
 }: {
     book: string;
     note: Note;
     actions: NoteActions;
     index: number;
-    captured: string | null;
     onIndex: (index: number) => void;
     onClose: () => void;
-    onDiscard: () => void;
 }) {
     const port = useNotesPort();
     const i18n = useTranslation();
     const { t } = i18n;
     const { copied, copyImage } = useCopyToClipboard();
-    const marks = useMarking(captured !== null);
+    const marks = useMarking();
     const { marking } = marks;
     const { images } = note;
     const image = images[index];
@@ -64,10 +59,6 @@ export function ImageViewer({
                     : drawnPng(await port.imagePng(book, given), kept, image.width, image.height),
             );
             if (!saved) return false;
-        }
-        if (captured !== null) {
-            onClose();
-            return true;
         }
         marks.end();
         return true;
@@ -98,9 +89,12 @@ export function ImageViewer({
                             key={image.id}
                             book={book}
                             image={image}
-                            place={captured}
+                            taken={marksBesides(
+                                images.map((held) => held.marked?.marks ?? []),
+                                index,
+                            )}
                             onDone={keepMarks}
-                            onCancel={captured === null ? marks.end : onDiscard}
+                            onCancel={marks.end}
                         />
                     ) : (
                         <>
@@ -138,8 +132,8 @@ export function ImageViewer({
  * Whether the image's marks are open. Once they end, the focus goes back to what opened them
  * (`annotate`), so `Esc` closes the viewer next.
  */
-function useMarking(initial: boolean) {
-    const [marking, setMarking] = useState(initial);
+function useMarking() {
+    const [marking, setMarking] = useState(false);
     const annotate = useRef<HTMLButtonElement>(null);
     const marked = useRef(false);
     useEffect(() => {

@@ -127,6 +127,15 @@ export function nextLetter(marks: readonly Mark[]): string {
     return 'A';
 }
 
+/**
+ * The marks of a note's images, `byImage` in their order, but the one at `index`: a letter placed
+ * on that one comes after theirs, so the note's letters never repeat across its images. Each
+ * caller gives the marks as it holds them: a note's as kept, a draft's as being marked.
+ */
+export function marksBesides(byImage: readonly (readonly Mark[])[], index: number): Mark[] {
+    return byImage.flatMap((marks, at) => (at === index ? [] : marks));
+}
+
 /** A point kept inside an image of `width` x `height`, in whole pixels, as the backend takes it. */
 export function inImage(point: MarkPoint, width: number, height: number): MarkPoint {
     return {

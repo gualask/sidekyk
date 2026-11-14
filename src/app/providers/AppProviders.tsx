@@ -18,8 +18,8 @@ import { createTranslator, detectLocale, formatTag, TranslationProvider } from '
 import type { NoteLines } from '@/shared/notes/note-lines';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 import { SidebarWidthsProvider } from '@/shared/ui/sidebar-width';
+import { CompactWindowProvider } from './compact-window';
 import { createAppQueryClient } from './query-client';
-import { QuickNoteProvider } from './quick-note';
 import { useReportUncaughtErrors } from './report-uncaught-errors';
 import { ShowWindowProvider } from './show-window';
 import { TitleBarProvider } from './title-bar';
@@ -39,7 +39,7 @@ export function AppProviders({
         <QueryClientProvider client={queryClient}>
             <ShowWindowProvider value={runtime.showWindow}>
                 <TitleBarProvider value={runtime.titleBar}>
-                    <QuickNoteProvider value={runtime.quickNote}>
+                    <CompactWindowProvider value={runtime.compactWindow}>
                         <SettingsProvider value={runtime.settings}>
                             <TranslationBridge>
                                 <ProjectsProvider value={runtime.projects}>
@@ -63,7 +63,7 @@ export function AppProviders({
                                 </ProjectsProvider>
                             </TranslationBridge>
                         </SettingsProvider>
-                    </QuickNoteProvider>
+                    </CompactWindowProvider>
                 </TitleBarProvider>
             </ShowWindowProvider>
         </QueryClientProvider>
