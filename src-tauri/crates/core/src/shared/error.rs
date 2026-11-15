@@ -11,111 +11,73 @@ pub enum AppError {
     Anyhow(#[from] anyhow::Error),
 }
 
-/// Stable codes understood by the frontend's user-facing error formatter.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UserFacingErrorCode {
+/// Declares the user-facing codes from one list: the enum, each code's wire string (`as_str`) and
+/// every code (`ALL`, which `parse` reads), so a code cannot be left out of any of them.
+macro_rules! user_facing_codes {
+    ($($(#[$doc:meta])* $code:ident => $wire:literal,)*) => {
+        /// Stable codes understood by the frontend's user-facing error formatter.
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum UserFacingErrorCode {
+            $($(#[$doc])* $code,)*
+        }
+
+        impl UserFacingErrorCode {
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$code => $wire,)*
+                }
+            }
+
+            const ALL: &[Self] = &[$(Self::$code,)*];
+        }
+    };
+}
+
+user_facing_codes! {
     /// Git refuses a branch switch that would overwrite changes not committed.
-    BranchSwitchBlocked,
+    BranchSwitchBlocked => "branch_switch_blocked",
     /// A WSL project's distro is not installed, or WSL is not.
-    DistroMissing,
+    DistroMissing => "distro_missing",
     /// A WSL project's distro does not run, and a summary does not start it.
-    DistroStopped,
-    ExportInRepository,
-    FileMissing,
+    DistroStopped => "distro_stopped",
+    ExportInRepository => "export_in_repository",
+    FileMissing => "file_missing",
     /// A folder added to a project is on another machine than its folders (this one, a distro).
-    FolderElsewhere,
+    FolderElsewhere => "folder_elsewhere",
     /// A folder added to a project is one of its folders, or holds one or is inside one.
-    FolderOverlaps,
-    GitNotFound,
-    GitTimedOut,
+    FolderOverlaps => "folder_overlaps",
+    GitNotFound => "git_not_found",
+    GitTimedOut => "git_timed_out",
     /// The helper that reads a WSL project could not start, or stopped.
-    HelperFailed,
+    HelperFailed => "helper_failed",
     /// An image for a note is bigger than a note takes, in bytes or in pixels.
-    ImageTooLarge,
+    ImageTooLarge => "image_too_large",
     /// A file given to a note is not an image a note takes (PNG, JPEG, GIF, WebP), or is broken.
-    ImageUnsupported,
-    InvalidCommit,
-    InvalidShortcut,
-    NoteListMissing,
-    NoteMissing,
-    NoteTooLong,
+    ImageUnsupported => "image_unsupported",
+    InvalidCommit => "invalid_commit",
+    InvalidShortcut => "invalid_shortcut",
+    NoteListMissing => "note_list_missing",
+    NoteMissing => "note_missing",
+    NoteTooLong => "note_too_long",
     /// A book's notes do not read, or a newer version of Sidekyk wrote them: never written over.
-    NotesUnreadable,
-    PathOutsideRepository,
-    ProjectNotFound,
-    RepositoryMissing,
+    NotesUnreadable => "notes_unreadable",
+    PathOutsideRepository => "path_outside_repository",
+    ProjectNotFound => "project_not_found",
+    RepositoryMissing => "repository_missing",
     /// Another git (the agent's) holds the repository's index: a switch waits for it to end.
-    RepositoryBusy,
+    RepositoryBusy => "repository_busy",
     /// Git refuses the repository: another user owns it, and it is not in `safe.directory`.
-    RepositoryUnsafeOwner,
+    RepositoryUnsafeOwner => "repository_unsafe_owner",
     /// Sidekyk's other global shortcut has these keys.
-    ShortcutInUse,
-    ShortcutTaken,
+    ShortcutInUse => "shortcut_in_use",
+    ShortcutTaken => "shortcut_taken",
 }
 
 impl UserFacingErrorCode {
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::BranchSwitchBlocked => "branch_switch_blocked",
-            Self::DistroMissing => "distro_missing",
-            Self::DistroStopped => "distro_stopped",
-            Self::ExportInRepository => "export_in_repository",
-            Self::FileMissing => "file_missing",
-            Self::FolderElsewhere => "folder_elsewhere",
-            Self::FolderOverlaps => "folder_overlaps",
-            Self::GitNotFound => "git_not_found",
-            Self::GitTimedOut => "git_timed_out",
-            Self::HelperFailed => "helper_failed",
-            Self::ImageTooLarge => "image_too_large",
-            Self::ImageUnsupported => "image_unsupported",
-            Self::InvalidCommit => "invalid_commit",
-            Self::InvalidShortcut => "invalid_shortcut",
-            Self::NoteListMissing => "note_list_missing",
-            Self::NoteMissing => "note_missing",
-            Self::NoteTooLong => "note_too_long",
-            Self::NotesUnreadable => "notes_unreadable",
-            Self::PathOutsideRepository => "path_outside_repository",
-            Self::ProjectNotFound => "project_not_found",
-            Self::RepositoryMissing => "repository_missing",
-            Self::RepositoryBusy => "repository_busy",
-            Self::RepositoryUnsafeOwner => "repository_unsafe_owner",
-            Self::ShortcutInUse => "shortcut_in_use",
-            Self::ShortcutTaken => "shortcut_taken",
-        }
-    }
-
     /// The code `as_str` gives, back: an error that crossed a process boundary (the helper's).
     pub fn parse(code: &str) -> Option<Self> {
         Self::ALL.iter().copied().find(|c| c.as_str() == code)
     }
-
-    const ALL: &[Self] = &[
-        Self::BranchSwitchBlocked,
-        Self::DistroMissing,
-        Self::DistroStopped,
-        Self::ExportInRepository,
-        Self::FileMissing,
-        Self::FolderElsewhere,
-        Self::FolderOverlaps,
-        Self::GitNotFound,
-        Self::GitTimedOut,
-        Self::HelperFailed,
-        Self::ImageTooLarge,
-        Self::ImageUnsupported,
-        Self::InvalidCommit,
-        Self::InvalidShortcut,
-        Self::NoteListMissing,
-        Self::NoteMissing,
-        Self::NoteTooLong,
-        Self::NotesUnreadable,
-        Self::PathOutsideRepository,
-        Self::ProjectNotFound,
-        Self::RepositoryMissing,
-        Self::RepositoryBusy,
-        Self::RepositoryUnsafeOwner,
-        Self::ShortcutInUse,
-        Self::ShortcutTaken,
-    ];
 }
 
 /// An error intended to be surfaced to the user (via a stable error `code`).
