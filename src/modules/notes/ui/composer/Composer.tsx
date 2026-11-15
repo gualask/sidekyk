@@ -1,7 +1,7 @@
 import { IconPhoto, IconScreenshot, IconX } from '@tabler/icons-react';
 import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import { keysLabel } from '@/shared/platform/keys';
+import { withKeys } from '@/shared/platform/keys';
 import { useCanCapture } from '../../application/captures';
 import { useNotesPort } from '../../application/notes.port';
 import { useNotesSettings } from '../../application/notes-settings';
@@ -79,7 +79,7 @@ export function Composer({
                 ref={field}
                 rows={1}
                 spellCheck={false}
-                placeholder={`${placeholder}  ${keysLabel('Mod+KeyN')}`}
+                placeholder={withKeys(placeholder, 'Mod+KeyN')}
                 aria-label={label}
                 className={`block max-h-[132px] w-full resize-none rounded-lg border bg-ui-surface-subtle py-[7px] pl-2.5 text-[13px]/[1.5] text-ui-text outline-none placeholder:text-ui-text-muted focus:border-ui-accent ${
                     canCapture ? 'pr-9' : 'pr-2.5'

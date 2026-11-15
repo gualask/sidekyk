@@ -2,6 +2,7 @@ import { IconArrowsMaximize, IconMinus } from '@tabler/icons-react';
 import { type CSSProperties, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
+import { withKeys } from '@/shared/platform/keys';
 import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 import { CrashNotice } from '@/shared/ui/CrashNotice';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
@@ -67,9 +68,8 @@ export function PanelTile({
     const i18n = useTranslation();
     const { t } = i18n;
     const title = t(panel.title);
-    // what a tooltip adds: the key that opens the panel, if one does
+    // the key that opens the panel, after its tooltips, if one does
     const shortcut = panelShortcut(panel);
-    const key = shortcut ? ` (${shortcut})` : '';
     const [header, setHeader] = useState<HTMLElement | null>(null);
     // the width the tile needs: what its panel needs, and its border
     const fit = useMemo<PanelProps['tileFit']>(
@@ -100,7 +100,7 @@ export function PanelTile({
                 <TileHeader
                     panel={panel}
                     title={title}
-                    keyHint={key}
+                    shortcut={shortcut}
                     setHeader={setHeader}
                     onMinimize={onMinimize}
                     onZoomIn={onZoomIn}
@@ -156,28 +156,29 @@ export function PanelTile({
 function TileHeader({
     panel,
     title,
-    keyHint,
+    shortcut,
     setHeader,
     onMinimize,
     onZoomIn,
 }: {
     panel: PanelDefinition;
     title: string;
-    /** What a tooltip adds: the key that opens the panel, if one does. */
-    keyHint: string;
+    /** The key that opens the panel, after its tooltips; none for one no key opens. */
+    shortcut: string | null;
     /** Takes the element the panel puts its header in. */
     setHeader: (element: HTMLElement | null) => void;
     onMinimize: (() => void) | undefined;
     onZoomIn: () => void;
 }) {
     const { t } = useTranslation();
+    const tip = (label: string) => (shortcut ? withKeys(label, shortcut) : label);
     return (
         <div className={`${HEADER} pr-2 pl-3`}>
             {/* the panel's icon names it, its tooltip the title and the key that opens it */}
             <span
                 role="img"
                 className="grid shrink-0 place-items-center text-ui-text-muted"
-                title={`${title}${keyHint}`}
+                title={tip(title)}
                 aria-label={title}
             >
                 <panel.icon size={15} stroke={1.75} />
@@ -200,7 +201,7 @@ function TileHeader({
                 type="button"
                 data-zoom-in
                 className={`btn-icon h-[26px] w-[26px] ${onMinimize ? '' : 'ml-auto'}`}
-                title={`${t('tile.zoomInto', { panel: title })}${keyHint}`}
+                title={tip(t('tile.zoomInto', { panel: title }))}
                 aria-label={t('tile.zoomInto', { panel: title })}
                 onClick={onZoomIn}
             >

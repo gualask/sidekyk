@@ -8,45 +8,33 @@ import {
 } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { useCopyToClipboard } from '@/shared/ui/hooks/use-copy-to-clipboard';
-import { KeyHint } from '@/shared/ui/KeyCaps';
-import {
-    type CaptureWhere,
-    useCaptureDraft,
-    useDropCrops,
-    useWriteCapture,
-} from '../../application/captures';
+import { useCaptureDraft, useDropCrops, useWriteCapture } from '../../application/captures';
 import { useNotesPort } from '../../application/notes.port';
-import { useNotes } from '../../application/notes.queries';
 import { useNotesSettings } from '../../application/notes-settings';
 import {
     type CaptureDraft,
     type CaptureFocus,
     canRemove,
-    chipsPlace,
     type DraftImage,
     draftChanged,
     draftCrops,
+    draftImageId,
     enterAction,
-    placeState,
     steppedTo,
     withHistory,
     withoutCrop,
 } from '../../model/capture-draft';
-import { type MoveSubject, picked } from '../../model/destination';
 import { marksBesides } from '../../model/marks';
-import { noteTitle, sourceImage } from '../../model/notes';
-import { DestinationField } from '../destination-field/DestinationField';
+import { sourceImage } from '../../model/notes';
+import { DiscardDialog } from '../DiscardDialog';
 import { useChoice } from '../destination-field/use-choice';
-import { type Destination, useDestination } from '../destination-field/use-destination';
-import { DiscardDialog } from '../mark-editor/DiscardDialog';
 import { drawnPng } from '../mark-editor/drawing/draw-marks';
 import { linesClass, wrapLines } from '../notes-layout';
+import { CaptureFoot } from './CaptureFoot';
 import { enterKeys } from './enter-keys';
 import { ImageEditor } from './ImageEditor';
 import { ImageStrip } from './ImageStrip';
-
-/** What a capture's new note is, for the destination field: a note being written. */
-const NEW_NOTE: MoveSubject = { kind: 'new' };
+import { useCaptureDestination, whereTo } from './use-capture-destination';
 
 /**
  * The capture window (`docs/features/capture.md`): the draft's image selected with its marks, the
@@ -121,7 +109,7 @@ function CaptureForm({
     const text = useRef<HTMLTextAreaElement>(null);
     const where = useRef<HTMLInputElement>(null);
     const destination = useCaptureDestination(draft, live);
-    const { choosing, start, end: endChoice, restore } = useChoice(live, destination);
+    const choice = useChoice(live, destination);
     const [busy, setBusy] = useState(false);
     const [asking, setAsking] = useState(false);
     const { destination: goes } = draft;
@@ -154,13 +142,7 @@ function CaptureForm({
     };
 
     // `⌘W`: as `Esc`, each time it is asked
-    const askedBefore = useRef(closeAsked);
-    const asked = useEffectEvent(discard);
-    useEffect(() => {
-        if (closeAsked === askedBefore.current) return;
-        askedBefore.current = closeAsked;
-        asked();
-    }, [closeAsked]);
+    useOnEachAsk(closeAsked, discard);
 
     const submit = async (copy: boolean) => {
         if (busy || !live) return;
@@ -235,7 +217,7 @@ function CaptureForm({
                 {image ? (
                     <ImageEditor
                         root={imageRoot}
-                        id={imageId(image)}
+                        id={draftImageId(image)}
                         src={imageSrc(port, book, image, false)}
                         width={image.kind === 'crop' ? image.width : image.image.width}
                         height={image.kind === 'crop' ? image.height : image.image.height}
@@ -280,31 +262,14 @@ function CaptureForm({
                     onKeyDown={textKey}
                 />
             </div>
-            <div className="dialog-foot items-center py-2">
-                {goes.kind === 'note' ? (
-                    <NoteName book={goes.book} id={goes.note} />
-                ) : (
-                    <DestinationField
-                        destination={destination}
-                        input={where}
-                        label={t('notes.moveWhere')}
-                        popup={choosing}
-                        place="min-w-0 flex-1"
-                        onFocus={start}
-                        onBlur={endChoice}
-                        onEnter={(row) => {
-                            // a suggestion chosen becomes a chip, as with Tab
-                            if (row) destination.setState(picked(destination.state, row));
-                            else if (destination.state.chip) void submit(false);
-                        }}
-                        onEscape={() => {
-                            restore();
-                            text.current?.focus();
-                        }}
-                    />
-                )}
-                <CaptureKeys choosing={choosing} where={goes.kind === 'place'} />
-            </div>
+            <CaptureFoot
+                draft={draft}
+                destination={destination}
+                choice={choice}
+                where={where}
+                onWrite={() => void submit(false)}
+                onText={() => text.current?.focus()}
+            />
             <DiscardDialog
                 open={asking}
                 title={t('notes.discardCaptureTitle')}
@@ -320,34 +285,15 @@ function CaptureForm({
     );
 }
 
-/**
- * The destination field of a draft going to a place: on that place once its book's lists are
- * read (a list chosen by name needs them), then as the user chooses.
- */
-function useCaptureDestination(draft: CaptureDraft, live: boolean): Destination {
-    const destination = useDestination(NEW_NOTE);
-    const place = draft.destination.kind === 'place' ? draft.destination.place : null;
-    const { data } = useNotes(place?.book ?? '', place !== null);
-    const placed = useRef(false);
-    const { books, setState } = destination;
+/** Runs `run` each time `asks` (a count of asks) goes up after the first render. */
+function useOnEachAsk(asks: number, run: () => void) {
+    const before = useRef(asks);
+    const asked = useEffectEvent(run);
     useEffect(() => {
-        if (!live || !place || placed.current || (place.list !== null && !data)) return;
-        placed.current = true;
-        setState(placeState(place, books, data?.lists));
-    }, [live, place, data, books, setState]);
-    return destination;
-}
-
-/** Where the draft's note goes: the note it is for, or the field's chips; none without a book. */
-function whereTo(draft: CaptureDraft, destination: Destination): CaptureWhere | null {
-    const goes = draft.destination;
-    if (goes.kind === 'note') return { kind: 'note', book: goes.book, note: goes.note };
-    const place = chipsPlace(destination.state);
-    return place ? { kind: 'new', ...place } : null;
-}
-
-function imageId(image: DraftImage): string {
-    return image.kind === 'crop' ? image.crop : image.image.id;
+        if (asks === before.current) return;
+        before.current = asks;
+        asked();
+    }, [asks]);
 }
 
 /**
@@ -362,60 +308,4 @@ function imageSrc(
 ): string {
     if (image.kind === 'crop') return port.cropUrl(image.crop, thumb);
     return port.imageUrl(book ?? '', thumb ? image.image : sourceImage(image.image), thumb);
-}
-
-/** The note a draft adds to, by its title. */
-function NoteName({ book, id }: { book: string; id: string }) {
-    const { t } = useTranslation();
-    const { data } = useNotes(book);
-    const note = data?.notes.find((held) => held.id === id);
-    return (
-        <span className="min-w-0 flex-1 truncate text-xs text-ui-text-secondary">
-            {t('notes.captureInto', { title: note ? noteTitle(note.text) : '' })}
-        </span>
-    );
-}
-
-/**
- * The keys the capture window takes, as the focus is in the draft or on its destination (`where`:
- * a field to choose it).
- */
-function CaptureKeys({ choosing, where }: { choosing: boolean; where: boolean }) {
-    const { t } = useTranslation();
-    if (choosing) {
-        return (
-            <>
-                <span>
-                    <KeyHint
-                        text={t('common.keysChoose')}
-                        keys={{ up: 'ArrowUp', down: 'ArrowDown' }}
-                    />
-                </span>
-                <span>
-                    <KeyHint text={t('notes.moveComplete')} keys={{ tab: 'Tab' }} />
-                </span>
-                <span>
-                    <KeyHint text={t('quickNote.back')} keys={{ esc: 'Escape' }} />
-                </span>
-            </>
-        );
-    }
-    return (
-        <>
-            <span>
-                <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
-            </span>
-            <span>
-                <KeyHint text={t('notes.captureKeys')} keys={{ keys: 'Mod+Enter' }} />
-            </span>
-            {where ? (
-                <span>
-                    <KeyHint text={t('quickNote.where')} keys={{ tab: 'Tab' }} />
-                </span>
-            ) : null}
-            <span>
-                <KeyHint text={t('common.escCloses')} keys={{ esc: 'Escape' }} />
-            </span>
-        </>
-    );
 }

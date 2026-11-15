@@ -17,11 +17,12 @@ export function BranchName({
     return (
         <span
             className={`inline-flex min-w-0 items-center gap-1 font-mono ${className}`}
-            title={`${label} (${
-                branch.upstream
+            title={t('branch.title', {
+                branch: label,
+                tracking: branch.upstream
                     ? t('branch.tracking', { upstream: branch.upstream })
-                    : t('branch.noUpstream')
-            })`}
+                    : t('branch.noUpstream'),
+            })}
         >
             <IconGitBranch size={13} className="shrink-0" />
             <span className="truncate">{label}</span>

@@ -1,8 +1,8 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
-import { useNotesPort } from './notes.port';
+import { type NotesPort, useNotesPort } from './notes.port';
 
 /**
  * Where a book's notes are cached, and below the same key what is told of them (the open ones on
@@ -17,14 +17,18 @@ export const openKey = (book: string) => [...notesKey(book), 'open'] as const;
  * A book's notes, read once: only the app writes them, and every change goes through the cache
  * too.
  */
-export function useNotes(book: string, enabled = true) {
-    const port = useNotesPort();
-    return useQuery({
+export function notesQuery(port: NotesPort, book: string) {
+    return queryOptions({
         queryKey: notesKey(book),
         queryFn: () => port.getNotes(book),
         staleTime: Number.POSITIVE_INFINITY,
-        enabled,
     });
+}
+
+/** A book's notes, as `notesQuery` reads them; none asked while not `enabled`. */
+export function useNotes(book: string, enabled = true) {
+    const port = useNotesPort();
+    return useQuery({ ...notesQuery(port, book), enabled });
 }
 
 /**

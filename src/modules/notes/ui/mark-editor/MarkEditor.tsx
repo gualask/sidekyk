@@ -4,7 +4,7 @@ import { useNotesPort } from '../../application/notes.port';
 import { markHistory, sameMarks } from '../../model/marks';
 import { sourceImage } from '../../model/notes';
 import type { Mark, NoteImage } from '../../model/notes.types';
-import { DiscardDialog } from './DiscardDialog';
+import { DiscardDialog } from '../DiscardDialog';
 import { EditorHeader } from './EditorHeader';
 import { MarkStage } from './MarkStage';
 import { onMarkKey, useMarkSession } from './use-mark-session';

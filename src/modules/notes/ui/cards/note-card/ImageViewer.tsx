@@ -190,7 +190,7 @@ function ViewerHeader({
             {count > 1 ? (
                 <>
                     <span className="px-1 text-xs text-ui-text-muted tabular-nums">
-                        {index + 1}/{count}
+                        {t('notes.imageOf', { index: index + 1, count })}
                     </span>
                     <button
                         type="button"

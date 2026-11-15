@@ -6,6 +6,7 @@ import {
     type CaptureDraft,
     type CapturePlace,
     type Crop,
+    draftImageId,
     draftImages,
     draftText,
     initialDestination,
@@ -22,8 +23,9 @@ import type {
     Note,
     ProjectNotes,
 } from '../model/notes.types';
+import { bookChanges } from './note-actions/book-changes';
 import { type NotesPort, useNotesPort } from './notes.port';
-import { notesKey, openKey } from './notes.queries';
+import { notesKey, notesQuery } from './notes.queries';
 
 const canCaptureKey = ['can-capture'] as const;
 /** The capture window's draft, while it is open: kept apart from any view, as captures add to it. */
@@ -124,11 +126,7 @@ export function useCaptures(onScreen: () => string | null) {
 
 /** A book's notes, from the cache, else read and cached. */
 function bookNotes(client: QueryClient, port: NotesPort, book: string): Promise<ProjectNotes> {
-    return client.fetchQuery({
-        queryKey: notesKey(book),
-        queryFn: () => port.getNotes(book),
-        staleTime: Number.POSITIVE_INFINITY,
-    });
+    return client.fetchQuery(notesQuery(port, book));
 }
 
 function findNote(notes: ProjectNotes, id: string): Note {
@@ -164,10 +162,10 @@ export type CaptureWhere =
     | { kind: 'note'; book: string; note: string };
 
 /**
- * Writes a draft's note in one step: its list made first when new, the marks drawn over each
- * image marked, then the note; cached, the place kept as the last one chosen (not a note's), the
- * crops gone. The note written, or null when it failed (a toast says why, the draft and its crops
- * stay).
+ * Writes a draft's note: the marks drawn over each image marked, then, among the book's changes
+ * (`bookChanges`), its list made first when new and the note in one step; the place kept as the
+ * last one chosen (not a note's), the crops gone. The note written, or null when it failed (a
+ * toast says why, the draft and its crops stay).
  */
 export function useWriteCapture(draw: DrawMarks) {
     const port = useNotesPort();
@@ -176,25 +174,29 @@ export function useWriteCapture(draw: DrawMarks) {
     const i18n = useTranslation();
     return useCallback(
         async (draft: CaptureDraft, where: CaptureWhere): Promise<Note | null> => {
+            const { book } = where;
+            const failed = i18n.t('notes.captureWriteFailed');
+            let images: CaptureImage[];
             try {
-                const { book } = where;
-                const target = await imageTarget(client, port, where);
-                const images = await drawn(port, draft, draw, book);
-                const note = await port.writeCapture({
-                    book,
-                    target,
-                    text: draftText(draft),
-                    images,
-                });
-                keepWritten(client, book, note);
-                if (where.kind === 'new') {
-                    client.setQueryData<CapturePlace>(lastPlaceKey, { book, list: note.list });
-                }
-                return note;
+                images = await drawn(port, draft, draw, book);
             } catch (error) {
-                showToast(errorToast(i18n.t('notes.captureWriteFailed'), error, i18n));
+                showToast(errorToast(failed, error, i18n));
                 return null;
             }
+            const { send, update } = bookChanges({ book, port, client, showToast, i18n });
+            const note = await send(
+                failed,
+                async () => {
+                    const target = await imageTarget(client, port, where);
+                    return port.writeCapture({ book, target, text: draftText(draft), images });
+                },
+                (written) => update((notes) => withNotes(notes, [written])),
+            );
+            if (!note) return null;
+            if (where.kind === 'new') {
+                client.setQueryData<CapturePlace>(lastPlaceKey, { book, list: note.list });
+            }
+            return note;
         },
         [client, port, draw, showToast, i18n],
     );
@@ -235,9 +237,7 @@ function drawn(
     draw: DrawMarks,
     book: string,
 ): Promise<CaptureImage[]> {
-    const held = new Map(
-        draft.images.map((image) => [image.kind === 'crop' ? image.crop : image.image.id, image]),
-    );
+    const held = new Map(draft.images.map((image) => [draftImageId(image), image]));
     return Promise.all(
         draftImages(draft).map(async (image): Promise<CaptureImage> => {
             if (image.marks.length === 0) return image;
@@ -251,12 +251,4 @@ function drawn(
             return { ...image, drawn: await draw(png, image.marks, width, height) };
         }),
     );
-}
-
-/** A note written, among its book's notes as cached; its row's count read again. */
-function keepWritten(client: QueryClient, book: string, note: Note) {
-    client.setQueryData<ProjectNotes>(notesKey(book), (notes) =>
-        notes ? withNotes(notes, [note]) : notes,
-    );
-    void client.invalidateQueries({ queryKey: openKey(book) });
 }

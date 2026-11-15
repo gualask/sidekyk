@@ -39,7 +39,7 @@ export function DiscardDialog({
                             className="btn-ghost-sm text-ui-danger hover:bg-ui-danger-soft hover:text-ui-danger-soft-text"
                             onClick={onDiscard}
                         >
-                            {t('notes.discardMarks')}
+                            {t('notes.discard')}
                         </button>
                     </div>
                 </AlertDialog.Popup>

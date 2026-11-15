@@ -118,7 +118,7 @@ export function TopBar({
                 <button
                     type="button"
                     className="btn-icon h-7 w-7"
-                    title={`${t('common.shortcuts')} (?)`}
+                    title={withKeys(t('common.shortcuts'), '?')}
                     aria-label={t('common.shortcuts')}
                     aria-pressed={helpOpen}
                     onClick={onToggleHelp}

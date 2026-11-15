@@ -32,3 +32,5 @@ export function useChoice(open: boolean, { state, setState, chipNotes }: Destina
         restore: () => setState(before.current),
     };
 }
+
+export type Choice = ReturnType<typeof useChoice>;

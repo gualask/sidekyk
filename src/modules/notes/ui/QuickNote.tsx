@@ -4,11 +4,11 @@ import { KeyHint } from '@/shared/ui/KeyCaps';
 import { type NoteActions, useNoteActions } from '../application/note-actions/note-actions';
 import { useNotes } from '../application/notes.queries';
 import { useNotesSettings } from '../application/notes-settings';
-import { type MoveSubject, moveOf, picked } from '../model/destination';
+import { type MoveSubject, moveOf } from '../model/destination';
 import { INBOX_BOOK, type Note } from '../model/notes.types';
 import { PendingList } from './composer/Composer';
 import { useNoteDraft } from './composer/use-note-draft';
-import { DestinationField } from './destination-field/DestinationField';
+import { ChoosingKeys, CompactDestination } from './destination-field/CompactDestination';
 import { useChoice } from './destination-field/use-choice';
 import { useDestination } from './destination-field/use-destination';
 import { linesClass, wrapLines } from './notes-layout';
@@ -37,8 +37,8 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
     const field = useRef<HTMLTextAreaElement>(null);
     const where = useRef<HTMLInputElement>(null);
     const destination = useDestination(NEW_NOTE);
-    const { state, setState, reset } = destination;
-    const { choosing, start, end, restore } = useChoice(open, destination);
+    const { state, reset } = destination;
+    const choice = useChoice(open, destination);
     // the Inbox's one list, made with it
     const list = notes?.lists[0]?.id;
     const draft = useInboxDraft(box, field, actions, list, (note) => {
@@ -96,31 +96,18 @@ export function QuickNote({ open, onDone }: { open: boolean; onDone: () => void 
                     <PendingList pending={draft.pending} onDrop={draft.dropPending} />
                 </div>
                 <div className="dialog-foot items-center py-2">
-                    <DestinationField
+                    <CompactDestination
                         destination={destination}
+                        choice={choice}
                         input={where}
-                        label={t('notes.moveWhere')}
-                        popup={choosing}
-                        place="min-w-0 flex-1"
-                        onFocus={start}
-                        onBlur={end}
-                        onEnter={(row) => {
-                            // a suggestion chosen becomes a chip, as with Tab
-                            if (row) {
-                                setState(picked(state, row));
-                                return;
-                            }
-                            if (!state.chip) return;
-                            // a note written goes; else it is written next, there
+                        // a note written goes; else it is written next, there
+                        onWrite={() => {
                             if (draft.written) draft.submit();
                             else field.current?.focus();
                         }}
-                        onEscape={() => {
-                            restore();
-                            field.current?.focus();
-                        }}
+                        onBack={() => field.current?.focus()}
                     />
-                    <QuickNoteKeys choosing={choosing} />
+                    <QuickNoteKeys choosing={choice.choosing} />
                 </div>
             </section>
         </main>
@@ -160,27 +147,7 @@ function useInboxDraft(
 /** The keys the quick note takes, as the focus is in the note or on its destination. */
 function QuickNoteKeys({ choosing }: { choosing: boolean }) {
     const { t } = useTranslation();
-    if (choosing) {
-        return (
-            <>
-                <span>
-                    <KeyHint
-                        text={t('common.keysChoose')}
-                        keys={{ up: 'ArrowUp', down: 'ArrowDown' }}
-                    />
-                </span>
-                <span>
-                    <KeyHint text={t('notes.moveComplete')} keys={{ tab: 'Tab' }} />
-                </span>
-                <span>
-                    <KeyHint text={t('quickNote.add')} keys={{ enter: 'Enter' }} />
-                </span>
-                <span>
-                    <KeyHint text={t('quickNote.back')} keys={{ esc: 'Escape' }} />
-                </span>
-            </>
-        );
-    }
+    if (choosing) return <ChoosingKeys />;
     return (
         <>
             <span>

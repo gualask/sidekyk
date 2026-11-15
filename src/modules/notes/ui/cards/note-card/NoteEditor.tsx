@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
+import { hasShortcutModifier } from '@/shared/platform/shortcut';
 import type { NoteActions } from '../../../application/note-actions/note-actions';
 import { onNoteFieldKey, useNotesSettings } from '../../../application/notes-settings';
 import type { Note } from '../../../model/notes.types';
@@ -73,7 +74,7 @@ export function NoteEditor({
                 onKeyDown={(event) => {
                     if (references.keyDown(event)) return;
                     if (onNoteFieldKey(event, settings)) return;
-                    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                    if (event.key === 'Enter' && hasShortcutModifier(event)) {
                         event.preventDefault();
                         event.currentTarget.blur();
                     }

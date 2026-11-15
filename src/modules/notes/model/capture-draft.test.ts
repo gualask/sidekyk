@@ -5,6 +5,7 @@ import {
     chipsPlace,
     draftChanged,
     draftCrops,
+    draftImageId,
     draftImages,
     draftText,
     enterAction,
@@ -101,6 +102,11 @@ describe('a draft', () => {
         expect(steppedTo(two, 1).selected).toBe(0);
         expect(steppedTo(two, -1).selected).toBe(0);
         expect(steppedTo(steppedTo(two, 1), -1).selected).toBe(1);
+    });
+
+    it("names a crop by itself and a note's image by its id", () => {
+        const added = newDraft({ kind: 'note', book: 'shop', note: 'n1' }, note, crop('c1'));
+        expect(added.images.map(draftImageId)).toEqual(['i1', 'c1']);
     });
 
     it("lets a crop go, but never a note's own image nor a new note's only crop", () => {

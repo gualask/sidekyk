@@ -86,6 +86,11 @@ export function newDraft(
     return withCrop({ destination, images: own, selected: 0, text, startText: text }, crop);
 }
 
+/** What names an image of the draft: its crop, or the note's image's id. */
+export function draftImageId(image: DraftImage): string {
+    return image.kind === 'crop' ? image.crop : image.image.id;
+}
+
 /** The draft with `crop` after its images, selected. */
 export function withCrop(draft: CaptureDraft, crop: Crop): CaptureDraft {
     const image: DraftImage = { kind: 'crop', ...crop, history: markHistory(NO_MARKS) };

@@ -77,6 +77,13 @@ export function useNoteActions(book: string) {
             }
         };
 
+        /** A note on top of a list; the note as stored, or undefined when it failed. */
+        const add = (list: string, text: string) =>
+            send(
+                t('notes.addFailed'),
+                () => port.addNote(book, list, text),
+                (note) => update((notes) => withNotes(notes, [note])),
+            );
         /** Adds images to a note, or to a new one; the note as stored, or undefined. */
         const addImages = (pending: PendingImages, target: ImageTarget) =>
             send(
@@ -98,11 +105,7 @@ export function useNoteActions(book: string) {
             ): Promise<{ note: Note | undefined; left: PendingImages[] }> => {
                 let note: Note | undefined;
                 if (text.trim() !== '') {
-                    note = await send(
-                        t('notes.addFailed'),
-                        () => port.addNote(book, list, text),
-                        (added) => update((notes) => withNotes(notes, [added])),
-                    );
+                    note = await add(list, text);
                     if (!note) return { note, left: [...pending] };
                 }
                 for (const [index, images] of pending.entries()) {
@@ -145,13 +148,7 @@ export function useNoteActions(book: string) {
                     action: { label: t('notes.undo'), run: () => void restore(note) },
                 });
             },
-            /** A note on top of a list; the note as stored, or undefined when it failed. */
-            add: (list: string, text: string) =>
-                send(
-                    t('notes.addFailed'),
-                    () => port.addNote(book, list, text),
-                    (note) => update((notes) => withNotes(notes, [note])),
-                ),
+            add,
             setText: async (id: string, text: string) => {
                 patch(id, { text });
                 await send(

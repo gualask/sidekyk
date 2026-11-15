@@ -157,8 +157,8 @@ pub struct Settings {
     pub diff_scrollbar: DiffScrollbar,
     pub code_lines: CodeLines,
     pub copy_template: CopyTemplate,
-    /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`, `notes`);
-    /// one missing takes its default.
+    /// The sidebars' widths in pixels, as last dragged, by sidebar (`docs/features/workspace.md`,
+    /// Sidebar widths); one missing takes its default.
     pub sidebar_widths: BTreeMap<String, u32>,
     pub commits_place: CommitsPlace,
     pub note_lines: NoteLines,

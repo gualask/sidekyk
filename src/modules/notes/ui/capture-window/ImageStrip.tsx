@@ -1,7 +1,7 @@
 import { IconPlus, IconX } from '@tabler/icons-react';
 import type { MouseEvent } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import type { DraftImage } from '../../model/capture-draft';
+import { type DraftImage, draftImageId } from '../../model/capture-draft';
 
 /** A thumbnail's height in the strip, in CSS pixels. */
 const THUMB_HEIGHT = 48;
@@ -41,10 +41,7 @@ export function ImageStrip({
         >
             {images.length > 1
                 ? images.map((image, index) => (
-                      <li
-                          key={image.kind === 'crop' ? image.crop : image.image.id}
-                          className="group/image relative shrink-0"
-                      >
+                      <li key={draftImageId(image)} className="group/image relative shrink-0">
                           <button
                               type="button"
                               tabIndex={-1}
