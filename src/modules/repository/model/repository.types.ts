@@ -287,13 +287,22 @@ export interface DiagramColors {
     series: string[];
 }
 
-/**
- * A diagram drawn: an SVG that holds its font and runs nothing, shown as an image, its size in CSS
- * pixels. Or a source Mermaid does not read, `detail` in Mermaid's words.
- */
-export type Diagram =
-    | { kind: 'drawn'; svg: string; width: number; height: number }
-    | { kind: 'invalid'; detail: string | null };
+/** What a Mermaid source gives: a diagram drawn, or why it does not read. */
+export type Diagram = DrawnDiagram | InvalidDiagram;
+
+/** An SVG that holds its font and runs nothing, shown as an image, its size in CSS pixels. */
+export interface DrawnDiagram {
+    kind: 'drawn';
+    svg: string;
+    width: number;
+    height: number;
+}
+
+/** A source Mermaid does not read, `detail` in Mermaid's words. */
+export interface InvalidDiagram {
+    kind: 'invalid';
+    detail: string | null;
+}
 
 export interface MarkdownDocument {
     blocks: MarkdownBlock[];

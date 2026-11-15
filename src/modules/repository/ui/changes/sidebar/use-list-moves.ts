@@ -4,15 +4,11 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isOwnKey } from '@/shared/ui/keys';
 import { useShowToast } from '@/shared/ui/toasts';
 import type { useCommitView } from '../../../application/commit-view';
+import { leftToTiles, listMove } from '../../../model/keys';
 import type { ChangedFile } from '../../../model/repository.types';
 import type { Selection } from '../../../model/selection';
 import { fileKey } from '../../../model/tree/file-groups';
 import { commitFileKey } from '../shown-key';
-
-const NEXT_KEYS = new Set(['ArrowDown', 'j']);
-const PREVIOUS_KEYS = new Set(['ArrowUp', 'k']);
-/** In a tile the arrows move among tiles: the list takes `j`/`k` only. */
-const ARROWS = new Set(['ArrowDown', 'ArrowUp']);
 
 /** A file of the list on screen: the key it shows under, and its opening. */
 interface ListFile {
@@ -21,8 +17,8 @@ interface ListFile {
 }
 
 /**
- * The moves among the files of the list on screen, the commit's or the working tree's: the arrows
- * go to the next or previous one; `Esc` leaves the commit, or the file opened from Files; and the
+ * The moves among the files of the list on screen, the commit's or the working tree's: the list's
+ * keys (`listMove`) go to the next or previous one; `Esc` leaves the commit, or the file opened from Files; and the
  * step it returns, for `n`/`p` past a file's last or first change, opens the next or previous
  * file on its first change or its last, a word saying so at either end of the list.
  */
@@ -63,10 +59,11 @@ export function useListMoves({
         return { key, open: () => setSelection({ kind: 'change', key }) };
     };
 
-    // the arrows move in the list on screen
+    // the list's keys move in the list on screen; in a tile the arrows are the tiles'
     useWindowKeys((event) => {
-        if (!hasKeys || (place === 'tile' && ARROWS.has(event.key)) || !isOwnKey(event)) return;
-        const step = NEXT_KEYS.has(event.key) ? 1 : PREVIOUS_KEYS.has(event.key) ? -1 : 0;
+        if (!hasKeys || (place === 'tile' && leftToTiles(event.key)) || !isOwnKey(event)) return;
+        const move = listMove(event.key);
+        const step = move === 'next' ? 1 : move === 'previous' ? -1 : 0;
         if (step === 0) return;
         const next = neighbour(step);
         if (!next) return;

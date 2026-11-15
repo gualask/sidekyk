@@ -74,6 +74,7 @@ export function FileTree({
     return (
         <div
             ref={scrollRef}
+            data-rows
             role="tree"
             aria-label={label}
             className="h-full overflow-y-auto overflow-x-hidden font-mono text-[12.5px]"

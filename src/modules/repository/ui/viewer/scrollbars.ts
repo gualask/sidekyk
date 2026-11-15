@@ -98,6 +98,23 @@ export function useScrollbars(scrollElement: HTMLElement | null) {
 }
 
 /**
+ * A press on a track itself, not on a mark nor the thumb, centers that point of what scrolls along
+ * `axis`.
+ */
+export function centerAt(event: PointerEvent<HTMLElement>, scrollElement: HTMLElement, axis: Axis) {
+    if (event.target !== event.currentTarget || event.button !== 0) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const vertical = axis === 'vertical';
+    const at = vertical
+        ? (event.clientY - box.top) / box.height
+        : (event.clientX - box.left) / box.width;
+    const [shown, total] = extent(scrollElement, axis);
+    const offset = at * total - shown / 2;
+    if (vertical) scrollElement.scrollTop = offset;
+    else scrollElement.scrollLeft = offset;
+}
+
+/**
  * Scrolls the element by a thumb's drag along `axis`, the thumb under the pointer: its travel on
  * the track is the content's. `onClick` follows a press that did not move.
  */

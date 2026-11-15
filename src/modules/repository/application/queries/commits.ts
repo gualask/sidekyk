@@ -64,7 +64,9 @@ export function useCommitFiles(folderId: string, commit: Commit | null) {
     const port = useRepositoryPort();
     const request = commit ? commitRequest(commit) : null;
     return useQuery({
-        queryKey: request ? commitKeys.files(folderId, request) : ['commit', folderId, 'none'],
+        queryKey: request
+            ? commitKeys.files(folderId, request)
+            : commitKeys.unasked(folderId, 'files'),
         queryFn: () => (request ? port.getCommitFiles(folderId, request) : null),
         enabled: request !== null,
         staleTime: Number.POSITIVE_INFINITY,
@@ -74,7 +76,9 @@ export function useCommitFiles(folderId: string, commit: Commit | null) {
 export function useCommitFileDiff(folderId: string, request: CommitFileDiffRequest | null) {
     const port = useRepositoryPort();
     return useQuery({
-        queryKey: request ? commitKeys.diff(folderId, request) : ['commit', folderId, 'none'],
+        queryKey: request
+            ? commitKeys.diff(folderId, request)
+            : commitKeys.unasked(folderId, 'diff'),
         queryFn: () => (request ? port.getCommitFileDiff(folderId, request) : null),
         enabled: request !== null,
         staleTime: Number.POSITIVE_INFINITY,

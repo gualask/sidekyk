@@ -1,3 +1,5 @@
+import { splitLines } from '@/shared/format/text-lines';
+
 type DiffLineKind = 'context' | 'add' | 'del' | 'note';
 
 export type LineEnd = 'crlf' | 'lf' | 'none';
@@ -199,8 +201,7 @@ export function parseUnifiedDiff(text: string): ParsedDiff {
     let newNumber = 0;
     let changedLines = 0;
 
-    const lines = text.split('\n');
-    if (lines.at(-1) === '') lines.pop();
+    const lines = splitLines(text);
 
     for (const line of lines) {
         const header = HUNK_HEADER.exec(line);

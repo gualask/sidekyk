@@ -52,53 +52,81 @@ export function graphRows(commits: readonly Commit[]): GraphRow[] {
     const rows: GraphRow[] = [];
     for (const commit of commits) {
         const before = lanes;
-        let lane = before.findIndex((l) => l?.sha === commit.sha);
-        let color: number;
-        if (lane < 0) {
-            // a tip: nothing above goes down to it
-            lane = freeLane(before);
-            const kinds = commit.refs.map((r) => r.kind);
-            color = kinds.includes('head')
-                ? HEAD_COLOR
-                : kinds.includes('upstream')
-                  ? UPSTREAM_COLOR
-                  : nextColor();
-        } else {
-            color = before[lane]?.color ?? HEAD_COLOR;
-        }
-        const after = before.slice();
-        const lines: GraphLine[] = [];
-        before.forEach((l, j) => {
-            if (!l) return;
-            if (l.sha === commit.sha) {
-                // every lane going down to this commit ends at its node
-                lines.push({ from: j, to: lane, half: 'top', color: l.color });
-                after[j] = null;
-            } else {
-                lines.push({ from: j, to: j, half: 'full', color: l.color });
-            }
-        });
-        after[lane] = null;
-        commit.parents.forEach((parent, n) => {
-            // the first parent continues this lane, even when another lane goes down to it too:
-            // both end at the parent. Another parent joins the lane going to it, or takes a free one.
-            let target = n === 0 ? lane : after.findIndex((l) => l?.sha === parent);
-            let parentColor = n === 0 ? color : (after[target]?.color ?? -1);
-            if (target < 0) {
-                target = freeLane(after);
-                parentColor = nextColor();
-            }
-            after[target] = { sha: parent, color: parentColor };
-            lines.push({ from: lane, to: target, half: 'bottom', color: parentColor });
-        });
+        const { lane, color } = laneOf(before, commit, nextColor);
+        const { after, lines } = linesThrough(before, commit.sha, lane);
+        lines.push(...placeParents(after, commit.parents, lane, color, nextColor));
         while (after.length > 0 && after[after.length - 1] === null) after.pop();
-        rows.push({
-            lane,
-            color,
-            lines,
-            width: Math.max(before.length, after.length, lane + 1),
-        });
+        rows.push({ lane, color, lines, width: Math.max(before.length, after.length, lane + 1) });
         lanes = after;
     }
     return rows;
+}
+
+/**
+ * The commit's lane and color: the lane going down to it, or for a tip (nothing above goes down to
+ * it) a free one, HEAD's or the upstream's color when it is theirs, else the next.
+ */
+function laneOf(
+    before: readonly (Lane | null)[],
+    commit: Commit,
+    nextColor: () => number,
+): { lane: number; color: number } {
+    const lane = before.findIndex((l) => l?.sha === commit.sha);
+    if (lane >= 0) return { lane, color: before[lane]?.color ?? HEAD_COLOR };
+    const kinds = commit.refs.map((r) => r.kind);
+    const color = kinds.includes('head')
+        ? HEAD_COLOR
+        : kinds.includes('upstream')
+          ? UPSTREAM_COLOR
+          : nextColor();
+    return { lane: freeLane(before), color };
+}
+
+/**
+ * The lines of the lanes above through the commit's row, and the lanes below it before its
+ * parents take theirs: every lane going down to the commit ends at its node, the others go
+ * straight by.
+ */
+function linesThrough(
+    before: readonly (Lane | null)[],
+    sha: string,
+    lane: number,
+): { after: (Lane | null)[]; lines: GraphLine[] } {
+    const after = before.slice();
+    const lines: GraphLine[] = [];
+    before.forEach((l, j) => {
+        if (!l) return;
+        if (l.sha === sha) {
+            lines.push({ from: j, to: lane, half: 'top', color: l.color });
+            after[j] = null;
+        } else {
+            lines.push({ from: j, to: j, half: 'full', color: l.color });
+        }
+    });
+    after[lane] = null;
+    return { after, lines };
+}
+
+/**
+ * Places the commit's parents in the lanes below it (`after`), and returns the lines from its node
+ * to them. The first parent continues the commit's lane, even when another lane goes down to it
+ * too: both end at the parent. Another parent joins the lane going to it, or takes a free one.
+ */
+function placeParents(
+    after: (Lane | null)[],
+    parents: readonly string[],
+    lane: number,
+    color: number,
+    nextColor: () => number,
+): GraphLine[] {
+    return parents.map((parent, n) => {
+        let target = n === 0 ? lane : after.findIndex((l) => l?.sha === parent);
+        let parentColor = n === 0 ? color : (after[target]?.color ?? -1);
+        if (target < 0) {
+            target = freeLane(after);
+            parentColor = nextColor();
+        }
+        after[target] = { sha: parent, color: parentColor };
+        return { from: lane, to: target, half: 'bottom', color: parentColor };
+    });
 }

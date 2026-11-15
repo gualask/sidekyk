@@ -3,17 +3,20 @@ import { parseUnifiedDiff } from '../../../model/diff/diff-parser';
 import { diffRows, wholeFileRows } from '../../../model/diff/diff-rows';
 import { wholeFile } from '../../../model/diff/whole-file';
 import {
-    changeMarks,
     diffLayout,
     HUNK_ROW_HEIGHT,
     heightOf,
+    hunkAsked,
     hunkFrom,
+    hunkMarks,
     hunkStepped,
     hunksBetween,
     LINE_ROW_HEIGHT,
     lineRowBox,
     offsetBelow,
+    offsetInto,
     openingOffset,
+    placeAt,
     rowAt,
     shownWhole,
     spanBox,
@@ -67,7 +70,17 @@ describe('diff layout', () => {
         expect(openingOffset(diffLayout(CHANGES), -1, 0)).toBe(84);
         // the hunk starts on row 2: three lines above it are cut at the top
         expect(openingOffset(diffLayout(WHOLE), 0, 3)).toBe(0);
-        expect(openingOffset(diffLayout(WHOLE), 5, 3)).toBe(0);
+        // past the last (a file read again with fewer hunks): the last, as the pane marks it
+        expect(openingOffset(diffLayout(CHANGES), 5, 0)).toBe(84);
+    });
+
+    it('takes the hunk asked for among those there are', () => {
+        expect(hunkAsked(null, 3)).toBeNull();
+        expect(hunkAsked(0, 0)).toBeNull();
+        expect(hunkAsked(-1, 3)).toBe(2);
+        expect(hunkAsked(-5, 3)).toBe(0);
+        expect(hunkAsked(7, 3)).toBe(2);
+        expect(hunkAsked(1, 3)).toBe(1);
     });
 
     it('steps to the next hunk below the line read, or the previous above it', () => {
@@ -87,14 +100,14 @@ describe('diff layout', () => {
     it('marks each hunk where its changed lines are, by what they did', () => {
         // the first hunk adds row 2, the second deletes row 6
         const layout = diffLayout(CHANGES);
-        expect(changeMarks(layout, CHANGES)).toEqual([
+        expect(hunkMarks(layout, CHANGES)).toEqual([
             { hunk: 0, top: layout.starts[2], height: LINE_ROW_HEIGHT, kind: 'add' },
             { hunk: 1, top: layout.starts[6], height: LINE_ROW_HEIGHT, kind: 'del' },
         ]);
         const mixed = diffRows(
             parseUnifiedDiff(['@@ -1,3 +1,3 @@', ' a', '-b', '+B', ' c'].join('\n')).hunks,
         );
-        expect(changeMarks(diffLayout(mixed), mixed)).toEqual([
+        expect(hunkMarks(diffLayout(mixed), mixed)).toEqual([
             { hunk: 0, top: 44, height: 2 * LINE_ROW_HEIGHT, kind: 'mixed' },
         ]);
     });
@@ -138,7 +151,7 @@ describe('diff layout', () => {
         expect(heightOf(layout, 7)).toBe(LINE_ROW_HEIGHT);
         expect(layout.total).toBe(2 * HUNK_ROW_HEIGHT + 9 * LINE_ROW_HEIGHT);
         expect(spanBox(layout, { first: 1, last: 3 })).toEqual({ top: 24, height: 120 });
-        expect(changeMarks(layout, CHANGES)[0]).toEqual({
+        expect(hunkMarks(layout, CHANGES)[0]).toEqual({
             hunk: 0,
             top: 44,
             height: 3 * LINE_ROW_HEIGHT,
@@ -159,6 +172,16 @@ describe('diff layout', () => {
         expect(offsetBelow(diffLayout(WHOLE), 45, 2)).toBe(85);
         // past the last row: the last
         expect(offsetBelow(diffLayout(WHOLE), 0, 100)).toBe(11 * LINE_ROW_HEIGHT);
+    });
+
+    it('keeps a place as far into its row, within a row laid out shorter', () => {
+        // the first line wrapped on three rows, then on one: 50 px into it is its last pixel
+        const wrapped = diffLayout(WHOLE, (index) => (index === 0 ? 3 : 1));
+        expect(placeAt(wrapped, 3 * LINE_ROW_HEIGHT + 7)).toEqual({ row: 1, into: 7 });
+        const place = placeAt(wrapped, 50);
+        expect(place).toEqual({ row: 0, into: 50 });
+        expect(offsetInto(diffLayout(WHOLE), place.row, place.into)).toBe(LINE_ROW_HEIGHT - 1);
+        expect(offsetInto(diffLayout(WHOLE), 1, 7)).toBe(LINE_ROW_HEIGHT + 7);
     });
 
     it('tells a box shown whole between two offsets, as the find bar leaves them to read', () => {

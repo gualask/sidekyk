@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createTranslator } from '@/shared/i18n';
 import type { RepositorySummary } from '../repository.types';
-import { changedCount, changedLabel, compactCount, summedTotals } from './summary';
+import {
+    changedCount,
+    changedLabel,
+    compactCount,
+    summedTotals,
+    trackedLinesChanged,
+} from './summary';
 
 const summary = (files: number, truncated: boolean): RepositorySummary => ({
     branch: { head: 'main', commit: 'abc1234', upstream: null, ahead: 0, behind: 0 },
@@ -54,5 +60,22 @@ describe('changedLabel', () => {
         });
         expect(changedLabel(totals(0), en)).toBe('clean');
         expect(changedLabel(totals(8), en)).toBe('8 changed');
+    });
+});
+
+describe('trackedLinesChanged', () => {
+    const changed = (files: number, additions: number, deletions: number) => ({
+        totals: { files, additions, deletions },
+        truncated: false,
+    });
+
+    it('is true once a line of a tracked file was added or removed', () => {
+        expect(trackedLinesChanged(changed(2, 3, 0))).toBe(true);
+        expect(trackedLinesChanged(changed(1, 0, 4))).toBe(true);
+    });
+
+    it('is false for new or binary files alone, and when clean', () => {
+        expect(trackedLinesChanged(changed(3, 0, 0))).toBe(false);
+        expect(trackedLinesChanged(changed(0, 0, 0))).toBe(false);
     });
 });

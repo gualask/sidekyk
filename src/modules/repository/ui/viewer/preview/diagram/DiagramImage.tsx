@@ -1,10 +1,7 @@
 import { type CSSProperties, useMemo } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { diagramUrl } from '../../../../model/preview/diagram';
-import type { Diagram } from '../../../../model/repository.types';
-
-export type DrawnDiagram = Extract<Diagram, { kind: 'drawn' }>;
-type InvalidDiagram = Extract<Diagram, { kind: 'invalid' }>;
+import type { DrawnDiagram, InvalidDiagram } from '../../../../model/repository.types';
 
 /** A drawn diagram as an image, at its own size unless `className` says otherwise. */
 export function DiagramImage({

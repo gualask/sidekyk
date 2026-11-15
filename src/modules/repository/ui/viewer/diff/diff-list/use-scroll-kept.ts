@@ -1,7 +1,7 @@
 import type { Virtualizer } from '@tanstack/react-virtual';
 import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { DiffRow } from '../../../../model/diff/diff-rows';
-import { type DiffLayout, heightOf, rowAt } from '../diff-layout';
+import { type DiffLayout, offsetInto, placeAt } from '../diff-layout';
 
 /**
  * Keeps the rows on screen where they are. Laid out again (the list's width, long lines switched,
@@ -57,7 +57,6 @@ export function useScrollKept({
  * where it was: as far into it, within its new height.
  */
 function keptOffset(before: DiffLayout, after: DiffLayout, offset: number): number {
-    const row = rowAt(before, offset);
-    const into = offset - (before.starts[row] ?? 0);
-    return (after.starts[row] ?? 0) + Math.min(into, heightOf(after, row) - 1);
+    const { row, into } = placeAt(before, offset);
+    return offsetInto(after, row, into);
 }

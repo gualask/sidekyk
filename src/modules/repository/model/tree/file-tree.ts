@@ -1,4 +1,5 @@
 import type { ChangeMark } from '@/shared/git/change-mark';
+import { listMove } from '../keys';
 import type { ChangedFile, ChangeKind, Directory } from '../repository.types';
 
 /**
@@ -98,9 +99,9 @@ function selectable(row: TreeRow | undefined): row is Exclude<TreeRow, { kind: '
 }
 
 /**
- * As in VS Code: `↓`/`↑` (`j`/`k`) move, `→` opens a folder or goes into it, `←` closes it or goes
- * up to the folder above, `↵` and `Space` open a file or open and close a folder. Nothing for any
- * other key, or where the selection cannot go.
+ * As in VS Code: the list's keys (`listMove`) move, and open a file or open and close a folder;
+ * `→` opens a folder or goes into it, `←` closes it or goes up to the folder above. Nothing for
+ * any other key, or where the selection cannot go.
  */
 export function treeMove(
     rows: readonly TreeRow[],
@@ -122,8 +123,9 @@ export function treeMove(
         }
         return null;
     };
-    if (key === 'ArrowDown' || key === 'j') return select(at < 0 ? 0 : at + 1, 1);
-    if (key === 'ArrowUp' || key === 'k') return select(at < 0 ? 0 : at - 1, at < 0 ? 1 : -1);
+    const move = listMove(key);
+    if (move === 'next') return select(at < 0 ? 0 : at + 1, 1);
+    if (move === 'previous') return select(at < 0 ? 0 : at - 1, at < 0 ? 1 : -1);
     if (!selectable(row)) return null;
     if (key === 'ArrowRight') {
         if (row.kind !== 'folder') return null;
@@ -134,7 +136,7 @@ export function treeMove(
         const above = rows.slice(0, at).findLastIndex((other) => other.depth < row.depth);
         return above < 0 ? null : select(above, -1);
     }
-    if (key === 'Enter' || key === ' ') {
+    if (move === 'open') {
         return row.kind === 'folder'
             ? { kind: 'toggle', path: row.path }
             : { kind: 'open', path: row.path };

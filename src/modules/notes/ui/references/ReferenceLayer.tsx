@@ -3,6 +3,7 @@ import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } fro
 import { createPortal } from 'react-dom';
 import type { Highlight } from '@/shared/format/highlight-parts';
 import { useTranslation } from '@/shared/i18n';
+import { splitPath } from '@/shared/projects/file-path';
 import { MatchedText } from '@/shared/ui/MatchedText';
 import type { SuggestedFile } from '../../application/note-references';
 import { entityParts, type NoteEntity, type Typing } from '../../model/entities';
@@ -248,9 +249,8 @@ function FileOption({
 
 /** A file's name, then its folder muted, the letters typed in bold in both. */
 function FilePath({ file }: { file: SuggestedFile }) {
-    const cut = file.path.lastIndexOf('/') + 1;
-    const name = file.path.slice(cut);
-    const folder = file.path.slice(0, Math.max(0, cut - 1));
+    const { name, dir: folder } = splitPath(file.path);
+    const cut = file.path.length - name.length;
     return (
         <span className="flex min-w-0 items-baseline gap-2">
             <MatchedText

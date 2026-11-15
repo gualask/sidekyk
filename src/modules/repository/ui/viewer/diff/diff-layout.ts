@@ -2,7 +2,8 @@ import type { DiffRow } from '../../../model/diff/diff-rows';
 
 /**
  * Known heights, so the virtualized diff knows every row's place without measuring it: a hunk's
- * header, and each row a line shows in, one unless long lines wrap (`soft-wrap.ts`).
+ * header, and each row a line shows in, one unless long lines wrap
+ * (`model/text/soft-wrap/wrap.ts`).
  */
 export const HUNK_ROW_HEIGHT = 24;
 export const LINE_ROW_HEIGHT = 20;
@@ -115,6 +116,17 @@ export function rowAt({ starts }: DiffLayout, offset: number): number {
     return Math.max(0, firstPast(starts, offset) - 1);
 }
 
+/** Where `offset` is: its row, and how far into it. */
+export function placeAt(layout: DiffLayout, offset: number): { row: number; into: number } {
+    const row = rowAt(layout, offset);
+    return { row, into: offset - (layout.starts[row] ?? 0) };
+}
+
+/** The offset `into` pixels into row `row`, within its height: a row may be shorter. */
+export function offsetInto(layout: DiffLayout, row: number, into: number): number {
+    return (layout.starts[row] ?? 0) + Math.min(into, heightOf(layout, row) - 1);
+}
+
 /**
  * The hunks with a line among rows `from` to `to`, each with its lines only (in the Changes view
  * a hunk starts with its header): those the gutter marks on screen.
@@ -136,13 +148,21 @@ export function hunksBetween(
 }
 
 /**
- * Where the list opens on hunk `hunk` (the first if null), `linesAbove` lines above it: lines of
+ * The hunk asked for among `count`: counted from the end when negative (-1, the last: `p` goes
+ * into a file from its bottom), the last past it, the first before it; null when none was asked
+ * for, or there is none.
+ */
+export function hunkAsked(hunk: number | null, count: number): number | null {
+    if (hunk === null || count === 0) return null;
+    return hunk < 0 ? Math.max(0, count + hunk) : Math.min(hunk, count - 1);
+}
+
+/**
+ * Where the list opens on hunk `hunk` (`hunkAsked`; the first if null), `linesAbove` lines above it: lines of
  * the file, each as tall as it wraps.
  */
 export function openingOffset(layout: DiffLayout, hunk: number | null, linesAbove: number): number {
-    // a hunk counted from the end (-1, the last): `p` goes into a file from its bottom
-    const index = hunk === null ? 0 : hunk < 0 ? layout.hunks.length + hunk : hunk;
-    const span = layout.hunks[index];
+    const span = layout.hunks[hunkAsked(hunk, layout.hunks.length) ?? 0];
     if (!span) return 0;
     return layout.starts[Math.max(0, span.first - linesAbove)] ?? 0;
 }
@@ -152,10 +172,8 @@ export function openingOffset(layout: DiffLayout, hunk: number | null, linesAbov
  * is, `lines` below the top of the screen.
  */
 export function offsetBelow(layout: DiffLayout, offset: number, lines: number): number {
-    const top = rowAt(layout, offset);
-    const row = Math.min(top + lines, layout.starts.length - 1);
-    const into = offset - (layout.starts[top] ?? 0);
-    return (layout.starts[row] ?? 0) + Math.min(into, heightOf(layout, row) - 1);
+    const { row, into } = placeAt(layout, offset);
+    return offsetInto(layout, Math.min(row + lines, layout.starts.length - 1), into);
 }
 
 /** The hunk at row `row`, or the next one below it, or the last: the change being read there. */
@@ -180,8 +198,8 @@ export function hunkStepped(layout: DiffLayout, reading: number, step: 1 | -1): 
     return previous < 0 ? null : previous;
 }
 
-/** A change on the scrollbar's map: a hunk's changed lines, where they sit in the list. */
-export interface ChangeMark {
+/** A hunk on the scrollbar's map: its changed lines, where they sit in the list. */
+export interface HunkMark {
     hunk: number;
     top: number;
     height: number;
@@ -189,8 +207,8 @@ export interface ChangeMark {
 }
 
 /** The marks of a diff's changes: one per hunk, from its first changed line to its last. */
-export function changeMarks(layout: DiffLayout, rows: readonly DiffRow[]): ChangeMark[] {
-    const marks: ChangeMark[] = [];
+export function hunkMarks(layout: DiffLayout, rows: readonly DiffRow[]): HunkMark[] {
+    const marks: HunkMark[] = [];
     rows.forEach((row, index) => {
         if (row.kind !== 'line' || (row.line.kind !== 'add' && row.line.kind !== 'del')) return;
         const top = layout.starts[index] ?? 0;
@@ -220,7 +238,7 @@ export interface TrackMark {
     /** Where it takes a click: at least `MARK_HIT` tall, around what shows. */
     hitTop: number;
     hitHeight: number;
-    kind: ChangeMark['kind'];
+    kind: HunkMark['kind'];
 }
 
 /** The part of the track a mark from `top` to `bottom` takes clicks on. */
@@ -241,11 +259,7 @@ function joinMark(last: TrackMark, kind: TrackMark['kind'], bottom: number, hitB
  * clicks on at least `MARK_HIT` pixels; marks whose clicks would overlap are one, going to its
  * first change.
  */
-export function trackMarks(
-    marks: readonly ChangeMark[],
-    total: number,
-    height: number,
-): TrackMark[] {
+export function trackMarks(marks: readonly HunkMark[], total: number, height: number): TrackMark[] {
     if (total <= 0 || height <= 0) return [];
     const scale = height / total;
     const shown: TrackMark[] = [];

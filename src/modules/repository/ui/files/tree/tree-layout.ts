@@ -1,3 +1,4 @@
+import { fittedWidth } from '@/shared/ui/sidebar-width';
 import type { TreeRow } from '../../../model/tree/file-tree';
 
 /**
@@ -19,7 +20,10 @@ export const TREE_PADDING_LEFT = 6;
 export const TREE_TWISTY = 18;
 export const TREE_PADDING_RIGHT = 10;
 
-/** What the tree needs to show every row it has whole, from its font's width. */
+/**
+ * The width that shows every row the tree has whole, from its font's width, in `element`: the
+ * sidebar or the tile it fills, its rows laid out in its `[data-rows]` list.
+ */
 export function fittingWidth(rows: readonly TreeRow[], element: HTMLElement): number {
     const style = getComputedStyle(element);
     const context = document.createElement('canvas').getContext('2d');
@@ -33,5 +37,6 @@ export function fittingWidth(rows: readonly TreeRow[], element: HTMLElement): nu
         const text = context.measureText(row.name).width + slashes * 2;
         widest = Math.max(widest, TREE_PADDING_LEFT + row.depth * TREE_INDENT + text);
     }
-    return Math.ceil(widest + TREE_TWISTY + TREE_PADDING_RIGHT);
+    const room = element.querySelector<HTMLElement>('[data-rows]')?.clientWidth ?? 0;
+    return fittedWidth(element, room, widest + TREE_TWISTY + TREE_PADDING_RIGHT);
 }

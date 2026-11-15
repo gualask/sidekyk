@@ -1,6 +1,6 @@
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD, type ChangeMark } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
-import { splitPath } from '../../../model/tree/file-groups';
+import { splitPath } from '@/shared/projects/file-path';
 import { RECENT_GROUP_LABEL, type RecentRow } from '../../../model/tree/recent-files';
 import { LIST_HEADING, LIST_MORE } from '../../lists/list-styles';
 import { useVirtualRows } from '../../lists/use-virtual-rows';
@@ -68,6 +68,7 @@ export function RecentList({
     return (
         <nav
             ref={scrollRef}
+            data-rows
             aria-label={label}
             className="h-full overflow-y-auto overflow-x-hidden font-mono text-[12.5px]"
         >

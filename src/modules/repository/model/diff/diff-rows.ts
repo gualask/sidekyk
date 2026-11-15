@@ -1,3 +1,4 @@
+import { splitLines } from '@/shared/format/text-lines';
 import { lineWidth, TAB_SIZE } from '../text/soft-wrap/glyphs';
 import type { DiffHunk, DiffLine } from './diff-parser';
 import type { WholeFile } from './whole-file';
@@ -54,9 +55,7 @@ export function widestLine(hunks: readonly DiffHunk[]): number {
 
 /** A file's text as lines of a diff that changes none, numbered from 1, for the same viewer. */
 export function textLines(text: string): DiffLine[] {
-    const lines = text.split('\n');
-    if (lines.at(-1) === '') lines.pop();
-    return lines.map((line, index) => ({
+    return splitLines(text).map((line, index) => ({
         id: index,
         kind: 'context',
         text: line,

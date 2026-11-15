@@ -30,6 +30,11 @@ export function compactCount(count: number): string {
     return `${Math.floor(count / 100_000) / 10}M`;
 }
 
+/** Whether lines of tracked files changed: new files alone, or binary ones, change none. */
+export function trackedLinesChanged({ totals }: ChangedTotals): boolean {
+    return totals.additions + totals.deletions > 0;
+}
+
 /** What changed, in words: `8 changed`, or "clean". */
 export function changedLabel(changed: ChangedTotals, { t, tp }: Translator): string {
     const { files } = changed.totals;

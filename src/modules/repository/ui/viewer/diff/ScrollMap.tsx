@@ -1,17 +1,9 @@
-import {
-    type CSSProperties,
-    type PointerEvent,
-    type RefObject,
-    useEffect,
-    useMemo,
-    useRef,
-    useState,
-} from 'react';
+import { type CSSProperties, type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import { useTranslation } from '@/shared/i18n';
 import type { DiffRow } from '../../../model/diff/diff-rows';
-import { dragThumb } from '../scrollbars';
-import { changeMarks, type DiffLayout, type TrackMark, trackMarks } from './diff-layout';
+import { centerAt, dragThumb } from '../scrollbars';
+import { type DiffLayout, hunkMarks, type TrackMark, trackMarks } from './diff-layout';
 
 /** The map's width, narrow or wide (a setting), in pixels; and under the pointer, over the rows. */
 const MAP_WIDTH: Record<DiffScrollbar, number> = { narrow: 12, wide: 20 };
@@ -49,15 +41,15 @@ export function ChangeMap({
     const track = useRef<HTMLDivElement>(null);
     // the track's height: marks share it, each with room for a click
     const height = useClientHeight(track);
-    const changes = useMemo(() => changeMarks(layout, rows), [layout, rows]);
+    const hunks = useMemo(() => hunkMarks(layout, rows), [layout, rows]);
     const marks = useMemo(
         () =>
             trackMarks(
-                changes.map((mark) => ({ ...mark, top: mark.top + topSpace })),
+                hunks.map((mark) => ({ ...mark, top: mark.top + topSpace })),
                 contentHeight,
                 height,
             ),
-        [changes, topSpace, contentHeight, height],
+        [hunks, topSpace, contentHeight, height],
     );
 
     return (
@@ -68,7 +60,7 @@ export function ChangeMap({
                 ref={track}
                 className="absolute inset-y-0 right-0 z-10 w-full border-l border-ui-border bg-ui-surface transition-[width] duration-150 group-hover/map:w-(--map-open) group-hover/map:delay-200 motion-reduce:transition-none"
                 style={{ '--map-open': `${MAP_OPEN_WIDTH[width]}px` } as CSSProperties}
-                onPointerDown={(event) => centerAt(event, scrollElement)}
+                onPointerDown={(event) => centerAt(event, scrollElement, 'vertical')}
             >
                 {marks.map((mark) => (
                     // the click's room, around what shows
@@ -126,14 +118,6 @@ function useClientHeight(ref: RefObject<HTMLElement | null>): number {
     return height;
 }
 
-/** A press on the track itself, not a mark nor the thumb, centers that point of what scrolls. */
-function centerAt(event: PointerEvent<HTMLElement>, scrollElement: HTMLElement) {
-    if (event.target !== event.currentTarget || event.button !== 0) return;
-    const box = event.currentTarget.getBoundingClientRect();
-    const at = (event.clientY - box.top) / box.height;
-    scrollElement.scrollTop = at * scrollElement.scrollHeight - scrollElement.clientHeight / 2;
-}
-
 /** The mark whose click room is `at` pixels down the track, if any. */
 function markAt(marks: readonly TrackMark[], at: number): TrackMark | undefined {
     return marks.find((mark) => at >= mark.hitTop && at < mark.hitTop + mark.hitHeight);
@@ -164,13 +148,7 @@ export function SideScrollbar({
             ref={track}
             aria-hidden
             className="relative h-2.5 shrink-0 border-t border-ui-border bg-ui-surface"
-            onPointerDown={(event) => {
-                if (event.target !== event.currentTarget || event.button !== 0) return;
-                const box = event.currentTarget.getBoundingClientRect();
-                const at = (event.clientX - box.left) / box.width;
-                scrollElement.scrollLeft =
-                    at * scrollElement.scrollWidth - scrollElement.clientWidth / 2;
-            }}
+            onPointerDown={(event) => centerAt(event, scrollElement, 'horizontal')}
         >
             <div
                 ref={thumb}

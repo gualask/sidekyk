@@ -36,7 +36,7 @@ project is: `projects.md`; the levels: `workspace.md`.
   --no-merges --shortstat -n 501 HEAD`, `LC_ALL=C`, at most 500 commits and 256 KiB, summed by
   local day in the frontend (`activityDays`). Keyed by HEAD and first day, outside the repository's
   keys: changes on disk leave it alone. 80 ms here (68 commits), 0.5 s on a 4,366-file Rust repository (129). The
-  line (`model/sparkline.ts`) is a monotone cubic (Steffen's): never under the baseline nor past
+  line (`model/history/sparkline.ts`) is a monotone cubic (Steffen's): never under the baseline nor past
   the busiest day.
 
 ## Decisions

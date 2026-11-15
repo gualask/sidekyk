@@ -2,11 +2,13 @@ import { IconFileText } from '@tabler/icons-react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelProps } from '@/shared/panels/panel';
 import type { FileFinder } from '../../application/find';
+import { useLinkedAnchor } from '../../application/linked-anchor';
 import type { SnapshotRead } from '../../application/queries/formatting-check';
-import { useFileViewChoice, useLinkedAnchor } from '../../application/view-choice';
+import { useFileViewChoice } from '../../application/view-choice';
 import { CHANGE_AREA_LABEL } from '../../model/change-area';
 import type { ChangedFile } from '../../model/repository.types';
 import { type FileLines, fileTarget } from '../../model/targets';
+import { fileKey } from '../../model/tree/file-groups';
 import { ChangeDiffView } from '../viewer/diff/DiffView';
 import { LINES_ABOVE } from '../viewer/diff/diff-layout';
 import { FileHeader } from '../viewer/FileHeader';
@@ -59,7 +61,7 @@ export function FileViewer({
     if (change) {
         return (
             <ChangeDiffView
-                key={`${change.area}:${change.path}:${opening}`}
+                key={`${fileKey(change)}:${opening}`}
                 folderId={folderId}
                 file={change}
                 snapshot={snapshot}

@@ -1,4 +1,5 @@
 import type { UnifiedDiff } from '@/modules/repository';
+import { splitLines } from '@/shared/format/text-lines';
 
 /** Unchanged lines the fixtures' files have after their last change. */
 const LINES_AFTER = 40;
@@ -11,8 +12,7 @@ const HUNK_HEADER = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/;
  * made up and numbered.
  */
 export function wholeFileDiff({ text, truncated }: UnifiedDiff): UnifiedDiff {
-    const lines = text.split('\n');
-    if (lines.at(-1) === '') lines.pop();
+    const lines = splitLines(text);
     const first = lines.findIndex((line) => HUNK_HEADER.test(line));
     if (first < 0) return { text, truncated };
 

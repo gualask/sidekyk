@@ -1,3 +1,5 @@
+import { localMidnight } from '@/shared/time/local-day';
+import { listMove } from '../keys';
 import type { RecentFile } from '../repository.types';
 
 /** When a file changed, by the local calendar, as a file manager groups by date modified. */
@@ -18,24 +20,17 @@ export type RecentRow =
     /** Older files the list does not hold. */
     | { kind: 'more'; count: number };
 
-/** Local midnight `days` days before the day of `now`, in milliseconds. */
-function midnight(now: number, days: number): number {
-    const day = new Date(now);
-    day.setHours(0, 0, 0, 0);
-    day.setDate(day.getDate() - days);
-    return day.getTime();
-}
-
 /**
  * The group of a change at `modified`, seen at `now`: today, yesterday, the 7 days before today,
  * the 30 days before today, or earlier. A time ahead of the clock is today.
  */
 export function recentGroupOf(now: number): (modified: number) => RecentGroup {
+    const daysBack = (days: number) => localMidnight(new Date(now), -days).getTime();
     const bounds: [number, RecentGroup][] = [
-        [midnight(now, 0), 'today'],
-        [midnight(now, 1), 'yesterday'],
-        [midnight(now, 7), 'week'],
-        [midnight(now, 30), 'month'],
+        [daysBack(0), 'today'],
+        [daysBack(1), 'yesterday'],
+        [daysBack(7), 'week'],
+        [daysBack(30), 'month'],
     ];
     return (modified) => bounds.find(([start]) => modified >= start)?.[1] ?? 'earlier';
 }
@@ -63,7 +58,7 @@ export function recentRows(files: readonly RecentFile[], more: number, now: numb
 export type RecentMove = { kind: 'select'; path: string } | { kind: 'open'; path: string };
 
 /**
- * As the tree: `↓`/`↑` (`j`/`k`) move among the files, `↵` and `Space` open the one selected.
+ * As the tree: the list's keys (`listMove`) move among the files and open the one selected.
  * Nothing for any other key, or where the selection cannot go.
  */
 export function recentMove(
@@ -77,9 +72,10 @@ export function recentMove(
         const path = files[index];
         return path === undefined ? null : { kind: 'select', path };
     };
-    if (key === 'ArrowDown' || key === 'j') return select(at + 1);
-    if (key === 'ArrowUp' || key === 'k') return select(at < 0 ? 0 : at - 1);
-    if ((key === 'Enter' || key === ' ') && at >= 0 && selected !== null) {
+    const move = listMove(key);
+    if (move === 'next') return select(at + 1);
+    if (move === 'previous') return select(at < 0 ? 0 : at - 1);
+    if (move === 'open' && at >= 0 && selected !== null) {
         return { kind: 'open', path: selected };
     }
     return null;

@@ -28,6 +28,9 @@ export const repositoryKeys = {
         ] as const,
     commits: (folderId: string) => [...repositoryKeys.of(folderId), 'commits'] as const,
     branches: (folderId: string) => [...repositoryKeys.of(folderId), 'branches'] as const,
+    /** A diff or a file not asked for yet: a query of its own, never run. */
+    unasked: (folderId: string, what: 'diff' | 'file') =>
+        [...repositoryKeys.of(folderId), 'unasked', what] as const,
     /**
      * Outside `of`: a change on disk, the window showing again or a project read again leave it
      * alone, since its key names what would change it, HEAD and the first day.
@@ -51,6 +54,12 @@ export const repositoryKeys = {
     colors: (folderId: string, { path, version }: FileSide, first: number) =>
         [...repositoryKeys.of(folderId), 'colors', version.kind, path, first] as const,
 };
+
+/** The folder a key of `repositoryKeys.of` names; null for any other key. */
+export function folderOfKey(queryKey: QueryKey): string | null {
+    const [root, folderId] = queryKey;
+    return root === repositoryKeys.all[0] && typeof folderId === 'string' ? folderId : null;
+}
 
 /** Whether a key's value names a path that the working tree's `changed` paths touch. */
 function touchesPath(changed: readonly string[] | null, path: unknown): boolean {
@@ -111,6 +120,9 @@ export const commitKeys = {
         ] as const,
     colors: (folderId: string, sha: string, path: string, first: number) =>
         ['commit', folderId, sha, 'colors', path, first] as const,
+    /** A commit's files or a file's diff not asked for yet: a query of its own, never run. */
+    unasked: (folderId: string, what: 'files' | 'diff') =>
+        ['commit', folderId, 'unasked', what] as const,
 };
 
 /**

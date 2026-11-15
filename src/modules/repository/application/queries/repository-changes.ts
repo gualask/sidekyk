@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { useRepositoryPort } from '../repository.port';
-import { isOld, repositoryKeys, worktreeChangeTouches } from './repository-keys';
+import { folderOfKey, isOld, repositoryKeys, worktreeChangeTouches } from './repository-keys';
 
 /** Reads again what is shown of a folder: after a fix, such as git installed in its distro. */
 export function useReadFolderAgain(): (folderId: string) => void {
@@ -59,7 +59,7 @@ export function useRepositoryChangeSubscription() {
                 {
                     queryKey: repositoryKeys.all,
                     type: 'active',
-                    predicate: (query) => query.queryKey[1] === missed || isOld(query),
+                    predicate: (query) => folderOfKey(query.queryKey) === missed || isOld(query),
                 },
                 // a read already under way started after the window showed
                 { cancelRefetch: false },

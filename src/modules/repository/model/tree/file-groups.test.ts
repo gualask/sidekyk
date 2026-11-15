@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile } from '../repository.types';
 import { changedFile } from '../testing';
-import {
-    changeOf,
-    fileKey,
-    fileListRows,
-    groupFiles,
-    orderedFiles,
-    splitPath,
-} from './file-groups';
+import { changeOf, fileKey, fileListRows, groupFiles, orderedFiles } from './file-groups';
 
 function file(path: string, area: ChangedFile['area']): ChangedFile {
     return changedFile(path, { area, kind: area === 'untracked' ? 'untracked' : 'modified' });
@@ -59,11 +52,6 @@ describe('file groups', () => {
             'changes.group.staged (1)',
             'staged:z.ts',
         ]);
-    });
-
-    it('splits a path into name and folder', () => {
-        expect(splitPath('src/app/App.tsx')).toEqual({ name: 'App.tsx', dir: 'src/app' });
-        expect(splitPath('README.md')).toEqual({ name: 'README.md', dir: '' });
     });
 });
 

@@ -1,7 +1,7 @@
 import { type QueryCache, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useSyncExternalStore } from 'react';
 import { hasErrorCode } from '@/shared/errors/app-error';
-import { repositoryKeys } from './repository-keys';
+import { folderOfKey, repositoryKeys } from './repository-keys';
 
 /** The failures of a folder's reads that need the user, the weightiest first. */
 const FOLDER_FAILURES = [
@@ -19,7 +19,8 @@ function failedFolders(cache: QueryCache): string {
         if (query.state.status !== 'error') continue;
         const failure = FOLDER_FAILURES.find((code) => hasErrorCode(query.state.error, code));
         if (!failure) continue;
-        const id = query.queryKey[1] as string;
+        const id = folderOfKey(query.queryKey);
+        if (id === null) continue;
         const known = failures.get(id);
         if (!known || FOLDER_FAILURES.indexOf(failure) < FOLDER_FAILURES.indexOf(known)) {
             failures.set(id, failure);

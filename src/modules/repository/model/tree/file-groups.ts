@@ -65,10 +65,3 @@ export function changeOf(ordered: readonly ChangedFile[], path: string): Changed
 export function fileKey(file: Pick<ChangedFile, 'area' | 'path'>): string {
     return `${file.area}:${file.path}`;
 }
-
-export function splitPath(path: string): { name: string; dir: string } {
-    const slash = path.lastIndexOf('/');
-    return slash < 0
-        ? { name: path, dir: '' }
-        : { name: path.slice(slash + 1), dir: path.slice(0, slash) };
-}

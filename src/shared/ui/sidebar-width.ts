@@ -32,6 +32,15 @@ export function SidebarWidthsProvider({
     return createElement(SidebarWidthsContext.Provider, { value }, children);
 }
 
+/**
+ * The width a sidebar takes for its rows to have `needed` pixels, where they have `room` now: what
+ * it takes besides them (its border, a scrollbar, the room around its list) is read from the page,
+ * so a fit to what it shows (`SidebarWidth.fit`) never comes short.
+ */
+export function fittedWidth(box: HTMLElement, room: number, needed: number): number {
+    return Math.ceil(needed + box.getBoundingClientRect().width - room);
+}
+
 /** A sidebar's width, as `useSidebarWidth` gives it. */
 export interface SidebarWidth {
     /** The sidebar's width, leaving the content beside it its room. */

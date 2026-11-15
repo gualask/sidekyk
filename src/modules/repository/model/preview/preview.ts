@@ -1,3 +1,4 @@
+import { splitPath } from '@/shared/projects/file-path';
 import type { MarkdownAlign, MarkdownBlock, MarkdownInline } from '../repository.types';
 
 /** What a file shows as it reads, beside its text: by its extension, as the backend knows it. */
@@ -14,7 +15,7 @@ export const MAX_IMAGE_BYTES = 16 * 1024 * 1024;
 
 /** The preview a file has, if any. */
 export function previewKind(path: string): PreviewKind | null {
-    const name = path.slice(path.lastIndexOf('/') + 1);
+    const { name } = splitPath(path);
     const dot = name.lastIndexOf('.');
     if (dot <= 0) return null;
     const extension = name.slice(dot + 1).toLowerCase();

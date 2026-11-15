@@ -6,7 +6,12 @@ import type { ProjectFolder } from '@/shared/projects/project-info';
 import { folderName, remoteMachine } from '@/shared/projects/project-place';
 import { useRepositorySummaries, useRepositorySummary } from '../../application/queries/snapshot';
 import { branchLabel } from '../../model/history/branch';
-import { type ChangedTotals, changedLabel, summedTotals } from '../../model/history/summary';
+import {
+    type ChangedTotals,
+    changedLabel,
+    summedTotals,
+    trackedLinesChanged,
+} from '../../model/history/summary';
 import { projectErrorMessage } from '../../model/project-error';
 import { LineCounts } from '../LineCounts';
 import { BranchName } from './BranchName';
@@ -94,7 +99,7 @@ function Week({ folder }: { folder: ProjectFolder }) {
 function Changed({ totals: changed }: { totals: ChangedTotals }) {
     const i18n = useTranslation();
     const { totals } = changed;
-    if (totals.additions + totals.deletions > 0) {
+    if (trackedLinesChanged(changed)) {
         return (
             <span className="inline-flex shrink-0 items-baseline gap-1.5 text-xs">
                 <LineCounts additions={totals.additions} deletions={totals.deletions} compact />

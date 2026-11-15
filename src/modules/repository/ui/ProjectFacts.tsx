@@ -1,7 +1,7 @@
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
 import { useRepositorySummaries, useRepositorySummary } from '../application/queries/snapshot';
-import { changedLabel } from '../model/history/summary';
+import { changedLabel, trackedLinesChanged } from '../model/history/summary';
 import type { RepositorySummary } from '../model/repository.types';
 import { TrackedLines } from './LineCounts';
 import { BranchName } from './summary/BranchName';
@@ -37,7 +37,6 @@ export function FolderFacts({ folder }: { folder: ProjectFolder }) {
     const [repository] = useRepositorySummaries([folder]);
     const summary = repository?.summary.data;
     const i18n = useTranslation();
-    const totals = summary?.totals;
     return (
         <>
             <span className="flex min-w-0 text-ui-text-muted group-data-highlighted:text-ui-accent-on-soft">
@@ -47,8 +46,11 @@ export function FolderFacts({ folder }: { folder: ProjectFolder }) {
                 {summary ? changedLabel(summary, i18n) : null}
             </span>
             <span className="text-right text-xs">
-                {totals && totals.additions + totals.deletions > 0 ? (
-                    <TrackedLines additions={totals.additions} deletions={totals.deletions} />
+                {summary && trackedLinesChanged(summary) ? (
+                    <TrackedLines
+                        additions={summary.totals.additions}
+                        deletions={summary.totals.deletions}
+                    />
                 ) : null}
             </span>
         </>
@@ -86,7 +88,7 @@ function ChangeCounts({ summary }: { summary: RepositorySummary }) {
     return (
         <span className="inline-flex items-center gap-2 whitespace-nowrap">
             {changedLabel(summary, i18n)}
-            {totals.additions + totals.deletions > 0 ? (
+            {trackedLinesChanged(summary) ? (
                 <TrackedLines additions={totals.additions} deletions={totals.deletions} />
             ) : null}
         </span>

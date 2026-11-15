@@ -5,6 +5,7 @@ import type {
     RecentFiles,
     TreeEntry,
 } from '@/modules/repository';
+import { splitPath } from '@/shared/projects/file-path';
 import { FILE_TEXTS, VAULT_PATHS } from './fixture-files';
 
 /** The files git lists in the review scenario's repository, besides the changed ones. */
@@ -128,9 +129,8 @@ class FixtureTree {
     }
 
     has(path: string): boolean {
-        const slash = path.lastIndexOf('/');
-        const folder = this.folders.get(slash < 0 ? '' : path.slice(0, slash));
-        return folder?.files.includes(path.slice(slash + 1)) ?? false;
+        const { name, dir } = splitPath(path);
+        return this.folders.get(dir)?.files.includes(name) ?? false;
     }
 }
 

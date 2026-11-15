@@ -59,12 +59,12 @@ Markdown file or their own: `diagrams.md`.
   (`cat-file -s`). The ids come with the changed files, `oldBlob`/`newBlob`: status's `hH`/`hI`
   for the working tree, `diff-tree --raw` for a commit, no git call of their own; the snapshot's
   time unchanged (`.local/snapshot-cost`, 2026-11-01). `ImageDiff` shows the sides
-  (`imageSides` in `model/sides.ts`: the diff's sides, as for syntax colors, with their objects),
+  (`imageSides` in `model/diff/sides.ts`: the diff's sides, as for syntax colors, with their objects),
   each an `ImageView`.
 - Links outside: `open_url` (`interfaces/tauri/links.rs`) allows `http`, `https`, `mailto` only,
   through `tauri-plugin-opener`. The window never navigates away from the app's page
   (`on_navigation`) nor opens another (`on_new_window` denies).
-- Frontend: `PreviewPane` (lazy `MarkdownPreview`, or `ImageView`), one component with a switch on
+- Frontend: `PreviewPane` (lazy `MarkdownPreview` or `DiagramPane`, or `ImageView`), one component with a switch on
   the node's kind; top-level blocks virtualized and measured (`@tanstack/react-virtual`); every
   element is ours, so no `dangerouslySetInnerHTML`. Code blocks ask `useSyntaxColors` for the
   blocks of lines on screen.

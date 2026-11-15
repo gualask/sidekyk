@@ -5,6 +5,7 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken, isOwnKey } from '@/shared/ui/keys';
 import type { ImageSide, ImageSides } from '../../../model/diff/sides';
 import { shortSha } from '../../../model/history/commits';
+import { changeStep } from '../../../model/keys';
 import type { FileVersion } from '../../../model/repository.types';
 import { ImageView } from '../preview/ImageView';
 
@@ -37,7 +38,7 @@ export function ImageDiff({
     useWindowKeys(
         (event) => {
             if (event.defaultPrevented || isKeyTaken(event.target) || !isOwnKey(event)) return;
-            const step = event.key === 'n' ? 1 : event.key === 'p' ? -1 : 0;
+            const step = changeStep(event.key);
             if (step === 0) return;
             event.preventDefault();
             onPastEnd(step);

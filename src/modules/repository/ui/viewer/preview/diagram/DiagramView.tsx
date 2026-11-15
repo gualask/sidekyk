@@ -6,9 +6,10 @@ import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken, isOwnKey } from '@/shared/ui/keys';
 import { useShownDiagram } from '../../../../application/queries/file-reads';
 import { type Placement, ZOOM } from '../../../../model/preview/diagram';
+import type { DrawnDiagram } from '../../../../model/repository.types';
 import { ErrorText, Notice } from '../../pane/Pane';
 import { useDiagramColors } from '../diagram-colors';
-import { DiagramImage, type DrawnDiagram, InvalidLine } from './DiagramImage';
+import { DiagramImage, InvalidLine } from './DiagramImage';
 import { useDiagramPlacement } from './use-diagram-placement';
 
 type ShownDiagram = ReturnType<typeof useShownDiagram>;

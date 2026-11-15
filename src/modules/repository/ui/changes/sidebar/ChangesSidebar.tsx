@@ -1,4 +1,5 @@
 import { type ReactNode, useRef } from 'react';
+import { useTranslation } from '@/shared/i18n';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
 import type { useCommitView } from '../../../application/commit-view';
@@ -32,6 +33,7 @@ export function ChangesSidebar({
     const viewed = commitView.commit;
     const listWidth = useSidebarWidth('changes', LIST_WIDTH);
     const listBox = useRef<HTMLElement>(null);
+    const i18n = useTranslation();
 
     return (
         <>
@@ -60,7 +62,11 @@ export function ChangesSidebar({
                 box={listBox}
                 place="edge"
                 fitting={(box) =>
-                    fittingRowsWidth(viewed ? (commitView.files.data?.files ?? []) : files, box)
+                    fittingRowsWidth(
+                        viewed ? (commitView.files.data?.files ?? []) : files,
+                        box,
+                        i18n,
+                    )
                 }
                 what="list"
             />

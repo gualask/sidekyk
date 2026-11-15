@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FileDiffRequest } from '../../model/repository.types';
-import { repositoryKeys, worktreeChangeTouches } from './repository-keys';
+import { commitKeys, folderOfKey, repositoryKeys, worktreeChangeTouches } from './repository-keys';
 
 const diff = (area: FileDiffRequest['area'], path: string, origPath: string | null = null) =>
     repositoryKeys.diff('p', { area, path, origPath, wholeFile: false });
@@ -47,5 +47,32 @@ describe('a change in the working tree', () => {
         expect(worktreeChangeTouches(repositoryKeys.snapshot('p'), [])).toBe(true);
         expect(worktreeChangeTouches(repositoryKeys.directory('p', 'src'), [])).toBe(true);
         expect(worktreeChangeTouches(repositoryKeys.file('p', 'README.md'), null)).toBe(true);
+    });
+});
+
+describe('folderOfKey', () => {
+    it("names the folder of a repository's key", () => {
+        expect(folderOfKey(repositoryKeys.snapshot('p'))).toBe('p');
+        expect(folderOfKey(diff('unstaged', 'a.ts'))).toBe('p');
+        expect(
+            folderOfKey(repositoryKeys.colors('p', { path: 'a.ts', version: { kind: 'head' } }, 1)),
+        ).toBe('p');
+    });
+
+    it('names none for a key outside the repositories', () => {
+        expect(folderOfKey(repositoryKeys.activity('p', 'abc', 0))).toBeNull();
+        expect(folderOfKey(repositoryKeys.formatting('p'))).toBeNull();
+        expect(folderOfKey(repositoryKeys.blob('p', 'abc'))).toBeNull();
+        expect(folderOfKey(repositoryKeys.all)).toBeNull();
+    });
+});
+
+describe('a query not asked for yet', () => {
+    it('has a key of its own, kept apart from the other queries of its folder', () => {
+        expect(repositoryKeys.unasked('p', 'diff')).not.toEqual(
+            repositoryKeys.unasked('p', 'file'),
+        );
+        expect(commitKeys.unasked('p', 'files')).not.toEqual(commitKeys.unasked('p', 'diff'));
+        expect(folderOfKey(repositoryKeys.unasked('p', 'file'))).toBe('p');
     });
 });

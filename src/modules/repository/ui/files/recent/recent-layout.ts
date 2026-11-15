@@ -1,4 +1,5 @@
-import { splitPath } from '../../../model/tree/file-groups';
+import { splitPath } from '@/shared/projects/file-path';
+import { fittedWidth } from '@/shared/ui/sidebar-width';
 import type { RecentGroup, RecentRow } from '../../../model/tree/recent-files';
 
 /** Recent's rows: their room on each side, before the folder and before the time, in pixels. */
@@ -9,8 +10,8 @@ export const RECENT_TIME_GAP = 12;
 export const RECENT_SMALL_FONT = 11;
 
 /**
- * What Recent needs to show every row whole, from its fonts' widths: the name, its folder and its
- * time, as `formats` writes it.
+ * The width that shows every row of Recent whole, from its fonts' widths, in `element`: the name,
+ * its folder and its time, as `formats` writes it, its rows laid out in its `[data-rows]` list.
  */
 export function recentFittingWidth(
     rows: readonly RecentRow[],
@@ -36,7 +37,8 @@ export function recentFittingWidth(
             context.measureText(time).width;
         widest = Math.max(widest, width);
     });
-    return Math.ceil(widest + 2 * RECENT_PADDING_X);
+    const room = element.querySelector<HTMLElement>('[data-rows]')?.clientWidth ?? 0;
+    return fittedWidth(element, room, widest + 2 * RECENT_PADDING_X);
 }
 
 /**

@@ -1,4 +1,5 @@
 import { type FileVersion, lineCheck, type SyntaxColors } from '@/modules/repository';
+import { splitLines } from '@/shared/format/text-lines';
 
 /** What the fixtures serve, to find a version's text in. */
 export interface FixtureTexts {
@@ -70,8 +71,7 @@ function spansOf(line: string): SyntaxColors['lines'][number]['spans'] {
 /** As the backend answers: a block of lines of a text, colored. */
 export function fixtureColors(text: string | null, first: number, count: number): SyntaxColors {
     if (text === null) return { tooLarge: false, lines: [] };
-    const lines = text.split('\n');
-    if (lines.at(-1) === '') lines.pop();
+    const lines = splitLines(text);
     return {
         tooLarge: false,
         lines: lines

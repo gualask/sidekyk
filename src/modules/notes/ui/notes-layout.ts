@@ -1,4 +1,5 @@
 import type { NoteLines } from '@/shared/notes/note-lines';
+import { fittedWidth } from '@/shared/ui/sidebar-width';
 
 /** Grows a text field with what it holds, up to its CSS max height. */
 export function autosize(field: HTMLTextAreaElement | null) {
@@ -14,14 +15,14 @@ export function autosize(field: HTMLTextAreaElement | null) {
  */
 const LIST_ROW_EXTRA = 12 + 8 + 28 + 12;
 
-/** What the lists need to show every name whole, from their font's width. */
+/** The width that shows every list's name whole in `box`, the lists' sidebar, from their font. */
 export function fittingListsWidth(names: readonly string[], box: HTMLElement): number {
     const style = getComputedStyle(box);
     const context = document.createElement('canvas').getContext('2d');
     if (!context) return 0;
     context.font = `600 13px ${style.fontFamily}`;
     const widest = Math.max(0, ...names.map((name) => context.measureText(name).width));
-    return Math.ceil(widest + LIST_ROW_EXTRA);
+    return fittedWidth(box, box.clientWidth, widest + LIST_ROW_EXTRA);
 }
 
 /** A note's text field wrapping its long lines or not. */

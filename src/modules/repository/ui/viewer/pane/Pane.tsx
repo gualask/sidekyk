@@ -9,7 +9,7 @@ import type { DiffHunk } from '../../../model/diff/diff-parser';
 import { type DiffRow, rowsOfLines } from '../../../model/diff/diff-rows';
 import type { FileLines } from '../../../model/targets';
 import type { FileSyntax } from '../../../model/text/syntax';
-import { diffLayout, FIND_BAR_SPACE } from '../diff/diff-layout';
+import { diffLayout, FIND_BAR_SPACE, hunkAsked } from '../diff/diff-layout';
 import { DiffList } from '../diff/diff-list/DiffList';
 import type { HunkReader } from '../diff/diff-list/use-hunk-reader';
 import { ChangeMap, SideScrollbar } from '../diff/ScrollMap';
@@ -33,12 +33,6 @@ export function Notice({ children }: { children: ReactNode }) {
             {children}
         </div>
     );
-}
-
-/** The hunk a viewer opens on, as an index: null opens on the first, unmarked. */
-function openedOn(openOn: number | null, count: number): number | null {
-    if (openOn === null || count === 0) return null;
-    return openOn < 0 ? Math.max(0, count + openOn) : Math.min(openOn, count - 1);
 }
 
 /** The row of a file's line: the first at or past it; null for none. */
@@ -108,9 +102,10 @@ export function Pane({
     const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
     const wrapper = useLineWrapper(scrollElement, rows, codeLines === 'wrap');
     const layout = useMemo(() => diffLayout(rows, wrapper?.rowsOf), [rows, wrapper]);
-    // the hunk gone to (`n`/`p`, a mark of the map), else the one opened on
+    // the hunk gone to (`n`/`p`, a mark of the map), else the one opened on (none: the first,
+    // unmarked)
     const [stepped, setStepped] = useState<number | null>(null);
-    const current = stepped ?? openedOn(openOn, hunks.length);
+    const current = stepped ?? hunkAsked(openOn, hunks.length);
     const bars = useScrollbars(scrollElement);
     const reader = useRef<HunkReader | null>(null);
     const [uncolored, setUncolored] = useState(false);

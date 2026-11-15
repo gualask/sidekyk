@@ -18,9 +18,10 @@ const NO_HUNKS: [] = [];
 
 /**
  * A file that did not change: its text on the viewer's rows, which copy a line, or a selection,
- * with a click as they do in a diff. A link shows where it points, never followed. A Markdown
- * or SVG file shows as it reads too, "Code | Preview" in the header: a switch opens the other on
- * the line that was at the top. An image shows as it is, having no text.
+ * with a click as they do in a diff. A link shows where it points, never followed. A file with
+ * both code and preview (`hasCodeAndPreview`) shows as it reads too, "Code | Preview" in the
+ * header: a switch opens the other on the line that was at the top. An image shows as it is,
+ * having no text.
  */
 export function TextFileView({
     folderId,

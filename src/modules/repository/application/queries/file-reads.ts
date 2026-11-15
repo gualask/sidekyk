@@ -4,9 +4,9 @@ import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
 import { MAX_IMAGE_BYTES } from '../../model/preview/preview';
 import type {
-    Diagram,
     DiagramColors,
     Directory,
+    DrawnDiagram,
     FileDiffRequest,
     ImageSource,
 } from '../../model/repository.types';
@@ -19,7 +19,7 @@ export function useFileDiff(folderId: string, request: FileDiffRequest | null) {
     return useQuery({
         queryKey: request
             ? repositoryKeys.diff(folderId, request)
-            : [...repositoryKeys.of(folderId), 'none'],
+            : repositoryKeys.unasked(folderId, 'diff'),
         queryFn: () => (request ? port.getFileDiff(folderId, request) : null),
         enabled: request !== null,
     });
@@ -80,7 +80,7 @@ export function useFileContent(folderId: string, path: string | null) {
     return useQuery({
         queryKey: path
             ? repositoryKeys.file(folderId, path)
-            : [...repositoryKeys.of(folderId), 'none'],
+            : repositoryKeys.unasked(folderId, 'file'),
         queryFn: () => (path ? port.getFileContent(folderId, path) : null),
         enabled: path !== null,
     });
@@ -149,8 +149,6 @@ export function useShownDiagram(source: string, colors: DiagramColors) {
         error: query.isError ? query.error : null,
     };
 }
-
-type DrawnDiagram = Extract<Diagram, { kind: 'drawn' }>;
 
 /** Which folders of a project hold a file, `first` alone when it does (`foldersHolding`). */
 export function useFoldersHolding(): RepositoryPort['foldersHolding'] {

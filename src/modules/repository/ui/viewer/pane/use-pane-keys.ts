@@ -3,6 +3,7 @@ import { shortcutKey } from '@/shared/platform/shortcut';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { isKeyTaken, isOwnKey } from '@/shared/ui/keys';
 import type { FileFinder } from '../../../application/find';
+import { changeStep } from '../../../model/keys';
 import type { HunkReader } from '../diff/diff-list/use-hunk-reader';
 
 /**
@@ -34,7 +35,7 @@ export function usePaneKeys({
                 return;
             }
             if (!isOwnKey(event)) return;
-            const change = event.key === 'n' ? 1 : event.key === 'p' ? -1 : 0;
+            const change = changeStep(event.key);
             if (change !== 0 && onPastEnd) {
                 event.preventDefault();
                 if (!reader.current?.step(change)) onPastEnd(change);

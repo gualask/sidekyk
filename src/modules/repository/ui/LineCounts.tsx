@@ -1,9 +1,10 @@
 import { useTranslation } from '@/shared/i18n';
-import { compactCount } from '../model/history/summary';
+import { countsText } from '../model/line-counts';
 
 /**
- * `+12 −3` (`+1.2k −340` when `compact`); `binary` for a binary file; a dash when the lines were not counted (a very large new
- * file, or past the limits on how many new files are read).
+ * A file's line counts (`countsText`), the lines added and removed in their colors; a dash when
+ * the lines were not counted (a very large new file, or past the limits on how many new files are
+ * read) says so in its tooltip.
  */
 export function LineCounts({
     additions,
@@ -16,22 +17,22 @@ export function LineCounts({
     binary?: boolean;
     compact?: boolean;
 }) {
-    const { t } = useTranslation();
-    if (binary) {
-        return <span className="text-ui-text-muted">{t('lines.binary')}</span>;
-    }
-    if (additions === null && deletions === null) {
+    const i18n = useTranslation();
+    const shown = countsText({ additions, deletions, binary }, i18n, compact);
+    if (shown.kind !== 'lines') {
         return (
-            <span className="text-ui-text-muted" title={t('lines.notCounted')}>
-                —
+            <span
+                className="text-ui-text-muted"
+                title={shown.kind === 'notCounted' ? i18n.t('lines.notCounted') : undefined}
+            >
+                {shown.text}
             </span>
         );
     }
-    const shown = compact ? compactCount : String;
     return (
         <span className="inline-flex gap-1.5 font-mono tabular-nums">
-            <span className="text-ui-diff-add-mark">+{shown(additions ?? 0)}</span>
-            <span className="text-ui-diff-del-mark">−{shown(deletions ?? 0)}</span>
+            <span className="text-ui-diff-add-mark">{shown.added}</span>
+            <span className="text-ui-diff-del-mark">{shown.removed}</span>
         </span>
     );
 }

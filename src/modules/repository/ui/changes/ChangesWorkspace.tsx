@@ -6,10 +6,11 @@ import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info'
 import { remoteMachine } from '@/shared/projects/project-place';
 import { useCommitView } from '../../application/commit-view';
 import { useCommitFileFind, useFileFind } from '../../application/find';
+import { useLinkedAnchor } from '../../application/linked-anchor';
 import { useRepositorySettings } from '../../application/repository-settings';
 import { useSelectedFile } from '../../application/selection';
 import { useShownTarget } from '../../application/shown-target';
-import { useFileViewChoice, useLinkedAnchor } from '../../application/view-choice';
+import { useFileViewChoice } from '../../application/view-choice';
 import { hasPreview } from '../../model/preview/preview';
 import { projectErrorMessage } from '../../model/project-error';
 import type { RepositorySnapshot } from '../../model/repository.types';

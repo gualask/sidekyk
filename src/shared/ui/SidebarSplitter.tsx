@@ -27,8 +27,8 @@ export function SidebarSplitter({
     box: RefObject<HTMLElement | null>;
     place: 'edge' | 'gap';
     /**
-     * The width that shows all the sidebar has, measured on the double click; null when there is
-     * nothing to fit: the double click goes back to the default width.
+     * The width that shows all the sidebar has (`fittedWidth`), measured on the double click; null
+     * when there is nothing to fit: the double click goes back to the default width.
      */
     fitting: (box: HTMLElement) => number | null;
     /** What the sidebar shows, for the tooltip. */

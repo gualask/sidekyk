@@ -1,3 +1,4 @@
+import { localMidnight } from '@/shared/time/local-day';
 import type { CommitActivity } from '../repository.types';
 
 /** The days of a row's week: today and the six before it. */
@@ -14,17 +15,14 @@ export interface ActivityDay {
 
 /** The local midnight `ACTIVITY_DAYS - 1` days before `now`, in seconds: the chart's first day. */
 export function activitySince(now: Date): number {
-    const first = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (ACTIVITY_DAYS - 1));
-    return first.getTime() / 1000;
+    return localMidnight(now, -(ACTIVITY_DAYS - 1)).getTime() / 1000;
 }
 
 /** The commits of `activity` by local day from `since`, oldest first; days are local, DST included. */
 export function activityDays(activity: CommitActivity, since: number): ActivityDay[] {
     const first = new Date(since * 1000);
     const days = Array.from({ length: ACTIVITY_DAYS }, (_, index) => ({
-        start:
-            new Date(first.getFullYear(), first.getMonth(), first.getDate() + index).getTime() /
-            1000,
+        start: localMidnight(first, index).getTime() / 1000,
         additions: 0,
         deletions: 0,
         commits: 0,

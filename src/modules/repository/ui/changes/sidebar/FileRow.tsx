@@ -1,5 +1,5 @@
+import { splitPath } from '@/shared/projects/file-path';
 import type { FileChange } from '../../../model/repository.types';
-import { splitPath } from '../../../model/tree/file-groups';
 import { LineCounts } from '../../LineCounts';
 import { KindBadge } from './KindBadge';
 
