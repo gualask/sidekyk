@@ -2,12 +2,12 @@ import { Dialog } from '@base-ui/react/dialog';
 import { type FormEvent, useRef, useState } from 'react';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectAvatar, ProjectInfo } from '@/shared/projects/project-info';
 import { useAddProjectFolder, useRemoveProjectFolder } from '../application/project-folders';
 import { useEditProject, useMergeProjects, useProjects } from '../application/projects.queries';
 import { writtenLetters } from '../model/avatar-letters';
 import { AvatarField } from './avatar-field';
-import { FolderRow, NameField } from './project-fields';
+import { FolderList, NameField } from './project-fields';
 
 /** Another project that has the folder picked: merged into this one if the user says so. */
 interface Mergeable {
@@ -57,11 +57,7 @@ export function EditProjectDialog({
         event.preventDefault();
         if (cannotSave) return;
         const avatar = { color, letters: written };
-        const same =
-            name === project.name &&
-            color === project.avatar.color &&
-            written === project.avatar.letters;
-        if (same) onClose();
+        if (unchanged(project, name, avatar)) onClose();
         else save.mutate({ projectId: project.id, name, avatar }, { onSuccess: onClose });
     };
     const error = [save, add, remove, merge].find((change) => change.isError)?.error;
@@ -88,7 +84,7 @@ export function EditProjectDialog({
                             name={name}
                             letters={letters}
                             color={color}
-                            invalid={written === false}
+                            written={written}
                             onLetters={setLetters}
                             onColor={setColor}
                         />
@@ -96,9 +92,12 @@ export function EditProjectDialog({
                             <legend className="mb-1 text-xs font-semibold">
                                 {t('projects.folders')}
                             </legend>
-                            <ProjectFolders
-                                project={project}
-                                removing={remove.isPending}
+                            <FolderList
+                                folders={project.folders.map((folder) => ({
+                                    key: folder.id,
+                                    location: folder,
+                                }))}
+                                disabled={remove.isPending}
                                 onRemove={(folderId) =>
                                     remove.mutate({ projectId: project.id, folderId })
                                 }
@@ -148,31 +147,12 @@ export function EditProjectDialog({
     );
 }
 
-/** The project's folders, each with × to leave it out, or a line saying it has none. */
-function ProjectFolders({
-    project,
-    removing,
-    onRemove,
-}: {
-    project: ProjectInfo;
-    removing: boolean;
-    onRemove: (folderId: string) => void;
-}) {
-    const { t } = useTranslation();
-    if (project.folders.length === 0) {
-        return <p className="text-[13px] text-ui-text-muted">{t('projects.noFolder')}</p>;
-    }
+/** Whether the name and the avatar are the project's as they are: nothing to save. */
+function unchanged(project: ProjectInfo, name: string, avatar: ProjectAvatar): boolean {
     return (
-        <ul className="flex flex-col gap-1">
-            {project.folders.map((folder) => (
-                <FolderRow
-                    key={folder.id}
-                    location={folder}
-                    disabled={removing}
-                    onRemove={() => onRemove(folder.id)}
-                />
-            ))}
-        </ul>
+        name === project.name &&
+        avatar.color === project.avatar.color &&
+        avatar.letters === project.avatar.letters
     );
 }
 

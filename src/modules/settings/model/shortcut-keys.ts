@@ -100,13 +100,13 @@ export function pendingShortcut(event: KeyboardEventLike, mac: boolean): string 
     return keysLabel([...held.map((modifier) => modifier.name), '…'].join('+'), mac);
 }
 
-/** The modifiers one of which a shortcut needs, as a sentence names them: `⌃, ⌥ or ⌘`. */
+/**
+ * The modifiers one of which a shortcut needs, as a sentence of the UI's language names them:
+ * `⌃, ⌥ or ⌘` (`Intl.ListFormat`, its tag's way: `⌃, ⌥, or ⌘` in American English).
+ */
 export function neededModifiers(mac: boolean, i18n: Translator): string {
     const labels = MODIFIERS.filter((modifier) => TAKES_NO_CHARACTER.includes(modifier.name)).map(
         (modifier) => modifierLabel(modifier.name, mac),
     );
-    return i18n.t('shortcut.either', {
-        some: labels.slice(0, -1).join(', '),
-        last: labels.at(-1) ?? '',
-    });
+    return new Intl.ListFormat(i18n.formatTag, { type: 'disjunction' }).format(labels);
 }

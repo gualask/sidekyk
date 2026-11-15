@@ -7,7 +7,7 @@ import { useProjectsPort } from './projects.port';
 import { projectsChange, projectsKey, showList } from './projects.queries';
 
 /** The name of the project a folder of the list on screen is of, for a message about it. */
-function folderName(queryClient: QueryClient, folderId: string): string {
+function projectOfFolderName(queryClient: QueryClient, folderId: string): string {
     const list = queryClient.getQueryData<ProjectList>(projectsKey);
     const project = list?.projects.find((p) => p.folders.some((folder) => folder.id === folderId));
     return project?.name ?? folderId;
@@ -48,7 +48,9 @@ export function useRelocateFolder({
         onError: (error, folderId) => {
             showToast(
                 errorToast(
-                    i18n.t('projects.locateFailed', { name: folderName(queryClient, folderId) }),
+                    i18n.t('projects.locateFailed', {
+                        name: projectOfFolderName(queryClient, folderId),
+                    }),
                     error,
                     i18n,
                 ),

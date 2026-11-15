@@ -119,7 +119,6 @@
     "shortcuts.settings": "Impostazioni",
     "shortcuts.help": "Mostra o nascondi questa guida",
     "toast.dismiss": "Chiudi",
-    "shortcut.either": "{some} o {last}",
     "shortcut.unavailable": "Questo sistema non offre a Sidekyk una scorciatoia globale.",
     "shortcut.description": "Scorciatoia globale, da qualsiasi app.",
     "shortcut.toggleLabel": "Mostra e nascondi Sidekyk",

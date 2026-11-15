@@ -42,7 +42,7 @@ export function NameField({
  * A folder of a project in its dialog: its name, where it is muted after it (cut at its start, as
  * everywhere, whole in the tooltip), and × to leave it out, unless `onRemove` is null.
  */
-export function FolderRow({
+function FolderRow({
     location,
     onRemove,
     disabled = false,
@@ -73,5 +73,38 @@ export function FolderRow({
                 </button>
             ) : null}
         </li>
+    );
+}
+
+/**
+ * A project's folders in its dialog, by `key`: a `FolderRow` each, × leaving one out unless
+ * `onRemove` is null; without folders, a line that says so, where folders can be left out.
+ */
+export function FolderList({
+    folders,
+    onRemove,
+    disabled = false,
+}: {
+    folders: readonly { key: string; location: ProjectLocation }[];
+    onRemove: ((key: string) => void) | null;
+    disabled?: boolean;
+}) {
+    const { t } = useTranslation();
+    if (folders.length === 0) {
+        return onRemove ? (
+            <p className="text-[13px] text-ui-text-muted">{t('projects.noFolder')}</p>
+        ) : null;
+    }
+    return (
+        <ul className="flex flex-col gap-1">
+            {folders.map(({ key, location }) => (
+                <FolderRow
+                    key={key}
+                    location={location}
+                    disabled={disabled}
+                    onRemove={onRemove ? () => onRemove(key) : null}
+                />
+            ))}
+        </ul>
     );
 }

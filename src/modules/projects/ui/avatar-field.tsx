@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { useTranslation } from '@/shared/i18n';
-import { AVATAR_COLORS, avatarColor, nameLetters } from '@/shared/projects/avatar';
+import { AVATAR_COLORS, avatarColor, avatarLetters } from '@/shared/projects/avatar';
 import { ProjectAvatar } from '@/shared/projects/ProjectAvatar';
 
 const COLORS = Array.from({ length: AVATAR_COLORS }, (_, i) => i + 1);
@@ -12,23 +12,27 @@ const COLORS = Array.from({ length: AVATAR_COLORS }, (_, i) => i + 1);
 export function AvatarField({
     name,
     letters,
+    written,
     color,
-    invalid,
     onLetters,
     onColor,
 }: {
     /** The name as written in the dialog, which gives the letters when none are written. */
     name: string;
     letters: string;
+    /**
+     * The letters as `writtenLetters` reads them: none (the name's), or false when they cannot
+     * show (more than two, or not letters and digits).
+     */
+    written: string | null | false;
     color: number;
-    /** The letters written cannot show: more than two, or not letters and digits. */
-    invalid: boolean;
     onLetters: (letters: string) => void;
     onColor: (color: number) => void;
 }) {
     const { t } = useTranslation();
     const id = useId();
-    const shown = invalid || letters.trim() === '' ? null : letters.trim();
+    const invalid = written === false;
+    const shown = written === false ? null : written;
     return (
         <fieldset className="flex min-w-0 flex-col gap-1">
             <legend className="mb-1 text-xs font-semibold">{t('projects.avatar')}</legend>
@@ -39,7 +43,7 @@ export function AvatarField({
                 />
                 <input
                     value={letters}
-                    placeholder={nameLetters(name).toLocaleUpperCase()}
+                    placeholder={avatarLetters({ name, avatar: { color, letters: null } })}
                     aria-label={t('projects.letters')}
                     aria-invalid={invalid}
                     aria-describedby={invalid ? `${id}-invalid` : undefined}

@@ -83,8 +83,8 @@ describe('pendingShortcut', () => {
 
 describe('neededModifiers', () => {
     it('names the modifiers one of which a shortcut needs', () => {
-        expect(neededModifiers(true, en)).toBe('⌃, ⌥ or ⌘');
-        expect(neededModifiers(false, en)).toBe('Ctrl, Alt or Win');
+        expect(neededModifiers(true, en)).toBe('⌃, ⌥, or ⌘');
+        expect(neededModifiers(false, createTranslator('en', 'en-GB'))).toBe('Ctrl, Alt or Win');
         expect(neededModifiers(false, createTranslator('it', 'it'))).toBe('Ctrl, Alt o Win');
     });
 });

@@ -6,6 +6,7 @@ import { useChooseProjectFolder, useCreateProject } from '../application/project
 import {
     freeRepositories,
     isParent,
+    type ParentUse,
     type PickedFolder,
     parentFolders,
     withFolder,
@@ -17,7 +18,7 @@ import {
     ParentChoice,
     type PickedParent,
 } from './new-project-fields';
-import { FolderRow, NameField } from './project-fields';
+import { FolderList, NameField } from './project-fields';
 
 /**
  * New project, the same for everyone: a name, and folders if wanted (any folder, inside a
@@ -40,53 +41,20 @@ export function NewProjectDialog({
     onOpenProject: (projectId: string) => void;
     onClose: () => void;
 }) {
-    const usable = picked?.kind === 'usable' ? picked : null;
-    const [name, setName] = useState(usable?.name ?? '');
-    const [folders, setFolders] = useState<PickedFolder[]>(() =>
-        usable && !isParent(usable) ? [{ path: usable.path, location: usable.location }] : [],
+    const [name, setName] = useState(picked?.kind === 'usable' ? picked.name : '');
+    // a folder's name fills the name while it is empty
+    const fillName = (folder: string) =>
+        setName((current) => (current.trim() === '' ? folder : current));
+    const { shown, parent, setUse, notice, choose, chooseFolder, removeFolder } = usePickedFolders(
+        picked,
+        fillName,
     );
-    const [parent, setParent] = useState<PickedParent | null>(() =>
-        usable && isParent(usable) ? { folder: usable, use: 'together' } : null,
-    );
-    const [notice, setNotice] = useState<FolderNotice | null>(
-        picked?.kind === 'inProject' ? picked : null,
-    );
-    const choose = useChooseProjectFolder();
     const create = useCreateProject();
     const nameField = useRef<HTMLInputElement>(null);
     const i18n = useTranslation();
     const { t, tp } = i18n;
     const each = parent?.use === 'each';
 
-    const chooseFolder = async () => {
-        const choice = await choose.mutateAsync().catch(() => null);
-        if (!choice) return;
-        if (choice.kind !== 'usable') {
-            setNotice(choice);
-            return;
-        }
-        setNotice(null);
-        if (name.trim() === '') setName(choice.name);
-        // only the first folder picked is asked about: later ones join as they are
-        if (folders.length === 0 && !parent && isParent(choice)) {
-            setParent({ folder: choice, use: 'together' });
-            return;
-        }
-        setFolders((all) => withFolder(all, { path: choice.path, location: choice.location }));
-    };
-    const removeFolder = (folder: PickedFolder) => {
-        if (parent && !folders.includes(folder)) {
-            // one of the parent's: the others stay as folders picked, the choice asked no more
-            const rest = parentFolders(parent.folder, parent.use).filter(
-                (f) => f.path !== folder.path,
-            );
-            setFolders((all) => [...rest, ...all]);
-            setParent(null);
-            return;
-        }
-        setFolders((all) => all.filter((f) => f !== folder));
-    };
-    const shown = parent ? [...parentFolders(parent.folder, parent.use), ...folders] : folders;
     const blank = !each && name.trim() === '';
     const submit = async (event: FormEvent) => {
         event.preventDefault();
@@ -132,13 +100,14 @@ export function NewProjectDialog({
                             <legend className="mb-1 text-xs font-semibold">
                                 {t('projects.foldersOptional')}
                             </legend>
-                            {parent ? (
-                                <ParentChoice
-                                    parent={parent}
-                                    onUse={(use) => setParent({ ...parent, use })}
-                                />
-                            ) : null}
-                            <FolderList shown={shown} onRemove={each ? null : removeFolder} />
+                            {parent ? <ParentChoice parent={parent} onUse={setUse} /> : null}
+                            <FolderList
+                                folders={shown.map((folder) => ({
+                                    key: folder.path,
+                                    location: folder.location,
+                                }))}
+                                onRemove={each ? null : removeFolder}
+                            />
                             {each ? null : (
                                 <div>
                                     <button
@@ -186,6 +155,66 @@ export function NewProjectDialog({
     );
 }
 
+/**
+ * The folders the new project will follow, as they are picked: those picked one by one, a parent
+ * of repositories picked first and what it becomes, and why the last one picked was not taken.
+ * `fillName` gets a folder's name as one is taken. Starts on `picked`, if any.
+ */
+function usePickedFolders(picked: FolderChoice | null, fillName: (name: string) => void) {
+    const usable = picked?.kind === 'usable' ? picked : null;
+    const [folders, setFolders] = useState<PickedFolder[]>(() =>
+        usable && !isParent(usable) ? [{ path: usable.path, location: usable.location }] : [],
+    );
+    const [parent, setParent] = useState<PickedParent | null>(() =>
+        usable && isParent(usable) ? { folder: usable, use: 'together' } : null,
+    );
+    const [notice, setNotice] = useState<FolderNotice | null>(
+        picked?.kind === 'inProject' ? picked : null,
+    );
+    const choose = useChooseProjectFolder();
+
+    /** Asks for a folder: taken, asked about (a parent picked first), or said not taken. */
+    const chooseFolder = async () => {
+        const choice = await choose.mutateAsync().catch(() => null);
+        if (!choice) return;
+        if (choice.kind !== 'usable') {
+            setNotice(choice);
+            return;
+        }
+        setNotice(null);
+        fillName(choice.name);
+        // only the first folder picked is asked about: later ones join as they are
+        if (folders.length === 0 && !parent && isParent(choice)) {
+            setParent({ folder: choice, use: 'together' });
+            return;
+        }
+        setFolders((all) => withFolder(all, { path: choice.path, location: choice.location }));
+    };
+    /** Leaves the folder at `path` out. */
+    const removeFolder = (path: string) => {
+        if (parent && !folders.some((f) => f.path === path)) {
+            // one of the parent's: the others stay as folders picked, the choice asked no more
+            const rest = parentFolders(parent.folder, parent.use).filter((f) => f.path !== path);
+            setFolders((all) => [...rest, ...all]);
+            setParent(null);
+            return;
+        }
+        setFolders((all) => all.filter((f) => f.path !== path));
+    };
+    const shown = parent ? [...parentFolders(parent.folder, parent.use), ...folders] : folders;
+    return {
+        /** In their order: the parent's, as its use says, then those picked one by one. */
+        shown,
+        parent,
+        setUse: (use: ParentUse) => setParent((held) => held && { ...held, use }),
+        notice,
+        /** The asking, for whether it runs or failed. */
+        choose,
+        chooseFolder,
+        removeFolder,
+    };
+}
+
 /** A project to make: its name and its folders' paths. */
 interface NewProject {
     name: string;
@@ -215,34 +244,4 @@ async function makeInTurn(
         made = (await make(project)).active;
     }
     return made;
-}
-
-/**
- * The folders of the new project, each removable unless `onRemove` is null (a project per
- * repository); without folders, a line that says so, but there.
- */
-function FolderList({
-    shown,
-    onRemove,
-}: {
-    shown: PickedFolder[];
-    onRemove: ((folder: PickedFolder) => void) | null;
-}) {
-    const { t } = useTranslation();
-    if (shown.length > 0) {
-        return (
-            <ul className="flex flex-col gap-1">
-                {shown.map((folder) => (
-                    <FolderRow
-                        key={folder.path}
-                        location={folder.location}
-                        onRemove={onRemove ? () => onRemove(folder) : null}
-                    />
-                ))}
-            </ul>
-        );
-    }
-    return onRemove ? (
-        <p className="text-[13px] text-ui-text-muted">{t('projects.noFolder')}</p>
-    ) : null;
 }

@@ -119,7 +119,6 @@
     "shortcuts.settings": "Settings",
     "shortcuts.help": "Show or hide this",
     "toast.dismiss": "Dismiss",
-    "shortcut.either": "{some} or {last}",
     "shortcut.unavailable": "This system offers Sidekyk no global shortcut.",
     "shortcut.description": "Global shortcut, from any app.",
     "shortcut.toggleLabel": "Show and hide Sidekyk",

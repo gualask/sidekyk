@@ -15,6 +15,10 @@ The UI in English and Italian: the frontend's text, and what the backend writes 
   `1 sett`, `4 mesi`, `2 anni`; a column of them as wide as the language's longest
   (`relativeTimeWidth`).
 - Key names as printed on keys (`Ctrl`, `Alt`, `Shift`, `Space`).
+- A list in a sentence is the language's (`Intl.ListFormat`): `⌃, ⌥ or ⌘`, `⌃, ⌥ o ⌘`. Names
+  listed as a label (a project's folders, the files waiting) and facts side by side (a card's
+  time and length) are parted by a comma in every language, not joined by its `and`: they stay
+  short, and read alike.
 - Text that leaves the app follows the UI's language: the copy marker `(removed in a1b2c3d)`, the
   export's headings, the first list (`General` / `Generale`, kept once created).
 - Not translated: git's and the backend's errors without a code (`unknown`), shown as they come.
