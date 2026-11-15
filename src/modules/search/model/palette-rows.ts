@@ -1,3 +1,4 @@
+import type { Highlight } from '@/shared/format/highlight-parts';
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { Translator } from '@/shared/i18n';
 import type { PanelDefinition } from '@/shared/panels/panel';
@@ -6,7 +7,7 @@ import {
     type ProjectLocation,
     projectFolder,
 } from '@/shared/projects/project-info';
-import type { ContentFile, Highlight, SearchResults } from './search.types';
+import type { ContentFile, SearchResults } from './search.types';
 
 /** A panel as the palette offers it. */
 export interface PalettePanel {

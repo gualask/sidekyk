@@ -1,3 +1,4 @@
+import type { Translator } from '@/shared/i18n';
 import type { ProjectLocation } from './project-info';
 
 /**
@@ -9,14 +10,18 @@ export function remoteMachine(location: ProjectLocation): string | null {
 }
 
 /** The machine a project is on when it is not this one, as the user reads it: `WSL: Ubuntu`. */
-export function remoteName(location: ProjectLocation): string | null {
-    return location.kind === 'wsl' ? `WSL: ${location.distro}` : null;
+export function remoteName(location: ProjectLocation, i18n: Translator): string | null {
+    return location.kind === 'wsl'
+        ? i18n.t('common.wslMachine', { distro: location.distro })
+        : null;
 }
 
 /** Where a project's folder is, in a sentence: its path, and its machine when not this one. */
-export function placeName(location: ProjectLocation): string {
-    const remote = remoteName(location);
-    return remote ? `${location.root} (${remote})` : location.root;
+export function placeName(location: ProjectLocation, i18n: Translator): string {
+    const machine = remoteName(location, i18n);
+    return machine
+        ? i18n.t('common.placeOnMachine', { path: location.root, machine })
+        : location.root;
 }
 
 /**

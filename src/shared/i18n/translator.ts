@@ -1,6 +1,7 @@
 import type { Locale } from './locale';
 import en from './messages/en.json';
 import it from './messages/it.json';
+import { PLACEHOLDER } from './placeholder';
 
 /** English is the source of the keys: every other catalog has the same ones (`i18n:check`). */
 type Messages = typeof en;
@@ -25,7 +26,7 @@ export interface Translator {
 
 function fill(template: string, values: MessageValues | undefined): string {
     if (!values) return template;
-    return template.replace(/\{(\w+)\}/g, (placeholder, name: string) =>
+    return template.replace(PLACEHOLDER, (placeholder, name: string) =>
         name in values ? String(values[name]) : placeholder,
     );
 }

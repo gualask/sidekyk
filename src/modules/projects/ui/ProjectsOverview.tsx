@@ -173,6 +173,7 @@ function ProjectRow({
     onRemove: () => void;
     summary: (part: SummaryPart) => ReactNode;
 }) {
+    const i18n = useTranslation();
     const folder = projectFolder(project);
     return (
         <article
@@ -194,7 +195,7 @@ function ProjectRow({
                         data-current-row={selected ? '' : undefined}
                         className="block min-w-0 truncate text-left text-sm font-semibold after:absolute after:inset-0 focus-visible:outline-none focus-visible:after:outline-2 focus-visible:after:-outline-offset-2 focus-visible:after:outline-ui-accent"
                         // its overlay covers the row: the folder shows wherever the pointer rests
-                        title={folder ? placeName(folder) : undefined}
+                        title={folder ? placeName(folder, i18n) : undefined}
                         onClick={onOpen}
                     >
                         {project.name}

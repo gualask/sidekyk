@@ -74,6 +74,14 @@ export function useSidebarWidth(
     };
     /** The width the layout lets the sidebar have. */
     const shown = (box: HTMLElement) => Math.round(box.getBoundingClientRect().width);
+    /** The width the layout would let the sidebar have at `width`, the sidebar left as it was. */
+    const allowedWidth = (box: HTMLElement, width: number) => {
+        const before = box.style.width;
+        resize(box, width);
+        const allowed = shown(box);
+        box.style.width = before;
+        return allowed;
+    };
 
     return {
         style: { width: value, maxWidth: `calc(100% - ${CONTENT_MIN_WIDTH}px)` },
@@ -101,11 +109,8 @@ export function useSidebarWidth(
                 beforeFit.current = undefined;
                 return;
             }
-            const [current, before] = [shown(box), box.style.width];
-            resize(box, fitting);
-            const target = shown(box);
-            box.style.width = before;
-            if (target <= current + 1) return;
+            const target = allowedWidth(box, fitting);
+            if (target <= shown(box) + 1) return;
             beforeFit.current = stored;
             store(target);
         },

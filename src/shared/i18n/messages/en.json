@@ -63,6 +63,8 @@
     "shortcut.noteMayNotWork": "The shortcut for a quick note may not work",
     "problem.changeShortcut": "Change shortcut",
     "problem.locate": "Locate…",
+    "common.wslMachine": "WSL: {distro}",
+    "common.placeOnMachine": "{path} ({machine})",
     "common.remove": "Remove",
     "problem.retry": "Try again",
     "problem.moved.title": "{name}'s folder was moved or deleted",

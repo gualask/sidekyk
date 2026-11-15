@@ -5,7 +5,6 @@ export type {
     ContentEnd,
     ContentFile,
     FileMatches,
-    Highlight,
     SearchRequest,
     SearchResults,
 } from './model/search.types';

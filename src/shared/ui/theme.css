@@ -15,7 +15,6 @@
     --ui-text-muted: #5b677a;
     /* also the capture overlay's button, drawn natively (`infrastructure/capture/macos/layers.rs`) */
     --ui-accent: #6366f1;
-    --ui-accent-hover: #4f46e5;
     --ui-accent-text: #4f46e5;
     --ui-accent-muted: #6366f1;
     --ui-accent-soft: #eef2ff;
@@ -182,7 +181,6 @@
     --color-ui-text-dim: var(--ui-text-dim);
     --color-ui-text-muted: var(--ui-text-muted);
     --color-ui-accent: var(--ui-accent);
-    --color-ui-accent-hover: var(--ui-accent-hover);
     --color-ui-accent-text: var(--ui-accent-text);
     --color-ui-accent-muted: var(--ui-accent-muted);
     --color-ui-accent-soft: var(--ui-accent-soft);
@@ -190,7 +188,6 @@
     --color-ui-accent-tint: var(--ui-accent-tint);
     --color-ui-accent-on-soft: var(--ui-accent-on-soft);
     --color-ui-accent-solid: var(--ui-accent-solid);
-    --color-ui-accent-solid-hover: var(--ui-accent-solid-hover);
     --color-ui-accent-on-solid: var(--ui-accent-on-solid);
     --color-ui-danger: var(--ui-danger);
     --color-ui-danger-soft: var(--ui-danger-soft);
@@ -201,7 +198,6 @@
     --color-ui-warning: var(--ui-warning);
     --color-ui-warning-soft: var(--ui-warning-soft);
     --color-ui-warning-soft-text: var(--ui-warning-soft-text);
-    --color-ui-warning-on-solid: var(--ui-warning-on-solid);
     --color-ui-important: var(--ui-important);
     --color-ui-mark: var(--ui-mark);
     --color-ui-mark-text: var(--ui-mark-text);

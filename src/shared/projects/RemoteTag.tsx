@@ -1,3 +1,4 @@
+import { useTranslation } from '@/shared/i18n';
 import type { ProjectLocation } from './project-info';
 import { remoteName } from './project-place';
 
@@ -9,7 +10,8 @@ export function RemoteTag({
     folder: ProjectLocation | null;
     className?: string;
 }) {
-    const name = folder ? remoteName(folder) : null;
+    const i18n = useTranslation();
+    const name = folder ? remoteName(folder, i18n) : null;
     return name ? (
         <span className={`chip shrink-0 whitespace-nowrap ${className}`}>{name}</span>
     ) : null;

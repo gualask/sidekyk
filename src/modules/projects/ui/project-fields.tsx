@@ -51,13 +51,14 @@ export function FolderRow({
     onRemove: (() => void) | null;
     disabled?: boolean;
 }) {
-    const { t } = useTranslation();
+    const i18n = useTranslation();
+    const { t } = i18n;
     const name = folderName(location);
     return (
         <li className="flex min-w-0 items-center gap-2 text-[13px]">
             <span className="shrink-0 font-medium">{name}</span>
             <span className="flex min-w-0 flex-1">
-                <FolderPath path={placeName(location)} />
+                <FolderPath path={placeName(location, i18n)} />
             </span>
             {onRemove ? (
                 <button

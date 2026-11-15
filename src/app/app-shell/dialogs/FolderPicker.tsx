@@ -23,7 +23,8 @@ export function FolderPicker({
     onPick: (folderId: string) => void;
     onClose: () => void;
 }) {
-    const { t } = useTranslation();
+    const i18n = useTranslation();
+    const { t } = i18n;
     const input = useRef<HTMLInputElement>(null);
     const [query, setQuery] = useState('');
     const names = useMemo(() => project.folders.map(folderName), [project.folders]);
@@ -70,7 +71,7 @@ export function FolderPicker({
                         >
                             <span className="flex min-w-0 flex-col">
                                 <span className="truncate">{folderName(folder)}</span>
-                                <FolderPath path={placeName(folder)} />
+                                <FolderPath path={placeName(folder, i18n)} />
                             </span>
                             <FolderFacts folder={folder} />
                         </Autocomplete.Item>

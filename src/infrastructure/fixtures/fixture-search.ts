@@ -4,10 +4,10 @@ import type {
     ContentEnd,
     ContentFile,
     FileMatches,
-    Highlight,
     SearchRequest,
     SearchResults,
 } from '@/modules/search';
+import type { Highlight } from '@/shared/format/highlight-parts';
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 

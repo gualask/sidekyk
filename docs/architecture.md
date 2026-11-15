@@ -57,12 +57,11 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   `app`, `infrastructure` or another module; outside a module only its `index.ts`;
   `infrastructure` never imports `app`; `shared` imports only `shared`; `@tauri-apps/*` only in
   `infrastructure/tauri/`; `infrastructure/fixtures/` only from `app/DevModePage.tsx`; only
-  `shared/projects/` reads a location's variant (`project-place.ts`), the fixtures aside.
-- Panels: `PanelDefinition` (`shared/panels/panel.ts`): id, title, icon, lazy component, needs,
-  optional `summary` and `tileMinWidth`. `PanelProps`: `project`, `header` (a portal), `tileFit`,
-  `target` (a request in the panel's terms) and `targetTaken`, `place` (`tile`/`full`), `selected`
-  (takes the keys), `show(panel, target)`, `findInFiles(text)`. A panel remounts per project and
-  zoom; what must survive lives in `useSessionState`.
+  `shared/projects/` reads a location's variant (`project-place.ts`), the fixtures aside. A
+  relative import meets the rules of the `@/` path it names.
+- Panels: `PanelDefinition` and `PanelProps` (`shared/panels/panel.ts`): what a module gives the
+  app, and what the app gives a panel, each field documented there. A panel remounts per project
+  and zoom; what must survive lives in `useSessionState`.
 - Panel requests: a target is a change to what a panel shows, never what it shows. Each
   field is state, written once into its one owner (the selection with its marked lines, the find
   bar, the open list), or an effect done once (open on a hunk or lines, bring a note into view,

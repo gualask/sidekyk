@@ -1,4 +1,4 @@
-import { highlightParts, type Matched } from '../../modules/notes/model/highlight-parts';
+import { type Highlight, highlightParts } from '@/shared/format/highlight-parts';
 
 /** A text ranked against a query, the letters it matched in bold: the palette's, a note's `@`. */
 export function MatchedText({
@@ -7,7 +7,7 @@ export function MatchedText({
     className,
 }: {
     text: string;
-    highlights: Matched;
+    highlights: readonly Highlight[];
     className: string;
 }) {
     return (

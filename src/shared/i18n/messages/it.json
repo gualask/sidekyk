@@ -63,6 +63,8 @@
     "shortcut.noteMayNotWork": "La scorciatoia per la nota rapida potrebbe non funzionare",
     "problem.changeShortcut": "Cambia scorciatoia",
     "problem.locate": "Individua…",
+    "common.wslMachine": "WSL: {distro}",
+    "common.placeOnMachine": "{path} ({machine})",
     "common.remove": "Rimuovi",
     "problem.retry": "Riprova",
     "problem.moved.title": "La cartella di {name} è stata spostata o eliminata",

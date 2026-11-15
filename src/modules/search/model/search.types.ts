@@ -1,3 +1,4 @@
+import type { Highlight } from '@/shared/format/highlight-parts';
 import type { ChangeMark } from '@/shared/git/change-mark';
 import type { ProjectInfo } from '@/shared/projects/project-info';
 
@@ -14,9 +15,6 @@ export interface SearchRequest {
     /** The project whose files are searched: the one on screen, none when all projects show. */
     projectId: string | null;
 }
-
-/** Where the query's letters are in a text: UTF-16 offsets `[start, end)`. */
-export type Highlight = [start: number, end: number];
 
 /** A project as the projects' list has it: its folders tell two of one name apart. */
 interface ProjectMatch extends ProjectInfo {

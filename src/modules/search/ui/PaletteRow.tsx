@@ -1,6 +1,7 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { IconFile, IconList, IconNote } from '@tabler/icons-react';
 import type { CSSProperties } from 'react';
+import type { Highlight } from '@/shared/format/highlight-parts';
 import { CHANGE_MARK_TONE, CHANGE_MARK_WORD } from '@/shared/git/change-mark';
 import { type Translator, useTranslation } from '@/shared/i18n';
 import { FolderPath } from '@/shared/projects/FolderPath';
@@ -9,7 +10,6 @@ import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { KeyCap } from '@/shared/ui/KeyCaps';
 import { MatchedText } from '@/shared/ui/MatchedText';
 import type { PaletteItem, PaletteRow as Row } from '../model/palette-rows';
-import type { Highlight } from '../model/search.types';
 
 /**
  * A row of the virtualized list, placed at `start`: a group's or a file's heading, the files left

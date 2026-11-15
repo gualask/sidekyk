@@ -8,6 +8,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { parseSync } from 'vite';
+import { PLACEHOLDER } from '../src/shared/i18n/placeholder.ts';
 
 const ROOT_DIR = process.cwd();
 const MESSAGES_DIR = path.join(ROOT_DIR, 'src/shared/i18n/messages');
@@ -32,7 +33,7 @@ async function readCatalogs() {
 }
 
 function placeholders(message) {
-    return [...String(message).matchAll(/\{(\w+)\}/g)].map((match) => match[1]).sort();
+    return [...String(message).matchAll(PLACEHOLDER)].map((match) => match[1]).sort();
 }
 
 /** Source files the app runs: tests and fixtures may name keys without keeping them alive. */

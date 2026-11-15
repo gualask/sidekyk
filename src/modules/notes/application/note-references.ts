@@ -1,11 +1,11 @@
 import { createContext, createElement, type ReactNode, useContext, useMemo } from 'react';
+import type { Highlight } from '@/shared/format/highlight-parts';
 import { type NamedLines, type NoteEntity, noteEntities } from '../model/entities';
-import type { Matched } from '../model/highlight-parts';
 
 /** A file a note's `@` suggests: its path, and where the letters typed are in it. */
 export interface SuggestedFile {
     path: string;
-    highlights: Matched;
+    highlights: readonly Highlight[];
 }
 
 /** The files a note can name: those of one folder, searched by name, best first. */

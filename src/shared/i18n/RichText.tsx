@@ -1,4 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
+import { PLACEHOLDER } from './placeholder';
 
 /**
  * A message whose placeholders are elements, such as code or a key cap: `t` gives it unfilled,
@@ -7,7 +8,7 @@ import { Fragment, type ReactNode } from 'react';
 export function RichText({ text, parts }: { text: string; parts: Record<string, ReactNode> }) {
     const nodes: ReactNode[] = [];
     let at = 0;
-    for (const match of text.matchAll(/\{(\w+)\}/g)) {
+    for (const match of text.matchAll(PLACEHOLDER)) {
         if (match.index > at) nodes.push(text.slice(at, match.index));
         const name = match[1];
         nodes.push(<Fragment key={`${name}@${match.index}`}>{parts[name] ?? match[0]}</Fragment>);

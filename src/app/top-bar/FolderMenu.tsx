@@ -21,12 +21,13 @@ export function FolderMenu({
     onShow: (folderId: string) => void;
     onEdit: () => void;
 }) {
-    const { t } = useTranslation();
+    const i18n = useTranslation();
+    const { t } = i18n;
     return (
         <Menu.Root>
             <Menu.Trigger
                 className="flex min-w-0 items-center gap-1 rounded-md px-1.5 py-1 hover:bg-ui-surface-hover focus-visible:outline-2 focus-visible:outline-ui-accent data-popup-open:bg-ui-surface-hover"
-                title={placeName(folder)}
+                title={placeName(folder, i18n)}
                 aria-label={t('topBar.folderOf', {
                     name: folderName(folder),
                     project: project.name,
@@ -45,7 +46,7 @@ export function FolderMenu({
                                     value={each.id}
                                     closeOnClick
                                     className="menu-item gap-2 py-1.5"
-                                    title={placeName(each)}
+                                    title={placeName(each, i18n)}
                                 >
                                     <span className="flex w-3.5 shrink-0 justify-center">
                                         <Menu.RadioItemIndicator>

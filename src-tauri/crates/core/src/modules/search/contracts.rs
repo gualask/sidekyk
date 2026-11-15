@@ -16,7 +16,8 @@ pub struct SearchRequest {
     pub project_id: Option<String>,
 }
 
-/// Where the query's letters are in a text: UTF-16 offsets `[start, end)`, as JavaScript counts.
+/// Where the query's letters are in a text: UTF-16 offsets `[start, end)`, as JavaScript counts
+/// (`Highlight` in `src/shared/format/highlight-parts.ts`).
 pub type Highlight = [u32; 2];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

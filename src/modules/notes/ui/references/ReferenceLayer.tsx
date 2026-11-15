@@ -1,11 +1,11 @@
 import { IconFile } from '@tabler/icons-react';
 import { type ReactNode, type RefObject, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import type { Highlight } from '@/shared/format/highlight-parts';
 import { useTranslation } from '@/shared/i18n';
 import { MatchedText } from '@/shared/ui/MatchedText';
 import type { SuggestedFile } from '../../application/note-references';
 import { entityParts, type NoteEntity, type Typing } from '../../model/entities';
-import type { Matched } from '../../model/highlight-parts';
 
 /** The menu's width, and its room from the field's text. */
 const MENU_WIDTH = 380;
@@ -270,10 +270,10 @@ function FilePath({ file }: { file: SuggestedFile }) {
 }
 
 /** The highlights within `[from, to)` of a text, as offsets from `from`. */
-function shifted(highlights: Matched, from: number, to: number): Matched {
-    return highlights.flatMap(([start, end]) => {
+function shifted(highlights: readonly Highlight[], from: number, to: number): Highlight[] {
+    return highlights.flatMap(([start, end]): Highlight[] => {
         const first = Math.max(start, from);
         const last = Math.min(end, to);
-        return first < last ? [[first - from, last - from] as const] : [];
+        return first < last ? [[first - from, last - from]] : [];
     });
 }

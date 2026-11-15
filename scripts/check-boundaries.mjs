@@ -47,6 +47,14 @@ function sourceLayer(file) {
     return relative.startsWith('src/') ? (relative.slice(4).match(LAYERS)?.[1] ?? null) : null;
 }
 
+/** A relative specifier as the `@/` one naming the same file, so both meet the same rules. */
+function aliased(fromFile, specifier) {
+    if (!specifier.startsWith('.')) return specifier;
+    const target = path.relative(SOURCE_DIR, path.resolve(path.dirname(fromFile), specifier));
+    if (target.startsWith('..') || path.isAbsolute(target)) return specifier;
+    return `@/${target.split(path.sep).join('/')}`;
+}
+
 function importedLayer(specifier) {
     if (!specifier.startsWith('@/')) return null;
     return specifier.slice(2).match(LAYERS)?.[1] ?? null;
@@ -118,7 +126,7 @@ async function violationsOf(file) {
             violations.push(`${relative}:${line}: direct Tauri import outside infrastructure/tauri`);
         }
 
-        if (!isAllowedImport(fromLayer, file, specifier)) {
+        if (!isAllowedImport(fromLayer, file, aliased(file, specifier))) {
             violations.push(`${relative}:${line}: ${fromLayer} cannot import ${specifier}`);
         }
     }

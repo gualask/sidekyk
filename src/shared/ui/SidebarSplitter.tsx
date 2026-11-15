@@ -12,7 +12,8 @@ const TITLES: Record<'column' | 'tree' | 'list' | 'inbox', MessageKey> = {
 /**
  * The splitter of a sidebar: a drag resizes the sidebar, a double click fits what it shows and a
  * second one goes back. Eight pixels wide over the sidebar's right edge (`edge`), or filling the
- * gap the app gives a tile that is the sidebar, by the tile on its left (`gap`, `PanelProps.edge`).
+ * gap the app leaves on the left of a column of tiles that is the sidebar (`gap`, the app's
+ * `SideColumn`).
  */
 export function SidebarSplitter({
     width,

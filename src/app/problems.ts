@@ -71,8 +71,9 @@ function folderProblem(
     folder: ProjectFolder,
     failure: FolderFailure,
     fixes: ProjectFixes,
-    { t }: Translator,
+    i18n: Translator,
 ): Problem | null {
+    const { t } = i18n;
     const id = `${failure}:${folder.id}`;
     const locate = { label: t('problem.locate'), run: () => fixes.locate(folder) };
     const remove = { label: t('common.remove'), run: () => fixes.remove(project) };
@@ -82,7 +83,7 @@ function folderProblem(
         return {
             id,
             title: t('problem.moved.title', { name }),
-            detail: t('problem.moved.detail', { place: placeName(folder) }),
+            detail: t('problem.moved.detail', { place: placeName(folder, i18n) }),
             fixes: [locate, remove],
         };
     }
