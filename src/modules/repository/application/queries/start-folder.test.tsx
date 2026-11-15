@@ -1,10 +1,9 @@
 // @vitest-environment happy-dom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, type ReactNode } from 'react';
+import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectFolder } from '@/shared/projects/project-info';
 import { renderHook } from '@/shared/testing/render-hook';
-import { type RepositoryPort, RepositoryProvider } from '../repository.port';
+import { repositoryWrapper } from '../testing';
 import { useFolderKind, useStartFolder } from './folder-kind';
 
 const API: ProjectFolder = { id: 'api', kind: 'wsl', distro: 'Debian', root: '/home/dev/api' };
@@ -18,13 +17,7 @@ function stoppedDistro() {
         return 'repository' as const;
     });
     // the one method these hooks call
-    const port = { getFolderKind } as unknown as RepositoryPort;
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={queryClient}>
-            <RepositoryProvider value={port}>{children}</RepositoryProvider>
-        </QueryClientProvider>
-    );
+    const wrapper = repositoryWrapper({ getFolderKind });
     return { getFolderKind, wrapper };
 }
 

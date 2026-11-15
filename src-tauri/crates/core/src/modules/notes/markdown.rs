@@ -84,7 +84,7 @@ fn list_notes<'a>(list: &NoteList, notes: &'a [Note]) -> (Vec<&'a Note>, Vec<&'a
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::notes::{ImageKind, NoteImage};
+    use crate::modules::notes::{test_note, ImageKind, NoteImage};
 
     const WORDS: ExportWords = ExportWords {
         notes: "notes",
@@ -94,14 +94,9 @@ mod tests {
 
     fn note(list: &str, position: f64, text: &str, done: Option<u64>) -> Note {
         Note {
-            id: format!("{position}"),
-            list: list.into(),
             position,
-            text: text.into(),
-            created: 0,
-            edited: 0,
             done,
-            images: Vec::new(),
+            ..test_note(&format!("{position}"), list, text)
         }
     }
 

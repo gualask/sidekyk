@@ -93,6 +93,16 @@ mod tests {
         for bad in ["", "/etc/passwd", "../outside", "src/../../outside"] {
             assert!(checked_path(bad).is_err(), "{bad}");
         }
+        // Windows's own forms of a path outside the folder
+        #[cfg(windows)]
+        for bad in [
+            r"..\outside",
+            r"src\..\..\outside",
+            r"C:\Windows\x",
+            r"\\server\share\x",
+        ] {
+            assert!(checked_path(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

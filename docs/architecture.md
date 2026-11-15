@@ -168,7 +168,9 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `C:\Program Files\Git\cmd`; on Windows
   without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
 - `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
-  a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+  a command), `-c diff.autoRefreshIndex=false` (`git diff` against the working tree rewrites the
+  index on a stat-only change, the lock variable notwithstanding), `GIT_TERMINAL_PROMPT=0`,
+  `LC_ALL=C`.
 - Diffs: `--no-ext-diff --no-textconv`. `git diff` alone runs a `diff=<driver>` textconv
   (numstat, diff-tree and log do not): its diff would show what that program prints, not the file
   the viewer reads. VS Code and Zed diff the blobs as stored.

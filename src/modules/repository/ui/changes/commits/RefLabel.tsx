@@ -1,7 +1,7 @@
 import { IconCloud, IconGitBranch, IconTag } from '@tabler/icons-react';
 import { HEAD_COLOR, UPSTREAM_COLOR } from '../../../model/history/graph';
 import type { CommitRef } from '../../../model/repository.types';
-import { laneColor } from './GraphCell';
+import { laneColor } from './lane-color';
 
 /** A ref's icon: a branch, the upstream's cloud as VS Code's, a tag. */
 const REF_ICONS = { head: IconGitBranch, upstream: IconCloud, tag: IconTag } as const;

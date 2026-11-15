@@ -167,7 +167,7 @@ fn deleted_outside_tree(files: &ProjectFiles) -> Vec<&str> {
 
 /// How each changed path changed, the strongest of its areas: an edit over a new file over a
 /// deletion, as the Files panel colors it (`changeMarks` in
-/// `src/modules/repository/model/file-tree.ts`: change both together).
+/// `src/modules/repository/model/tree/file-tree.ts`: change both together).
 fn marks_by_path(changed: &[ChangedFile]) -> HashMap<&str, ChangeMark> {
     let mut marks: HashMap<&str, ChangeMark> = HashMap::new();
     for file in changed {

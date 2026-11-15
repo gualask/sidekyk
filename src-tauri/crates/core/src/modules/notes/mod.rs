@@ -9,6 +9,8 @@ mod images;
 mod markdown;
 mod ports;
 mod store;
+#[cfg(test)]
+mod testing;
 
 pub use book::note_title;
 pub use contracts::{
@@ -21,3 +23,5 @@ pub use images::{
 pub use markdown::{to_markdown, ExportWords, EXPORT_IMAGES};
 pub use ports::{GivenFiles, NotesStorage};
 pub use store::{BookNotes, CaptureImage, CaptureWrite, NotesStore};
+#[cfg(test)]
+pub(crate) use testing::test_note;

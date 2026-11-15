@@ -64,6 +64,9 @@ impl LocalRepositoryBackend {
             // refresh. Sidekyk opens any folder, so its reads never let a repository run code (the
             // branch switch the user asks for runs its hooks, as in a terminal).
             .args(["-c", "core.fsmonitor=false"])
+            // `git diff` against the working tree rewrites the index when a file's stat changed
+            // but not its content, even with `GIT_OPTIONAL_LOCKS=0`: a read must not write.
+            .args(["-c", "diff.autoRefreshIndex=false"])
             .args(args)
             .current_dir(cwd)
             // Never take index.lock: a refresh must not fight the agent's own git commands, and
@@ -281,13 +284,20 @@ mod tests {
         std::fs::write(path, body).unwrap();
     }
 
-    fn scratch_repo() -> tempfile::TempDir {
+    /// A repository with no commit yet, its author set and nothing signed.
+    fn empty_repo() -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
         git(root, &["init", "-q", "-b", "main"]);
         git(root, &["config", "user.email", "test@example.com"]);
         git(root, &["config", "user.name", "Test"]);
         git(root, &["config", "commit.gpgsign", "false"]);
+        dir
+    }
+
+    fn scratch_repo() -> tempfile::TempDir {
+        let dir = empty_repo();
+        let root = dir.path();
         write(root, "src/cart.ts", "a\nb\nc\n");
         write(root, "README.md", "hello\n");
         git(root, &["add", "."]);
@@ -444,9 +454,8 @@ mod tests {
 
     #[test]
     fn snapshot_before_the_first_commit_adds_up_staged_and_unstaged() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = empty_repo();
         let root = dir.path();
-        git(root, &["init", "-q", "-b", "main"]);
         write(root, "a.ts", "one\n");
         git(root, &["add", "a.ts"]);
         write(root, "a.ts", "one\ntwo\n");
@@ -553,12 +562,8 @@ mod tests {
 
     #[test]
     fn changes_ignoring_whitespace_leave_out_formatting_in_both_areas() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = empty_repo();
         let root = dir.path();
-        git(root, &["init", "-q", "-b", "main"]);
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test"]);
-        git(root, &["config", "commit.gpgsign", "false"]);
         git(root, &["config", "core.autocrlf", "false"]);
         write(root, "crlf.ts", "a\nb\n");
         write(root, "indent.ts", "a\n  b\nc\n");
@@ -595,12 +600,8 @@ mod tests {
 
     #[test]
     fn commit_activity_counts_the_lines_of_each_commit_since_a_time() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = empty_repo();
         let root = dir.path();
-        git(root, &["init", "-q", "-b", "main"]);
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test"]);
-        git(root, &["config", "commit.gpgsign", "false"]);
         git(root, &["config", "log.showSignature", "true"]);
         let backend = LocalRepositoryBackend::default();
         let repo = resolve_repository(&backend, root).unwrap();
@@ -791,12 +792,8 @@ mod tests {
 
     #[test]
     fn recent_commits_list_the_branch_and_show_what_each_changed() {
-        let dir = tempfile::tempdir().unwrap();
+        let dir = empty_repo();
         let root = dir.path();
-        git(root, &["init", "-q", "-b", "main"]);
-        git(root, &["config", "user.email", "test@example.com"]);
-        git(root, &["config", "user.name", "Test"]);
-        git(root, &["config", "commit.gpgsign", "false"]);
         // a signature check in the user's config must not run, nor change the output
         git(root, &["config", "log.showSignature", "true"]);
         let backend = LocalRepositoryBackend::default();
@@ -1238,6 +1235,35 @@ mod tests {
             panic!("git answers");
         };
         assert_eq!(visible, [Path::new("src/cart.ts")]);
+    }
+
+    #[test]
+    fn a_read_never_writes_the_index() {
+        let dir = scratch_repo();
+        // stat data the index does not hold, the content unchanged: a git free to refresh the
+        // index writes it back
+        std::fs::File::options()
+            .write(true)
+            .open(dir.path().join("src/cart.ts"))
+            .unwrap()
+            .set_modified(std::time::UNIX_EPOCH + Duration::from_secs(1_000_000_000))
+            .unwrap();
+        let index = dir.path().join(".git/index");
+        let before = std::fs::read(&index).unwrap();
+
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let unchanged = || std::fs::read(&index).unwrap() == before;
+        load_snapshot(&backend, &repo.info).unwrap();
+        assert!(unchanged(), "the snapshot wrote the index");
+        load_summary(&backend, &repo.info).unwrap();
+        assert!(unchanged(), "the summary wrote the index");
+        let request: FileDiffRequest = serde_json::from_value(
+            json!({ "path": "src/cart.ts", "origPath": null, "area": "unstaged" }),
+        )
+        .unwrap();
+        load_file_diff(&backend, &repo.info, &request).unwrap();
+        assert!(unchanged(), "the diff wrote the index");
     }
 
     // the hook is a shell script, made executable
@@ -1946,7 +1972,10 @@ mod tests {
         };
         drop(dir);
         let err = load_summary(&LocalRepositoryBackend::default(), &repository).unwrap_err();
-        assert_eq!(err.to_string(), "repository_missing");
+        assert_eq!(
+            user_facing_code(&err),
+            Some(UserFacingErrorCode::RepositoryMissing)
+        );
     }
 
     /// The median, min and max of `runs` calls to `work`, after one warm-up call.

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile, Directory } from '../repository.types';
+import { changedFile } from '../testing';
 import {
     changeMarks,
     foldersAbove,
@@ -89,17 +90,8 @@ describe('foldersAbove', () => {
 });
 
 describe('changeMarks', () => {
-    const file = (path: string, kind: ChangedFile['kind']): ChangedFile => ({
-        path,
-        origPath: null,
-        area: kind === 'untracked' ? 'untracked' : 'unstaged',
-        kind,
-        additions: 1,
-        deletions: 0,
-        binary: false,
-        oldBlob: null,
-        newBlob: null,
-    });
+    const file = (path: string, kind: ChangedFile['kind']): ChangedFile =>
+        changedFile(path, { area: kind === 'untracked' ? 'untracked' : 'unstaged', kind });
 
     it('marks files and the folders above them, an edit over a new file', () => {
         const marks = changeMarks([
@@ -107,6 +99,10 @@ describe('changeMarks', () => {
             file('src/cart/total.ts', 'modified'),
             file('src/util/fresh.ts', 'untracked'),
             file('old/gone.ts', 'deleted'),
+            // every kind of new file is new
+            file('staged/a.ts', 'added'),
+            file('moved/b.ts', 'renamed'),
+            file('copied/c.ts', 'copied'),
         ]);
         expect(Object.fromEntries(marks)).toEqual({
             'src/cart/new.ts': 'added',
@@ -115,6 +111,12 @@ describe('changeMarks', () => {
             src: 'modified',
             'src/util/fresh.ts': 'added',
             'src/util': 'added',
+            'staged/a.ts': 'added',
+            staged: 'added',
+            'moved/b.ts': 'added',
+            moved: 'added',
+            'copied/c.ts': 'added',
+            copied: 'added',
         });
     });
 });

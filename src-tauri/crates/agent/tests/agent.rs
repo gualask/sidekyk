@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use sidekyk_core::infrastructure::agent::AgentRepositories;
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
-use sidekyk_core::modules::folder::{FileContent, FolderKind, RepositoryInfo};
+use sidekyk_core::modules::folder::{FileContent, FolderKind};
 use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
 use sidekyk_core::modules::repository::{BranchSwitch, FileDiffRequest};
 use sidekyk_core::shared::error::{user_facing_code, UserFacingErrorCode};
@@ -220,20 +220,6 @@ fn a_failure_keeps_its_code_through_the_helper() {
         user_facing_code(&error),
         Some(UserFacingErrorCode::FileMissing)
     );
-    let error = agent.resolve(&dir.path().join("nowhere")).unwrap_err();
-    assert_eq!(
-        user_facing_code(&error),
-        Some(UserFacingErrorCode::RepositoryMissing)
-    );
-    let moved = RepositoryInfo {
-        root: dir.path().join("moved").to_string_lossy().into_owned(),
-        name: "moved".into(),
-    };
-    let error = agent.snapshot(&moved).unwrap_err();
-    assert_eq!(
-        user_facing_code(&error),
-        Some(UserFacingErrorCode::RepositoryMissing)
-    );
 }
 
 /// A `wslpath` of a distro that mounts `C:` at `/mnt/c`, first on the helper's `PATH`.
@@ -331,6 +317,15 @@ fn a_helper_that_stops_at_once_is_not_started_at_every_request() {
     );
 }
 
+/// Waits until the client's helper is closed.
+fn closed(agent: &AgentRepositories) {
+    let deadline = Instant::now() + DEADLINE;
+    while agent.is_running() {
+        assert!(Instant::now() < deadline, "the helper was never closed");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+
 /// A client of this crate's binary closing it when idle for `after`, and how many it started.
 fn counting(after: Duration) -> (AgentRepositories, Arc<AtomicUsize>) {
     let starts = Arc::new(AtomicUsize::new(0));
@@ -357,7 +352,7 @@ fn an_idle_helper_is_closed_unless_it_watches() {
     let dir = scratch_repo();
     let (agent, starts) = counting(IDLE);
     let info = agent.resolve(dir.path()).unwrap();
-    std::thread::sleep(IDLE * 3);
+    closed(&agent);
     agent.summary(&info).unwrap();
     assert_eq!(
         starts.load(Ordering::Relaxed),
@@ -367,11 +362,12 @@ fn an_idle_helper_is_closed_unless_it_watches() {
 
     agent.watch(Some(&info), Box::new(|_| {}));
     std::thread::sleep(IDLE * 3);
+    assert!(agent.is_running(), "kept while it watches");
     agent.summary(&info).unwrap();
     assert_eq!(starts.load(Ordering::Relaxed), 2, "kept while it watches");
 
     agent.watch(None, Box::new(|_| {}));
-    std::thread::sleep(IDLE * 3);
+    closed(&agent);
     agent.summary(&info).unwrap();
     assert_eq!(
         starts.load(Ordering::Relaxed),

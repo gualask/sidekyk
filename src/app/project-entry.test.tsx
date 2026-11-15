@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+    activeProject,
     type Opened,
     type ProjectList,
     type ProjectsPort,
@@ -68,7 +69,9 @@ describe('a folder given on the command line at startup', () => {
         const entered = vi.fn();
         const { result } = renderHook(
             () => {
-                const entry = useProjectEntry(useProjects().data, null);
+                // the project on screen, as the window takes it
+                const list = useProjects().data;
+                const entry = useProjectEntry(list, list ? activeProject(list) : null);
                 useProjectsChangeSubscription((opened) => {
                     if (opened.kind === 'project') {
                         entry.enter(opened.id, entered, opened.folderId);
@@ -81,5 +84,6 @@ describe('a folder given on the command line at startup', () => {
         await vi.waitFor(() => expect(entered).toHaveBeenCalledTimes(1));
         // the folder given, not a picker among the project's two
         expect(result.current.picker).toBeNull();
+        await vi.waitFor(() => expect(result.current.folder?.id).toBe('web'));
     });
 });

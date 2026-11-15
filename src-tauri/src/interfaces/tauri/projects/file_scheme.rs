@@ -106,6 +106,20 @@ mod tests {
     }
 
     #[test]
+    fn an_image_is_answered_with_no_script_and_kept_for_good() {
+        let response = found("image/svg+xml", b"<svg/>".to_vec());
+        let header = |name| response.headers()[name].to_str().unwrap();
+        assert_eq!(header(header::CONTENT_TYPE), "image/svg+xml");
+        assert_eq!(
+            header(header::CONTENT_SECURITY_POLICY),
+            "default-src 'none'; style-src 'unsafe-inline'"
+        );
+        assert_eq!(header(header::X_CONTENT_TYPE_OPTIONS), "nosniff");
+        assert_eq!(header(header::CACHE_CONTROL), "max-age=31536000, immutable");
+        assert_eq!(response.body().as_ref(), b"<svg/>");
+    }
+
+    #[test]
     fn a_query_may_name_a_git_object() {
         assert_eq!(blob("blob=ab12"), Some("ab12".into()));
         assert_eq!(blob("v=1-2&blob=ab12"), Some("ab12".into()));

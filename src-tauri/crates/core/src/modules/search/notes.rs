@@ -214,18 +214,13 @@ fn shown_note(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::modules::notes::{NoteList, INBOX_BOOK};
+    use crate::modules::notes::{test_note, NoteList, INBOX_BOOK};
 
     fn note(id: &str, position: f64, text: &str, done: Option<u64>) -> Note {
         Note {
-            id: id.into(),
-            list: "l1".into(),
             position,
-            text: text.into(),
-            created: 0,
-            edited: 0,
             done,
-            images: Vec::new(),
+            ..test_note(id, "l1", text)
         }
     }
 
@@ -323,8 +318,9 @@ mod tests {
 
     #[test]
     fn one_letter_is_not_looked_for_inside_notes() {
-        let (_, found) = notes().search("q");
-        assert!(found.iter().all(|n| n.snippet.is_none()));
+        // a letter every note holds
+        let (_, found) = notes().search("e");
+        assert!(found.is_empty(), "{found:?}");
     }
 
     /// The books as the store hands them over.

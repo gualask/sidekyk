@@ -263,7 +263,10 @@ mod tests {
             (UserFacingErrorCode::GitNotFound, "git_not_found"),
             (UserFacingErrorCode::GitTimedOut, "git_timed_out"),
             (UserFacingErrorCode::HelperFailed, "helper_failed"),
+            (UserFacingErrorCode::ImageTooLarge, "image_too_large"),
+            (UserFacingErrorCode::ImageUnsupported, "image_unsupported"),
             (UserFacingErrorCode::InvalidCommit, "invalid_commit"),
+            (UserFacingErrorCode::InvalidShortcut, "invalid_shortcut"),
             (UserFacingErrorCode::NoteListMissing, "note_list_missing"),
             (UserFacingErrorCode::NoteMissing, "note_missing"),
             (UserFacingErrorCode::NoteTooLong, "note_too_long"),
@@ -279,18 +282,6 @@ mod tests {
                 UserFacingErrorCode::RepositoryUnsafeOwner,
                 "repository_unsafe_owner",
             ),
-        ];
-        for (code, wire) in cases {
-            assert_eq!(code.as_str(), wire);
-            assert_eq!(UserFacingErrorCode::parse(wire), Some(code));
-        }
-        assert_eq!(UserFacingErrorCode::parse("unknown"), None);
-    }
-
-    #[test]
-    fn shortcut_error_codes_keep_the_wire_contract() {
-        let cases = [
-            (UserFacingErrorCode::InvalidShortcut, "invalid_shortcut"),
             (UserFacingErrorCode::ShortcutInUse, "shortcut_in_use"),
             (UserFacingErrorCode::ShortcutTaken, "shortcut_taken"),
         ];
@@ -298,5 +289,8 @@ mod tests {
             assert_eq!(code.as_str(), wire);
             assert_eq!(UserFacingErrorCode::parse(wire), Some(code));
         }
+        // every code the frontend may get has its row
+        assert_eq!(cases.len(), UserFacingErrorCode::ALL.len());
+        assert_eq!(UserFacingErrorCode::parse("unknown"), None);
     }
 }

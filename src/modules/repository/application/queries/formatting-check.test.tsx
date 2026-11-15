@@ -1,23 +1,13 @@
 // @vitest-environment happy-dom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, type ReactNode } from 'react';
+import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@/shared/testing/render-hook';
-import type { ChangedFile, RepositorySnapshot } from '../../model/repository.types';
-import { type RepositoryPort, RepositoryProvider } from '../repository.port';
+import type { RepositorySnapshot } from '../../model/repository.types';
+import { changedFile } from '../../model/testing';
+import { repositoryWrapper } from '../testing';
 import { type SnapshotRead, useFormattingCheck } from './formatting-check';
 
-const INDENTED: ChangedFile = {
-    path: 'src/cart.ts',
-    origPath: null,
-    area: 'unstaged',
-    kind: 'modified',
-    additions: 4,
-    deletions: 4,
-    binary: false,
-    oldBlob: null,
-    newBlob: null,
-};
+const INDENTED = changedFile('src/cart.ts', { additions: 4, deletions: 4 });
 
 const SNAPSHOT: RepositorySnapshot = {
     files: [INDENTED],
@@ -32,13 +22,7 @@ function formattingPort() {
     // all of it formatting: git -w leaves the file out
     const getChangesIgnoringWhitespace = vi.fn(async () => ({ files: [], truncated: false }));
     // the one method this hook calls
-    const port = { getChangesIgnoringWhitespace } as unknown as RepositoryPort;
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={queryClient}>
-            <RepositoryProvider value={port}>{children}</RepositoryProvider>
-        </QueryClientProvider>
-    );
+    const wrapper = repositoryWrapper({ getChangesIgnoringWhitespace });
     return { getChangesIgnoringWhitespace, wrapper };
 }
 

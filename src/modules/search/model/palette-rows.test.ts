@@ -16,9 +16,13 @@ const NONE: SearchResults = {
     notes: [],
 };
 
-const file = (path: string, score: number): SearchResults['files'][number] => ({
+const file = (
+    path: string,
+    score: number,
+    mark: SearchResults['files'][number]['mark'] = null,
+): SearchResults['files'][number] => ({
     path,
-    mark: null,
+    mark,
     score,
     highlights: [],
 });
@@ -58,7 +62,18 @@ describe('paletteRows', () => {
         );
         expect(projects.rows).toEqual([
             { kind: 'group', label: 'Projects' },
-            { kind: 'item', item: projects.items[0], index: 0 },
+            {
+                kind: 'item',
+                item: {
+                    kind: 'project',
+                    projectId: '/dev/shop',
+                    folder: { id: '/dev/shop', kind: 'local', root: '/dev/shop' },
+                    avatar: { color: 1, letters: null },
+                    label: 'shop',
+                    highlights: [],
+                },
+                index: 0,
+            },
         ]);
 
         const panels = paletteRows(
@@ -79,7 +94,7 @@ describe('paletteRows', () => {
         const { items, rows } = paletteRows(
             {
                 ...NONE,
-                files: [file('db/seed.sql', 110)],
+                files: [file('db/seed.sql', 110, 'modified')],
                 moreFiles: 3,
                 notes: [note('a', 60)],
             },
@@ -90,6 +105,13 @@ describe('paletteRows', () => {
             en,
         );
         expect(items.map((item) => item.label)).toEqual(['db/seed.sql', 'Note a']);
+        expect(items[0]).toEqual({
+            kind: 'file',
+            path: 'db/seed.sql',
+            mark: 'modified',
+            label: 'db/seed.sql',
+            highlights: [],
+        });
         expect(rows).toEqual([
             { kind: 'item', item: items[0], index: 0 },
             { kind: 'item', item: items[1], index: 1 },

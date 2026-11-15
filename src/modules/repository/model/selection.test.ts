@@ -1,20 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile } from './repository.types';
 import { FIRST_CHANGE, selectedFile, selectionOf } from './selection';
+import { changedFile } from './testing';
 import { orderedFiles } from './tree/file-groups';
 
 function file(path: string, kind: ChangedFile['kind'] = 'modified'): ChangedFile {
-    return {
-        path,
-        origPath: null,
-        area: 'unstaged',
-        kind,
-        additions: 1,
-        deletions: 0,
-        binary: false,
-        oldBlob: null,
-        newBlob: null,
-    };
+    return changedFile(path, { kind });
 }
 
 const ordered = orderedFiles([file('b.ts'), file('a.ts'), file('gone.ts', 'deleted')]);

@@ -16,6 +16,8 @@ struct State<T> {
     running: bool,
     /// Runs started so far; the one in flight, if any, is number `started`.
     started: u64,
+    /// Callers waiting for the run in flight to end.
+    waiting: usize,
     last: Option<(u64, T)>,
 }
 
@@ -25,6 +27,7 @@ impl<T> Default for Coalesced<T> {
             state: Mutex::new(State {
                 running: false,
                 started: 0,
+                waiting: 0,
                 last: None,
             }),
             finished: Condvar::new(),
@@ -72,7 +75,9 @@ impl<T: Clone> Coalesced<T> {
                 drop(guard);
                 return value;
             }
+            state.waiting += 1;
             state = self.finished.wait(state).unwrap_or_else(|e| e.into_inner());
+            state.waiting -= 1;
         }
     }
 }
@@ -81,7 +86,7 @@ impl<T: Clone> Coalesced<T> {
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{mpsc, Arc};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use super::*;
 
@@ -110,8 +115,12 @@ mod tests {
                 std::thread::spawn(move || coalesced.run(|| runs.fetch_add(1, Ordering::SeqCst)))
             })
             .collect();
-        // Let the late callers reach the wait before the first run ends.
-        std::thread::sleep(Duration::from_millis(100));
+        // the first run ends once every late caller waits for it
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while coalesced.lock().waiting < late.len() {
+            assert!(Instant::now() < deadline, "the late callers never waited");
+            std::thread::yield_now();
+        }
         release.send(()).unwrap();
 
         assert_eq!(first.join().unwrap(), 0);

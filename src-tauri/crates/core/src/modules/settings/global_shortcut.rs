@@ -284,12 +284,16 @@ mod tests {
     }
 
     impl FakeSystem {
+        /// The keys the system holds, in no order: sorted.
         fn keys(&self) -> Vec<String> {
-            self.registered
+            let mut keys: Vec<String> = self
+                .registered
                 .borrow()
                 .iter()
                 .map(|(_, k)| k.clone())
-                .collect()
+                .collect();
+            keys.sort();
+            keys
         }
     }
 
@@ -403,7 +407,7 @@ mod tests {
                 on("Control+Alt+KeyN"),
             ),
         );
-        assert_eq!(system.keys(), ["Control+Alt+Space", "Control+Alt+KeyN"]);
+        assert_eq!(system.keys(), ["Control+Alt+KeyN", "Control+Alt+Space"]);
         assert_eq!(shortcuts.status().capture, None);
         assert_eq!(
             shortcuts.status().note,
@@ -496,7 +500,7 @@ mod tests {
             &both(on("Control+Alt+Space"), on("Control+Alt+Space")),
         );
         assert_eq!(code(result), Some(UserFacingErrorCode::ShortcutInUse));
-        assert_eq!(system.keys(), ["Control+Alt+Space", "Control+Alt+KeyC"]);
+        assert_eq!(system.keys(), ["Control+Alt+KeyC", "Control+Alt+Space"]);
         // the window's turned off frees its keys for capture
         shortcuts
             .apply(
@@ -534,7 +538,7 @@ mod tests {
         }
         assert_eq!(
             system.keys(),
-            ["Control+Alt+Space", "Control+Alt+KeyC", "Control+Alt+KeyN"]
+            ["Control+Alt+KeyC", "Control+Alt+KeyN", "Control+Alt+Space"]
         );
         assert_eq!(
             shortcuts.status().note,

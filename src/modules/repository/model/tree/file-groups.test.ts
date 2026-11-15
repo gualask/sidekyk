@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ChangedFile } from '../repository.types';
+import { changedFile } from '../testing';
 import {
     changeOf,
     fileKey,
@@ -10,17 +11,7 @@ import {
 } from './file-groups';
 
 function file(path: string, area: ChangedFile['area']): ChangedFile {
-    return {
-        path,
-        origPath: null,
-        area,
-        kind: area === 'untracked' ? 'untracked' : 'modified',
-        additions: 1,
-        deletions: 0,
-        binary: false,
-        oldBlob: null,
-        newBlob: null,
-    };
+    return changedFile(path, { area, kind: area === 'untracked' ? 'untracked' : 'modified' });
 }
 
 describe('file groups', () => {

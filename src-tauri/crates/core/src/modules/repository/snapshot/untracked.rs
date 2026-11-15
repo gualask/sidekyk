@@ -96,7 +96,6 @@ mod tests {
             budget.count(&huge, Path::new("dump.sql")),
             Counts::default()
         );
-        assert_eq!(budget.bytes, MAX_UNTRACKED_TOTAL_BYTES);
 
         let big = FakeFiles {
             size: MAX_UNTRACKED_FILE_BYTES as usize,

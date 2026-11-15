@@ -230,6 +230,9 @@ mod tests {
     use notify::event::{AccessKind, CreateKind, Flag};
     use std::path::PathBuf;
 
+    /// Past a batch held by the report interval, the quiet period and the system's own delay.
+    const QUIET: Duration = REPORT_INTERVAL.saturating_add(Duration::from_secs(1));
+
     /// The paths a watcher reported; these tests drop no event.
     fn paths_of(changed: Changed) -> Vec<PathBuf> {
         match changed {
@@ -324,7 +327,7 @@ mod tests {
         add_folders(&watch, &[root.clone(), root.join(".git")]);
         // FSEvents may first report what happened just before the watch started
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        while received.recv_timeout(Duration::from_secs(1)).is_ok() {
+        while received.recv_timeout(QUIET).is_ok() {
             assert!(
                 std::time::Instant::now() < deadline,
                 "the watcher never went quiet"
@@ -333,7 +336,7 @@ mod tests {
 
         // what git does on every command: read the index
         std::fs::read(root.join(".git/index")).unwrap();
-        if let Ok(paths) = received.recv_timeout(Duration::from_secs(1)) {
+        if let Ok(paths) = received.recv_timeout(QUIET) {
             panic!("a read reported {paths:?}");
         }
     }

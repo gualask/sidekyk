@@ -38,7 +38,10 @@ function setUp() {
 }
 
 describe('ErrorBoundary', () => {
-    afterEach(() => vi.unstubAllGlobals());
+    afterEach(() => {
+        vi.unstubAllGlobals();
+        vi.useRealTimers();
+    });
 
     it('shows the fallback in place of what threw, and reports the error', () => {
         const reportError = vi.fn();
@@ -48,6 +51,16 @@ describe('ErrorBoundary', () => {
         render('a');
         expect(box.textContent).toBe('boom');
         expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'boom' }));
+    });
+
+    it('without reportError, throws the error out of a task, as an uncaught one', () => {
+        vi.stubGlobal('reportError', undefined);
+        vi.useFakeTimers();
+        broken.now = true;
+        const { box, render } = setUp();
+        render('a');
+        expect(box.textContent).toBe('boom');
+        expect(() => vi.runAllTimers()).toThrow('boom');
     });
 
     it('tries the children again on retry, or once its reset key changes', () => {

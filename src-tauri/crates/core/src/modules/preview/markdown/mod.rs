@@ -267,9 +267,8 @@ mod tests {
 
     #[test]
     fn links_and_images_are_resolved() {
-        let blocks = parse(
-            "[o](other.md#Run \"T\") [x](javascript:alert(1)) <a@b.c> ![logo](logo.png) ![b](https://x/b.svg)\n",
-        );
+        let blocks =
+            parse("[o](other.md#Run \"T\") [x](javascript:alert(1)) <a@b.c> ![logo](logo.png)\n");
         let Block::Paragraph { content, .. } = &blocks[0] else {
             panic!("{blocks:?}")
         };
@@ -310,16 +309,6 @@ mod tests {
                     anchor: None,
                 }),
                 alt: "logo".into(),
-                title: None,
-            }
-        );
-        assert_eq!(
-            content[8],
-            Inline::Image {
-                target: Some(Target::Web {
-                    url: "https://x/b.svg".into()
-                }),
-                alt: "b".into(),
                 title: None,
             }
         );

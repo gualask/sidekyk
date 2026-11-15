@@ -1,11 +1,6 @@
 import type { ReactNode } from 'react';
-import {
-    type GraphLine,
-    type GraphRow,
-    HEAD_COLOR,
-    OTHER_COLORS,
-    UPSTREAM_COLOR,
-} from '../../../model/history/graph';
+import type { GraphLine, GraphRow } from '../../../model/history/graph';
+import { laneColor } from './lane-color';
 
 /** A commit row's height: the list places its rows by it, and a lane's lines meet across rows. */
 export const COMMIT_ROW_HEIGHT = 32;
@@ -16,22 +11,6 @@ export const COMMIT_ROW_HEIGHT = 32;
  */
 const LANE_WIDTH = 14;
 const GRAPH_MAX_SHARE = '33%';
-
-/** The lanes of other branches, in turn, after HEAD's (the accent) and the upstream's. */
-const OTHER_LANE_COLORS = [
-    'var(--ui-series-2)',
-    'var(--ui-series-3)',
-    'var(--ui-series-4)',
-    'var(--ui-series-6)',
-] as const;
-
-/** A lane's color in the palette, by what the lane is (`graph.ts`). */
-export function laneColor(color: number): string {
-    if (color === HEAD_COLOR) return 'var(--ui-accent)';
-    if (color === UPSTREAM_COLOR) return 'var(--ui-series-5)';
-    const other = (color - OTHER_COLORS) % OTHER_LANE_COLORS.length;
-    return OTHER_LANE_COLORS[other] ?? OTHER_LANE_COLORS[0];
-}
 
 const laneX = (lane: number) => LANE_WIDTH / 2 + lane * LANE_WIDTH;
 

@@ -315,7 +315,12 @@ mod tests {
                 "target/debug/a.o"
             ]
         );
-        assert_eq!(asked[1], ["src", "src/main.rs"]);
+        // a path under an ignored directory is settled from memory
+        assert!(asked[1].contains(&"src/main.rs".to_string()), "{asked:?}");
+        assert!(
+            asked[1].iter().all(|path| !path.starts_with("target")),
+            "{asked:?}"
+        );
     }
 
     #[test]

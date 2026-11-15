@@ -1,10 +1,8 @@
 // @vitest-environment happy-dom
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@/shared/testing/render-hook';
 import type { Diagram, DiagramColors, DiagramRequest } from '../../model/repository.types';
-import { type RepositoryPort, RepositoryProvider } from '../repository.port';
+import { repositoryWrapper } from '../testing';
 import { useShownDiagram } from './file-reads';
 
 const COLORS = { dark: true, series: ['#6366f1'] } as DiagramColors;
@@ -17,13 +15,7 @@ function diagramPort() {
     const renderDiagram = vi.fn(async ({ source }: DiagramRequest) =>
         source.endsWith('B') ? DRAWN : INVALID,
     );
-    const port = { renderDiagram } as unknown as RepositoryPort;
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    const wrapper = ({ children }: { children: ReactNode }) => (
-        <QueryClientProvider client={queryClient}>
-            <RepositoryProvider value={port}>{children}</RepositoryProvider>
-        </QueryClientProvider>
-    );
+    const wrapper = repositoryWrapper({ renderDiagram });
     return { renderDiagram, wrapper };
 }
 

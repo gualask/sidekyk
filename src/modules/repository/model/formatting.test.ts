@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formattingTotals } from './formatting';
 import type { ChangedFile } from './repository.types';
+import { changedFile } from './testing';
 
 function file(
     path: string,
@@ -8,17 +9,13 @@ function file(
     additions: number | null,
     deletions: number | null,
 ): ChangedFile {
-    return {
-        path,
-        origPath: null,
+    return changedFile(path, {
         area,
         kind: area === 'untracked' ? 'untracked' : 'modified',
         additions,
         deletions,
         binary: additions === null,
-        oldBlob: null,
-        newBlob: null,
-    };
+    });
 }
 
 describe('formattingTotals', () => {

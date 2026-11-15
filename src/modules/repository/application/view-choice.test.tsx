@@ -41,4 +41,16 @@ describe('how a file with a preview shows', () => {
         rerender(undefined);
         expect(result.current.view).toBe('preview');
     });
+
+    it('follows a changed setting over a choice of what it already showed', () => {
+        let value = settings('preview');
+        const wrapper = ({ children }: { children: ReactNode }) => (
+            <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>
+        );
+        const { result, rerender } = renderHook(() => useFileViewChoice(), { wrapper });
+        act(() => result.current.choose('preview'));
+        value = settings('code');
+        rerender(undefined);
+        expect(result.current.view).toBe('code');
+    });
 });

@@ -177,6 +177,7 @@ impl NoteBook {
 #[cfg(test)]
 pub(super) mod tests {
     use super::*;
+    use crate::modules::notes::test_note;
 
     pub(crate) const GENERAL: &str = "1000000000000000";
     pub(crate) const RELEASE: &str = "2000000000000000";
@@ -237,16 +238,7 @@ pub(super) mod tests {
 
     #[test]
     fn a_project_without_lists_gets_one_and_strays_join_it() {
-        let stray = Note {
-            id: id(1),
-            list: "9999999999999999".into(),
-            position: 0.0,
-            text: "orphan".into(),
-            created: 1,
-            edited: 1,
-            done: None,
-            images: Vec::new(),
-        };
+        let stray = test_note(&id(1), "9999999999999999", "orphan");
         let first = || NoteList {
             id: GENERAL.into(),
             name: "General".into(),

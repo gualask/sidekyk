@@ -24,6 +24,9 @@ describe('shortcutFromEvent', () => {
             'Shift+Super+KeyK',
         );
         expect(shortcutFromEvent(press('F5', { alt: true }))).toBe('Alt+F5');
+        expect(shortcutFromEvent(press('Digit1', { ctrl: true, alt: true }))).toBe(
+            'Control+Alt+Digit1',
+        );
     });
 
     it('waits while only modifiers are held', () => {

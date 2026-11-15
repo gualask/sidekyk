@@ -836,9 +836,15 @@ pub mod tests {
         assert!(store
             .move_note(&storage, &shop(), &other.id, inbox, into_list)
             .is_err());
+        // a second list, so shop could give one away: only the Inbox refuses it
+        store.add_list(&storage, &shop(), "Release").unwrap();
         assert!(store.move_list(&storage, &shop(), &general, inbox).is_err());
+        assert!(store.merge_book(&storage, &shop(), inbox, "web").is_err());
         // nothing of it was taken
-        assert_eq!(store.notes(&storage, inbox).unwrap().notes, [note]);
+        let kept = store.notes(&storage, inbox).unwrap();
+        assert_eq!(kept.notes, [note]);
+        assert_eq!(kept.lists.len(), 1);
+        assert_eq!(store.notes(&storage, &shop()).unwrap().lists.len(), 2);
     }
 
     #[test]

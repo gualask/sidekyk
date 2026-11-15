@@ -232,9 +232,11 @@ fn keep_state<C>(states: &mut Vec<(String, C)>, key: &str, state: C) {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use super::*;
+
+    const DEADLINE: Duration = Duration::from_secs(10);
 
     /// A text is a number, added to the one before it: its single line's `check` shows both.
     struct Added {
@@ -276,25 +278,48 @@ mod tests {
         lines.map(|lines| lines[0].check)
     }
 
-    fn ask(colors: &Arc<ColorThread<Added>>, key: &str, hash: u64, text: &str) -> Option<u32> {
+    fn ask(colors: &ColorThread<Added>, key: &str, hash: u64, text: &str) -> Option<u32> {
         check(colors.colored(key, hash, "a.rs", text.into()))
     }
 
-    fn ask_later(
-        colors: &Arc<ColorThread<Added>>,
-        key: &'static str,
+    /// Queues a text from the test's thread, so texts queue in the order written; its answer
+    /// comes on what is returned.
+    fn queue(
+        colors: &ColorThread<Added>,
+        key: &str,
         hash: u64,
-        text: &'static str,
-    ) -> std::thread::JoinHandle<Option<u32>> {
-        let colors = colors.clone();
-        let handle = std::thread::spawn(move || ask(&colors, key, hash, text));
-        std::thread::sleep(Duration::from_millis(50));
-        handle
+        text: &str,
+    ) -> mpsc::Receiver<Option<Lines>> {
+        let (reply, answer) = mpsc::channel();
+        colors.send(Job {
+            key: key.into(),
+            hash,
+            path: "a.rs".into(),
+            bytes: text.into(),
+            reply,
+        });
+        answer
+    }
+
+    fn answered(answer: &mpsc::Receiver<Option<Lines>>) -> Option<u32> {
+        check(answer.recv_timeout(DEADLINE).expect("no answer"))
+    }
+
+    /// Waits until the coloring thread runs a text of `key`.
+    fn running(colors: &ColorThread<Added>, key: &str) {
+        let deadline = Instant::now() + DEADLINE;
+        while lock(&colors.shared.running)
+            .as_ref()
+            .is_none_or(|running| running.key != key)
+        {
+            assert!(Instant::now() < deadline, "{key} never ran");
+            std::thread::yield_now();
+        }
     }
 
     #[test]
     fn a_text_is_colored_once_and_a_changed_one_from_it() {
-        let colors = Arc::new(ColorThread::new(add));
+        let colors = ColorThread::new(add);
         assert_eq!(ask(&colors, "a", 1, "1"), Some(1));
         assert_eq!(
             ask(&colors, "a", 1, "100"),
@@ -309,32 +334,30 @@ mod tests {
 
     #[test]
     fn a_newer_text_stops_the_run_of_the_old_one() {
-        let colors = Arc::new(ColorThread::new(add));
-        let old = ask_later(&colors, "a", 1, "wait");
+        let colors = ColorThread::new(add);
+        let old = queue(&colors, "a", 1, "wait");
+        running(&colors, "a");
         assert_eq!(ask(&colors, "a", 2, "3"), Some(3));
-        assert_eq!(
-            old.join().unwrap(),
-            None,
-            "the old text's caller reads again"
-        );
+        assert_eq!(answered(&old), None, "the old text's caller reads again");
     }
 
     #[test]
     fn a_text_queued_behind_a_newer_one_of_its_file_is_not_colored() {
-        let colors = Arc::new(ColorThread::new(add));
+        let colors = ColorThread::new(add);
         // the thread is busy with another file while both texts of "a" queue
-        let busy = ask_later(&colors, "b", 1, "wait");
-        let old = ask_later(&colors, "a", 1, "1");
-        let new = ask_later(&colors, "a", 2, "2");
+        let busy = queue(&colors, "b", 1, "wait");
+        running(&colors, "b");
+        let old = queue(&colors, "a", 1, "1");
+        let new = queue(&colors, "a", 2, "2");
         assert_eq!(ask(&colors, "b", 2, "7"), Some(7), "stops the busy run");
-        assert_eq!(busy.join().unwrap(), None);
-        assert_eq!(old.join().unwrap(), None);
-        assert_eq!(new.join().unwrap(), Some(2));
+        assert_eq!(answered(&busy), None);
+        assert_eq!(answered(&old), None);
+        assert_eq!(answered(&new), Some(2));
     }
 
     #[test]
     fn only_the_last_texts_are_kept() {
-        let colors = Arc::new(ColorThread::new(add));
+        let colors = ColorThread::new(add);
         for key in ["a", "b", "c", "d", "e"] {
             ask(&colors, key, 1, "1");
         }
@@ -345,7 +368,7 @@ mod tests {
 
     #[test]
     fn a_panic_while_coloring_answers_none_and_the_thread_goes_on() {
-        let colors = Arc::new(ColorThread::new(add));
+        let colors = ColorThread::new(add);
         assert_eq!(ask(&colors, "a", 1, "panic"), None);
         assert_eq!(ask(&colors, "a", 2, "4"), Some(4));
     }
