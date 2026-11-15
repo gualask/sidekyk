@@ -14,7 +14,8 @@ the others point to it.
   - `project-folders.md`: several folders in a project, one on screen; merging projects; a folder
     above repositories.
   - `wsl.md`: WSL projects and the helper (protocol, lifecycle, shipping).
-  - `changes.md`: snapshot, diffs, commits, the viewer.
+  - `changes.md`: snapshot, diffs, the viewer.
+  - `history.md`: recent commits as a graph, the branch switch.
   - `syntax-colors.md`
   - `files.md`: tree, file view, folders without git, the shared selection.
   - `previews.md`: Markdown, SVG and images as they read; links, images loaded from the app.

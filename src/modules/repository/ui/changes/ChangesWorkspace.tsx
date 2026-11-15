@@ -6,6 +6,7 @@ import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info'
 import { remoteMachine } from '@/shared/projects/project-place';
 import { useCommitView } from '../../application/commit-view';
 import { useCommitFileFind, useFileFind } from '../../application/find';
+import { useRepositorySettings } from '../../application/repository-settings';
 import { useSelectedFile } from '../../application/selection';
 import { useShownTarget } from '../../application/shown-target';
 import { useFileViewChoice, useLinkedAnchor } from '../../application/view-choice';
@@ -17,6 +18,7 @@ import { fileTarget } from '../../model/targets';
 import { fileKey } from '../../model/tree/file-groups';
 import { ChangedFileView, type ShowInFiles } from './ChangedFileView';
 import { CommitFileView } from './CommitFileView';
+import { RecentCommits } from './commits/RecentCommits';
 import { shownKeyOf } from './shown-key';
 import { ChangesSidebar } from './sidebar/ChangesSidebar';
 import { OtherFolders } from './sidebar/OtherFolders';
@@ -27,7 +29,7 @@ import { useDiffViewChoice } from './use-diff-view-choice';
 
 /**
  * The Changes panel, the viewer of the project's files: what changed in its working tree, file by
- * file, and below it the recent commits. A commit clicked there shows its files in the list
+ * file, and below it the recent commits: under the list, or under the list and the viewer. A commit clicked there shows its files in the list
  * instead, until going back to the working tree; a file picked in Files shows here too, as its
  * text when it did not change.
  */
@@ -102,6 +104,23 @@ function Changes({
         openAt,
     });
 
+    const { commitsPlace, setCommitsPlace } = useRepositorySettings();
+    const commits = (
+        <RecentCommits
+            folderId={folderId}
+            open={commitView.listOpen}
+            onOpenChange={commitView.setListOpen}
+            viewed={viewed}
+            onView={(commit) => {
+                // a commit's files have their own bar
+                commitView.view(commit);
+                find.close();
+            }}
+            place={commitsPlace}
+            onPlaceChange={setCommitsPlace}
+        />
+    );
+
     // the file in the tree, and in Files full screen at the hunk being read
     const showInFiles: ShowInFiles = (path, hunk) => ({
         panel: 'files',
@@ -113,16 +132,11 @@ function Changes({
             <SnapshotNotices snapshot={snapshot} folder={folder} viewed={viewed !== null} />
             <div className="flex min-h-0 flex-1">
                 <ChangesSidebar
-                    folderId={folderId}
                     commitView={commitView}
                     files={snapshot.data?.files ?? []}
                     selectedKey={selected ? fileKey(selected) : null}
                     onSelect={(file) => setSelection({ kind: 'change', key: fileKey(file) })}
-                    onView={(commit) => {
-                        // a commit's files have their own bar
-                        commitView.view(commit);
-                        find.close();
-                    }}
+                    commits={commitsPlace === 'sidebar' ? commits : null}
                 />
                 <main className="min-w-0 flex-1 bg-ui-surface-subtle">
                     {/* until the settings say which view a diff opens in, no diff is asked for */}
@@ -176,6 +190,7 @@ function Changes({
                     )}
                 </main>
             </div>
+            {commitsPlace === 'footer' ? commits : null}
         </div>
     );
 }

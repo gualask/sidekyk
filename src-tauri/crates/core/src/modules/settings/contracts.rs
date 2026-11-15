@@ -59,6 +59,16 @@ pub enum CodeLines {
     Wrap,
 }
 
+/// Where the Changes panel shows the recent commits: at the bottom of its list, or under the list
+/// and the viewer, the panel's whole width.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommitsPlace {
+    #[default]
+    Sidebar,
+    Footer,
+}
+
 /// How a note's long lines show: wrapped at the panel's edge, or on one line, scrolled sideways.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -150,6 +160,7 @@ pub struct Settings {
     /// The sidebars' widths in pixels, as last dragged, by sidebar (`files`, `changes`, `notes`);
     /// one missing takes its default.
     pub sidebar_widths: BTreeMap<String, u32>,
+    pub commits_place: CommitsPlace,
     pub note_lines: NoteLines,
 }
 
@@ -173,6 +184,7 @@ impl Default for Settings {
             code_lines: CodeLines::default(),
             copy_template: CopyTemplate::default(),
             sidebar_widths: BTreeMap::new(),
+            commits_place: CommitsPlace::default(),
             note_lines: NoteLines::default(),
         }
     }
@@ -235,6 +247,7 @@ mod tests {
             code_lines: CodeLines::Wrap,
             copy_template: CopyTemplate("Look at {row}:\n{text}".to_string()),
             sidebar_widths: BTreeMap::from([("files".to_string(), 320)]),
+            commits_place: CommitsPlace::Footer,
             note_lines: NoteLines::Scroll,
         };
         let json = serde_json::json!({
@@ -249,6 +262,7 @@ mod tests {
             "codeLines": "wrap",
             "copyTemplate": "Look at {row}:\n{text}",
             "sidebarWidths": { "files": 320 },
+            "commitsPlace": "footer",
             "noteLines": "scroll",
         });
         assert_eq!(serde_json::to_value(&settings).unwrap(), json);
@@ -280,6 +294,7 @@ mod tests {
                 code_lines: CodeLines::Scroll,
                 copy_template: CopyTemplate::default(),
                 sidebar_widths: BTreeMap::new(),
+                commits_place: CommitsPlace::Sidebar,
                 note_lines: NoteLines::Wrap,
             }
         );

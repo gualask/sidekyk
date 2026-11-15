@@ -3,8 +3,8 @@
 What is left to build, by theme; not a timeline. **After:** marks an item that builds on another;
 **Next:** the one to build next, nothing left to decide.
 A built item leaves this file for `docs/features/` (`docs/README.md`). Every item keeps
-repositories read-only and follows the golden rule (`AGENTS.md`); out of scope:
-`docs/product.md`.
+repositories read-only (but the branch switch, `docs/features/history.md`) and follows the golden
+rule (`AGENTS.md`); out of scope: `docs/product.md`.
 
 ## App
 

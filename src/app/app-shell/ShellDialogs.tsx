@@ -4,6 +4,7 @@ import { useRemoveProject } from '@/modules/projects';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import type { useProjectEntry } from '../project-entry';
 import {
+    BranchPicker,
     CommandPalette,
     EditProjectDialog,
     FolderPicker,
@@ -16,7 +17,8 @@ import type { PaletteContent } from './palette-content';
 
 /**
  * The dialogs over the workspace, each loaded on its first show: a project's to remove or to
- * edit, the folder to enter a project on, the shortcuts, the settings and the command palette.
+ * edit, the folder to enter a project on, the branch to switch a folder to, the shortcuts, the
+ * settings and the command palette.
  */
 export function ShellDialogs({
     dialogs,
@@ -69,6 +71,15 @@ export function ShellDialogs({
                             onMerged: (into: string, from: string) => forgetBooks([into, from]),
                             onClose: () => dialogs.setEditing(null),
                         }}
+                    />
+                </Suspense>
+            ) : null}
+            {dialogs.branching ? (
+                <Suspense fallback={null}>
+                    <BranchPicker
+                        key={dialogs.branching.id}
+                        folder={dialogs.branching}
+                        onClose={() => dialogs.setBranching(null)}
                     />
                 </Suspense>
             ) : null}

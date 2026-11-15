@@ -22,6 +22,11 @@ export const FolderPicker = preloadable(
 );
 
 /** Loaded when first asked for: the first paint does not show it. */
+export const BranchPicker = lazy(() =>
+    import('../BranchPicker').then((module) => ({ default: module.BranchPicker })),
+);
+
+/** Loaded when first asked for: the first paint does not show it. */
 export const ShortcutsHelp = lazy(() =>
     import('../ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
 );

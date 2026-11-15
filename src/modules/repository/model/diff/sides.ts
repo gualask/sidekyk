@@ -1,4 +1,4 @@
-import type { ChangedFile, Commit, FileChange, FileVersion } from '../repository.types';
+import type { ChangedFile, CommitRequest, FileChange, FileVersion } from '../repository.types';
 
 /** One version of a file: a side of a diff, or the file the Files panel shows. */
 export interface FileSide {
@@ -32,7 +32,7 @@ export function changeSides(file: Pick<ChangedFile, 'path' | 'origPath' | 'area'
 
 /** The sides of a file of a commit: the commit, against its parent. */
 export function commitSides(
-    commit: Pick<Commit, 'sha' | 'parent'>,
+    commit: CommitRequest,
     file: Pick<FileChange, 'path' | 'origPath'>,
 ): DiffSides {
     return {

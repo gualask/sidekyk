@@ -84,9 +84,20 @@ fn answer(repositories: &Arc<LocalRepositories>, output: &Output, id: u64, reque
                 value(r.changes_ignoring_whitespace(&repository)?)
             }));
         }
-        Request::RecentCommits { repository } => {
-            on_thread(Box::new(move |r| value(r.recent_commits(&repository)?)));
+        Request::RecentCommits { repository, skip } => {
+            on_thread(Box::new(move |r| {
+                value(r.recent_commits(&repository, skip)?)
+            }));
         }
+        Request::Branches { repository } => {
+            on_thread(Box::new(move |r| value(r.branches(&repository)?)));
+        }
+        Request::SwitchBranch {
+            repository,
+            request,
+        } => on_thread(Box::new(move |r| {
+            value(r.switch_branch(&repository, &request)?)
+        })),
         Request::CommitActivity { repository, since } => {
             on_thread(Box::new(move |r| {
                 value(r.commit_activity(&repository, since)?)
@@ -256,6 +267,8 @@ fn request_name(request: &Request) -> &'static str {
         Request::FileDiff { .. } => "fileDiff",
         Request::ChangesIgnoringWhitespace { .. } => "changesIgnoringWhitespace",
         Request::RecentCommits { .. } => "recentCommits",
+        Request::Branches { .. } => "branches",
+        Request::SwitchBranch { .. } => "switchBranch",
         Request::CommitActivity { .. } => "commitActivity",
         Request::CommitFiles { .. } => "commitFiles",
         Request::CommitFileDiff { .. } => "commitFileDiff",

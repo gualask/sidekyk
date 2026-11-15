@@ -202,6 +202,7 @@ export function AppShell() {
                     facts={level >= 1 && hasChanges}
                     onShowFolder={entry.showFolder}
                     onEditFolders={() => dialogs.setEditing(project)}
+                    onSwitchBranch={() => dialogs.setBranching(folder)}
                 />
                 <main className="min-h-0 flex-1">
                     {projects.isError ? (

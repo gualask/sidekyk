@@ -147,31 +147,72 @@ pub struct ChangesIgnoringWhitespace {
     pub truncated: bool,
 }
 
-/// One commit of the branch on screen, as the recent commits list it.
+/// One commit of the graph: of HEAD's history or of its upstream's.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Commit {
     /// The full hash.
     pub sha: String,
-    /// The first parent, `None` for a root commit. A merge shows what it brought to it, as VS
-    /// Code does.
-    pub parent: Option<String>,
-    /// The commit has more than one parent.
-    pub merge: bool,
+    /// Its parents' full hashes, the first one first: none for a root commit, two or more for a
+    /// merge. A merge shows what it brought to its first parent, as VS Code does.
+    pub parents: Vec<String>,
     pub author: String,
     /// The author date, in seconds since the Unix epoch.
     pub time: i64,
     pub subject: String,
+    /// The refs pointing at it the graph names: the branch checked out, its upstream, the tags.
+    pub refs: Vec<CommitRef>,
 }
 
-/// The last commits of the branch on screen, newest first, following first parents: the commits
-/// of a branch merged into it are in its merge.
+/// A ref the graph draws, on the commit it points at.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitRef {
+    /// `main`, `origin/main`, `v1.2`; `HEAD` for a detached HEAD.
+    pub name: String,
+    pub kind: CommitRefKind,
+}
+
+/// In the order a commit lists its refs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CommitRefKind {
+    /// The branch checked out, or a detached HEAD.
+    Head,
+    /// The branch HEAD's branch tracks.
+    Upstream,
+    /// A tag, lightweight or annotated: a release, a mark.
+    Tag,
+}
+
+/// A page of the graph's commits, children before their parents (`--topo-order`): HEAD's history
+/// and its upstream's, as VS Code's graph shows them by default.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RecentCommits {
     pub commits: Vec<Commit>,
-    /// The branch has older commits than those listed.
+    /// Older commits follow: the next page starts after these.
     pub more: bool,
+}
+
+/// A branch to switch to: one of this repository's, or a remote one no local branch tracks.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Branch {
+    /// `main`; a remote one with its remote, `origin/feature`.
+    pub name: String,
+    pub remote: bool,
+    /// HEAD is on it.
+    pub current: bool,
+}
+
+/// The switch the user asked for: to a local branch, or to a remote one, which makes the local
+/// branch that tracks it.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchSwitch {
+    pub name: String,
+    pub remote: bool,
 }
 
 /// When a commit was made (Unix seconds), and the lines it added and removed.
@@ -354,11 +395,14 @@ mod tests {
         let commits = RecentCommits {
             commits: vec![Commit {
                 sha: "a1b2c3d4".into(),
-                parent: None,
-                merge: false,
+                parents: vec!["0f9e8d7c".into()],
                 author: "Ada".into(),
                 time: 1_760_000_000,
                 subject: "Add the cart".into(),
+                refs: vec![CommitRef {
+                    name: "origin/main".into(),
+                    kind: CommitRefKind::Upstream,
+                }],
             }],
             more: true,
         };
@@ -367,14 +411,36 @@ mod tests {
             serde_json::json!({
                 "commits": [{
                     "sha": "a1b2c3d4",
-                    "parent": null,
-                    "merge": false,
+                    "parents": ["0f9e8d7c"],
                     "author": "Ada",
                     "time": 1_760_000_000,
-                    "subject": "Add the cart"
+                    "subject": "Add the cart",
+                    "refs": [{ "name": "origin/main", "kind": "upstream" }]
                 }],
                 "more": true
             })
+        );
+    }
+
+    #[test]
+    fn branches_serialize_and_a_switch_reads_the_frontend_payload() {
+        let branch = Branch {
+            name: "origin/feature".into(),
+            remote: true,
+            current: false,
+        };
+        assert_eq!(
+            serde_json::to_value(branch).unwrap(),
+            serde_json::json!({ "name": "origin/feature", "remote": true, "current": false })
+        );
+        let switch: BranchSwitch =
+            serde_json::from_value(serde_json::json!({ "name": "main", "remote": false })).unwrap();
+        assert_eq!(
+            switch,
+            BranchSwitch {
+                name: "main".into(),
+                remote: false,
+            }
         );
     }
 

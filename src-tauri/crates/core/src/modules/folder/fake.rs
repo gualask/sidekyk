@@ -22,6 +22,10 @@ pub(crate) trait FakeBackend: Send + Sync {
         unreachable!()
     }
 
+    fn git_write(&self, _cwd: &Path, _args: &[&str]) -> anyhow::Result<GitOutput> {
+        unreachable!()
+    }
+
     fn read_file(&self, _path: &Path, _limit: u64) -> Option<Vec<u8>> {
         unreachable!()
     }
@@ -80,6 +84,10 @@ impl<T: FakeBackend> RepositoryBackend for T {
         max_stdout: usize,
     ) -> anyhow::Result<GitOutput> {
         FakeBackend::git_with_input(self, cwd, args, input, max_stdout)
+    }
+
+    fn git_write(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
+        FakeBackend::git_write(self, cwd, args)
     }
 
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {

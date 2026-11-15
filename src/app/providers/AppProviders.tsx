@@ -14,6 +14,7 @@ import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/reposi
 import { SearchProvider } from '@/modules/search';
 import { SettingsProvider, useChangeSettings, useSettingsWhenRead } from '@/modules/settings';
 import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import type { CommitsPlace } from '@/shared/git/commits-place';
 import { createTranslator, detectLocale, formatTag, TranslationProvider } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import type { ProjectInfo } from '@/shared/projects/project-info';
@@ -97,12 +98,14 @@ function TranslationBridge({ children }: { children: ReactNode }) {
 
 /**
  * What the Changes and Files panels take from the settings, which they cannot import: the view a
- * diff opens in, the one a file with a preview opens in, the copy template, the scrollbar's width
- * and how long lines show, the defaults until the settings are read. Read at startup alongside
- * the projects, from the backend's memory, so the first diff asks for the right view.
+ * diff opens in, the one a file with a preview opens in, the copy template, the scrollbar's width,
+ * how long lines show and where the recent commits are, the defaults until the settings are read.
+ * Read at startup alongside the projects, from the backend's memory, so the first diff asks for
+ * the right view.
  */
 function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
+    const change = useChangeSettings();
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
@@ -110,8 +113,11 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
             copyTemplate: settings?.copyTemplate ?? DEFAULT_COPY_TEMPLATE,
             scrollbar: settings?.diffScrollbar ?? 'narrow',
             codeLines: settings?.codeLines ?? 'scroll',
+            commitsPlace: settings?.commitsPlace ?? 'sidebar',
+            setCommitsPlace: (commitsPlace: CommitsPlace) =>
+                change((current) => ({ ...current, commitsPlace })),
         }),
-        [settings],
+        [settings, change],
     );
     return <RepositorySettingsProvider value={value}>{children}</RepositorySettingsProvider>;
 }

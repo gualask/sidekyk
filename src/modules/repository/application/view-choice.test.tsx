@@ -13,6 +13,8 @@ function settings(fileView: FileView): RepositorySettings {
         copyTemplate: '',
         scrollbar: 'narrow',
         codeLines: 'scroll',
+        commitsPlace: 'sidebar',
+        setCommitsPlace: () => {},
     };
 }
 

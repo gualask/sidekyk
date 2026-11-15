@@ -8,6 +8,7 @@ interface AppErrorPayload {
 
 /** The message of each code the backend sends; any other shows the backend's own. */
 const USER_MESSAGES: Record<string, MessageKey> = {
+    branch_switch_blocked: 'error.branchSwitchBlocked',
     distro_missing: 'error.distroMissing',
     distro_stopped: 'error.distroStopped',
     export_in_repository: 'error.exportInRepository',
@@ -27,7 +28,9 @@ const USER_MESSAGES: Record<string, MessageKey> = {
     notes_unreadable: 'error.notesUnreadable',
     path_outside_repository: 'error.pathOutsideRepository',
     project_not_found: 'error.projectNotFound',
+    repository_busy: 'error.repositoryBusy',
     repository_missing: 'error.repositoryMissing',
+    repository_unsafe_owner: 'error.repositoryUnsafeOwner',
     shortcut_in_use: 'error.shortcutInUse',
     shortcut_taken: 'error.shortcutTaken',
 };

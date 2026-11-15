@@ -1,5 +1,6 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type { CodeLines } from '@/shared/git/code-lines';
+import type { CommitsPlace } from '@/shared/git/commits-place';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { FileView } from '@/shared/git/file-view';
@@ -16,6 +17,9 @@ export interface RepositorySettings {
     scrollbar: DiffScrollbar;
     /** Whether lines longer than the viewer scroll sideways or wrap. */
     codeLines: CodeLines;
+    /** Where the Changes panel shows the recent commits, and how the section moves them. */
+    commitsPlace: CommitsPlace;
+    setCommitsPlace: (place: CommitsPlace) => void;
 }
 
 const RepositorySettingsContext = createContext<RepositorySettings | null>(null);

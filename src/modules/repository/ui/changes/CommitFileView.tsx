@@ -1,5 +1,6 @@
 import type { FileFinder } from '../../application/find';
 import { commitSides, imageSides } from '../../model/diff/sides';
+import { commitRequest } from '../../model/history/commits';
 import { isImage } from '../../model/preview/preview';
 import type { Commit, FileChange } from '../../model/repository.types';
 import { CommitDiffView } from '../viewer/diff/DiffView';
@@ -41,7 +42,7 @@ export function CommitFileView({
             <ImageDiff
                 key={`${shownKey}:image`}
                 folderId={folderId}
-                sides={imageSides(commitSides(commit, file), file)}
+                sides={imageSides(commitSides(commitRequest(commit), file), file)}
                 header={header}
                 onPastEnd={onPastEnd}
                 renderHeader={() => <FileHeader path={file.path} origPath={file.origPath} />}

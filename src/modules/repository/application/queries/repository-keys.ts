@@ -27,6 +27,7 @@ export const repositoryKeys = {
             request.wholeFile,
         ] as const,
     commits: (folderId: string) => [...repositoryKeys.of(folderId), 'commits'] as const,
+    branches: (folderId: string) => [...repositoryKeys.of(folderId), 'branches'] as const,
     /**
      * Outside `of`: a change on disk, the window showing again or a project read again leave it
      * alone, since its key names what would change it, HEAD and the first day.
@@ -71,6 +72,7 @@ export function worktreeChangeTouches(
         // a change of kind is told as such
         case 'kind':
         case 'commits':
+        case 'branches':
             return false;
         case 'diff': {
             const [area, path, origPath] = rest;

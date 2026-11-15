@@ -35,7 +35,14 @@ fn diff_args<'a>(
     orig_path: Option<&'a str>,
     whole_file: bool,
 ) -> (Vec<&'a str>, Vec<i32>) {
-    let base = ["--no-color", "--no-ext-diff", context_option(whole_file)];
+    // `git diff` alone runs a `diff=<driver>` textconv (numstat and diff-tree do not): the diff
+    // would show what a configured program prints instead of the file, as the viewer reads it
+    let base = [
+        "--no-color",
+        "--no-ext-diff",
+        "--no-textconv",
+        context_option(whole_file),
+    ];
     let mut args = vec![LITERAL_PATHSPECS, "diff"];
     let mut ok_codes = vec![0];
     match area {

@@ -1,5 +1,6 @@
-//! What the app reads its repositories through: this machine's (`LocalRepositories`) or a
-//! helper's, on another machine (`infrastructure::agent`). Every method maps onto one request.
+//! What the app reads its repositories through, and switches their branch with: this machine's
+//! (`LocalRepositories`) or a helper's, on another machine (`infrastructure::agent`). Every method
+//! maps onto one request.
 
 use std::path::Path;
 
@@ -8,8 +9,9 @@ use crate::modules::folder::{
 };
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::repository::{
-    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Branch, BranchSwitch, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -55,7 +57,14 @@ pub trait Repositories: Send + Sync {
         info: &RepositoryInfo,
     ) -> anyhow::Result<ChangesIgnoringWhitespace>;
 
-    fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits>;
+    /// A page of the graph's commits, after the first `skip`.
+    fn recent_commits(&self, info: &RepositoryInfo, skip: usize) -> anyhow::Result<RecentCommits>;
+
+    /// The branches to switch to (`repository::load_branches`).
+    fn branches(&self, info: &RepositoryInfo) -> anyhow::Result<Vec<Branch>>;
+
+    /// The one write: the branch switch the user asks for (`repository::switch_branch`).
+    fn switch_branch(&self, info: &RepositoryInfo, request: &BranchSwitch) -> anyhow::Result<()>;
 
     fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity>;
 

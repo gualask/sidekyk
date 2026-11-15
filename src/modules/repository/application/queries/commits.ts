@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueries, useQuery } from '@tanstack/react-query';
 import { mergedActivity } from '../../model/history/activity';
 import { commitRequest } from '../../model/history/commits';
 import type { Commit, CommitFileDiffRequest } from '../../model/repository.types';
@@ -6,14 +6,18 @@ import { type RepositoryPort, useRepositoryPort } from '../repository.port';
 import { commitKeys, repositoryKeys } from './repository-keys';
 
 /**
- * The last commits of the branch on screen, read only while `open`: the section is closed until
- * asked for, and costs nothing until then. Once open, a change of HEAD or refs reads it again.
+ * The graph's commits, a page at a time, read only while `open`: the section is closed until
+ * asked for, and costs nothing until then. The next page is read when the list reaches the end
+ * of those read; a change of HEAD or refs reads the pages read again.
  */
 export function useRecentCommits(folderId: string, open: boolean) {
     const port = useRepositoryPort();
-    return useQuery({
+    return useInfiniteQuery({
         queryKey: repositoryKeys.commits(folderId),
-        queryFn: () => port.getRecentCommits(folderId),
+        queryFn: ({ pageParam }) => port.getRecentCommits(folderId, pageParam),
+        initialPageParam: 0,
+        getNextPageParam: (last, pages) =>
+            last.more ? pages.reduce((read, page) => read + page.commits.length, 0) : undefined,
         enabled: open,
     });
 }

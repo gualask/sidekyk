@@ -193,6 +193,8 @@ fn commands() -> impl Fn(::tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         tauri_commands::repository::get_file_diff,
         tauri_commands::repository::get_changes_ignoring_whitespace,
         tauri_commands::repository::get_recent_commits,
+        tauri_commands::repository::get_branches,
+        tauri_commands::repository::switch_branch,
         tauri_commands::repository::get_commit_activity,
         tauri_commands::repository::get_commit_files,
         tauri_commands::repository::get_commit_file_diff,

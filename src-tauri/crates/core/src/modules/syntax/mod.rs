@@ -1,7 +1,6 @@
 //! Syntax colors for the viewer: a version of a file colored with bat's grammars, kept while it
 //! does not change, and served a block of lines at a time, the blocks on screen. A changed version
-//! is colored again only around its changes. Read-only, as the repository module it reads
-//! through.
+//! is colored again only around its changes. Read-only.
 
 mod cache;
 mod coloring;

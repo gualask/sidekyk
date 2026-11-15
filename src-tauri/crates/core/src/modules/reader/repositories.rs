@@ -11,9 +11,9 @@ use crate::modules::folder::{
 };
 use crate::modules::preview::{self, MarkdownDocument};
 use crate::modules::repository::{
-    self, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles,
-    CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary,
-    UnifiedDiff,
+    self, Branch, BranchSwitch, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{self, ContentEnd, ContentFile, FileMatches, ProjectFiles};
 use crate::modules::syntax::{self, SyntaxColors, SyntaxRequest};
@@ -72,8 +72,16 @@ impl Repositories for LocalRepositories {
         repository::load_changes_ignoring_whitespace(&*self.backend, info)
     }
 
-    fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
-        repository::load_recent_commits(&*self.backend, info)
+    fn recent_commits(&self, info: &RepositoryInfo, skip: usize) -> anyhow::Result<RecentCommits> {
+        repository::load_recent_commits(&*self.backend, info, skip)
+    }
+
+    fn branches(&self, info: &RepositoryInfo) -> anyhow::Result<Vec<Branch>> {
+        repository::load_branches(&*self.backend, info)
+    }
+
+    fn switch_branch(&self, info: &RepositoryInfo, request: &BranchSwitch) -> anyhow::Result<()> {
+        repository::switch_branch(&*self.backend, info, request)
     }
 
     fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity> {

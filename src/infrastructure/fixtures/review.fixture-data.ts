@@ -286,6 +286,10 @@ const FILES: FixtureFile[] = [
     },
 ];
 
+/** The review's branch and the one it tracks, which its history names too. */
+export const REVIEW_BRANCH = 'feature/coupons';
+export const REVIEW_UPSTREAM = `origin/${REVIEW_BRANCH}`;
+
 export function reviewSnapshot(clean: boolean): RepositorySnapshot {
     const files = clean
         ? []
@@ -295,11 +299,12 @@ export function reviewSnapshot(clean: boolean): RepositorySnapshot {
               newBlob,
           }));
     const branch = {
-        head: 'feature/coupons',
+        head: REVIEW_BRANCH,
         commit: 'a1b2c3d',
-        upstream: 'origin/feature/coupons',
+        upstream: REVIEW_UPSTREAM,
         ahead: clean ? 0 : 2,
-        behind: 0,
+        // the upstream's commit HEAD lacks (`commits.fixture-data.ts`)
+        behind: 1,
     };
     return { files, summary: fixtureSummary(branch, files) };
 }

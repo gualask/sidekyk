@@ -13,7 +13,7 @@ use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::{LocalRepositoryWatcher, REPORT_INTERVAL};
 use sidekyk_core::modules::folder::{FileContent, FolderKind, RepositoryInfo};
 use sidekyk_core::modules::reader::{LocalRepositories, Repositories};
-use sidekyk_core::modules::repository::FileDiffRequest;
+use sidekyk_core::modules::repository::{BranchSwitch, FileDiffRequest};
 use sidekyk_core::shared::error::{user_facing_code, UserFacingErrorCode};
 
 /// Past a batch held by the watcher's report interval, its quiet period (250 ms) and the system's
@@ -116,9 +116,22 @@ fn the_helper_answers_as_the_app_reads_directly() {
         json(&local.changes_ignoring_whitespace(&info).unwrap())
     );
     assert_eq!(
-        json(&agent.recent_commits(&info).unwrap()),
-        json(&local.recent_commits(&info).unwrap())
+        json(&agent.recent_commits(&info, 0).unwrap()),
+        json(&local.recent_commits(&info, 0).unwrap())
     );
+    let branches = agent.branches(&info).unwrap();
+    assert_eq!(json(&branches), json(&local.branches(&info).unwrap()));
+    // the one write, through the helper: to the branch HEAD is on, which changes nothing
+    let current = branches.iter().find(|b| b.current).unwrap();
+    agent
+        .switch_branch(
+            &info,
+            &BranchSwitch {
+                name: current.name.clone(),
+                remote: false,
+            },
+        )
+        .unwrap();
     assert_eq!(
         json(&agent.commit_activity(&info, 0).unwrap()),
         json(&local.commit_activity(&info, 0).unwrap())

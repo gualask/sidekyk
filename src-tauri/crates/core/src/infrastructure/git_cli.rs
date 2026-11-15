@@ -15,12 +15,19 @@ use super::worktree_files;
 use crate::modules::folder::{
     FileStamp, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
 };
-use crate::shared::error::{user_facing, user_facing_code, UserFacingErrorCode};
+use crate::shared::error::{user_facing, user_facing_code, UserFacingError, UserFacingErrorCode};
 
 /// No git call takes longer: past it git is killed and the call fails with `git_timed_out`, so a
 /// hung command (a network drive, a huge repository) cannot hold a snapshot forever. Its message
 /// in `app-error.ts` names it.
 const GIT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// A git that writes (a branch switch, its hooks: git-lfs fetching files) is killed only past this,
+/// stuck: killed midway it would leave `index.lock` and a half-switched tree.
+const GIT_WRITE_TIMEOUT: Duration = Duration::from_secs(10 * 60);
+
+/// Far more than a switch and its hooks print.
+const MAX_WRITE_STDOUT: usize = 1024 * 1024;
 
 /// An app started from Finder or a desktop launcher can get a minimal PATH, so the usual install
 /// dirs are checked too.
@@ -54,7 +61,8 @@ impl LocalRepositoryBackend {
         let mut command = Command::new(bin);
         command
             // A repository's config can name an fsmonitor command, which git would run on every
-            // refresh. Sidekyk opens any folder, so it never lets a repository run code.
+            // refresh. Sidekyk opens any folder, so its reads never let a repository run code (the
+            // branch switch the user asks for runs its hooks, as in a terminal).
             .args(["-c", "core.fsmonitor=false"])
             .args(args)
             .current_dir(cwd)
@@ -77,14 +85,10 @@ impl LocalRepositoryBackend {
         args: &[&str],
         input: Option<&[u8]>,
         max_stdout: usize,
+        timeout: Duration,
     ) -> anyhow::Result<GitOutput> {
         let started = Instant::now();
-        let output = run(
-            &mut self.command(cwd, args)?,
-            input,
-            max_stdout,
-            GIT_TIMEOUT,
-        );
+        let output = run(&mut self.command(cwd, args)?, input, max_stdout, timeout);
         log_git(args, started, &output);
         output
     }
@@ -113,25 +117,45 @@ fn log_git(args: &[&str], started: Instant, output: &anyhow::Result<GitOutput>) 
     }
 }
 
-/// `process::run`, past its time a `git_timed_out`: `app-error.ts` names git.
+/// `process::run`, past its time a `git_timed_out` (`app-error.ts` names git), and a repository git
+/// refuses for its owner a `repository_unsafe_owner`.
 fn run(
     command: &mut Command,
     input: Option<&[u8]>,
     max_stdout: usize,
     timeout: Duration,
 ) -> anyhow::Result<GitOutput> {
-    process::run(command, input, max_stdout, timeout).map_err(|error| {
+    let output = process::run(command, input, max_stdout, timeout).map_err(|error| {
         if error.is::<TimedOut>() {
             user_facing(UserFacingErrorCode::GitTimedOut)
         } else {
             error
         }
-    })
+    })?;
+    if refuses_owner(&output) {
+        // git's own words, for the log
+        return Err(
+            anyhow::anyhow!("{}", output.stderr.trim()).context(UserFacingError::new(
+                UserFacingErrorCode::RepositoryUnsafeOwner,
+            )),
+        );
+    }
+    Ok(output)
+}
+
+/// Whether git refused the repository because another user owns it (CVE-2022-24765): its config
+/// could run programs as this user. Sidekyk never adds it to `safe.directory`; the user does. Under
+/// `LC_ALL=C`, up to git 2.37 (and in its backports): "unsafe repository ('…' is owned by someone
+/// else)"; since 2.38: "detected dubious ownership in repository at '…'".
+fn refuses_owner(output: &GitOutput) -> bool {
+    output.code == 128
+        && (output.stderr.contains("detected dubious ownership")
+            || output.stderr.contains("is owned by someone else"))
 }
 
 impl RepositoryBackend for LocalRepositoryBackend {
     fn git(&self, cwd: &Path, args: &[&str], max_stdout: usize) -> anyhow::Result<GitOutput> {
-        self.run_git(cwd, args, None, max_stdout)
+        self.run_git(cwd, args, None, max_stdout, GIT_TIMEOUT)
     }
 
     fn git_with_input(
@@ -141,7 +165,11 @@ impl RepositoryBackend for LocalRepositoryBackend {
         input: &[u8],
         max_stdout: usize,
     ) -> anyhow::Result<GitOutput> {
-        self.run_git(cwd, args, Some(input), max_stdout)
+        self.run_git(cwd, args, Some(input), max_stdout, GIT_TIMEOUT)
+    }
+
+    fn git_write(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput> {
+        self.run_git(cwd, args, None, MAX_WRITE_STDOUT, GIT_WRITE_TIMEOUT)
     }
 
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>> {
@@ -214,10 +242,11 @@ mod tests {
     };
     use crate::modules::preview::parse_markdown;
     use crate::modules::repository::{
-        load_blob_image, load_blob_size, load_changes_ignoring_whitespace, load_commit_activity,
-        load_commit_file_diff, load_commit_files, load_file_diff, load_recent_commits,
-        load_snapshot, load_summary, load_version_text, ChangeArea, ChangeKind, Commit,
-        CommitFileDiffRequest, CommitRequest, FileDiffRequest, FileVersion, RepositorySnapshot,
+        load_blob_image, load_blob_size, load_branches, load_changes_ignoring_whitespace,
+        load_commit_activity, load_commit_file_diff, load_commit_files, load_file_diff,
+        load_recent_commits, load_snapshot, load_summary, load_version_text, switch_branch,
+        BranchSwitch, ChangeArea, ChangeKind, Commit, CommitFileDiffRequest, CommitRef,
+        CommitRefKind, CommitRequest, FileDiffRequest, FileVersion, RepositorySnapshot,
         VersionText,
     };
     use crate::modules::search::{
@@ -394,7 +423,7 @@ mod tests {
         assert!(alone(&staged.text), "{}", staged.text);
 
         git(root, &["commit", "-q", "-m", "Both"]);
-        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let recent = load_recent_commits(&backend, &repo.info, 0).unwrap();
         let both = &recent.commits[0];
         let committed = load_commit_file_diff(
             &backend,
@@ -402,7 +431,7 @@ mod tests {
             &CommitFileDiffRequest {
                 commit: CommitRequest {
                     sha: both.sha.clone(),
-                    parent: both.parent.clone(),
+                    parent: both.parents.first().cloned(),
                 },
                 path: "src/[id].ts".into(),
                 orig_path: None,
@@ -501,6 +530,28 @@ mod tests {
     }
 
     #[test]
+    fn a_diff_shows_the_file_not_what_a_textconv_prints() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        write(root, ".gitattributes", "*.md diff=upper\n");
+        git(root, &["config", "diff.upper.textconv", "tr a-z A-Z <"]);
+        write(root, "README.md", "hello world\n");
+
+        let request: FileDiffRequest = serde_json::from_value(
+            json!({ "path": "README.md", "origPath": null, "area": "unstaged" }),
+        )
+        .unwrap();
+        let diff = load_file_diff(&backend, &repo.info, &request).unwrap();
+        assert!(
+            diff.text.contains("-hello\n+hello world\n"),
+            "{}",
+            diff.text
+        );
+    }
+
+    #[test]
     fn changes_ignoring_whitespace_leave_out_formatting_in_both_areas() {
         let dir = tempfile::tempdir().unwrap();
         let root = dir.path();
@@ -588,6 +639,156 @@ mod tests {
             .is_empty());
     }
 
+    /// `main` tracking `origin/main` with no remote to reach: the remote branch is a ref of its
+    /// own, set where a fetch would.
+    fn track(root: &Path, upstream_sha: &str) {
+        git(root, &["config", "remote.origin.url", "/nowhere"]);
+        git(
+            root,
+            &[
+                "config",
+                "remote.origin.fetch",
+                "+refs/heads/*:refs/remotes/origin/*",
+            ],
+        );
+        git(root, &["config", "branch.main.remote", "origin"]);
+        git(root, &["config", "branch.main.merge", "refs/heads/main"]);
+        git(
+            root,
+            &["update-ref", "refs/remotes/origin/main", upstream_sha],
+        );
+    }
+
+    #[test]
+    fn the_graph_holds_head_and_its_upstream_page_by_page() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        let base = object(root, "HEAD");
+        // the upstream has a commit HEAD lacks, HEAD one the upstream lacks
+        git(root, &["commit", "-q", "--allow-empty", "-m", "Theirs"]);
+        let theirs = object(root, "HEAD");
+        git(root, &["reset", "-q", "--hard", &base]);
+        git(root, &["commit", "-q", "--allow-empty", "-m", "Ours"]);
+        track(root, &theirs);
+        // a release tagged, and another branch there, which the graph does not name
+        git(root, &["tag", "-a", "-m", "Release", "v1.0", &base]);
+        git(root, &["branch", "other", &base]);
+
+        let graph = load_recent_commits(&backend, &repo.info, 0).unwrap();
+        let rows: Vec<(&str, Vec<CommitRef>)> = graph
+            .commits
+            .iter()
+            .map(|c| (c.subject.as_str(), c.refs.clone()))
+            .collect();
+        let named = |name: &str, kind| CommitRef {
+            name: name.into(),
+            kind,
+        };
+        assert_eq!(rows.len(), 3, "{rows:?}");
+        assert!(rows.contains(&("Ours", vec![named("main", CommitRefKind::Head)])));
+        assert!(rows.contains(&(
+            "Theirs",
+            vec![named("origin/main", CommitRefKind::Upstream)]
+        )));
+        assert_eq!(rows[2], ("init", vec![named("v1.0", CommitRefKind::Tag)]));
+        assert!(!graph.more);
+
+        // past the first page, the rest
+        let rest = load_recent_commits(&backend, &repo.info, 2).unwrap();
+        let subjects: Vec<&str> = rest.commits.iter().map(|c| c.subject.as_str()).collect();
+        assert_eq!(subjects, ["init"]);
+
+        // detached, without an upstream
+        git(root, &["checkout", "-q", "--detach", &base]);
+        let detached = load_recent_commits(&backend, &repo.info, 0).unwrap();
+        assert_eq!(detached.commits.len(), 1);
+        assert_eq!(
+            detached.commits[0].refs,
+            [
+                named("HEAD", CommitRefKind::Head),
+                named("v1.0", CommitRefKind::Tag)
+            ]
+        );
+    }
+
+    #[test]
+    fn a_switch_goes_to_a_local_or_a_remote_branch_and_never_overwrites_changes() {
+        let dir = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let repo = resolve_repository(&backend, dir.path()).unwrap();
+        let root = Path::new(&repo.info.root);
+        let base = object(root, "HEAD");
+        git(root, &["branch", "local-only"]);
+        git(
+            root,
+            &["update-ref", "refs/remotes/origin/fix-login", &base],
+        );
+        track(root, &base);
+        let names = || -> Vec<(String, bool, bool)> {
+            load_branches(&backend, &repo.info)
+                .unwrap()
+                .into_iter()
+                .map(|b| (b.name, b.remote, b.current))
+                .collect()
+        };
+        let mut listed = names();
+        listed.sort();
+        assert_eq!(
+            listed,
+            [
+                ("local-only".into(), false, false),
+                ("main".into(), false, true),
+                ("origin/fix-login".into(), true, false),
+            ]
+        );
+
+        let switch = |name: &str, remote: bool| {
+            switch_branch(
+                &backend,
+                &repo.info,
+                &BranchSwitch {
+                    name: name.into(),
+                    remote,
+                },
+            )
+        };
+        switch("local-only", false).unwrap();
+        assert_eq!(object(root, "HEAD"), base);
+        // a remote one makes the local branch that tracks it
+        switch("origin/fix-login", true).unwrap();
+        assert!(names().contains(&("fix-login".into(), false, true)));
+        assert!(!names().iter().any(|(name, ..)| name == "origin/fix-login"));
+
+        // a change the switch would overwrite: refused, kept
+        write(root, "src/cart.ts", "mine\n");
+        git(root, &["commit", "-q", "-am", "Change the cart"]);
+        write(root, "src/cart.ts", "not committed\n");
+        let blocked = switch("main", false).unwrap_err();
+        assert_eq!(
+            user_facing_code(&blocked),
+            Some(UserFacingErrorCode::BranchSwitchBlocked)
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join("src/cart.ts")).unwrap(),
+            "not committed\n"
+        );
+
+        // another git holds the index
+        write(root, ".git/index.lock", "");
+        let busy = switch("local-only", false).unwrap_err();
+        assert_eq!(
+            user_facing_code(&busy),
+            Some(UserFacingErrorCode::RepositoryBusy)
+        );
+        std::fs::remove_file(root.join(".git/index.lock")).unwrap();
+
+        // nothing that is not a branch
+        assert!(switch("no-such-branch", false).is_err());
+        assert!(switch("", false).is_err());
+    }
+
     #[test]
     fn recent_commits_list_the_branch_and_show_what_each_changed() {
         let dir = tempfile::tempdir().unwrap();
@@ -601,7 +802,7 @@ mod tests {
         let backend = LocalRepositoryBackend::default();
         let repo = resolve_repository(&backend, root).unwrap();
 
-        let none = load_recent_commits(&backend, &repo.info).unwrap();
+        let none = load_recent_commits(&backend, &repo.info, 0).unwrap();
         assert!(none.commits.is_empty(), "before the first commit");
         assert!(!none.more);
 
@@ -617,18 +818,24 @@ mod tests {
             &["commit", "-q", "-m", "Rename the cart\n\nWith a body."],
         );
 
-        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let recent = load_recent_commits(&backend, &repo.info, 0).unwrap();
         let subjects: Vec<&str> = recent.commits.iter().map(|c| c.subject.as_str()).collect();
         assert_eq!(subjects, ["Rename the cart", "Add the cart"]);
         let (last, first) = (&recent.commits[0], &recent.commits[1]);
-        assert_eq!(last.parent.as_deref(), Some(first.sha.as_str()));
-        assert_eq!(first.parent, None);
+        assert_eq!(last.parents, std::slice::from_ref(&first.sha));
+        assert!(first.parents.is_empty());
+        let head = CommitRef {
+            name: "main".into(),
+            kind: CommitRefKind::Head,
+        };
+        assert_eq!(last.refs, [head]);
+        assert!(first.refs.is_empty());
         assert_eq!(last.author, "Test");
         assert!(last.time > 1_600_000_000);
 
         let commit = |c: &Commit| CommitRequest {
             sha: c.sha.clone(),
-            parent: c.parent.clone(),
+            parent: c.parents.first().cloned(),
         };
         let files = load_commit_files(&backend, &repo.info, &commit(last)).unwrap();
         let blob = |commit: &str, path: &str| object(root, &format!("{commit}:{path}"));
@@ -699,7 +906,7 @@ mod tests {
         };
         assert!(load_commit_file_diff(&backend, &repo.info, &outside).is_err());
 
-        // a merged branch: its commits are in the merge, which shows what it brought
+        // a merged branch: its commits are in their own lane, the merge shows what it brought
         git(root, &["checkout", "-q", "-b", "side"]);
         write(root, "src/side.ts", "s\n");
         git(root, &["add", "."]);
@@ -709,11 +916,19 @@ mod tests {
             root,
             &["merge", "-q", "--no-ff", "-m", "Merge side", "side"],
         );
-        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let recent = load_recent_commits(&backend, &repo.info, 0).unwrap();
         let subjects: Vec<&str> = recent.commits.iter().map(|c| c.subject.as_str()).collect();
-        assert_eq!(subjects, ["Merge side", "Rename the cart", "Add the cart"]);
-        assert!(recent.commits[0].merge);
-        assert!(!recent.commits[1].merge);
+        assert_eq!(
+            subjects,
+            [
+                "Merge side",
+                "Work on the side",
+                "Rename the cart",
+                "Add the cart"
+            ]
+        );
+        assert_eq!(recent.commits[0].parents.len(), 2);
+        assert_eq!(recent.commits[1].parents.len(), 1);
         let merged = load_commit_files(&backend, &repo.info, &commit(&recent.commits[0])).unwrap();
         let paths: Vec<&str> = merged.files.iter().map(|f| f.path.as_str()).collect();
         assert_eq!(paths, ["src/side.ts"]);
@@ -1073,6 +1288,31 @@ mod tests {
             Some(UserFacingErrorCode::GitTimedOut)
         );
         assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[test]
+    fn a_repository_git_refuses_for_its_owner_is_told_apart() {
+        let repo = scratch_repo();
+        let backend = LocalRepositoryBackend::default();
+        let mut command = backend.command(repo.path(), &["status"]).unwrap();
+        // git's own switch for "another user owns this repository"
+        command.env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1");
+        let error = run(&mut command, None, 1000, GIT_TIMEOUT).err().unwrap();
+        assert_eq!(
+            user_facing_code(&error),
+            Some(UserFacingErrorCode::RepositoryUnsafeOwner)
+        );
+        assert!(format!("{error:#}").contains("safe.directory"), "{error:#}");
+
+        // up to git 2.37
+        let older = GitOutput {
+            code: 128,
+            stdout: Vec::new(),
+            stderr: "fatal: unsafe repository ('/srv/app' is owned by someone else)\n".into(),
+            truncated: false,
+        };
+        assert!(refuses_owner(&older));
+        assert!(!refuses_owner(&GitOutput { code: 1, ..older }));
     }
 
     #[test]
@@ -1865,18 +2105,18 @@ mod tests {
             );
         }
 
-        let recent = load_recent_commits(&backend, &repo.info).unwrap();
+        let recent = load_recent_commits(&backend, &repo.info, 0).unwrap();
         println!(
             "recent commits ({}): {}",
             recent.commits.len(),
             time(20, || {
-                load_recent_commits(&backend, &repo.info).unwrap();
+                load_recent_commits(&backend, &repo.info, 0).unwrap();
             })
         );
         if let Some(newest) = recent.commits.first() {
             let commit = CommitRequest {
                 sha: newest.sha.clone(),
-                parent: newest.parent.clone(),
+                parent: newest.parents.first().cloned(),
             };
             let files = load_commit_files(&backend, &repo.info, &commit).unwrap();
             println!(

@@ -208,7 +208,7 @@ export function CommitDiffView({
         origPath: file.origPath,
         wholeFile: shown.view === 'file',
     });
-    const { sha, parent } = commit;
+    const { sha, parent } = commitRequest(commit);
     const { path, origPath } = file;
     const syntax = useMemo(
         () => ({ folderId, sides: commitSides({ sha, parent }, { path, origPath }) }),

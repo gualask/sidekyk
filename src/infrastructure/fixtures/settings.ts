@@ -34,6 +34,7 @@ export function fixtureSettings(scenario: Scenario): SettingsPort {
         codeLines: 'scroll',
         copyTemplate: DEFAULT_COPY_TEMPLATE,
         sidebarWidths: {},
+        commitsPlace: 'sidebar',
         noteLines: 'wrap',
     };
     // in `problems`, another app holds the stored shortcut since startup

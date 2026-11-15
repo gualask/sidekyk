@@ -14,6 +14,8 @@ pub enum AppError {
 /// Stable codes understood by the frontend's user-facing error formatter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UserFacingErrorCode {
+    /// Git refuses a branch switch that would overwrite changes not committed.
+    BranchSwitchBlocked,
     /// A WSL project's distro is not installed, or WSL is not.
     DistroMissing,
     /// A WSL project's distro does not run, and a summary does not start it.
@@ -42,6 +44,10 @@ pub enum UserFacingErrorCode {
     PathOutsideRepository,
     ProjectNotFound,
     RepositoryMissing,
+    /// Another git (the agent's) holds the repository's index: a switch waits for it to end.
+    RepositoryBusy,
+    /// Git refuses the repository: another user owns it, and it is not in `safe.directory`.
+    RepositoryUnsafeOwner,
     /// Sidekyk's other global shortcut has these keys.
     ShortcutInUse,
     ShortcutTaken,
@@ -50,6 +56,7 @@ pub enum UserFacingErrorCode {
 impl UserFacingErrorCode {
     pub const fn as_str(self) -> &'static str {
         match self {
+            Self::BranchSwitchBlocked => "branch_switch_blocked",
             Self::DistroMissing => "distro_missing",
             Self::DistroStopped => "distro_stopped",
             Self::ExportInRepository => "export_in_repository",
@@ -70,6 +77,8 @@ impl UserFacingErrorCode {
             Self::PathOutsideRepository => "path_outside_repository",
             Self::ProjectNotFound => "project_not_found",
             Self::RepositoryMissing => "repository_missing",
+            Self::RepositoryBusy => "repository_busy",
+            Self::RepositoryUnsafeOwner => "repository_unsafe_owner",
             Self::ShortcutInUse => "shortcut_in_use",
             Self::ShortcutTaken => "shortcut_taken",
         }
@@ -81,6 +90,7 @@ impl UserFacingErrorCode {
     }
 
     const ALL: &[Self] = &[
+        Self::BranchSwitchBlocked,
         Self::DistroMissing,
         Self::DistroStopped,
         Self::ExportInRepository,
@@ -101,6 +111,8 @@ impl UserFacingErrorCode {
         Self::PathOutsideRepository,
         Self::ProjectNotFound,
         Self::RepositoryMissing,
+        Self::RepositoryBusy,
+        Self::RepositoryUnsafeOwner,
         Self::ShortcutInUse,
         Self::ShortcutTaken,
     ];
@@ -235,6 +247,10 @@ mod tests {
     #[test]
     fn user_facing_error_codes_keep_the_wire_contract() {
         let cases = [
+            (
+                UserFacingErrorCode::BranchSwitchBlocked,
+                "branch_switch_blocked",
+            ),
             (UserFacingErrorCode::DistroMissing, "distro_missing"),
             (UserFacingErrorCode::DistroStopped, "distro_stopped"),
             (
@@ -258,6 +274,11 @@ mod tests {
             ),
             (UserFacingErrorCode::ProjectNotFound, "project_not_found"),
             (UserFacingErrorCode::RepositoryMissing, "repository_missing"),
+            (UserFacingErrorCode::RepositoryBusy, "repository_busy"),
+            (
+                UserFacingErrorCode::RepositoryUnsafeOwner,
+                "repository_unsafe_owner",
+            ),
         ];
         for (code, wire) in cases {
             assert_eq!(code.as_str(), wire);

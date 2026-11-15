@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { PaletteMode } from '@/modules/search';
-import type { ProjectInfo } from '@/shared/projects/project-info';
+import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
 
 /** The command palette: whether it is open, what it looks for, and the text it opens with. */
 interface PaletteState {
@@ -21,9 +21,9 @@ const closePalette = (palette: PaletteState): PaletteState =>
 export type Dialogs = ReturnType<typeof useDialogs>;
 
 /**
- * The dialogs over the workspace: the settings, the command palette, the shortcuts, and a
- * project's to remove or to edit. One at a time where they meet: the palette and the settings
- * close each other.
+ * The dialogs over the workspace: the settings, the command palette, the shortcuts, a project's
+ * to remove or to edit, and the branch to switch a folder to. One at a time where they meet: the
+ * palette and the settings close each other.
  */
 export function useDialogs() {
     // null until first opened; then the dialogs stay mounted, to give the focus back as they close
@@ -34,6 +34,8 @@ export function useDialogs() {
     const [removing, setRemoving] = useState<ProjectInfo | null>(null);
     // a project whose name and folders change: from its row, or from its folders in the top bar
     const [editing, setEditing] = useState<ProjectInfo | null>(null);
+    // a folder whose branch is switched, from its branch in the top bar
+    const [branching, setBranching] = useState<ProjectFolder | null>(null);
     // a problem's fix in the settings: they open in place of the palette
     const openSettings = useCallback(() => {
         setPalette(closePalette);
@@ -51,6 +53,8 @@ export function useDialogs() {
         setRemoving,
         editing,
         setEditing,
+        branching,
+        setBranching,
         openSettings,
         toggleSettings: () => {
             setPalette(closePalette);

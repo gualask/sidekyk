@@ -10,8 +10,9 @@ use sidekyk_core::app::projects::Projects;
 use sidekyk_core::modules::folder::{Directory, FileContent, FileStamp, FolderKind, RecentFiles};
 use sidekyk_core::modules::preview::MarkdownDocument;
 use sidekyk_core::modules::repository::{
-    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Branch, BranchSwitch, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use sidekyk_core::modules::syntax::{SyntaxColors, SyntaxRequest};
 use sidekyk_core::shared::error::AppError;
@@ -98,13 +99,43 @@ pub(crate) async fn get_changes_ignoring_whitespace(
 }
 
 #[tauri::command]
-/// The last commits of the branch on screen in a project, newest first.
+/// A page of a project's graph: the commits of HEAD and of its upstream, after the first `skip`.
 pub(crate) async fn get_recent_commits(
     app: tauri::AppHandle,
     folder_id: String,
+    skip: usize,
 ) -> Result<RecentCommits, AppError> {
-    on_folder("get_recent_commits", app, folder_id, Start::May, |on| {
-        on.reader.recent_commits(&on.info)
+    on_folder(
+        "get_recent_commits",
+        app,
+        folder_id,
+        Start::May,
+        move |on| on.reader.recent_commits(&on.info, skip),
+    )
+    .await
+}
+
+#[tauri::command]
+/// The branches of a project's repository to switch to, as its picker lists them.
+pub(crate) async fn get_branches(
+    app: tauri::AppHandle,
+    folder_id: String,
+) -> Result<Vec<Branch>, AppError> {
+    on_folder("get_branches", app, folder_id, Start::May, |on| {
+        on.reader.branches(&on.info)
+    })
+    .await
+}
+
+#[tauri::command]
+/// Switches a project's repository to a branch, as the user picked it: the one write.
+pub(crate) async fn switch_branch(
+    app: tauri::AppHandle,
+    folder_id: String,
+    request: BranchSwitch,
+) -> Result<(), AppError> {
+    on_folder("switch_branch", app, folder_id, Start::May, move |on| {
+        on.reader.switch_branch(&on.info, &request)
     })
     .await
 }

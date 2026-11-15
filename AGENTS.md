@@ -53,7 +53,7 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 
 ## Invariants
 
-- Read-only: never stage, commit, revert or write files in a repository.
+- Read-only but one write: the branch switch the user asks for (`git switch`, `RepositoryBackend::git_write`); never stage, commit, revert, stash, fetch or write files in a repository.
 - Git runs with `GIT_OPTIONAL_LOCKS=0` and `-c core.fsmonitor=false`.
 - Paths from the frontend pass `checked_path` before reaching git.
 - Only relevant changes refresh the app: never `*.lock` or git-ignored paths.

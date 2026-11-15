@@ -6,7 +6,14 @@ import type {
     RepositoryPort,
 } from '@/modules/repository';
 import { projectFolder } from '@/shared/projects/project-info';
-import { commitActivity, commitFileDiff, commitFiles, recentCommits } from './commits.fixture-data';
+import {
+    allCommits,
+    commitActivity,
+    commitFileDiff,
+    commitFiles,
+    fixtureBranches,
+    recentCommits,
+} from './commits.fixture-data';
 import {
     FRESH_VAULT_PATHS,
     fixtureFileContent,
@@ -168,7 +175,8 @@ export function fixtureRepository(
             return content.kind === 'text' ? content.text : null;
         },
         commitDiff: (sha, path) => {
-            for (const { sha: commitSha, parent } of recentCommits(large(folderId)).commits) {
+            for (const { sha: commitSha, parents } of allCommits(large(folderId))) {
+                const parent = parents[0] ?? null;
                 const side = commitSha === sha ? 'new' : parent === sha ? 'old' : null;
                 if (!side) continue;
                 const commit = { sha: commitSha, parent };
@@ -262,9 +270,20 @@ export function fixtureRepository(
             return fixtureIgnoringWhitespace(snapshot(folderId).files);
         },
         // every project has the same history, even with a clean working tree
-        getRecentCommits: async (folderId) => {
+        getRecentCommits: async (folderId, skip) => {
             readable(folderId);
-            return recentCommits(large(folderId));
+            return recentCommits(large(folderId), skip);
+        },
+        getBranches: async (folderId) => {
+            readable(folderId);
+            return fixtureBranches(large(folderId));
+        },
+        // the review's changes would be overwritten by `main`; any other switch changes nothing
+        switchBranch: async (folderId, request) => {
+            readable(folderId);
+            if (scenarioData(folderId) && !large(folderId) && request.name === 'main') {
+                throw failure('branch_switch_blocked');
+            }
         },
         getCommitActivity: async (folderId, since) => {
             readable(folderId);

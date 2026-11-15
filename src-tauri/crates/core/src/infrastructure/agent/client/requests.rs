@@ -11,8 +11,9 @@ use crate::modules::folder::{
 use crate::modules::preview::MarkdownDocument;
 use crate::modules::reader::{OnChange, Repositories};
 use crate::modules::repository::{
-    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Branch, BranchSwitch, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -66,9 +67,25 @@ impl Repositories for AgentRepositories {
         self.call(Request::ChangesIgnoringWhitespace { repository }, &nothing)
     }
 
-    fn recent_commits(&self, info: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
+    fn recent_commits(&self, info: &RepositoryInfo, skip: usize) -> anyhow::Result<RecentCommits> {
         let repository = info.clone();
-        self.call(Request::RecentCommits { repository }, &nothing)
+        self.call(Request::RecentCommits { repository, skip }, &nothing)
+    }
+
+    fn branches(&self, info: &RepositoryInfo) -> anyhow::Result<Vec<Branch>> {
+        let repository = info.clone();
+        self.call(Request::Branches { repository }, &nothing)
+    }
+
+    fn switch_branch(&self, info: &RepositoryInfo, request: &BranchSwitch) -> anyhow::Result<()> {
+        let (repository, request) = (info.clone(), request.clone());
+        self.call(
+            Request::SwitchBranch {
+                repository,
+                request,
+            },
+            &nothing,
+        )
     }
 
     fn commit_activity(&self, info: &RepositoryInfo, since: i64) -> anyhow::Result<CommitActivity> {

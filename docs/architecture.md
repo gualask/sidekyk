@@ -169,12 +169,20 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
 - `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
   a command), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+- Diffs: `--no-ext-diff --no-textconv`. `git diff` alone runs a `diff=<driver>` textconv
+  (numstat, diff-tree and log do not): its diff would show what that program prints, not the file
+  the viewer reads. VS Code and Zed diff the blobs as stored.
+- A repository another user owns, which git refuses (CVE-2022-24765), fails every read with
+  `repository_unsafe_owner`, told by git's words (up to 2.37 "is owned by someone else", since 2.38
+  "detected dubious ownership"); its message says how to add it to `safe.directory`, which
+  Sidekyk never does itself: that repository's config could run programs as the user.
 - Paths after `--` are literal: `--literal-pathspecs` on diff, diff-tree and the
   snapshot's numstats, else `[id].tsx` also matched `i.tsx` and a file's diff held both. Not
   `GIT_LITERAL_PATHSPECS` for every command: `check-ignore` refuses it.
 - Bounded (`limits.rs`): status 8 MiB, numstat 4 MiB, diff 2 MiB, ls-files 32 MiB, `check-ignore`
   its input; past the limit git is killed and the output `truncated` (cut records dropped, diffs cut
-  at a line). stderr 64 KiB. 30 s → `git_timed_out`.
+  at a line). stderr 64 KiB. 30 s → `git_timed_out`. The one write, the branch switch
+  (`git_write`), 10 min and 1 MiB: a checkout killed midway leaves `index.lock`.
 
 ### Watching
 

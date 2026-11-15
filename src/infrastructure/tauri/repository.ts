@@ -18,7 +18,9 @@ export const tauriRepository: RepositoryPort = {
     getFileDiff: (folderId, request) => invoke('get_file_diff', { folderId, request }),
     getChangesIgnoringWhitespace: (folderId) =>
         invoke('get_changes_ignoring_whitespace', { folderId }),
-    getRecentCommits: (folderId) => invoke('get_recent_commits', { folderId }),
+    getRecentCommits: (folderId, skip) => invoke('get_recent_commits', { folderId, skip }),
+    getBranches: (folderId) => invoke('get_branches', { folderId }),
+    switchBranch: (folderId, request) => invoke('switch_branch', { folderId, request }),
     getCommitActivity: (folderId, since) => invoke('get_commit_activity', { folderId, since }),
     getCommitFiles: (folderId, commit) => invoke('get_commit_files', { folderId, commit }),
     getCommitFileDiff: (folderId, request) => invoke('get_commit_file_diff', { folderId, request }),

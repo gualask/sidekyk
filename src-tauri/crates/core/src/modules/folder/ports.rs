@@ -25,6 +25,11 @@ pub trait RepositoryBackend: Send + Sync {
         max_stdout: usize,
     ) -> anyhow::Result<GitOutput>;
 
+    /// Runs a `git` that writes the repository, the branch switch the user asks for, and returns
+    /// its output whatever the exit code. Given far longer than a read: a checkout killed midway
+    /// leaves `index.lock` and a half-switched tree.
+    fn git_write(&self, cwd: &Path, args: &[&str]) -> anyhow::Result<GitOutput>;
+
     /// Reads a working-tree file, or `None` when it is missing or larger than `limit` bytes.
     fn read_file(&self, path: &Path, limit: u64) -> Option<Vec<u8>>;
 

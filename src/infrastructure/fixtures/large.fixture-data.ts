@@ -49,8 +49,11 @@ function largeDiffText(): string {
     return `${lines.join('\n')}\n`;
 }
 
+/** The branch the large scenario's agent works on, which its history names too. */
+export const LARGE_BRANCH = 'agent/bulk-refactor';
+
 const BRANCH = {
-    head: 'agent/bulk-refactor',
+    head: LARGE_BRANCH,
     commit: 'f00dbab',
     upstream: null,
     ahead: 0,

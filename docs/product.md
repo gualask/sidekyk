@@ -5,7 +5,8 @@ notes per project, several projects.
 
 ## Guardrails
 
-- Repositories stay read-only; Sidekyk is not an editor.
+- Repositories stay read-only but for the branch switch the user asks for
+  (`features/history.md`); Sidekyk is not an editor: no staging, commit, stash or fetch.
 - The main gesture is one keystroke away: bring the window up, see the changes, copy a hunk.
 - The performance golden rule (`AGENTS.md`) applies to every panel.
 - Git views behave as VS Code's and Zed's; features hold across agents, terminals, shells and OSes,

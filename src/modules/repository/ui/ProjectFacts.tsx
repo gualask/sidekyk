@@ -6,18 +6,23 @@ import type { RepositorySummary } from '../model/repository.types';
 import { TrackedLines } from './LineCounts';
 import { BranchName } from './summary/BranchName';
 
-/** The project's facts, next to its name in the breadcrumb: its branch and what changed. */
+/**
+ * The project's facts, next to its name in the breadcrumb: its branch, a click away from the
+ * others (as VS Code's status bar), and what changed.
+ */
 export function ProjectFacts({
     folder,
     fromSnapshot,
+    onSwitchBranch,
 }: {
     /** The project's folder on screen. */
     folder: ProjectFolder;
     /** The Changes panel shows the folder, and its snapshot brings the facts. */
     fromSnapshot: boolean;
+    onSwitchBranch: () => void;
 }) {
     const summary = useRepositorySummary(folder.id, { fromSnapshot });
-    return summary.data ? <Facts summary={summary.data} /> : null;
+    return summary.data ? <Facts summary={summary.data} onSwitchBranch={onSwitchBranch} /> : null;
 }
 
 /**
@@ -50,11 +55,25 @@ export function FolderFacts({ folder }: { folder: ProjectFolder }) {
     );
 }
 
-/** A repository's branch and what changed, muted. */
-function Facts({ summary }: { summary: RepositorySummary }) {
+/** A repository's branch, which switches it to another, and what changed, muted. */
+function Facts({
+    summary,
+    onSwitchBranch,
+}: {
+    summary: RepositorySummary;
+    onSwitchBranch: () => void;
+}) {
+    const { t } = useTranslation();
     return (
         <span className="flex shrink-0 items-center gap-2.5 text-xs whitespace-nowrap text-ui-text-muted">
-            <BranchName branch={summary.branch} className="text-[11.5px]" />
+            <button
+                type="button"
+                aria-label={t('branch.switch')}
+                onClick={onSwitchBranch}
+                className="-mx-1 flex min-w-0 rounded-md px-1 py-0.5 transition-colors hover:bg-ui-surface-hover hover:text-ui-text-secondary focus-visible:outline-2 focus-visible:outline-ui-accent"
+            >
+                <BranchName branch={summary.branch} className="text-[11.5px]" />
+            </button>
             <ChangeCounts summary={summary} />
         </span>
     );

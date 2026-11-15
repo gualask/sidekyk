@@ -1,4 +1,5 @@
 import type {
+    Branch,
     Commit,
     CommitActivity,
     CommitFileDiffRequest,
@@ -9,6 +10,8 @@ import type {
     UnifiedDiff,
 } from '@/modules/repository';
 import { LOGO_BLOB } from './fixture-files';
+import { LARGE_BRANCH } from './large.fixture-data';
+import { REVIEW_BRANCH, REVIEW_UPSTREAM } from './review.fixture-data';
 
 /** The fixture's clock: commits are dated back from when the page loaded. */
 const NOW = Math.floor(Date.now() / 1000);
@@ -32,14 +35,27 @@ function file(
     return { path, origPath, kind, binary: false, oldBlob: null, newBlob, ...counts, diff };
 }
 
+/** The logo `feature/logo` added, which its merge brought in too. */
+const LOGO_ADDED = file(
+    'public/logo.png',
+    'added',
+    `diff --git a/public/logo.png b/public/logo.png
+new file mode 100644
+Binary files /dev/null and b/public/logo.png differ
+`,
+    { additions: null, deletions: null, binary: true },
+    null,
+    LOGO_BLOB,
+);
+
 const REVIEW_COMMITS: FixtureCommit[] = [
     {
         sha: sha(6),
-        parent: sha(5),
-        merge: false,
+        parents: [sha(5)],
         author: 'Claude',
         time: NOW - 25 * 60,
         subject: 'Apply coupons to the cart total',
+        refs: [{ name: REVIEW_BRANCH, kind: 'head' }],
         files: [
             file(
                 'src/cart/total.ts',
@@ -73,12 +89,36 @@ const REVIEW_COMMITS: FixtureCommit[] = [
         ],
     },
     {
+        sha: sha(7),
+        parents: [sha(4)],
+        author: 'Grace Hopper',
+        time: NOW - 90 * 60,
+        subject: 'Round coupon amounts to cents',
+        refs: [{ name: REVIEW_UPSTREAM, kind: 'upstream' }],
+        files: [
+            file(
+                'src/cart/coupon.ts',
+                'modified',
+                `diff --git a/src/cart/coupon.ts b/src/cart/coupon.ts
+--- a/src/cart/coupon.ts
++++ b/src/cart/coupon.ts
+@@ -1,3 +1,3 @@
+ export function couponAmount(coupon: Coupon): number {
+-    return coupon.amount;
++    return Math.round(coupon.amount * 100) / 100;
+ }
+`,
+                { additions: 1, deletions: 1 },
+            ),
+        ],
+    },
+    {
         sha: sha(5),
-        parent: sha(4),
-        merge: false,
+        parents: [sha(4)],
         author: 'Claude',
         time: NOW - 3 * HOUR,
         subject: 'Move formatMoney to utils',
+        refs: [],
         files: [
             file(
                 'src/utils/money.ts',
@@ -95,32 +135,29 @@ rename to src/utils/money.ts
     },
     {
         sha: sha(4),
-        parent: sha(2),
-        merge: true,
+        parents: [sha(2), sha(3)],
         author: 'Ada Lovelace',
         time: NOW - 26 * HOUR,
         subject: "Merge branch 'feature/logo'",
-        files: [
-            file(
-                'public/logo.png',
-                'added',
-                `diff --git a/public/logo.png b/public/logo.png
-new file mode 100644
-Binary files /dev/null and b/public/logo.png differ
-`,
-                { additions: null, deletions: null, binary: true },
-                null,
-                LOGO_BLOB,
-            ),
-        ],
+        refs: [],
+        files: [LOGO_ADDED],
+    },
+    {
+        sha: sha(3),
+        parents: [sha(2)],
+        author: 'Ada Lovelace',
+        time: NOW - 30 * HOUR,
+        subject: 'Add the logo',
+        refs: [],
+        files: [LOGO_ADDED],
     },
     {
         sha: sha(2),
-        parent: sha(1),
-        merge: false,
+        parents: [sha(1)],
         author: 'Ada Lovelace',
         time: NOW - 4 * 24 * HOUR,
         subject: 'Remove the legacy discounts, superseded by the coupons that the checkout applies',
+        refs: [{ name: 'v1.1.0', kind: 'tag' }],
         files: [
             file(
                 'src/legacy/discounts.ts',
@@ -140,11 +177,11 @@ deleted file mode 100644
     },
     {
         sha: sha(1),
-        parent: null,
-        merge: false,
+        parents: [],
         author: 'Ada Lovelace',
         time: NOW - 40 * 24 * HOUR,
         subject: 'Initial commit',
+        refs: [{ name: 'v1.0.0', kind: 'tag' }],
         files: [
             file(
                 'README.md',
@@ -163,8 +200,11 @@ new file mode 100644
     },
 ];
 
-/** Enough commits for older ones to remain, and one so large its list is cut. */
-const LARGE_COMMIT_COUNT = 50;
+/** Pages of commits to scroll through, and one commit so large its list is cut. */
+const LARGE_COMMIT_COUNT = 140;
+
+/** As many as a page of the backend's graph. */
+const PAGE = 50;
 const LARGE_COMMIT_FILES = 10_000;
 
 const LARGE_DIFF = `@@ -1,3 +1,3 @@
@@ -178,11 +218,11 @@ function largeCommit(n: number): FixtureCommit {
     const count = n === 0 ? LARGE_COMMIT_FILES : (n % 4) + 1;
     return {
         sha: sha(1000 - n),
-        parent: sha(999 - n),
-        merge: false,
+        parents: n === LARGE_COMMIT_COUNT - 1 ? [] : [sha(999 - n)],
         author: 'Claude',
         time: NOW - n * 5 * HOUR,
         subject: n === 0 ? 'Regenerate every module' : `Refactor module ${n}`,
+        refs: n === 0 ? [{ name: LARGE_BRANCH, kind: 'head' }] : [],
         files: Array.from({ length: count }, (_, i) =>
             file(
                 `generated/module-${String(i % 50).padStart(2, '0')}/file-${i}.ts`,
@@ -209,9 +249,15 @@ function find(large: boolean, commit: CommitRequest): FixtureCommit | undefined 
     return fixtureCommits(large).find((c) => c.sha === commit.sha);
 }
 
-export function recentCommits(large: boolean): RecentCommits {
-    const commits = fixtureCommits(large).map(({ files: _files, ...commit }) => commit);
-    return { commits, more: large };
+/** A page of the graph, after its first `skip` commits, as the backend reads it. */
+export function recentCommits(large: boolean, skip: number): RecentCommits {
+    const all = allCommits(large);
+    return { commits: all.slice(skip, skip + PAGE), more: skip + PAGE < all.length };
+}
+
+/** Every commit of the graph, without their files, as the backend lists them. */
+export function allCommits(large: boolean): Commit[] {
+    return fixtureCommits(large).map(({ files: _files, ...commit }) => commit);
 }
 
 export function commitFiles(large: boolean, commit: CommitRequest): CommitFiles {
@@ -271,4 +317,21 @@ export function commitActivity(week: keyof typeof WEEKS | 'none', since: number)
         }),
     );
     return { commits: commits.reverse(), more: false };
+}
+
+/** The branches to switch to: the review's, with remote ones no local branch tracks. */
+export function fixtureBranches(large: boolean): Branch[] {
+    if (large) {
+        return [
+            { name: LARGE_BRANCH, remote: false, current: true },
+            { name: 'main', remote: false, current: false },
+        ];
+    }
+    return [
+        { name: REVIEW_BRANCH, remote: false, current: true },
+        { name: 'main', remote: false, current: false },
+        { name: 'feature/logo', remote: false, current: false },
+        { name: 'origin/fix-login', remote: true, current: false },
+        { name: 'origin/release/1.2', remote: true, current: false },
+    ];
 }

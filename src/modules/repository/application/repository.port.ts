@@ -1,5 +1,7 @@
 import { createContext, createElement, type ReactNode, useContext } from 'react';
 import type {
+    Branch,
+    BranchSwitch,
     ChangesIgnoringWhitespace,
     CommitActivity,
     CommitFileDiffRequest,
@@ -40,8 +42,12 @@ export interface RepositoryPort {
     getFileDiff(folderId: string, request: FileDiffRequest): Promise<UnifiedDiff>;
     /** The staged and unstaged changes with whitespace ignored: a diff of each, only when asked. */
     getChangesIgnoringWhitespace(folderId: string): Promise<ChangesIgnoringWhitespace>;
-    /** The last commits of the branch on screen; none before the first commit. */
-    getRecentCommits(folderId: string): Promise<RecentCommits>;
+    /** A page of the graph, after its first `skip` commits; none before the first commit. */
+    getRecentCommits(folderId: string, skip: number): Promise<RecentCommits>;
+    /** The branches to switch to, read as the picker opens. */
+    getBranches(folderId: string): Promise<Branch[]>;
+    /** The one write: switches the repository to a branch the user picked. */
+    switchBranch(folderId: string, request: BranchSwitch): Promise<void>;
     /** The lines each commit of the branch on screen changed since `since` (Unix seconds). */
     getCommitActivity(folderId: string, since: number): Promise<CommitActivity>;
     getCommitFiles(folderId: string, commit: CommitRequest): Promise<CommitFiles>;

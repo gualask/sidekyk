@@ -1,11 +1,12 @@
-//! The recent commits of the branch on screen, as VS Code's source control lists them, the files
+//! The commits of the graph, HEAD's and its upstream's as VS Code's graph shows them, the files
 //! each one changed, and their diffs. Read when the list is opened, never in the background.
 
 use std::collections::HashMap;
+use std::path::Path;
 
 use super::contracts::{
-    ChangeKind, Commit, CommitFileDiffRequest, CommitFiles, CommitRequest, FileChange,
-    RecentCommits, UnifiedDiff,
+    ChangeKind, Commit, CommitFileDiffRequest, CommitFiles, CommitRef, CommitRefKind,
+    CommitRequest, FileChange, RecentCommits, UnifiedDiff,
 };
 use super::diff::{context_option, unified_diff};
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
@@ -16,15 +17,19 @@ use crate::modules::folder::{
 };
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
-/// How many commits are listed, as many as a page of VS Code's graph (`scm.graph.pageSize`).
+/// How many commits a page of the graph lists, as VS Code's (`scm.graph.pageSize`).
 const RECENT_COMMITS: usize = 50;
 
-/// Hash, parents, author, author date and subject, each ended by a NUL: `-z` writes the last.
-const LOG_FORMAT: &str = "--format=%H%x00%P%x00%an%x00%at%x00%s";
-const LOG_FIELDS: usize = 5;
+/// Hash, parents, author, author date, refs (`--decorate=full`) and subject, each ended by a NUL:
+/// `-z` writes the last.
+const LOG_FORMAT: &str = "--format=%H%x00%P%x00%an%x00%at%x00%D%x00%s";
+const LOG_FIELDS: usize = 6;
 
 /// Far more than the listed commits take, unless their subjects are huge.
 const MAX_LOG_BYTES: usize = 1024 * 1024;
+
+/// A full ref name, `refs/remotes/origin/main`.
+const MAX_REF_BYTES: usize = 4096;
 
 /// What git takes for a commit: a whole or abbreviated hash. Anything else is refused before
 /// git runs, so the frontend cannot pass an option or a revision expression.
@@ -37,9 +42,10 @@ pub(super) fn checked_commit(id: &str) -> anyhow::Result<&str> {
     }
 }
 
-/// The commits of `git log -z` in `LOG_FORMAT`. Only whole records count: output cut anywhere
-/// loses its last commit instead of showing it half read.
-fn parse_log_z(bytes: &[u8]) -> Vec<Commit> {
+/// The commits of `git log -z` in `LOG_FORMAT`, each with the refs the graph names (`named_refs`;
+/// `upstream` a full name). Only whole records count: output cut anywhere loses its last commit
+/// instead of showing it half read.
+fn parse_log_z(bytes: &[u8], upstream: Option<&str>) -> Vec<Commit> {
     let text = String::from_utf8_lossy(bytes);
     let fields: Vec<&str> = text.split('\0').collect();
     // what follows the last NUL is an unfinished field, or nothing
@@ -47,51 +53,102 @@ fn parse_log_z(bytes: &[u8]) -> Vec<Commit> {
     let (records, _) = ended.as_chunks::<LOG_FIELDS>();
     records
         .iter()
-        .map(|[sha, parents, author, time, subject]| {
-            let mut parents = parents.split(' ').filter(|p| !p.is_empty());
-            Commit {
-                sha: sha.to_string(),
-                parent: parents.next().map(str::to_string),
-                merge: parents.next().is_some(),
-                author: author.to_string(),
-                time: time.parse().unwrap_or(0),
-                subject: subject.to_string(),
-            }
+        .map(|[sha, parents, author, time, refs, subject]| Commit {
+            sha: sha.to_string(),
+            parents: parents
+                .split(' ')
+                .filter(|p| !p.is_empty())
+                .map(str::to_string)
+                .collect(),
+            author: author.to_string(),
+            time: time.parse().unwrap_or(0),
+            subject: subject.to_string(),
+            refs: named_refs(refs, upstream),
         })
         .collect()
 }
 
-/// The last commits of the branch on screen, newest first, along first parents; none before the
-/// first commit.
+/// The refs of `decorations` (`%D` with `--decorate=full`: `HEAD -> refs/heads/main,
+/// refs/remotes/origin/main, tag: refs/tags/v1`) the graph names: the branch checked out, its
+/// `upstream` (a full name) and the tags, in that order; other branches are left out, as VS Code's
+/// graph leaves out what it does not draw.
+fn named_refs(decorations: &str, upstream: Option<&str>) -> Vec<CommitRef> {
+    let mut refs: Vec<CommitRef> = decorations
+        .split(", ")
+        .filter_map(|decoration| {
+            let (name, kind) = if let Some(branch) = decoration.strip_prefix("HEAD -> ") {
+                (short_ref(branch), CommitRefKind::Head)
+            } else if decoration == "HEAD" {
+                ("HEAD", CommitRefKind::Head)
+            } else if let Some(tag) = decoration.strip_prefix("tag: refs/tags/") {
+                (tag, CommitRefKind::Tag)
+            } else if upstream == Some(decoration) {
+                (short_ref(decoration), CommitRefKind::Upstream)
+            } else {
+                return None;
+            };
+            Some(CommitRef {
+                name: name.to_string(),
+                kind,
+            })
+        })
+        .collect();
+    // stable: tags keep git's order
+    refs.sort_by_key(|r| r.kind);
+    refs
+}
+
+/// `main` for `refs/heads/main`, `origin/main` for `refs/remotes/origin/main`.
+fn short_ref(full: &str) -> &str {
+    full.strip_prefix("refs/heads/")
+        .or_else(|| full.strip_prefix("refs/remotes/"))
+        .unwrap_or(full)
+}
+
+/// The full name of the branch HEAD's branch tracks, if it has one: none on a detached HEAD.
+fn upstream(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<Option<String>> {
+    let out = backend.git(
+        root,
+        &["rev-parse", "--symbolic-full-name", "@{upstream}"],
+        MAX_REF_BYTES,
+    )?;
+    let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    // a ref git names never starts with `-`, which would read as an option
+    Ok((out.code == 0 && name.starts_with("refs/")).then_some(name))
+}
+
+/// A page of the graph: the commits of HEAD and of its upstream, children before their parents,
+/// after the first `skip`; none before the first commit.
 pub fn load_recent_commits(
     backend: &dyn RepositoryBackend,
     repository: &RepositoryInfo,
+    skip: usize,
 ) -> anyhow::Result<RecentCommits> {
     let root = existing_root(backend, repository)?;
+    let upstream = upstream(backend, root)?;
     // one more than listed, to know whether there are older ones
     let count = format!("-n{}", RECENT_COMMITS + 1);
-    let out = git_checked(
-        backend,
-        root,
-        &[
-            "log",
-            "-z",
-            LOG_FORMAT,
-            &count,
-            // the branch's own history, one commit after the other: a merge stands for the
-            // commits it brought
-            "--first-parent",
-            // `log.showSignature` in the user's config would run gpg for every commit
-            "--no-show-signature",
-            // before the first commit HEAD names nothing: an empty list, not a failure
-            "--ignore-missing",
-            "HEAD",
-            "--",
-        ],
-        &[0],
-        MAX_LOG_BYTES,
-    )?;
-    let mut commits = parse_log_z(&out.stdout);
+    let skip = format!("--skip={skip}");
+    let mut args = vec![
+        "log",
+        "-z",
+        LOG_FORMAT,
+        &count,
+        &skip,
+        // children before parents, which the graph's lanes need; with git's commit-graph file it
+        // does not walk the whole history (VS Code's graph sorts so too)
+        "--topo-order",
+        "--decorate=full",
+        // `log.showSignature` in the user's config would run gpg for every commit
+        "--no-show-signature",
+        // before the first commit HEAD names nothing: an empty list, not a failure
+        "--ignore-missing",
+        "HEAD",
+    ];
+    args.extend(upstream.as_deref());
+    args.push("--");
+    let out = git_checked(backend, root, &args, &[0], MAX_LOG_BYTES)?;
+    let mut commits = parse_log_z(&out.stdout, upstream.as_deref());
     let more = out.truncated || commits.len() > RECENT_COMMITS;
     commits.truncate(RECENT_COMMITS);
     Ok(RecentCommits { commits, more })
@@ -252,29 +309,60 @@ mod tests {
 
     #[test]
     fn log_records_read_whole_and_a_cut_one_is_dropped() {
-        let out = b"c3\0b2\0Ada\x001760000000\0Add the cart\0b2\0a1 f6\0Bo\x001750000000\0Merge\0a1\0\0Ada\x00100\0Root\0";
-        let commits = parse_log_z(out);
+        let out = b"c3\0b2\0Ada\x001760000000\0HEAD -> refs/heads/main, tag: refs/tags/v1\0Add the cart\0\
+b2\0a1 f6\0Bo\x001750000000\0refs/remotes/origin/main, refs/remotes/origin/HEAD\0Merge\0\
+a1\0\0Ada\x00100\0refs/heads/other\0Root\0";
+        let upstream = Some("refs/remotes/origin/main");
+        let commits = parse_log_z(out, upstream);
+        fn parents(c: &Commit) -> Vec<&str> {
+            c.parents.iter().map(String::as_str).collect()
+        }
         assert_eq!(
             commits
                 .iter()
-                .map(|c| (c.sha.as_str(), c.parent.as_deref(), c.subject.as_str()))
+                .map(|c| (c.sha.as_str(), parents(c), c.subject.as_str()))
                 .collect::<Vec<_>>(),
             [
-                ("c3", Some("b2"), "Add the cart"),
-                ("b2", Some("a1"), "Merge"),
-                ("a1", None, "Root"),
+                ("c3", vec!["b2"], "Add the cart"),
+                ("b2", vec!["a1", "f6"], "Merge"),
+                ("a1", vec![], "Root"),
+            ]
+        );
+        let named = |name: &str, kind| CommitRef {
+            name: name.into(),
+            kind,
+        };
+        // the branch checked out, its upstream and the tags: no other branch
+        assert_eq!(
+            commits[0].refs,
+            [
+                named("main", CommitRefKind::Head),
+                named("v1", CommitRefKind::Tag)
             ]
         );
         assert_eq!(
-            commits.iter().map(|c| c.merge).collect::<Vec<_>>(),
-            [false, true, false]
+            commits[1].refs,
+            [named("origin/main", CommitRefKind::Upstream)]
         );
+        assert!(commits[2].refs.is_empty());
         assert_eq!(commits[0].author, "Ada");
         assert_eq!(commits[0].time, 1_760_000_000);
 
         let cut = &out[..out.len() - 3];
-        assert_eq!(parse_log_z(cut).len(), 2);
-        assert!(parse_log_z(b"").is_empty());
+        assert_eq!(parse_log_z(cut, upstream).len(), 2);
+        assert!(parse_log_z(b"", upstream).is_empty());
+        // a detached HEAD, on the upstream's commit
+        let detached = parse_log_z(
+            b"c3\0\0Ada\x001\0HEAD, refs/remotes/origin/main\0S\0",
+            upstream,
+        );
+        assert_eq!(
+            detached[0].refs,
+            [
+                named("HEAD", CommitRefKind::Head),
+                named("origin/main", CommitRefKind::Upstream)
+            ]
+        );
     }
 
     #[test]

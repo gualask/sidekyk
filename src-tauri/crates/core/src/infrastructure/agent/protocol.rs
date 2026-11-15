@@ -10,7 +10,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::value::RawValue;
 
 use crate::modules::folder::{RepositoryChange, RepositoryInfo};
-use crate::modules::repository::{CommitFileDiffRequest, CommitRequest, FileDiffRequest};
+use crate::modules::repository::{
+    BranchSwitch, CommitFileDiffRequest, CommitRequest, FileDiffRequest,
+};
 use crate::modules::search::ContentFile;
 use crate::modules::syntax::SyntaxRequest;
 use crate::shared::error::{rebuilt, wire_code, UserFacingErrorCode};
@@ -54,6 +56,14 @@ pub enum Request {
     },
     RecentCommits {
         repository: RepositoryInfo,
+        skip: usize,
+    },
+    Branches {
+        repository: RepositoryInfo,
+    },
+    SwitchBranch {
+        repository: RepositoryInfo,
+        request: BranchSwitch,
     },
     CommitActivity {
         repository: RepositoryInfo,

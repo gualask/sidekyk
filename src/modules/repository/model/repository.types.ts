@@ -115,28 +115,54 @@ export interface ChangesIgnoringWhitespace {
     truncated: boolean;
 }
 
-/** One commit of the branch on screen, as the recent commits list it. */
+/** One commit of the graph: of HEAD's history or of its upstream's. */
 export interface Commit {
     /** The full hash. */
     sha: string;
-    /** The first parent, null for a root commit. A merge shows what it brought to it, as VS Code does. */
-    parent: string | null;
-    /** The commit has more than one parent. */
-    merge: boolean;
+    /**
+     * Its parents' full hashes, the first one first: none for a root commit, two or more for a
+     * merge. A merge shows what it brought to its first parent, as VS Code does.
+     */
+    parents: string[];
     author: string;
     /** The author date, in seconds since the Unix epoch. */
     time: number;
     subject: string;
+    /** The refs pointing at it the graph names: the branch checked out, its upstream, the tags. */
+    refs: CommitRef[];
+}
+
+/** A ref the graph draws, on the commit it points at. */
+export interface CommitRef {
+    /** `main`, `origin/main`, `v1.2`; `HEAD` for a detached HEAD. */
+    name: string;
+    /** The branch checked out (or a detached HEAD), the branch it tracks, or a tag. */
+    kind: 'head' | 'upstream' | 'tag';
 }
 
 /**
- * The last commits of the branch on screen, newest first, following first parents: the commits of
- * a branch merged into it are in its merge.
+ * A page of the graph's commits, children before their parents: HEAD's history and its
+ * upstream's, as VS Code's graph shows them by default.
  */
 export interface RecentCommits {
     commits: Commit[];
-    /** The branch has older commits than those listed. */
+    /** Older commits follow: the next page starts after these. */
     more: boolean;
+}
+
+/** A branch to switch to: one of the repository's, or a remote one no local branch tracks. */
+export interface Branch {
+    /** `main`; a remote one with its remote, `origin/feature`. */
+    name: string;
+    remote: boolean;
+    /** HEAD is on it. */
+    current: boolean;
+}
+
+/** The switch the user asked for; a remote branch makes the local branch that tracks it. */
+export interface BranchSwitch {
+    name: string;
+    remote: boolean;
 }
 
 /** When a commit was made (seconds since the Unix epoch), and the lines it added and removed. */

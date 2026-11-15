@@ -4,6 +4,7 @@
  */
 
 import type { CodeLines } from '@/shared/git/code-lines';
+import type { CommitsPlace } from '@/shared/git/commits-place';
 import type { DiffScrollbar } from '@/shared/git/diff-scrollbar';
 import type { DiffView } from '@/shared/git/diff-view';
 import type { FileView } from '@/shared/git/file-view';
@@ -46,6 +47,8 @@ export interface Settings {
     copyTemplate: string;
     /** The sidebars' widths in pixels, as last dragged, by sidebar; one missing takes its default. */
     sidebarWidths: Record<string, number>;
+    /** Where the Changes panel shows the recent commits. */
+    commitsPlace: CommitsPlace;
     /** How a note's long lines show. */
     noteLines: NoteLines;
 }

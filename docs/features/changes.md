@@ -24,8 +24,7 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   half the row); a copy has no break added. A new width keeps the top row in place.
 - `n`/`p`: next or previous change across the files of the list (or of the commit);
   past the last, the next file opens on its first; a word at either end.
-- Recent commits (VS Code's graph, first parents, 50); a commit's files replace the list until
-  `×`/`Esc`.
+- Recent commits, the graph and the branch switch: `history.md`.
 - Find bar: `⌘F` with a file open (a commit's too), empty, matches from the top (`3/12`, `↵`/`⇧↵`,
   `Esc`); `⌘F` in the bar or its icon opens the palette's search in contents with its text. Top
   right as VS Code's find widget; the match read is never under it.
@@ -45,12 +44,9 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   16 KiB of paths). The summary is against HEAD: unstaged counts but for staged paths. One in
   flight per project. Untracked files read to count lines (binary: NUL in the first 8 KiB): 4 MiB per
   file, 32 MiB and 2,000 files per snapshot. At most 10,000 changed paths (`truncated`, `10k+`).
-- Diff: `git diff [--cached] --no-color --no-ext-diff -U3 -- <path>` (both paths for a staged
+- Diff: `git diff [--cached] --no-color --no-ext-diff --no-textconv -U3 -- <path>` (both paths for a staged
   rename, `--no-index /dev/null <path>` for untracked); full file with `-U` at git's maximum. Parsed
   from the first `@@`, so `diff.noprefix` and the like do not matter.
-- Commits: `git log -z --first-parent -n 51 HEAD --ignore-missing --no-show-signature`; a commit's
-  files `git diff-tree -r -z --raw --numstat -M` against its first parent (`--root` for a root),
-  at most 10,000; ids must be hashes (`invalid_commit`).
 - Scrollbars (`ScrollMap.tsx`, `scrollbars.ts`): one observer of the scroll element; thumbs and
   marks follow scrolls and resizes without a render; the content's height is the one scale.
   `trackMarks` gives click rooms and joins overlaps. `Pane` owns the layout and the hunk gone to,

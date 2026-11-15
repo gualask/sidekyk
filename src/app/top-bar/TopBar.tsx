@@ -40,6 +40,7 @@ export function TopBar({
     facts,
     onShowFolder,
     onEditFolders,
+    onSwitchBranch,
 }: {
     level: ZoomLevel;
     project: ProjectInfo | null;
@@ -61,6 +62,8 @@ export function TopBar({
     onShowFolder: (folderId: string) => void;
     /** Opens the project's name and folders, to change them. */
     onEditFolders: () => void;
+    /** Opens the branches of the folder on screen, to switch it to another. */
+    onSwitchBranch: () => void;
 }) {
     const { t } = useTranslation();
     const overlaid = useTitleBarOverlaid();
@@ -81,7 +84,9 @@ export function TopBar({
                 onShowFolder={onShowFolder}
                 onEditFolders={onEditFolders}
             />
-            {folder && facts ? <ProjectFacts folder={folder} fromSnapshot /> : null}
+            {folder && facts ? (
+                <ProjectFacts folder={folder} fromSnapshot onSwitchBranch={onSwitchBranch} />
+            ) : null}
             <div className="ml-auto flex items-center gap-1.5">
                 {minimized.length > 0 ? (
                     <MinimizedChips minimized={minimized} onRestore={onRestore} />

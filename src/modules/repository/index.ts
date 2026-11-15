@@ -1,3 +1,4 @@
+export { useBranches, useSwitchBranch } from './application/queries/branches';
 export { useFoldersHolding, useOpenUrl } from './application/queries/file-reads';
 export { type FolderFailure, useFolderFailures } from './application/queries/folder-failures';
 export { useFolderKind, useProjectKind } from './application/queries/folder-kind';
@@ -9,6 +10,7 @@ export { type RepositoryPort, RepositoryProvider } from './application/repositor
 export { RepositorySettingsProvider } from './application/repository-settings';
 export { useShownFile } from './application/selection';
 export {
+    type Branch,
     type ChangedFile,
     type ChangesIgnoringWhitespace,
     type Commit,

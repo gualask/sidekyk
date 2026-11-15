@@ -15,8 +15,9 @@ use crate::modules::preview::MarkdownDocument;
 use crate::modules::projects::{FoundFolder, Location, NameCase, ProjectList};
 use crate::modules::reader::{OnChange, Repositories};
 use crate::modules::repository::{
-    ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest, CommitFiles, CommitRequest,
-    FileDiffRequest, RecentCommits, RepositorySnapshot, RepositorySummary, UnifiedDiff,
+    Branch, BranchSwitch, ChangesIgnoringWhitespace, CommitActivity, CommitFileDiffRequest,
+    CommitFiles, CommitRequest, FileDiffRequest, RecentCommits, RepositorySnapshot,
+    RepositorySummary, UnifiedDiff,
 };
 use crate::modules::search::{ContentEnd, ContentFile, FileMatches};
 use crate::modules::syntax::{SyntaxColors, SyntaxRequest};
@@ -56,7 +57,13 @@ impl Repositories for Told {
     ) -> anyhow::Result<ChangesIgnoringWhitespace> {
         unreachable!()
     }
-    fn recent_commits(&self, _: &RepositoryInfo) -> anyhow::Result<RecentCommits> {
+    fn recent_commits(&self, _: &RepositoryInfo, _: usize) -> anyhow::Result<RecentCommits> {
+        unreachable!()
+    }
+    fn branches(&self, _: &RepositoryInfo) -> anyhow::Result<Vec<Branch>> {
+        unreachable!()
+    }
+    fn switch_branch(&self, _: &RepositoryInfo, _: &BranchSwitch) -> anyhow::Result<()> {
         unreachable!()
     }
     fn commit_activity(&self, _: &RepositoryInfo, _: i64) -> anyhow::Result<CommitActivity> {
