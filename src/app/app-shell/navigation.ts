@@ -5,10 +5,12 @@ import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info'
 import { zoomTransition } from '@/shared/ui/zoom-transition';
 import { type Asked, taken } from '../asked';
 import { deepestLevel, INITIAL_PANEL, type ProjectTiles, panelById, tileBeside } from '../panels';
-import type { ZoomLevel } from '../workspace';
+import type { ZoomLevel } from '../zoom-level';
 
 /** Where the window is, and every move from there. */
 export type Navigation = ReturnType<typeof useNavigation>;
+
+const NO_PANELS: readonly PanelDefinition[] = [];
 
 /**
  * Where the window is: its level, the panel full screen at level 2 and the tile selected at level
@@ -55,23 +57,13 @@ export function useNavigation({
         }));
         setPanel(tile);
     };
-    // a panel asked for that waits in the top bar comes back to take its request (a note found
-    // at all projects, once its project's panels show): within the zoom still running, not in a
-    // transition of its own, which would skip it
-    // once for each request: one never taken (its panel failed to read) leaves the tile free to
-    // go back to the top bar
-    const bringBack = useEffectEvent((tile: PanelDefinition) => unminimize(tile));
-    const broughtBack = useRef<Asked | null>(null);
+    // a request for a tile of the project's panels that waits in the top bar
     const askedTile = request?.project === project?.id && level === 1 ? request?.panel : null;
-    const waiting = askedTile && layout.minimized.includes(askedTile) ? request : null;
-    useEffect(() => {
-        const tile = waiting ? panelById(waiting.panel) : undefined;
-        if (!tile || broughtBack.current === waiting) return;
-        broughtBack.current = waiting;
-        bringBack(tile);
-    }, [waiting]);
+    useBringBack(askedTile && layout.minimized.includes(askedTile) ? request : null, unminimize);
     // a tile minimized is not selected: the main one is, which is never minimized
     const selectedTile = tiles && layout.minimized.includes(panel.id) ? tiles.main : panel;
+    // the project's panels open full screen from its panels, never from all projects
+    const fullScreenPanels = level > 0 && tiles ? tiles.fullScreen : NO_PANELS;
 
     /** A request to a panel of the project on screen, for its folder on screen. */
     const askOf = (panelId: string, target: PanelTarget): Asked | null =>
@@ -147,6 +139,12 @@ export function useNavigation({
             if (level > 0) zoom((level - 1) as ZoomLevel);
         },
         select: setPanel,
+        /** The panels that open full screen from here (a key, the palette): none at all projects. */
+        fullScreenPanels,
+        /** Opens a panel full screen, when it is one of `fullScreenPanels`. */
+        openFullScreen: (next: PanelDefinition) => {
+            if (fullScreenPanels.includes(next)) zoom(2, next);
+        },
         show,
         minimize,
         restore,
@@ -160,6 +158,23 @@ export function useNavigation({
             return among !== null;
         },
     };
+}
+
+/**
+ * A panel asked for that waits in the top bar (`waiting`) comes back to take its request (a note
+ * found at all projects, once its project's panels show): within the zoom still running, not in a
+ * transition of its own, which would skip it. Once for each request: one never taken (its panel
+ * failed to read) leaves the tile free to go back to the top bar.
+ */
+function useBringBack(waiting: Asked | null, bringBack: (tile: PanelDefinition) => void) {
+    const onWaiting = useEffectEvent(bringBack);
+    const broughtBack = useRef<Asked | null>(null);
+    useEffect(() => {
+        const tile = waiting ? panelById(waiting.panel) : undefined;
+        if (!tile || broughtBack.current === waiting) return;
+        broughtBack.current = waiting;
+        onWaiting(tile);
+    }, [waiting]);
 }
 
 /**

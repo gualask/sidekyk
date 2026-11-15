@@ -1,5 +1,5 @@
 import { IconArrowsMaximize, IconMinus } from '@tabler/icons-react';
-import { type CSSProperties, Suspense, useState } from 'react';
+import { type CSSProperties, Suspense, useMemo, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import type { PanelDefinition, PanelProps, PanelTarget } from '@/shared/panels/panel';
 import type { ProjectFolder, ProjectInfo } from '@/shared/projects/project-info';
@@ -15,6 +15,9 @@ const HEADER =
 
 /** Full screen, the panel takes the whole width. */
 const FULL_WIDTH = { flexGrow: 1, flexBasis: 0 };
+
+/** A tile's `border`, 1 px a side: what a tile adds to the width its panel needs. */
+const TILE_BORDERS = 2;
 
 /**
  * A panel, in a tile (level 1) or full screen (level 2). Its header carries what the panel puts
@@ -68,11 +71,15 @@ export function PanelTile({
     const shortcut = panelShortcut(panel);
     const key = shortcut ? ` (${shortcut})` : '';
     const [header, setHeader] = useState<HTMLElement | null>(null);
+    // the width the tile needs: what its panel needs, and its border
+    const fit = useMemo<PanelProps['tileFit']>(
+        () => tileFit && ((measure) => tileFit(measure ? () => measure() + TILE_BORDERS : null)),
+        [tileFit],
+    );
 
     return (
         <section
             aria-label={title}
-            data-panel={panel.id}
             // a tile zooms in on itself under the pointer (⌘+scroll), and grows to full screen
             data-zoom={onZoomIn ? '' : undefined}
             style={{
@@ -124,7 +131,7 @@ export function PanelTile({
                                 project,
                                 folder,
                                 header,
-                                tileFit,
+                                tileFit: fit,
                                 target,
                                 targetTaken,
                                 place: onZoomIn ? 'tile' : 'full',

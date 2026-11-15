@@ -17,7 +17,7 @@ import { FilesListing, TooManyFiles } from './FilesListing';
 import { FileViewer } from './FileViewer';
 import { recentFittingWidth } from './recent/recent-layout';
 import { type RecentListState, useRecentList } from './recent/use-recent-list';
-import { FILES_TREE_WIDTH, fittingWidth } from './tree/tree-layout';
+import { FILES_TREE_SIDEBAR, FILES_TREE_WIDTH, fittingWidth } from './tree/tree-layout';
 import { type FileTreeState, useFileTree } from './tree/use-file-tree';
 import { useFilesKeys } from './use-files-keys';
 
@@ -99,7 +99,7 @@ function Files({
     useFilesKeys({ active: hasKeys, place, view, tree, recent, pick, openFile });
 
     const { treeBox, fitting } = useTreeFit(view, tree, recent, tileFit);
-    const treeWidth = useSidebarWidth('files', FILES_TREE_WIDTH);
+    const treeWidth = useSidebarWidth(FILES_TREE_SIDEBAR, FILES_TREE_WIDTH);
     const actions = header ? (
         <FilesActions
             header={header}

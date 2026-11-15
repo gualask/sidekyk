@@ -5,7 +5,7 @@ import { MACOS } from '@/shared/platform/macos';
 import { useWindowKeys } from '@/shared/ui/hooks/use-window-keys';
 import { KeyCap } from '@/shared/ui/KeyCaps';
 import { isKeyTaken } from '@/shared/ui/keys';
-import { PANEL_KEYS } from './panels';
+import { PANEL_KEYS } from '../../panels';
 
 /** A shortcut: what it does, and its combinations (`shared/platform/keys.ts`), each a key cap. */
 interface Shortcut {

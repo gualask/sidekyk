@@ -11,7 +11,7 @@ import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { panelShortcut } from '../panels';
 import type { Problem } from '../problems';
 import { useTitleBarOverlaid } from '../providers';
-import type { ZoomLevel } from '../workspace';
+import type { ZoomLevel } from '../zoom-level';
 import { FolderMenu } from './FolderMenu';
 
 /** Loaded with the first problem: most sessions have none. */

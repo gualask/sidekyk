@@ -72,15 +72,9 @@ export function useAppNoteReferences({
                     .then((held) => {
                         const now = onScreen.current;
                         if (now.projectId !== projectId || now.shown !== shown) return;
-                        if (held.length === 0) {
-                            showToast({ title: i18n.t('notes.fileNotFound', { path }) });
-                        } else if (shown !== null && held.includes(shown)) {
-                            open.current(target, null, null);
-                        } else if (held.length === 1) {
-                            open.current(target, held[0] ?? null, null);
-                        } else {
-                            open.current(target, null, held);
-                        }
+                        const opening = whereToOpen(held, shown);
+                        if (opening) open.current(target, opening.folderId, opening.among);
+                        else showToast({ title: i18n.t('notes.fileNotFound', { path }) });
                     })
                     .catch((error: unknown) =>
                         showToast(
@@ -91,4 +85,19 @@ export function useAppNoteReferences({
             openUrl,
         };
     }, [projectId, shown, search, holding, openUrl, showToast, i18n]);
+}
+
+/**
+ * Where a file a note names opens, from the project's folders that hold it (`held`): in the folder
+ * on screen when it is one of them, else in the only other one, else in one of them, asked which;
+ * nowhere when none does.
+ */
+export function whereToOpen(
+    held: readonly string[],
+    shown: string | null,
+): { folderId: string | null; among: readonly string[] | null } | null {
+    if (held.length === 0) return null;
+    if (shown !== null && held.includes(shown)) return { folderId: null, among: null };
+    if (held.length === 1) return { folderId: held[0] ?? null, among: null };
+    return { folderId: null, among: held };
 }

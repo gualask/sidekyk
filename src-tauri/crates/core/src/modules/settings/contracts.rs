@@ -164,6 +164,9 @@ pub struct Settings {
     pub note_lines: NoteLines,
 }
 
+/// The panels take the defaults of how they show things before the settings are read
+/// (`DEFAULT_VIEW_SETTINGS`, `src/modules/settings/model/settings-defaults.ts`): one changed here
+/// changes there.
 impl Default for Settings {
     fn default() -> Self {
         Self {

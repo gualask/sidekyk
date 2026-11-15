@@ -14,7 +14,7 @@ import type { PanelDefinition, PanelProps } from '@/shared/panels/panel';
 import { trackDrag } from '@/shared/ui/pointer-drag';
 import { SidebarSplitter } from '@/shared/ui/SidebarSplitter';
 import { useSidebarWidth } from '@/shared/ui/sidebar-width';
-import { MAIN_TILE_MIN_WIDTH, SIDE_WIDTH, sideMinWidth, TILE_BORDERS, TILE_GAP } from '../panels';
+import { MAIN_TILE_MIN_WIDTH, SIDE_WIDTH, sideMinWidth, TILE_GAP } from './tile-layout';
 
 /** The least height a tile of the column keeps while the splitter between them is dragged. */
 const TILE_MIN_HEIGHT = 96;
@@ -97,8 +97,9 @@ export function SideColumn({
 }
 
 /**
- * What each tile needs, as its panel measures it: `tileFits` gives each panel where to tell it,
- * `fitting` the width the tiles shown need, borders included; null when none tells.
+ * What each tile needs, as it tells it (its panel's measure and its border, `PanelTile`):
+ * `tileFits` gives each tile where to tell it, `fitting` the width the tiles shown need; null when
+ * none tells.
  */
 function useTileFits(panels: readonly PanelDefinition[], shown: readonly PanelDefinition[]) {
     const fits = useRef(new Map<string, () => number>());
@@ -117,7 +118,7 @@ function useTileFits(panels: readonly PanelDefinition[], shown: readonly PanelDe
     );
     const fitting = () => {
         const needs = shown.flatMap((panel) => fits.current.get(panel.id)?.() ?? []);
-        return needs.length > 0 ? Math.max(...needs) + TILE_BORDERS : null;
+        return needs.length > 0 ? Math.max(...needs) : null;
     };
     return { tileFits, fitting };
 }

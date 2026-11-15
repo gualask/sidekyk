@@ -26,15 +26,15 @@ import { useProblems } from '../problems';
 import { useProjectEntry } from '../project-entry';
 import { useShowWindowWhen } from '../providers';
 import { TopBar } from '../top-bar/TopBar';
-import type { ZoomLevel } from '../workspace';
 import { useWorkspaceKeys } from '../workspace-view/workspace-keys';
 import { useZoomGestures } from '../workspace-view/zoom-gestures';
-import { preloadDialogs } from './dialog-chunks';
-import { useDialogs } from './dialogs';
+import type { ZoomLevel } from '../zoom-level';
+import { preloadDialogs } from './dialogs/dialog-chunks';
+import { useDialogs } from './dialogs/dialogs';
+import { ShellDialogs } from './dialogs/ShellDialogs';
 import { useNavigation } from './navigation';
 import { useOverviewAsks } from './overview-asks';
 import { usePaletteContent } from './palette-content';
-import { ShellDialogs } from './ShellDialogs';
 import { Workspace } from './Workspace';
 
 /** The window: the top bar, and below it the workspace at its zoom level. */
@@ -145,9 +145,7 @@ export function AppShell() {
         zoomIn,
         zoomOut: nav.zoomOut,
         // full screen, from a project's panels or another panel
-        openPanel: (next) => {
-            if (level > 0 && tiles?.fullScreen.includes(next)) zoom(2, next);
-        },
+        openPanel: nav.openFullScreen,
         moveTile: nav.moveTile,
         toggleSettings: dialogs.toggleSettings,
         togglePalette: dialogs.togglePalette,

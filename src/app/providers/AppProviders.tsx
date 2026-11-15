@@ -12,8 +12,12 @@ import {
 import { ProjectsProvider, useProjects } from '@/modules/projects';
 import { RepositoryProvider, RepositorySettingsProvider } from '@/modules/repository';
 import { SearchProvider } from '@/modules/search';
-import { SettingsProvider, useChangeSettings, useSettingsWhenRead } from '@/modules/settings';
-import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
+import {
+    DEFAULT_VIEW_SETTINGS,
+    SettingsProvider,
+    useChangeSettings,
+    useSettingsWhenRead,
+} from '@/modules/settings';
 import type { CommitsPlace } from '@/shared/git/commits-place';
 import { createTranslator, detectLocale, formatTag, TranslationProvider } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
@@ -109,11 +113,11 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
-            fileView: settings?.fileView ?? 'preview',
-            copyTemplate: settings?.copyTemplate ?? DEFAULT_COPY_TEMPLATE,
-            scrollbar: settings?.diffScrollbar ?? 'narrow',
-            codeLines: settings?.codeLines ?? 'scroll',
-            commitsPlace: settings?.commitsPlace ?? 'sidebar',
+            fileView: settings?.fileView ?? DEFAULT_VIEW_SETTINGS.fileView,
+            copyTemplate: settings?.copyTemplate ?? DEFAULT_VIEW_SETTINGS.copyTemplate,
+            scrollbar: settings?.diffScrollbar ?? DEFAULT_VIEW_SETTINGS.diffScrollbar,
+            codeLines: settings?.codeLines ?? DEFAULT_VIEW_SETTINGS.codeLines,
+            commitsPlace: settings?.commitsPlace ?? DEFAULT_VIEW_SETTINGS.commitsPlace,
             setCommitsPlace: (commitsPlace: CommitsPlace) =>
                 change((current) => ({ ...current, commitsPlace })),
         }),
@@ -124,7 +128,7 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
 
 /** How Notes shows long lines, from the settings, and how it switches them (`⌥Z`). */
 function NotesSettingsBridge({ children }: { children: ReactNode }) {
-    const lines = useSettingsWhenRead()?.noteLines ?? 'wrap';
+    const lines = useSettingsWhenRead()?.noteLines ?? DEFAULT_VIEW_SETTINGS.noteLines;
     const change = useChangeSettings();
     const value = useMemo(
         () => ({

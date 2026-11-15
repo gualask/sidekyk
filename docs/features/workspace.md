@@ -79,8 +79,11 @@ problems. Why semantic zoom: `../product.md`.
   screen. A tile's panel can open itself full screen (`PanelProps.zoomIn`). A panel asked for that the project
   lacks gives way to its main one.
 - Keys: `app/workspace-view/workspace-keys.ts`; keys a field, dialog or menu takes are theirs; panels listen with
-  `useWindowKeys`, and the workspace skips handled keys. The shortcuts card (`ShortcutsHelp`, lazy)
-  is kept by hand. The wheel listener exists only while `⌘`/`Ctrl` is held.
+  `useWindowKeys`, and the workspace skips handled keys. Handlers match `KeyboardEvent.key`, so a
+  key works on any layout (`[` is `⌥è` on an Italian Mac); the shortcuts card (`ShortcutsHelp`,
+  lazy) and the tooltips write their combinations by hand, which may name a key's place (`Mod+KeyN`,
+  `Mod+Equal`): one keymap cannot drive both. The wheel listener exists only while `⌘`/`Ctrl` is
+  held.
 - Key names only in `shared/platform/keys.ts` (`keysLabel`, `withKeys`), from combinations as a
   global shortcut is stored (`Shift+Enter`, `Mod+K`); key caps: `shared/ui/KeyCaps.tsx`. Catalog
   texts take keys as placeholders (`{esc}`).

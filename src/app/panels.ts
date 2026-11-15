@@ -1,11 +1,5 @@
 import { notesPanel } from '@/modules/notes';
-import {
-    changesPanel,
-    FILES_TREE_WIDTH,
-    type FolderKind,
-    filesPanel,
-    startPanel,
-} from '@/modules/repository';
+import { changesPanel, type FolderKind, filesPanel, startPanel } from '@/modules/repository';
 import type { PanelDefinition, PanelNeed } from '@/shared/panels/panel';
 
 /**
@@ -13,26 +7,6 @@ import type { PanelDefinition, PanelNeed } from '@/shared/panels/panel';
  * at a project's panels (level 1), left to right.
  */
 const PANELS: readonly PanelDefinition[] = [changesPanel, filesPanel, notesPanel];
-
-/** The room between tiles, in pixels, where the splitter of the side column sits. */
-export const TILE_GAP = 8;
-
-/** What the main tile keeps of the width, the side column giving way first. */
-export const MAIN_TILE_MIN_WIDTH = 560;
-
-/**
- * The side column's width is the Files tree's (one setting with Files full screen): what the
- * column shows first, and what gives way first.
- */
-export const SIDE_WIDTH = { sidebar: 'files', initial: FILES_TREE_WIDTH.initial };
-
-/** A tile's border, both sides (`PanelTile`): what a tile adds to what its panel shows. */
-export const TILE_BORDERS = 2;
-
-/** The side column's least width: the widest least width of the tiles in it. */
-export function sideMinWidth(panels: readonly PanelDefinition[]): number {
-    return Math.max(0, ...panels.map((panel) => panel.tileMinWidth ?? 0));
-}
 
 /**
  * A project's panels, from what it has: those whose needs it meets, in their order. With several,

@@ -6,6 +6,9 @@ import type { TreeRow } from '../../../model/tree/file-tree';
  */
 export const FILES_TREE_WIDTH = { initial: 280, min: 160 };
 
+/** The tree's width among the sidebar widths (`sidebarWidths.files`), the side column's too. */
+export const FILES_TREE_SIDEBAR = 'files';
+
 /** A row's height, which the virtualized tree lays its rows out with. */
 export const TREE_ROW_HEIGHT = 22;
 

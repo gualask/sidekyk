@@ -55,12 +55,9 @@ export function usePaletteContent({
     revealInboxNote: (note: string | null) => void;
 }): PaletteContent {
     const i18n = useTranslation();
-    const { level, panel, zoom, show } = nav;
+    const { level, panel, zoom, show, fullScreenPanels, openFullScreen } = nav;
     // a project's own, at its panels
-    const panels = useMemo(
-        () => offeredPanels(level > 0 && tiles ? tiles.fullScreen : [], i18n),
-        [level, tiles, i18n],
-    );
+    const panels = useMemo(() => offeredPanels(fullScreenPanels, i18n), [fullScreenPanels, i18n]);
     // the file shown, whose lines found come first: worked out only while the palette is open
     const shownFile = useShownFile(level > 0 ? (folder?.id ?? null) : null);
     // the books of the lists and notes the palette finds at all projects
@@ -78,7 +75,7 @@ export function usePaletteContent({
         openProject,
         openPanel: (id) => {
             const next = panelById(id);
-            if (next && tiles?.fullScreen.includes(next)) zoom(2, next);
+            if (next) openFullScreen(next);
         },
         // as a file picked in the tree: in Changes when the project has it and Files is not full
         // screen, else in Files full screen, its tile being the tree alone

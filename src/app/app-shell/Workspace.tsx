@@ -14,10 +14,11 @@ import { remoteMachine } from '@/shared/projects/project-place';
 import { Preloaded } from '@/shared/ui/Preloaded';
 import { ZOOM_NAMES } from '@/shared/ui/zoom-transition';
 import { type Asked, targetFor } from '../asked';
-import { MAIN_TILE_MIN_WIDTH, type ProjectTiles, projectTiles, TILE_GAP } from '../panels';
-import type { ZoomLevel } from '../workspace';
+import { type ProjectTiles, projectTiles } from '../panels';
 import { PanelTile } from '../workspace-view/PanelTile';
 import { SideColumn } from '../workspace-view/SideColumn';
+import { MAIN_TILE_MIN_WIDTH, TILE_GAP } from '../workspace-view/tile-layout';
+import type { ZoomLevel } from '../zoom-level';
 
 /** A project and its panels, at level 1 or full screen: the zoom carries it to and from its row. */
 const PROJECT_ZOOM = { viewTransitionName: ZOOM_NAMES.project };
@@ -129,21 +130,13 @@ export function Workspace({
         );
     }
     if (!tiles) return <WaitingPanels folder={folder} />;
+    // what every panel of the project gets, wherever it shows
+    const onScreen = { project, folder, targetTaken, show, findInFiles, showFolder };
     // full screen, and a project's one panel at level 1
     if (level === 2 || tiles.side.length === 0) {
         return (
             <div className="flex h-full" style={PROJECT_ZOOM}>
-                <PanelTile
-                    panel={panel}
-                    project={project}
-                    folder={folder}
-                    target={targetOf(panel.id)}
-                    targetTaken={targetTaken}
-                    selected
-                    show={show}
-                    findInFiles={findInFiles}
-                    showFolder={showFolder}
-                />
+                <PanelTile {...onScreen} panel={panel} target={targetOf(panel.id)} selected />
             </div>
         );
     }
@@ -153,15 +146,10 @@ export function Workspace({
     return (
         <div className="flex h-full p-2" style={TILES_STYLE}>
             <PanelTile
+                {...onScreen}
                 panel={main}
-                project={project}
-                folder={folder}
                 target={targetOf(main.id)}
-                targetTaken={targetTaken}
                 selected={main === panel}
-                show={show}
-                findInFiles={findInFiles}
-                showFolder={showFolder}
                 tile={MAIN_SIZE}
                 onZoomIn={() => zoom(2, main)}
                 onSelect={() => select(main)}
@@ -174,15 +162,10 @@ export function Workspace({
                     onSplit={onSplit}
                     tile={(tile, tileFit) => (
                         <PanelTile
+                            {...onScreen}
                             panel={tile}
-                            project={project}
-                            folder={folder}
                             target={targetOf(tile.id)}
-                            targetTaken={targetTaken}
                             selected={tile === panel}
-                            show={show}
-                            findInFiles={findInFiles}
-                            showFolder={showFolder}
                             tile={SIDE_SIZE}
                             tileFit={tileFit}
                             onZoomIn={() => zoom(2, tile)}

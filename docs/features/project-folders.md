@@ -66,8 +66,9 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
   (`take_opened`); the app passes the choice to the overview, which opens `NewProjectDialog` on it.
 - Frontend: `PanelProps.folder` (the one shown) and `showFolder`; `useProjectKind` (a project of
   several folders has a repository's panels on its row when one is), `useRepositorySummaries`,
-  `useCommitActivities` (`mergedActivity`), `summedTotals`; `FolderMenu` and `FolderPicker` (lazy,
-  preloaded when idle) in `app/`; `FolderFacts` gives a row's cells, empty while read, so the
+  `useCommitActivities` (`mergedActivity`), `summedTotals`; `FolderMenu` in the top bar
+  (`app/top-bar/`), `FolderPicker` (lazy, preloaded when idle) among the dialogs
+  (`app/app-shell/dialogs/`); `FolderFacts` gives a row's cells, empty while read, so the
   columns (`FOLDER_COLUMNS`) hold. The panel is keyed by project and folder: another folder is
   another panel, as left there.
 

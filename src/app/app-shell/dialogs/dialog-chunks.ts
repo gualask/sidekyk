@@ -17,18 +17,18 @@ export const EditProjectDialog = preloadable(
 );
 /** Asked on entering a project of several folders; loaded while nothing else happens. */
 export const FolderPicker = preloadable(
-    () => import('../FolderPicker'),
+    () => import('./FolderPicker'),
     (module) => module.FolderPicker,
 );
 
 /** Loaded when first asked for: the first paint does not show it. */
 export const BranchPicker = lazy(() =>
-    import('../BranchPicker').then((module) => ({ default: module.BranchPicker })),
+    import('./BranchPicker').then((module) => ({ default: module.BranchPicker })),
 );
 
 /** Loaded when first asked for: the first paint does not show it. */
 export const ShortcutsHelp = lazy(() =>
-    import('../ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
+    import('./ShortcutsHelp').then((module) => ({ default: module.ShortcutsHelp })),
 );
 
 /** Fetches the code of the dialogs a key away: the settings, the palette, the folder picker. */

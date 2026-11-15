@@ -2,7 +2,8 @@ import { Suspense } from 'react';
 import { useForgetBooks } from '@/modules/notes';
 import { useRemoveProject } from '@/modules/projects';
 import { Preloaded } from '@/shared/ui/Preloaded';
-import type { useProjectEntry } from '../project-entry';
+import type { useProjectEntry } from '../../project-entry';
+import type { PaletteContent } from '../palette-content';
 import {
     BranchPicker,
     CommandPalette,
@@ -13,7 +14,6 @@ import {
     ShortcutsHelp,
 } from './dialog-chunks';
 import type { Dialogs } from './dialogs';
-import type { PaletteContent } from './palette-content';
 
 /**
  * The dialogs over the workspace, each loaded on its first show: a project's to remove or to
