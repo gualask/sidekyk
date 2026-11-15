@@ -13,6 +13,7 @@ import {
 } from '@/modules/notes';
 import { type FixtureCapturePort, fixtureCapture } from './capture.fixture';
 import {
+    absorb,
     addedNote,
     type Book,
     listOf,
@@ -34,6 +35,7 @@ import { failure, newId, type Scenario } from './scenario';
 export type FixtureNotes = NotesPort & {
     peek: (book: string) => ProjectNotes;
     drop: (book: string) => void;
+    merge: (from: string, into: string, label: string) => void;
 };
 
 /**
@@ -78,6 +80,23 @@ export function fixtureNotes(
         /** A project removed takes its notes, as the backend's `remove_project`. */
         drop: (key) => {
             books.delete(key);
+        },
+        /**
+         * A project merged into another moves its notes there, as the backend's `merge_book`:
+         * each list with notes, named after the project merged (`label`) when the other has its
+         * name; then its book goes.
+         */
+        merge: (from, into, label) => {
+            const source = projectBook(from);
+            const dest = projectBook(into);
+            for (const list of source.lists) {
+                const notes = source.notes.filter((n) => n.list === list.id);
+                if (notes.length === 0) continue;
+                const lower = list.name.toLowerCase();
+                const taken = dest.lists.some((l) => l.name.toLowerCase() === lower);
+                absorb(dest, taken ? `${list.name} (${label})` : list.name, notes);
+            }
+            books.delete(from);
         },
         getNotes: async (key) => snapshot(book(key)),
         addNote: async (key, listId, text) => ({ ...addedNote(book(key), listId, text) }),
@@ -142,23 +161,11 @@ export function fixtureNotes(
             const source = projectBook(from);
             const dest = projectBook(key);
             const left = takeList(source, listId);
-            const name = left.list.name.toLowerCase();
-            const same = dest.lists.find((l) => l.name.toLowerCase() === name);
-            const taker = same ?? { id: newId(), name: left.list.name };
-            if (!same) dest.lists.push(taker);
-            let bottom = openNotes(dest.notes, taker.id).at(-1)?.position ?? -1;
-            const notes = [...left.notes].sort((a, b) => a.position - b.position);
-            for (const moved of notes) {
-                if (moved.done === null) bottom += 1;
-                const position = moved.done === null ? bottom : moved.position;
-                replace(dest, { ...moved, list: taker.id, position });
-            }
             const result: MovedList = {
                 from,
                 to: key,
                 left,
-                into: taker.id,
-                joined: same !== undefined,
+                ...absorb(dest, left.list.name, left.notes),
             };
             return result;
         },

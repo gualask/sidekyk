@@ -1,5 +1,6 @@
 import type { Opened, ProjectList, ProjectsPort } from '@/modules/projects';
 import type { ProjectFolder, ProjectInfo, ProjectLocation } from '@/shared/projects/project-info';
+import type { FixtureNotes } from './notes';
 import { newAvatar } from './projects.fixture';
 import {
     ADDED_FOLDERS,
@@ -82,11 +83,11 @@ export function fixtureProjectList(scenario: Scenario): FixtureProjects {
 
 /**
  * The projects port on `projects`, and what stands in for `sidekyk <folder>`. `notes.drop` takes a
- * removed project's notes.
+ * removed project's notes, `notes.merge` moves a merged one's.
  */
 export function fixtureProjectsPort(
     projects: FixtureProjects,
-    notes: { drop: (book: string) => void },
+    notes: Pick<FixtureNotes, 'drop' | 'merge'>,
 ): { port: ProjectsPort; openFolder: (name: string) => void } {
     const { list, update, project, folder } = projects;
     // the project following the folder at `root`, if one does
@@ -244,8 +245,8 @@ export function fixtureProjectsPort(
                 ),
             });
         },
-        // as `merge_projects`: the folders follow, the notes move (`fixtureNotes` keeps them
-        // per project: they stay behind here), the project merged goes
+        // as `merge_projects`: once the folders may merge, the notes move first, then the folders
+        // follow and the project merged goes
         mergeProjects: async (into, from) => {
             const target = project(into);
             const merged = project(from);
@@ -259,6 +260,7 @@ export function fixtureProjectsPort(
             if (merged.folders.some((m) => target.folders.some((t) => overlaps(t.root, m.root)))) {
                 throw failure('folder_overlaps');
             }
+            notes.merge(from, into, merged.name);
             const wasActive = list().active === from;
             removeProject(from);
             return update({

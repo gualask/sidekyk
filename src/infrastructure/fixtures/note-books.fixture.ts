@@ -104,3 +104,26 @@ export function putList(book: Book, deleted: DeletedList) {
     for (const back of deleted.notes) replace(book, back);
     book.openList = deleted.list.id;
 }
+
+/**
+ * Puts `notes` in `book`'s list named `name` (case ignored), made after its lists when it has none,
+ * the open ones at the bottom: as the backend's `absorb`. Returns the list's id, and whether it
+ * was there already.
+ */
+export function absorb(
+    book: Book,
+    name: string,
+    notes: readonly Note[],
+): { into: string; joined: boolean } {
+    const lower = name.toLowerCase();
+    const same = book.lists.find((l) => l.name.toLowerCase() === lower);
+    const taker = same ?? { id: newId(), name };
+    if (!same) book.lists.push(taker);
+    let bottom = openNotes(book.notes, taker.id).at(-1)?.position ?? -1;
+    for (const moved of [...notes].sort((a, b) => a.position - b.position)) {
+        if (moved.done === null) bottom += 1;
+        const position = moved.done === null ? bottom : moved.position;
+        replace(book, { ...moved, list: taker.id, position });
+    }
+    return { into: taker.id, joined: same !== undefined };
+}
