@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ChangedFile, Directory } from '../repository.types';
+import type { ChangedFile, ChangeKind, Directory } from '../repository.types';
 import { changedFile } from '../testing';
 import {
+    changeMarkOf,
     changeMarks,
     foldersAbove,
     foldersToRead,
@@ -86,6 +87,31 @@ describe('foldersAbove', () => {
             'src/modules/cart',
         ]);
         expect(foldersAbove('README.md')).toEqual([]);
+    });
+});
+
+describe('changeMarkOf', () => {
+    it('marks a deleted file deleted, every kind of new file added, any other edited', () => {
+        const kinds: ChangeKind[] = [
+            'added',
+            'modified',
+            'deleted',
+            'renamed',
+            'copied',
+            'type-changed',
+            'untracked',
+            'conflicted',
+        ];
+        expect(Object.fromEntries(kinds.map((kind) => [kind, changeMarkOf(kind)]))).toEqual({
+            added: 'added',
+            modified: 'modified',
+            deleted: 'deleted',
+            renamed: 'added',
+            copied: 'added',
+            'type-changed': 'modified',
+            untracked: 'added',
+            conflicted: 'modified',
+        });
     });
 });
 

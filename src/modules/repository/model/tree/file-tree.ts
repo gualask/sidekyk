@@ -58,10 +58,19 @@ export function foldersAbove(path: string): string[] {
 const NEW_KINDS: ReadonlySet<ChangeKind> = new Set(['untracked', 'added', 'renamed', 'copied']);
 
 /**
+ * How a change of `kind` marks its file: deleted, new (untracked, added, renamed, copied), or
+ * edited. The backend's palette marks by the same rule (`marks_by_path` in
+ * `src-tauri/crates/core/src/modules/search/mod.rs`: change both together).
+ */
+export function changeMarkOf(kind: ChangeKind): ChangeMark {
+    if (kind === 'deleted') return 'deleted';
+    return NEW_KINDS.has(kind) ? 'added' : 'modified';
+}
+
+/**
  * The mark of every changed file, and of every folder above one: a folder takes the strongest
  * change inside it, an edit over a new file. A deleted file is not in the tree, and marks
- * nothing. The palette's marks follow the same rule (`marks_by_path` in
- * `src-tauri/crates/core/src/modules/search/mod.rs`: change both together).
+ * nothing.
  */
 export function changeMarks(files: readonly ChangedFile[]): ReadonlyMap<string, ChangeMark> {
     const marks = new Map<string, ChangeMark>();
@@ -70,7 +79,7 @@ export function changeMarks(files: readonly ChangedFile[]): ReadonlyMap<string, 
     };
     for (const file of files) {
         if (file.kind === 'deleted') continue;
-        const next = NEW_KINDS.has(file.kind) ? 'added' : 'modified';
+        const next = changeMarkOf(file.kind);
         mark(file.path, next);
         for (const folder of foldersAbove(file.path)) mark(folder, next);
     }

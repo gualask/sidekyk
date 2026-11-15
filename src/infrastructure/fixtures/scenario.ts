@@ -24,3 +24,10 @@ export function isLarge(scenario: Scenario, folderId: string): boolean {
 export function failure(code: string) {
     return { code, message: code };
 }
+
+let idSeq = 0;
+/** 16 hex digits, as the backend's `new_id` makes for projects, folders, notes and lists. */
+export function newId(): string {
+    idSeq += 1;
+    return (Date.now() * 1000 + idSeq).toString(16).padStart(16, '0').slice(-16);
+}

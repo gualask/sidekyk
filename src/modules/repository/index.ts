@@ -38,6 +38,7 @@ export {
 } from './model/repository.types';
 export { fileTarget } from './model/targets';
 export { lineCheck } from './model/text/syntax';
+export { changeMarkOf } from './model/tree/file-tree';
 export { changesPanel, filesPanel, startPanel } from './panel';
 export { FILES_TREE_SIDEBAR, FILES_TREE_WIDTH } from './ui/files/tree/tree-layout';
 export { FOLDER_COLUMNS } from './ui/folder-columns';

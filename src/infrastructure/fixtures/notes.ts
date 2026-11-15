@@ -1,250 +1,34 @@
 import {
-    addFiles,
-    type CaptureEvent,
-    type DeletedList,
-    type ImageDrop,
     type ImageTarget,
     INBOX_BOOK,
     imageFile,
-    type ListTarget,
     type MovedList,
     type Note,
     type NoteImage,
-    type NoteList,
     type NotesPort,
     openNotes,
     type ProjectNotes,
     positionAt,
     sourceImage,
 } from '@/modules/notes';
-import { REPOSITORY_IMAGES } from './fixture-files';
-import { type FixtureProjects, TOPIC_PROJECT } from './projects';
-import { failure, hasScenarioData, isLarge, type Scenario } from './scenario';
-
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-
-const LONG_ANSWER = `Here is how I would restructure the watcher, step by step.
-
-1. Keep one watcher per repository, but coalesce events per directory instead of per file. During a checkout of 2,000 files that is a few dozen events instead of thousands.
-2. Drop events for ignored paths before they reach the coalescer: today they are filtered after, so they still wake the thread.
-3. Debounce at 120 ms, not 300: the snapshot itself takes 40 ms on the large fixture, so the user waits less and the CPU cost is the same.
-4. On macOS, FSEvents already batches; the extra timer only matters on Linux and Windows.
-
-What I would not change:
-- the snapshot itself, it is already bounded;
-- the lock-free status calls (GIT_OPTIONAL_LOCKS=0).
-
-If you want, I can measure steps 1 and 2 with backend_timings before touching anything.`;
-
-/** The notes of the scenario's project, as in the approved mock: [list, text, age, done age]. */
-const REVIEW_NOTES: [string, string, number, number | null][] = [
-    [
-        'General',
-        'Palette with 10k files: does it stay under 16 ms per keystroke?',
-        20 * MINUTE,
-        null,
-    ],
-    ['General', 'Esc inside a note should leave the note, not zoom out', 26 * HOUR, null],
-    [
-        'General',
-        'Golden rule: measure before and after, nothing runs while idle, every dependency is discussed first',
-        2 * DAY,
-        null,
-    ],
-    ['General', 'Wide scrollbar setting', 3 * DAY, DAY],
-    ['General', 'Try `[`/`]` against the overview for switching', 4 * DAY, 2 * DAY],
-    [
-        'Architecture',
-        '"Coalescing events per directory instead of per file would cut wakeups during a large checkout, at the cost of one extra status call."',
-        3 * HOUR,
-        null,
-    ],
-    ['Architecture', LONG_ANSWER, 5 * HOUR, null],
-    [
-        'Architecture',
-        'Panels as modules behind one contract: app composes them, modules never import each other',
-        6 * DAY,
-        null,
-    ],
-    [
-        'Observability',
-        'Log the snapshot duration at debug, not info: it runs on every change',
-        40 * MINUTE,
-        null,
-    ],
-    [
-        'Observability',
-        'One span per git command, with its exit code and how long it took',
-        2 * HOUR,
-        null,
-    ],
-];
-
-/** The Inbox's notes in `review` and `clean`, newest first: [text, age]. */
-const INBOX_NOTES: [string, number][] = [
-    ['Ask whether the WSL helper needs its own log file', 15 * MINUTE],
-    ['Dentist on Thursday, 9:30: move the standup', 3 * HOUR],
-    [
-        '"Keep the watcher per repository and coalesce per directory" (from the agent, to try on the large fixture)',
-        28 * HOUR,
-    ],
-    ['Book idea: a field guide to small tools that stay out of the way', 3 * DAY],
-];
-
-/** The notes of a project without folder, on a topic: [list, text, age, done age]. */
-const TOPIC_NOTES: [string, string, number, number | null][] = [
-    ['Chapter 2', 'Reread the section on related work: too long', 26 * HOUR, null],
-    ['Chapter 2', 'Ask Prof. Rossi about the second dataset', 2 * DAY, null],
-    ['Chapter 2', 'Fix the figure numbering', 5 * DAY, 3 * DAY],
-    ['Reading', 'Lamport, "Time, Clocks, and the Ordering of Events"', 4 * DAY, null],
-    ['Reading', 'Kleppmann, chapter 9', 9 * DAY, 6 * DAY],
-    ['Reading', 'Brewer, "CAP twelve years later"', 12 * DAY, 8 * DAY],
-];
-
-/**
- * Images of the review's notes, by the text of the note that holds them: as served by Vite, the
- * same for the image and its thumbnail.
- */
-const NOTE_IMAGES: Record<string, { url: string; size: number; width: number; height: number }[]> =
-    {
-        'Esc inside a note should leave the note, not zoom out': [
-            { ...REPOSITORY_IMAGES['public/hero.png'], width: 640, height: 360 },
-        ],
-        'Ask whether the WSL helper needs its own log file': [
-            { ...REPOSITORY_IMAGES['public/logo.png'], width: 128, height: 128 },
-            { ...REPOSITORY_IMAGES['public/hero.png'], width: 640, height: 360 },
-        ],
-    };
-
-/** The kind of an image's bytes, by their first ones, as the backend tells it; null for others. */
-function kindOf(bytes: Uint8Array): NoteImage['kind'] | null {
-    const starts = (...head: number[]) => head.every((b, i) => bytes[i] === b);
-    if (starts(0x89, 0x50, 0x4e, 0x47)) return 'png';
-    if (starts(0xff, 0xd8, 0xff)) return 'jpeg';
-    if (starts(0x47, 0x49, 0x46)) return 'gif';
-    if (starts(0x52, 0x49, 0x46, 0x46) && String.fromCharCode(...bytes.slice(8, 12)) === 'WEBP') {
-        return 'webp';
-    }
-    return null;
-}
-
-let seq = 0;
-/** 16 hex digits, as the backend's ids. */
-function newId(): string {
-    seq += 1;
-    return (Date.now() * 1000 + seq).toString(16).padStart(16, '0').slice(-16);
-}
-
-/** Where each image of the fixtures is, by its id: Vite's URL, or one made for its bytes. */
-const IMAGE_URLS = new Map<string, string>();
-
-/**
- * The browser's own file drags, as the app's (`tauri/notes.ts`) follows the system's: the files
- * read here, added one by one through `addImage`, the first making the note the rest join.
- */
-function onBrowserImageDrop(
-    addImage: NotesPort['addImage'],
-    listener: (drop: ImageDrop) => void,
-): () => void {
-    const files = (event: DragEvent) => event.dataTransfer?.types.includes('Files') ?? false;
-    const over = (event: DragEvent) => {
-        if (!files(event)) return;
-        event.preventDefault();
-        listener({ kind: 'over', x: event.clientX, y: event.clientY });
-    };
-    const leave = (event: DragEvent) => {
-        // leaving the page, not moving between its elements
-        if (event.relatedTarget === null) listener({ kind: 'leave' });
-    };
-    const drop = (event: DragEvent) => {
-        if (!files(event)) return;
-        event.preventDefault();
-        const dropped = [...(event.dataTransfer?.files ?? [])];
-        listener({
-            kind: 'drop',
-            x: event.clientX,
-            y: event.clientY,
-            names: dropped.map((file) => file.name),
-            add: (book, target) =>
-                addFiles(dropped, target, (to, bytes) => addImage(book, to, bytes)),
-        });
-    };
-    window.addEventListener('dragover', over);
-    window.addEventListener('dragleave', leave);
-    window.addEventListener('drop', drop);
-    return () => {
-        window.removeEventListener('dragover', over);
-        window.removeEventListener('dragleave', leave);
-        window.removeEventListener('drop', drop);
-    };
-}
-
-interface Book {
-    lists: NoteList[];
-    notes: Note[];
-    openList: string;
-}
-
-function emptyBook(): Book {
-    const list = { id: newId(), name: 'General' };
-    return { lists: [list], notes: [], openList: list.id };
-}
-
-/** A book filled from rows of the mock, in their order from the top. */
-function bookOf(rows: [string, string, number, number | null][]): Book {
-    const now = Date.now();
-    const lists: NoteList[] = [];
-    const notes: Note[] = rows.map(([listName, text, age, doneAge], index) => {
-        let list = lists.find((l) => l.name === listName);
-        if (!list) {
-            list = { id: newId(), name: listName };
-            lists.push(list);
-        }
-        return {
-            id: newId(),
-            list: list.id,
-            position: index,
-            text,
-            created: now - age,
-            edited: now - age,
-            done: doneAge === null ? null : now - doneAge,
-            images: (NOTE_IMAGES[text] ?? []).map(({ url, size, width, height }) => {
-                const id = newId();
-                IMAGE_URLS.set(id, url);
-                return { id, kind: 'png', width, height, bytes: size, marked: null };
-            }),
-        };
-    });
-    return { lists, notes, openList: lists[0].id };
-}
-
-/** The Inbox's one list, holding the notes of `INBOX_NOTES`. */
-function inboxBook(): Book {
-    return bookOf(INBOX_NOTES.map(([text, age]) => ['General', text, age, null]));
-}
-
-/** In `large`, a list long enough to need its cards virtualized. */
-function largeBook(): Book {
-    const rows: [string, string, number, number | null][] = Array.from({ length: 600 }, (_, n) => [
-        n % 5 === 0 ? 'Long' : 'General',
-        n % 7 === 0 ? `${n}: ${LONG_ANSWER}` : `Note ${n}: try the change on the large fixture`,
-        n * MINUTE,
-        n % 9 === 0 ? n * MINUTE : null,
-    ]);
-    return bookOf(rows);
-}
-
-/** The notes a book starts with in `scenario`. */
-function initialNotes(scenario: Scenario, book: string): Book {
-    if (book === INBOX_BOOK) {
-        return scenario === 'review' || scenario === 'clean' ? inboxBook() : emptyBook();
-    }
-    if (book === TOPIC_PROJECT.id) return bookOf(TOPIC_NOTES);
-    if (!hasScenarioData(scenario, book)) return emptyBook();
-    return isLarge(scenario, book) ? largeBook() : bookOf(REVIEW_NOTES);
-}
+import { type FixtureCapturePort, fixtureCapture } from './capture.fixture';
+import {
+    addedNote,
+    type Book,
+    listOf,
+    noteOf,
+    putList,
+    removeList,
+    replace,
+    snapshot,
+    takeList,
+    takeOut,
+    targetList,
+} from './note-books.fixture';
+import { fixtureNoteImages, onBrowserImageDrop } from './note-images.fixture';
+import { initialNotes } from './notes.fixture-data';
+import type { FixtureProjects } from './projects';
+import { failure, newId, type Scenario } from './scenario';
 
 /** The notes port, and what the other fixtures read of it. */
 export type FixtureNotes = NotesPort & {
@@ -254,22 +38,22 @@ export type FixtureNotes = NotesPort & {
 
 /**
  * Notes in memory, as the backend keeps them (`src-tauri/crates/core/src/modules/notes/store/`):
- * each book starts with the scenario's notes (the scenario's project with the mock's notes, the
- * Inbox with a few in `review` and `clean`, the project without folder with its topic's, any other
- * book with none). As the backend, a book is the Inbox or a project in the list, not its
- * repository: a moved one's notes stay.
+ * each book starts with the scenario's notes (`initialNotes`). As the backend, a book is the Inbox
+ * or a project in the list, not its repository: a moved one's notes stay. `onTaken` opens the
+ * capture window on an area taken.
  */
 export function fixtureNotes(
     scenario: Scenario,
     projects: FixtureProjects,
     onTaken: (width: number, height: number) => void,
 ): FixtureNotes {
+    const images = fixtureNoteImages();
     const books = new Map<string, Book>();
     const book = (key: string): Book => {
         if (key !== INBOX_BOOK) projects.project(key);
         let found = books.get(key);
         if (!found) {
-            found = initialNotes(scenario, key);
+            found = initialNotes(scenario, key, images);
             books.set(key, found);
         }
         return found;
@@ -279,99 +63,16 @@ export function fixtureNotes(
         if (key === INBOX_BOOK) throw failure('unknown');
         return book(key);
     };
-    const snapshot = (b: Book): ProjectNotes => ({
-        lists: b.lists.map((l) => ({ ...l })),
-        notes: b.notes.map((n) => ({ ...n })),
-        openList: b.openList,
-    });
-    const note = (b: Book, id: string) => {
-        const found = b.notes.find((n) => n.id === id);
-        if (!found) throw failure('note_missing');
-        return found;
-    };
-    const list = (b: Book, id: string) => {
-        const found = b.lists.find((l) => l.id === id);
-        if (!found) throw failure('note_list_missing');
-        return found;
-    };
-    /** Puts a note in, in place of the one with its id if any. */
-    const replace = (b: Book, put: Note) => {
-        b.notes = [...b.notes.filter((n) => n.id !== put.id), { ...put }];
-    };
-    const takeOut = (b: Book, id: string) => {
-        b.notes = b.notes.filter((n) => n.id !== id);
-    };
-    /** Takes a list out; when it was open, the first left opens. */
-    const removeList = (b: Book, id: string) => {
-        b.lists = b.lists.filter((l) => l.id !== id);
-        if (b.openList === id) b.openList = b.lists[0].id;
-    };
-    /** The list a moved note goes to, made when asked for. */
-    const targetList = (b: Book, target: ListTarget) => {
-        if (target.kind === 'open') return b.openList;
-        if (target.kind === 'list') return list(b, target.id).id;
-        const added = { id: newId(), name: target.name.trim() };
-        b.lists.push(added);
-        return added.id;
-    };
-    /** Takes a book's list out with its notes; the last list stays. */
-    const takeList = (b: Book, id: string): DeletedList => {
-        const gone = list(b, id);
-        const index = b.lists.indexOf(gone);
-        if (b.lists.length === 1) throw failure('unknown');
-        removeList(b, id);
-        const notes = b.notes.filter((n) => n.list === id);
-        b.notes = b.notes.filter((n) => n.list !== id);
-        return { list: gone, index, notes };
-    };
-    const putList = (b: Book, deleted: DeletedList) => {
-        b.lists.splice(Math.min(deleted.index, b.lists.length), 0, { ...deleted.list });
-        for (const back of deleted.notes) replace(b, back);
-        b.openList = deleted.list.id;
-    };
-    /** As the backend's `add_images`: a format every webview shows, its size measured. */
+    /** As the backend's `add_images`: the image read, in the note given or a new one. */
     const addImage: NotesPort['addImage'] = async (key, target: ImageTarget, bytes) => {
         const b = book(key);
-        const kind = kindOf(bytes);
-        if (!kind) throw failure('image_unsupported');
-        const blob = new Blob([bytes], { type: `image/${kind}` });
-        const bitmap = await createImageBitmap(blob).catch(() => {
-            throw failure('image_unsupported');
-        });
-        const id = newId();
-        IMAGE_URLS.set(id, URL.createObjectURL(blob));
-        const image: NoteImage = {
-            id,
-            kind,
-            width: bitmap.width,
-            height: bitmap.height,
-            bytes: bytes.length,
-            marked: null,
-        };
-        bitmap.close();
-        const now = Date.now();
-        let found: Note;
-        if (target.kind === 'note') {
-            found = note(b, target.id);
-        } else {
-            list(b, target.list);
-            found = {
-                id: newId(),
-                list: target.list,
-                position: positionAt(openNotes(b.notes, target.list), '', 0),
-                text: '',
-                created: now,
-                edited: now,
-                done: null,
-                images: [],
-            };
-            b.notes.push(found);
-        }
+        const image = await images.read(bytes);
+        const found = target.kind === 'note' ? noteOf(b, target.id) : addedNote(b, target.list, '');
         found.images = [...found.images, image];
-        found.edited = now;
+        found.edited = Date.now();
         return { ...found };
     };
-    const port: FixtureNotes = {
+    const port: Omit<FixtureNotes, keyof FixtureCapturePort> = {
         /** The notes as they are, for the palette's search. */
         peek: (key) => snapshot(book(key)),
         /** A project removed takes its notes, as the backend's `remove_project`. */
@@ -379,26 +80,10 @@ export function fixtureNotes(
             books.delete(key);
         },
         getNotes: async (key) => snapshot(book(key)),
-        addNote: async (key, listId, text) => {
-            const b = book(key);
-            list(b, listId);
-            const now = Date.now();
-            const added: Note = {
-                id: newId(),
-                list: listId,
-                position: positionAt(openNotes(b.notes, listId), '', 0),
-                text,
-                created: now,
-                edited: now,
-                done: null,
-                images: [],
-            };
-            b.notes.push(added);
-            return { ...added };
-        },
+        addNote: async (key, listId, text) => ({ ...addedNote(book(key), listId, text) }),
         // as the backend, without renumbering: positions here never run out of room
         setNoteText: async (key, id, text) => {
-            const found = note(book(key), id);
+            const found = noteOf(book(key), id);
             if (found.text !== text) {
                 found.text = text;
                 found.edited = Date.now();
@@ -406,27 +91,27 @@ export function fixtureNotes(
             return { ...found };
         },
         setNoteDone: async (key, id, done) => {
-            const found = note(projectBook(key), id);
+            const found = noteOf(projectBook(key), id);
             if ((found.done !== null) !== done) found.done = done ? Date.now() : null;
             return { ...found };
         },
         placeNote: async (key, id, listId, index) => {
             const b = projectBook(key);
-            list(b, listId);
-            const moved = note(b, id);
+            listOf(b, listId);
+            const moved = noteOf(b, id);
             moved.position = positionAt(openNotes(b.notes, listId), id, index);
             moved.list = listId;
             return [{ ...moved }];
         },
         restoreNote: async (key, restored) => {
             const b = book(key);
-            list(b, restored.list);
+            listOf(b, restored.list);
             replace(b, restored);
             return { ...restored };
         },
         deleteNote: async (key, id) => {
             const b = book(key);
-            note(b, id);
+            noteOf(b, id);
             takeOut(b, id);
         },
         moveNote: async (from, id, key, target) => {
@@ -434,7 +119,7 @@ export function fixtureNotes(
             if (inbox && target.kind !== 'open') throw failure('unknown');
             const source = book(from);
             const dest = book(key);
-            const moved = note(source, id);
+            const moved = noteOf(source, id);
             const listId = targetList(dest, target);
             const placed: Note = {
                 ...moved,
@@ -448,7 +133,7 @@ export function fixtureNotes(
         },
         unmoveNote: async (at, original, home) => {
             const back = book(home);
-            list(back, original.list);
+            listOf(back, original.list);
             takeOut(book(at), original.id);
             replace(back, original);
             return { ...original };
@@ -493,7 +178,7 @@ export function fixtureNotes(
             return { ...added };
         },
         renameList: async (key, id, name) => {
-            const found = list(projectBook(key), id);
+            const found = listOf(projectBook(key), id);
             found.name = name.trim();
             return { ...found };
         },
@@ -516,13 +201,13 @@ export function fixtureNotes(
         },
         openList: async (key, id) => {
             const b = projectBook(key);
-            list(b, id);
+            listOf(b, id);
             b.openList = id;
         },
         addImage,
         // as the backend's `mark_image`: the drawn PNG under a new id, the image as given kept
         markImage: async (key, id, image, marks, drawn) => {
-            const found = note(book(key), id);
+            const found = noteOf(book(key), id);
             const index = found.images.findIndex((i) => i.id === image);
             if (index < 0) throw failure('unknown');
             const current = found.images[index];
@@ -533,14 +218,9 @@ export function fixtureNotes(
                 replacement = given;
             } else {
                 if (!drawn) throw failure('unknown');
-                const newImage = newId();
-                IMAGE_URLS.set(
-                    newImage,
-                    URL.createObjectURL(new Blob([drawn], { type: 'image/png' })),
-                );
                 replacement = {
                     ...current,
-                    id: newImage,
+                    id: images.drawn(drawn),
                     kind: 'png',
                     bytes: drawn.length,
                     marked: { source, marks },
@@ -551,14 +231,14 @@ export function fixtureNotes(
             return { ...found };
         },
         removeImage: async (key, id, image) => {
-            const found = note(book(key), id);
+            const found = noteOf(book(key), id);
             found.images = found.images.filter((i) => i.id !== image);
             found.edited = Date.now();
             return { ...found };
         },
         // as the backend's `copy_text`, the images where a Mac would keep them
         copyNote: async (key, id) => {
-            const found = note(book(key), id);
+            const found = noteOf(book(key), id);
             if (found.images.length === 0) return found.text;
             const paths = found.images
                 .map(
@@ -569,69 +249,10 @@ export function fixtureNotes(
             const text = found.text.trimEnd();
             return text === '' ? paths : `${text}\n\n${paths}`;
         },
-        imagePng: async (_key, image) => (await fetch(IMAGE_URLS.get(image.id) ?? '')).blob(),
-        imageUrl: (_key, image) => IMAGE_URLS.get(image.id) ?? '',
+        imagePng: async (_key, image) => (await fetch(images.url(image.id))).blob(),
+        imageUrl: (_key, image) => images.url(image.id),
         onImageDrop: (listener) => onBrowserImageDrop(addImage, listener),
-        // a capture picks the hero image a moment later, as if an area had been dragged; the
-        // capture window opens on it, as the backend opens it
-        canCapture: async () => true,
-        startCapture: async (into) => {
-            const area = await fetch(REPOSITORY_IMAGES['public/hero.png'].url);
-            const bytes = new Uint8Array(await area.arrayBuffer());
-            const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
-            const { width, height } = bitmap;
-            bitmap.close();
-            const crop = newId();
-            CROPS.set(crop, bytes);
-            setTimeout(() => {
-                for (const listener of captureListeners) {
-                    listener({ kind: 'taken', crop, width, height, into });
-                }
-                onTaken(width, height);
-            }, 300);
-        },
-        onCapture: (listener) => {
-            captureListeners.add(listener);
-            return () => captureListeners.delete(listener);
-        },
-        // as the backend's `write_capture`, step by step: the note with its first crop, the
-        // others after it, the marks, the text
-        writeCapture: async ({ book: key, target, text, images }) => {
-            let found = target.kind === 'note' ? note(book(key), target.id) : null;
-            for (const image of images) {
-                const before = found?.images.length ?? 0;
-                if (image.kind === 'crop') {
-                    const bytes = CROPS.get(image.crop);
-                    if (!bytes) throw failure('unknown');
-                    found = await addImage(
-                        key,
-                        found ? { kind: 'note', id: found.id } : target,
-                        bytes,
-                    );
-                }
-                const id = image.kind === 'crop' ? found?.images[before]?.id : image.id;
-                if (found && id && (image.marks.length > 0 || image.kind === 'image')) {
-                    found = await port.markImage(key, found.id, id, image.marks, image.drawn);
-                }
-            }
-            if (!found) throw failure('unknown');
-            if (text !== null) found = await port.setNoteText(key, found.id, text);
-            for (const image of images) if (image.kind === 'crop') CROPS.delete(image.crop);
-            return found;
-        },
-        dropCrops: async (crops) => {
-            for (const crop of crops) CROPS.delete(crop);
-        },
-        cropPng: async (crop) =>
-            new Blob([CROPS.get(crop) ?? new Uint8Array()], { type: 'image/png' }),
-        cropUrl: () => REPOSITORY_IMAGES['public/hero.png'].url,
-        openCaptureSettings: async () => undefined,
     };
-    return port;
+    const capture = fixtureCapture({ ...port, note: (key, id) => noteOf(book(key), id) }, onTaken);
+    return { ...port, ...capture };
 }
-
-/** The crops a draft holds, by id: the hero image's bytes. */
-const CROPS = new Map<string, Uint8Array<ArrayBuffer>>();
-
-/** Who follows the fixture's captures. */
-const captureListeners = new Set<(event: CaptureEvent) => void>();

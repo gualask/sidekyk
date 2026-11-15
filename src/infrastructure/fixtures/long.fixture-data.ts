@@ -53,13 +53,12 @@ function hunkText(
     return [`@@ -${range(oldStart, oldCount)} +${range(newStart, newCount)} @@`, ...body];
 }
 
-/**
- * The diff of `old` with `changes` (in order, apart), as `git diff -U3` writes it, and the whole
- * file as one hunk, as the backend answers a `wholeFile` request.
- */
-function longFile(path: string, old: readonly string[], changes: readonly Change[]): LongFile {
-    // the new file's lines, each marked as git would, and where each change starts in them
-    const marked: { sign: ' ' | '-' | '+'; text: string }[] = [];
+/** A line of the new file, marked as git marks it: unchanged, removed or added. */
+type MarkedLine = { sign: ' ' | '-' | '+'; text: string };
+
+/** The lines of `old` with `changes` made, in order, each marked as git would. */
+function markedLines(old: readonly string[], changes: readonly Change[]): MarkedLine[] {
+    const marked: MarkedLine[] = [];
     let at = 0;
     for (const change of changes) {
         for (; at < change.at; at++) marked.push({ sign: ' ', text: old[at] });
@@ -67,8 +66,14 @@ function longFile(path: string, old: readonly string[], changes: readonly Change
         for (const text of change.add) marked.push({ sign: '+', text });
     }
     for (; at < old.length; at++) marked.push({ sign: ' ', text: old[at] });
+    return marked;
+}
 
-    // hunks: the changed lines with their context, merged where the contexts touch
+/**
+ * The hunks of the marked lines, as their first and last index: the changed lines with their
+ * context, merged where the contexts touch.
+ */
+function hunkSpans(marked: readonly MarkedLine[]): [number, number][] {
     const changed = marked.flatMap((line, index) => (line.sign === ' ' ? [] : [index]));
     const spans: [number, number][] = [];
     for (const index of changed) {
@@ -78,40 +83,36 @@ function longFile(path: string, old: readonly string[], changes: readonly Change
         if (span && first <= span[1] + 1) span[1] = last;
         else spans.push([first, last]);
     }
+    return spans;
+}
+
+/** The text of the hunk of the marked lines from `first` to `last`: its header, then its lines. */
+function hunkLines(marked: readonly MarkedLine[], [first, last]: [number, number]): string[] {
+    const before = marked.slice(0, first);
+    const lines = marked.slice(first, last + 1);
+    return hunkText(
+        before.filter((l) => l.sign !== '+').length + 1,
+        lines.filter((l) => l.sign !== '+').length,
+        before.filter((l) => l.sign !== '-').length + 1,
+        lines.filter((l) => l.sign !== '-').length,
+        lines.map((l) => `${l.sign}${l.text}`),
+    );
+}
+
+/**
+ * The diff of `old` with `changes` (in order, apart), as `git diff -U3` writes it, and the whole
+ * file as one hunk, as the backend answers a `wholeFile` request.
+ */
+function longFile(path: string, old: readonly string[], changes: readonly Change[]): LongFile {
+    const marked = markedLines(old, changes);
     const head = [
         `diff --git a/${path} b/${path}`,
         'index 4e1f0a2..8c3d9b7 100644',
         `--- a/${path}`,
         `+++ b/${path}`,
     ];
-    const body: string[] = [];
-    for (const [first, last] of spans) {
-        const before = marked.slice(0, first);
-        const lines = marked.slice(first, last + 1);
-        const oldStart = before.filter((l) => l.sign !== '+').length + 1;
-        const newStart = before.filter((l) => l.sign !== '-').length + 1;
-        body.push(
-            ...hunkText(
-                oldStart,
-                lines.filter((l) => l.sign !== '+').length,
-                newStart,
-                lines.filter((l) => l.sign !== '-').length,
-                lines.map((l) => `${l.sign}${l.text}`),
-            ),
-        );
-    }
-    const oldCount = marked.filter((l) => l.sign !== '+').length;
-    const newCount = marked.filter((l) => l.sign !== '-').length;
-    const whole = [
-        ...head,
-        ...hunkText(
-            1,
-            oldCount,
-            1,
-            newCount,
-            marked.map((l) => `${l.sign}${l.text}`),
-        ),
-    ];
+    const body = hunkSpans(marked).flatMap((span) => hunkLines(marked, span));
+    const whole = [...head, ...hunkLines(marked, [0, marked.length - 1])];
     return {
         diff: { text: `${[...head, ...body].join('\n')}\n`, truncated: false },
         whole: { text: `${whole.join('\n')}\n`, truncated: false },

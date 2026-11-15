@@ -75,13 +75,17 @@ in-memory ports. UI changes are checked there, light and dark.
   `fixture_previews`, their diagrams the backend's renderer's in both themes, written to
   `diagrams.json` by `fixture_diagrams`. Each fails while its file is out of date
   (`SIDEKYK_UPDATE_FIXTURES=1 cargo test --manifest-path src-tauri/Cargo.toml -p sidekyk-core
-  fixture_` writes both again; not a second parser or renderer in TypeScript). New
-  project picks the scenario's repository and a folder without git in turn.
+  fixture_` writes both again; not a second parser or renderer in TypeScript). The folder
+  picker answers in turn: in New project, a parent of 4 repositories, a repository no project
+  follows, the scenario's repository (already a project), a folder without git; adding a folder,
+  a repository no project follows, another project's folder (to merge), the parent of
+  repositories (refused when one of the project's folders is inside it).
 - `&open=<name>` starts as `sidekyk <folder>`. In the console: `sidekykDev.openFolder('<name>')`
   (the project, else one made), `gitInit('<name>')` and `gitRemove('<name>')` (told as the
   watcher would), `stopDistro('<name>')` (`wsl --shutdown`; the next read starts it),
   `writeFile('<name>', '<path>', '<text>')` (an agent writing a file, told as the watcher would;
-  without a text, its later version in `fixture-files/edits/`, whose preview is generated too).
+  without a text, its later version in `fixture-files/edits/`, whose preview is generated too),
+  `quickNote()` (the quick note's global shortcut: opens it, or closes it when open).
 
 ## Timing tests
 

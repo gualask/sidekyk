@@ -48,8 +48,10 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
   backend's), `settings`. Each panel module one lazy chunk. Inside a module, a folder groups what
   one owner uses; a file two of them use stays in the folder above.
 - `infrastructure/`: the two implementations of `RuntimePorts` (`runtime-ports.ts`), `tauri/` (the
-  backend) and `fixtures/` (in memory, for the browser), a file per port in each; `app/` picks one, `DevModePage.tsx` the fixtures in a chunk
-  loaded only in dev builds. `shared/`: tokens, primitives, session state (`useSessionState`),
+  backend) and `fixtures/` (in memory, for the browser), a file per port in each but the fixtures'
+  window ports, in one (`window.ts`: the compact window's state is also the quick note's and the
+  capture's), the scenarios' data in `*.fixture-data.ts`; `app/` picks one, `DevModePage.tsx` the
+  fixtures in a chunk loaded only in dev builds. `shared/`: tokens, primitives, session state (`useSessionState`),
   keys, errors, i18n, the panel contract, the project type.
 - Rules (`pnpm boundaries:check`): `app` composes and owns no workflow state; `modules` never import
   `app`, `infrastructure` or another module; outside a module only its `index.ts`;

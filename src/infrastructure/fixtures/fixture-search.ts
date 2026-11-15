@@ -1,5 +1,5 @@
 import { doneNotes, INBOX_BOOK, noteTitle, openNotes, type ProjectNotes } from '@/modules/notes';
-import type { ChangedFile } from '@/modules/repository';
+import { type ChangedFile, changeMarkOf } from '@/modules/repository';
 import type {
     ContentEnd,
     ContentFile,
@@ -59,12 +59,7 @@ function marksByPath(changed: readonly ChangedFile[]): Map<string, ChangeMark> {
     const strength: ChangeMark[] = ['deleted', 'added', 'modified'];
     const marks = new Map<string, ChangeMark>();
     for (const file of changed) {
-        const mark: ChangeMark =
-            file.kind === 'deleted'
-                ? 'deleted'
-                : ['untracked', 'added', 'renamed', 'copied'].includes(file.kind)
-                  ? 'added'
-                  : 'modified';
+        const mark = changeMarkOf(file.kind);
         const before = marks.get(file.path);
         if (!before || strength.indexOf(mark) > strength.indexOf(before))
             marks.set(file.path, mark);
@@ -191,16 +186,28 @@ function searchNotes(book: string, query: string, notes: ProjectNotes, results: 
             continue;
         }
         const [at, until] = inText[0];
-        const start = Math.max(0, at - 24);
-        const before = (start > 0 ? '…' : '') + note.text.slice(start, at).replace(/\s+/g, ' ');
-        const text = `${before}${note.text.slice(at, until)}${note.text
-            .slice(until, until + 48)
-            .replace(/\s+/g, ' ')}…`;
-        const highlights: Highlight[] = [[before.length, before.length + until - at]];
-        found.push({ ...base, highlights: [], snippet: { text, highlights } });
+        found.push({ ...base, highlights: [], snippet: snippetAround(note.text, at, until) });
     }
     // best first, equal ones in their order (a stable sort)
     results.notes.push(...found.sort((a, b) => b.score - a.score));
+}
+
+/**
+ * The part of a note around a word found at `at` until `until`, on one line: some text before it
+ * and more after, cut with `…`, the word highlighted.
+ */
+function snippetAround(
+    text: string,
+    at: number,
+    until: number,
+): { text: string; highlights: Highlight[] } {
+    const start = Math.max(0, at - 24);
+    const before = (start > 0 ? '…' : '') + text.slice(start, at).replace(/\s+/g, ' ');
+    const after = text.slice(until, until + 48).replace(/\s+/g, ' ');
+    return {
+        text: `${before}${text.slice(at, until)}${after}…`,
+        highlights: [[before.length, before.length + until - at]],
+    };
 }
 
 /** As the backend's `MAX_LINES`. */
@@ -220,24 +227,32 @@ export function fixtureContentSearch(
     const literal = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = new RegExp(literal, /\p{Lu}/u.test(query) ? 'gu' : 'giu');
     const files: ContentFile[] = [];
-    let lines = 0;
+    let room = CONTENT_LINE_LIMIT;
     for (const path of paths) {
         const text = read(path);
         if (text === null) continue;
-        const found: ContentFile = { path, lines: [] };
-        for (const [index, line] of text.split('\n').entries()) {
-            const highlights = [...line.matchAll(pattern)].map(
-                (match): Highlight => [match.index, match.index + match[0].length],
-            );
-            if (highlights.length === 0) continue;
-            if (lines === CONTENT_LINE_LIMIT) {
-                if (found.lines.length > 0) files.push(found);
-                return { files, end: { more: true, cancelled: false } };
-            }
-            lines += 1;
-            found.lines.push({ number: index + 1, text: line, highlights });
-        }
-        if (found.lines.length > 0) files.push(found);
+        const { lines, more } = matchingLines(text, pattern, room);
+        if (lines.length > 0) files.push({ path, lines });
+        if (more) return { files, end: { more: true, cancelled: false } };
+        room -= lines.length;
     }
     return { files, end: { more: false, cancelled: false } };
+}
+
+/** The lines of a text the pattern matches, at most `room`; `more` when a line past them does too. */
+function matchingLines(
+    text: string,
+    pattern: RegExp,
+    room: number,
+): { lines: ContentFile['lines']; more: boolean } {
+    const lines: ContentFile['lines'] = [];
+    for (const [index, line] of text.split('\n').entries()) {
+        const highlights = [...line.matchAll(pattern)].map(
+            (match): Highlight => [match.index, match.index + match[0].length],
+        );
+        if (highlights.length === 0) continue;
+        if (lines.length === room) return { lines, more: true };
+        lines.push({ number: index + 1, text: line, highlights });
+    }
+    return { lines, more: false };
 }

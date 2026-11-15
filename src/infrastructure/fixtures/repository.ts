@@ -1,11 +1,9 @@
 import type {
-    ChangedFile,
     FileContent,
     FolderKind,
     RepositoryChangedEvent,
     RepositoryPort,
 } from '@/modules/repository';
-import { projectFolder } from '@/shared/projects/project-info';
 import {
     allCommits,
     commitActivity,
@@ -14,52 +12,16 @@ import {
     fixtureBranches,
     recentCommits,
 } from './commits.fixture-data';
-import {
-    FRESH_VAULT_PATHS,
-    fixtureFileContent,
-    fixtureFolderTree,
-    fixtureTree,
-} from './files.fixture-data';
-import {
-    editedText,
-    FIXTURE_BLOBS,
-    fixtureDiagram,
-    fixturePreview,
-    REPOSITORY_IMAGES,
-    VAULT_IMAGES,
-} from './fixture-files';
-import { largeDiff, largeSnapshot } from './large.fixture-data';
-import {
-    CLEAN_PROJECTS,
-    DOCUMENT_ROOTS,
-    type FixtureProjects,
-    GONE_PROJECT,
-    MISSING_PROJECT,
-    NO_GIT_PROJECT,
-} from './projects';
-import { fixtureIgnoringWhitespace, reviewDiff, reviewSnapshot } from './review.fixture-data';
-import { failure, hasScenarioData, isLarge, type Scenario } from './scenario';
+import { FRESH_VAULT_PATHS, fixtureFileContent } from './files.fixture-data';
+import { editedText, FIXTURE_BLOBS, fixtureDiagram, fixturePreview } from './fixture-files';
+import { type FixtureFolders, fixtureFolders } from './folders.fixture';
+import { largeDiff } from './large.fixture-data';
+import type { FixtureProjects } from './projects';
+import { CLEAN_PROJECTS } from './projects.fixture-data';
+import { fixtureIgnoringWhitespace, reviewDiff } from './review.fixture-data';
+import { failure, type Scenario } from './scenario';
 import { type FixtureTexts, fixtureColors, fixtureVersionText } from './syntax.fixture';
 import { wholeFileDiff } from './whole-file.fixture';
-
-/** How long Sidekyk's helper takes to start in a distro, as the first read of a WSL project waits. */
-const HELPER_START_MS = 1500;
-
-type FixtureTree = ReturnType<typeof fixtureTree>;
-
-/** What the search reads of a folder, as the backend's palette and content search do. */
-export interface FixtureFolders {
-    /** `distro_stopped` unless the folder's distro runs, as `readable_without_starting`. */
-    readableWithoutStarting: (folderId: string) => void;
-    tree: (folderId: string) => FixtureTree;
-    /**
-     * The files of the tree the palette searches, as the last snapshot found them changed: none
-     * when they cannot be read.
-     */
-    searched: (
-        folderId: string | null,
-    ) => { paths: readonly string[]; changed: readonly ChangedFile[] } | null;
-}
 
 /** The repository port, and what stands in for git, a distro and an agent in a folder. */
 export interface FixtureRepository {
@@ -77,85 +39,20 @@ export function fixtureRepository(
     scenario: Scenario,
     projects: FixtureProjects,
 ): FixtureRepository {
-    const { folder, shownOf } = projects;
-    const scenarioData = (folderId: string) => hasScenarioData(scenario, folderId);
-    const large = (folderId: string) => isLarge(scenario, folderId);
-    const rootOf = (folderId: string) => folder(folderId).root;
-    // what is a folder without git, by its root: `gitInit` and `gitRemove` change it
-    const plainRoots = new Set(DOCUMENT_ROOTS);
-    const kindOf = (folderId: string): FolderKind =>
-        plainRoots.has(rootOf(folderId)) ? 'plain' : 'repository';
-    // the folder is there, no git asked
-    const present = (folderId: string) => {
-        // missing where it was, not where Locate… finds it
-        if (rootOf(folderId) === projectFolder(MISSING_PROJECT)?.root) {
-            throw failure('repository_missing');
-        }
-        if (folderId === GONE_PROJECT.id) throw failure('distro_missing');
-    };
-    // a repository git can read: the frontend never asks a folder without git
-    const readable = (folderId: string) => {
-        present(folderId);
-        if (folderId === NO_GIT_PROJECT.id) throw failure('git_not_found');
-        if (kindOf(folderId) === 'plain') throw failure('unknown');
-    };
-    // as the backend: the kind and the summary never start a distro, the Start panel does; a
-    // distro running gets its helper started by the first read
-    const running = new Set(['Ubuntu', 'Alpine']);
-    const helpers = new Set<string>();
-    const distroOf = (folderId: string) => {
-        const found = folder(folderId);
-        return found.kind === 'wsl' ? found.distro : null;
-    };
-    const readableWithoutStarting = (folderId: string) => {
-        const distro = distroOf(folderId);
-        if (distro && !helpers.has(distro) && !running.has(distro)) {
-            throw failure('distro_stopped');
-        }
-    };
-    // the helper takes a while the first time, the distro started with it
-    const startHelper = async (folderId: string) => {
-        const distro = distroOf(folderId);
-        if (distro && !helpers.has(distro)) {
-            await new Promise((started) => setTimeout(started, HELPER_START_MS));
-            helpers.add(distro);
-            running.add(distro);
-        }
-    };
-    const snapshot = (folderId: string) => {
-        readable(folderId);
-        if (large(folderId)) return largeSnapshot();
-        return reviewSnapshot(!scenarioData(folderId));
-    };
-
-    // a folder without git holds the Vault's images, the repository its own
-    const imagesOf = (folderId: string) =>
-        DOCUMENT_ROOTS.includes(rootOf(folderId)) ? VAULT_IMAGES : REPOSITORY_IMAGES;
-
-    // as the backend, the tree is built once and kept: the fixtures never change on disk
-    const trees = new Map<string, FixtureTree>();
-    const tree = (folderId: string) => {
-        present(folderId);
-        let found = trees.get(folderId);
-        if (!found) {
-            found = DOCUMENT_ROOTS.includes(rootOf(folderId))
-                ? fixtureFolderTree()
-                : fixtureTree(large(folderId), snapshot(folderId).files);
-            trees.set(folderId, found);
-        }
-        return found;
-    };
-
-    const searched = (folderId: string | null) => {
-        if (!folderId) return null;
-        try {
-            readableWithoutStarting(folderId);
-            const changed = kindOf(folderId) === 'plain' ? [] : snapshot(folderId).files;
-            return { paths: tree(folderId).files, changed };
-        } catch {
-            return null;
-        }
-    };
+    const { shownOf } = projects;
+    const folders = fixtureFolders(scenario, projects);
+    const {
+        scenarioData,
+        large,
+        kindOf,
+        present,
+        readable,
+        readableWithoutStarting,
+        startHelper,
+        snapshot,
+        tree,
+        imagesOf,
+    } = folders;
 
     // the versions a diff compares, from the diffs and files served below
     const texts = (folderId: string): FixtureTexts => ({
@@ -222,8 +119,7 @@ export function fixtureRepository(
     const setKind = (name: string, kind: FolderKind) => {
         const shown = shownOf(name);
         if (!shown) throw new Error(`No project ${name} with a folder`);
-        if (kind === 'plain') plainRoots.add(shown.root);
-        else plainRoots.delete(shown.root);
+        folders.setKind(shown.id, kind);
         const event: RepositoryChangedEvent = {
             version: 5,
             folderId: shown.id,
@@ -236,10 +132,7 @@ export function fixtureRepository(
 
     const stopDistro = (name: string) => {
         const shown = shownOf(name);
-        const distro = shown ? distroOf(shown.id) : null;
-        if (!distro) return;
-        running.delete(distro);
-        helpers.delete(distro);
+        if (shown) folders.stopDistro(shown.id);
     };
 
     const port: RepositoryPort = {
@@ -367,7 +260,7 @@ export function fixtureRepository(
     };
     return {
         port,
-        folders: { readableWithoutStarting, tree, searched },
+        folders,
         setKind,
         stopDistro,
         writeFile,

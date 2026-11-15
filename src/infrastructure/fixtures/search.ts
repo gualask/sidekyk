@@ -7,9 +7,9 @@ import {
     fixtureRankNames,
     fixtureSearch,
 } from './fixture-search';
+import type { FixtureFolders } from './folders.fixture';
 import type { FixtureNotes } from './notes';
 import type { FixtureProjects } from './projects';
-import type { FixtureFolders } from './repository';
 
 /** As the backend's `SUGGESTED_FILE_LIMIT`: the files a note's `@` gets at most. */
 const SUGGESTED_FILE_LIMIT = 20;
