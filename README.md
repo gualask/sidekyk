@@ -15,7 +15,7 @@ instant when you bring it up, close to idle when it sits in the background.
   refreshed when files or refs change on disk; recent commits; a scrollbar that maps the changes;
   `n`/`p` from change to change across files.
 - Copy on click: a line, a hunk or a selection goes to the clipboard through your template
-  (`path:lines` plus a `diff` block by default), ready to paste to Codex, Claude Code or any other
+  (`path:lines`, then the text, by default), ready to paste to Codex, Claude Code or any other
   agent.
 - Files: the project's tree, changes colored, any file viewed.
 - One palette: `⌘K` by name (projects, panels, files, notes), `⌘F` in the files' contents.

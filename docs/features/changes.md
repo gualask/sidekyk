@@ -10,7 +10,8 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   and cut. Full file: the diff with full context, cut into git's three-line hunks (20 ms on a
   13,291-line file).
 - Copy with a click (line, hunk, selection) through the user's `{row}`/`{text}` template (default
-  `path:lines` and a `diff` block).
+  `{row}\n{text}`: `path:lines`, then the text as copied, no formatting that could break where it
+  is pasted).
 - Scrollbar as a map: a mark per hunk where its changed lines are, in the gutter's
   colors, under a translucent thumb as VS Code's. A mark has 12 px of click room at least
   (overlapping ones join), a click on the track centers there; the map widens under the pointer
