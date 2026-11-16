@@ -11,6 +11,7 @@ use anyhow::Context;
 use super::linux_helper::LinuxMachine;
 use crate::infrastructure::hide_console;
 use crate::infrastructure::process;
+use crate::modules::projects::same_distro;
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// Listing the distros starts none.
@@ -36,7 +37,7 @@ pub(super) enum DistroState {
 /// another language words otherwise. Starts no distro. A listing that fails is an error, never
 /// `Missing`: that one offers to remove the project.
 pub(super) fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
-    let named = |names: Vec<String>| names.iter().any(|n| n.eq_ignore_ascii_case(distro));
+    let named = |names: Vec<String>| names.iter().any(|name| same_distro(name, distro));
     // none running makes `wsl.exe` fail too: not running, then
     if named(distros(&["--list", "--running", "--quiet"]).unwrap_or_default()) {
         return Ok(DistroState::Running);
@@ -52,20 +53,26 @@ pub(super) fn distro_state(distro: &str) -> anyhow::Result<DistroState> {
 pub(super) fn installed_distro(distro: &str) -> anyhow::Result<String> {
     distros(&["--list", "--quiet"])?
         .into_iter()
-        .find(|name| name.eq_ignore_ascii_case(distro))
+        .find(|name| same_distro(name, distro))
         .ok_or_else(|| user_facing(UserFacingErrorCode::DistroMissing))
 }
 
-/// The distros `wsl.exe` lists; it fails when there are none, as when it cannot answer.
-fn distros(args: &[&str]) -> anyhow::Result<Vec<String>> {
+/// `wsl.exe`, its output piped and in UTF-8 (UTF-16 otherwise; one older than `WSL_UTF8` still
+/// writes UTF-16), with no console window.
+fn wsl_exe() -> Command {
     let mut command = Command::new("wsl.exe");
     command
-        .args(args)
-        // UTF-16 otherwise; a `wsl.exe` older than the variable still writes UTF-16
         .env("WSL_UTF8", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     hide_console(&mut command);
+    command
+}
+
+/// The distros `wsl.exe` lists; it fails when there are none, as when it cannot answer.
+fn distros(args: &[&str]) -> anyhow::Result<Vec<String>> {
+    let mut command = wsl_exe();
+    command.args(args);
     let output = process::run(&mut command, None, MAX_OUTPUT, LIST_TIMEOUT)
         .context("could not list the WSL distros")?;
     anyhow::ensure!(
@@ -108,22 +115,16 @@ impl LinuxMachine for Distro {
     /// `wsl.exe` running `program` in the distro, from its user's home: `env` finds a path
     /// relative to the home.
     fn command(&self, program: &str) -> Command {
-        let mut command = Command::new("wsl.exe");
-        command
-            .args([
-                "--distribution",
-                &self.0,
-                "--cd",
-                "~",
-                "--exec",
-                "env",
-                program,
-            ])
-            // `wsl.exe`'s own messages (a distro unknown) in UTF-8, not UTF-16
-            .env("WSL_UTF8", "1")
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
-        hide_console(&mut command);
+        let mut command = wsl_exe();
+        command.args([
+            "--distribution",
+            &self.0,
+            "--cd",
+            "~",
+            "--exec",
+            "env",
+            program,
+        ]);
         command
     }
 

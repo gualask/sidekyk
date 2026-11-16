@@ -83,6 +83,11 @@ pub fn same_distro(a: &str, b: &str) -> bool {
     a.eq_ignore_ascii_case(b)
 }
 
+/// A WSL distro's name as a key, by the rule of `same_distro`: two names of one distro, one key.
+pub fn distro_key(name: &str) -> String {
+    name.to_ascii_lowercase()
+}
+
 /// A path of this machine in parts, its letters folded when the file system ignores case.
 pub(super) fn local_parts(path: &Path, case: NameCase) -> Vec<String> {
     path.components()

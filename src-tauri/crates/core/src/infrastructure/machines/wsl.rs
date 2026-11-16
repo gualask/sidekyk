@@ -12,7 +12,7 @@ use super::linux_helper::LinuxHelper;
 use super::wsl_exe::{distro_state, installed_distro, plain_windows_path, Distro, DistroState};
 use crate::app::machines::{Machine, MachineReader};
 use crate::infrastructure::agent::AgentRepositories;
-use crate::modules::projects::{same_distro, FoundFolder, Location, ProjectList};
+use crate::modules::projects::{distro_key, same_distro, FoundFolder, Location, ProjectList};
 use crate::modules::reader::Repositories;
 use crate::shared::error::{user_facing, UserFacingError, UserFacingErrorCode};
 use crate::shared::sync::lock;
@@ -53,14 +53,14 @@ fn missing_or(distro: &str, error: anyhow::Error) -> anyhow::Error {
 /// The repositories of WSL distros: one helper per distro, started on first need there.
 pub struct WslRepositories {
     helper: Arc<LinuxHelper>,
-    /// By the distro's name in lower case: WSL's names ignore case.
+    /// By the distro's key (`distro_key`): WSL's names ignore case.
     distros: Mutex<HashMap<String, Arc<AgentRepositories>>>,
     /// The window is hidden: a distro asked for meanwhile is told, as the others were.
     hidden: AtomicBool,
-    /// Each distro's state as last listed, by its name in lower case, for `STATE_KEPT`.
+    /// Each distro's state as last listed, by its key, for `STATE_KEPT`.
     states: Mutex<HashMap<String, (Instant, DistroState)>>,
-    /// How each distro names a folder of Windows (its helper's `wslpath`), by the distro's name in
-    /// lower case and the folder: asked once a session, not once per file.
+    /// How each distro names a folder of Windows (its helper's `wslpath`), by the distro's key and
+    /// the folder: asked once a session, not once per file.
     linux_folders: Mutex<HashMap<(String, PathBuf), String>>,
 }
 
@@ -78,7 +78,7 @@ impl WslRepositories {
 
     /// What reads `distro`'s repositories. Starts nothing until asked something.
     fn of(&self, distro: &str) -> Arc<AgentRepositories> {
-        let key = distro.to_ascii_lowercase();
+        let key = distro_key(distro);
         let mut distros = lock(&self.distros);
         if let Some(repositories) = distros.get(&key) {
             return repositories.clone();
@@ -115,7 +115,7 @@ impl WslRepositories {
 
     /// `distro_state`, listed once for the rows of one distro shown together.
     fn state(&self, distro: &str) -> anyhow::Result<DistroState> {
-        let key = distro.to_ascii_lowercase();
+        let key = distro_key(distro);
         if let Some((at, state)) = lock(&self.states).get(&key) {
             if at.elapsed() < STATE_KEPT {
                 return Ok(*state);
@@ -195,7 +195,7 @@ impl Machine for WslRepositories {
         let (Some(folder), Some(name)) = (path.parent(), path.file_name()) else {
             return linux_path(path);
         };
-        let key = (distro.to_ascii_lowercase(), folder.to_path_buf());
+        let key = (distro_key(distro), folder.to_path_buf());
         let known = lock(&self.linux_folders).get(&key).cloned();
         let linux_folder = match known {
             Some(linux_folder) => linux_folder,

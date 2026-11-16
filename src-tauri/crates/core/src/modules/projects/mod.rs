@@ -13,5 +13,5 @@ pub use contracts::{
     FolderChange, FolderChoice, Location, Opened, Project, ProjectFolder, ProjectList,
     ProjectsChangedEvent, TilesLayout, PROJECTS_CHANGED_EVENT,
 };
-pub use place::{same_distro, FoundFolder, NameCase};
+pub use place::{distro_key, same_distro, FoundFolder, NameCase};
 pub use stored::leave_out_made_on_reading;

@@ -180,13 +180,29 @@ impl From<WireError> for anyhow::Error {
     }
 }
 
-pub fn write_frame(out: &mut impl Write, message: &impl Serialize) -> io::Result<()> {
-    let body = serde_json::to_vec(message)?;
-    let length = u32::try_from(body.len())
+/// The length written before `frame`: a u32 LE, at most `MAX_FRAME_BYTES`.
+fn length_of(frame: &[u8]) -> io::Result<[u8; 4]> {
+    u32::try_from(frame.len())
         .ok()
         .filter(|&length| length as usize <= MAX_FRAME_BYTES)
-        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "frame too long"))?;
-    out.write_all(&length.to_le_bytes())?;
+        .map(u32::to_le_bytes)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "frame too long"))
+}
+
+/// The frame after its `length`, as read: past `MAX_FRAME_BYTES` the stream is broken.
+fn read_body(input: &mut impl Read, length: [u8; 4]) -> io::Result<Vec<u8>> {
+    let length = u32::from_le_bytes(length) as usize;
+    if length > MAX_FRAME_BYTES {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "frame too long"));
+    }
+    let mut body = vec![0u8; length];
+    input.read_exact(&mut body)?;
+    Ok(body)
+}
+
+pub fn write_frame(out: &mut impl Write, message: &impl Serialize) -> io::Result<()> {
+    let body = serde_json::to_vec(message)?;
+    out.write_all(&length_of(&body)?)?;
     out.write_all(&body)?;
     out.flush()
 }
@@ -196,19 +212,9 @@ pub fn write_frame(out: &mut impl Write, message: &impl Serialize) -> io::Result
 pub fn write_bytes(out: &mut impl Write, message: &impl Serialize, bytes: &[u8]) -> io::Result<()> {
     let body = serde_json::to_vec(message)?;
     let frames = [body.as_slice(), bytes];
-    let lengths = frames.map(|frame| {
-        u32::try_from(frame.len())
-            .ok()
-            .filter(|&length| length as usize <= MAX_FRAME_BYTES)
-    });
-    let [Some(first), Some(second)] = lengths else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "frame too long",
-        ));
-    };
-    for (length, frame) in [first, second].into_iter().zip(frames) {
-        out.write_all(&length.to_le_bytes())?;
+    let lengths = [length_of(frames[0])?, length_of(frames[1])?];
+    for (length, frame) in lengths.into_iter().zip(frames) {
+        out.write_all(&length)?;
         out.write_all(frame)?;
     }
     out.flush()
@@ -218,13 +224,7 @@ pub fn write_bytes(out: &mut impl Write, message: &impl Serialize, bytes: &[u8])
 pub fn read_bytes(input: &mut impl Read) -> io::Result<Vec<u8>> {
     let mut length = [0u8; 4];
     input.read_exact(&mut length)?;
-    let length = u32::from_le_bytes(length) as usize;
-    if length > MAX_FRAME_BYTES {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "frame too long"));
-    }
-    let mut bytes = vec![0u8; length];
-    input.read_exact(&mut bytes)?;
-    Ok(bytes)
+    read_body(input, length)
 }
 
 /// The next frame, or `None` when the stream ended between two frames.
@@ -241,12 +241,7 @@ pub fn read_frame<T: DeserializeOwned>(input: &mut impl Read) -> io::Result<Opti
     }
     // a stream that ends inside a frame, its length included, is cut
     input.read_exact(&mut length[1..])?;
-    let length = u32::from_le_bytes(length) as usize;
-    if length > MAX_FRAME_BYTES {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "frame too long"));
-    }
-    let mut body = vec![0u8; length];
-    input.read_exact(&mut body)?;
+    let body = read_body(input, length)?;
     Ok(Some(serde_json::from_slice(&body)?))
 }
 
