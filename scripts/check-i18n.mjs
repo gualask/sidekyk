@@ -9,17 +9,12 @@ import path from 'node:path';
 import process from 'node:process';
 import { parseSync } from 'vite';
 import { PLACEHOLDER } from '../src/shared/i18n/placeholder.ts';
+import { filesUnder, relativePath, ROOT_DIR, SOURCE_DIR } from './source-files.mjs';
 
-const ROOT_DIR = process.cwd();
 const MESSAGES_DIR = path.join(ROOT_DIR, 'src/shared/i18n/messages');
-const SOURCE_DIR = path.join(ROOT_DIR, 'src');
 const BASE_LOCALE = 'en';
 const SOURCE_EXTENSIONS = new Set(['.ts', '.tsx']);
 const TRANSLATE_CALLS = new Set(['t', 'tp']);
-
-function relativePath(filePath) {
-    return path.relative(ROOT_DIR, filePath).split(path.sep).join('/');
-}
 
 async function readCatalogs() {
     const entries = await fs.readdir(MESSAGES_DIR, { withFileTypes: true });
@@ -37,22 +32,13 @@ function placeholders(message) {
 }
 
 /** Source files the app runs: tests and fixtures may name keys without keeping them alive. */
-async function collectSourceFiles(directory) {
-    const entries = await fs.readdir(directory, { withFileTypes: true });
-    const files = [];
-    for (const entry of entries) {
-        const entryPath = path.join(directory, entry.name);
-        if (entry.isDirectory() && relativePath(entryPath) !== 'src/infrastructure/fixtures') {
-            files.push(...(await collectSourceFiles(entryPath)));
-        } else if (
-            !entry.isDirectory() &&
-            SOURCE_EXTENSIONS.has(path.extname(entry.name)) &&
-            !/\.test\.tsx?$/.test(entry.name)
-        ) {
-            files.push(entryPath);
-        }
-    }
-    return files;
+/** The app's sources under `src`: neither the tests nor the fixtures. */
+function collectSourceFiles(directory) {
+    return filesUnder(directory, {
+        enter: (relative) => relative !== 'src/infrastructure/fixtures',
+        keep: (relative) =>
+            SOURCE_EXTENSIONS.has(path.extname(relative)) && !/\.test\.tsx?$/.test(relative),
+    });
 }
 
 function isTranslateCall(node) {

@@ -3,9 +3,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { filesUnder, relativePath, SOURCE_DIR } from './source-files.mjs';
 
-const ROOT_DIR = process.cwd();
-const SOURCE_DIR = path.join(ROOT_DIR, 'src');
 const SOURCE_EXTENSIONS = new Set(['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts']);
 const IGNORED_DIRS = new Set(['.git', 'dist', 'node_modules', 'target']);
 const IMPORT_PATTERN = /\b(?:from\s*|import\s*\(?\s*|require\s*\(\s*)['"]([^'"]+)['"]/g;
@@ -17,29 +16,12 @@ const DEV_MODE_PAGE = 'src/app/DevModePage.tsx';
 const LOCATION_VARIANT = /\.kind\s*[!=]==\s*'(?:local|wsl)'|\.distro\b/g;
 const LOCATION_READERS = ['src/shared/projects/', 'src/infrastructure/fixtures/'];
 
-function relativePath(filePath) {
-    return path.relative(ROOT_DIR, filePath).split(path.sep).join('/');
-}
-
-async function collectSourceFiles(directory) {
-    const entries = await fs.readdir(directory, { withFileTypes: true });
-    const files = [];
-
-    for (const entry of entries) {
-        if (IGNORED_DIRS.has(entry.name)) continue;
-
-        const entryPath = path.join(directory, entry.name);
-        if (entry.isDirectory()) {
-            files.push(...(await collectSourceFiles(entryPath)));
-            continue;
-        }
-
-        if (entry.isFile() && SOURCE_EXTENSIONS.has(path.extname(entry.name))) {
-            files.push(entryPath);
-        }
-    }
-
-    return files;
+/** Every source file under `src`. */
+function collectSourceFiles(directory) {
+    return filesUnder(directory, {
+        enter: (relative) => !IGNORED_DIRS.has(path.basename(relative)),
+        keep: (relative) => SOURCE_EXTENSIONS.has(path.extname(relative)),
+    });
 }
 
 function sourceLayer(file) {

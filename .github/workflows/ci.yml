@@ -26,6 +26,7 @@ jobs:
       - run: pnpm test
       - run: pnpm knip
       - run: pnpm boundaries:check
+      - run: pnpm i18n:check
 
   # debug builds read the frontend from devUrl, so these need no `pnpm build`
   rust:

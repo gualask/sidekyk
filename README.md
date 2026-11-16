@@ -4,13 +4,15 @@ A small desktop companion for reviewing what changed in a local git working tree
 agent works in your terminal. Keep it in the background; bring it up when you want to look at the
 changes, then copy a hunk and paste it back to the agent.
 
-Sidekyk is read-only. It never stages, commits or edits files. It is built to be fast and light:
-instant when you bring it up, close to idle when it sits in the background.
+Sidekyk only reads your repositories, but for a branch switch you ask for: it never stages,
+commits or edits files. It is built to be fast and light: instant when you bring it up, close to
+idle when it sits in the background.
 
 ## Features
 
-- Several repositories as projects: switch from the rail, see them all as cards (branch, changes,
-  waiting notes), zoom from all projects to a project's panels to one panel full screen.
+- Several repositories as projects: see them all as cards (branch, changes, waiting notes), zoom
+  from all projects to a project's panels to one panel full screen, `[` and `]` to the one before
+  or after.
 - Changes: files grouped as changes, new files and staged; diff or full file, syntax colored,
   refreshed when files or refs change on disk; recent commits; a scrollbar that maps the changes;
   `n`/`p` from change to change across files.
@@ -20,8 +22,7 @@ instant when you bring it up, close to idle when it sits in the background.
 - Files: the project's tree, changes colored, any file viewed.
 - One palette: `⌘K` by name (projects, panels, files, notes), `⌘F` in the files' contents.
 - Notes per project, as cards in lists; export to Markdown.
-- In the background: tray icon with the change count, a global shortcut to show or hide, no work
-  while hidden.
+- In the background: a tray icon, a global shortcut to show or hide, no work while hidden.
 
 ## Docs
 
@@ -45,8 +46,8 @@ pnpm install
 pnpm tauri:dev
 ```
 
-The app adds and opens the repository of the folder given as its first argument, else it opens the
-project it showed last.
+The app adds and opens the repository of the folder given as its first argument; else it starts
+at all projects, the one it showed last selected.
 
 ## Logs
 
