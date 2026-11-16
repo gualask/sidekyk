@@ -134,6 +134,7 @@ export default function MarkdownPreview({
                                 className="absolute top-0 left-0 w-full px-8"
                                 style={{ transform: `translateY(${item.start}px)` }}
                             >
+                                {/* the diagrams' labels take this size: `FONT_SIZE` in the backend's `diagram/colors.rs` */}
                                 <div className="mx-auto max-w-[860px] pb-4 text-[14.5px] leading-[1.65] text-ui-text">
                                     <Block block={blocks[item.index]} />
                                 </div>

@@ -19,9 +19,7 @@ const FONT_SIZE: f64 = 14.5;
 /// Mermaid's site configuration for a diagram in these colors. A diagram's own `%%{init}%%`,
 /// `style` and `classDef` still win: the author chose them.
 pub(super) fn theme_config(colors: &DiagramColors) -> anyhow::Result<Value> {
-    let background = parse(&colors.background)
-        .with_context(|| format!("background color {:?}", colors.background))?
-        .over(Rgb::WHITE);
+    let background = opaque("background", &colors.background, Rgb::WHITE)?;
     anyhow::ensure!(!colors.series.is_empty(), "no series colors");
     let palette = Palette::new(colors, background)?;
     let mut map = named_variables(&palette);
@@ -38,6 +36,14 @@ pub(super) fn theme_config(colors: &DiagramColors) -> anyhow::Result<Value> {
         "architecture": { "fontSize": FONT_SIZE },
         "themeVariables": map,
     }))
+}
+
+/// `value`, the token of `name`, laid over `background`; one that does not read is named in the
+/// error.
+fn opaque(name: &str, value: &str, background: Rgb) -> anyhow::Result<Rgb> {
+    Ok(parse(value)
+        .with_context(|| format!("{name} color {value:?}"))?
+        .over(background))
 }
 
 /// The app's colors, each opaque over the background, as hex.
@@ -59,13 +65,10 @@ struct Palette {
 }
 
 impl Palette {
-    /// Each of `colors` laid over `background`; one that does not read is named in the error.
+    /// Each of `colors` laid over `background` (`opaque`).
     fn new(colors: &DiagramColors, background: Rgb) -> anyhow::Result<Self> {
-        let color = |name: &str, value: &str| -> anyhow::Result<String> {
-            Ok(parse(value)
-                .with_context(|| format!("{name} color {value:?}"))?
-                .over(background)
-                .hex())
+        let color = |name: &str, value: &str| {
+            Ok::<_, anyhow::Error>(opaque(name, value, background)?.hex())
         };
         Ok(Self {
             bg: background.hex(),
@@ -173,10 +176,7 @@ fn insert_series(
     palette: &Palette,
 ) -> anyhow::Result<()> {
     for index in 0..12 {
-        let value = &series[index % series.len()];
-        let color = parse(value)
-            .with_context(|| format!("series color {value:?}"))?
-            .over(background);
+        let color = opaque("series", &series[index % series.len()], background)?;
         let label = if color.is_light() {
             &palette.on_light
         } else {

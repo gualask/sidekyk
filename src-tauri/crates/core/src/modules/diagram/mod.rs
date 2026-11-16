@@ -123,21 +123,25 @@ fn push_body_with_font(out: &mut String, body: &str, font: &str) {
     }
 }
 
+/// Where an attribute of a tag, written `name="value"`, is: the space before it, and its value's
+/// start and end.
+fn attribute_at(tag: &str, name: &str) -> Option<(usize, usize, usize)> {
+    let start = tag.find(&format!(" {name}=\""))?;
+    let value_start = start + name.len() + 3;
+    let value_end = value_start + tag[value_start..].find('"')?;
+    Some((start, value_start, value_end))
+}
+
 /// The value of an attribute of a tag, written `name="value"`.
 fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
-    let start = tag.find(&format!(" {name}=\""))? + name.len() + 3;
-    let length = tag[start..].find('"')?;
-    Some(&tag[start..start + length])
+    let (_, start, end) = attribute_at(tag, name)?;
+    Some(&tag[start..end])
 }
 
 /// A tag without one of its attributes, written `name="value"`; as it is without it.
 fn without_attribute(tag: &str, name: &str) -> String {
-    let Some(start) = tag.find(&format!(" {name}=\"")) else {
-        return tag.to_string();
-    };
-    let value_start = start + name.len() + 3;
-    match tag[value_start..].find('"') {
-        Some(length) => format!("{}{}", &tag[..start], &tag[value_start + length + 1..]),
+    match attribute_at(tag, name) {
+        Some((start, _, end)) => format!("{}{}", &tag[..start], &tag[end + 1..]),
         None => tag.to_string(),
     }
 }
