@@ -4,12 +4,13 @@ export {
     useGlobalShortcutStatus,
     useSettingsWhenRead,
 } from './application/settings.queries';
+export { SHORTCUT_ACTIONS, SHORTCUT_SETTING } from './model/global-shortcuts';
 export type {
     GlobalShortcutStatuses,
     Settings,
 } from './model/settings.types';
 export { DEFAULT_VIEW_SETTINGS } from './model/settings-defaults';
-export { SHORTCUT_ACTIONS, SHORTCUT_SETTING, shortcutProblem } from './model/shortcut-problem';
+export { shortcutProblem } from './model/shortcut-problem';
 
 /** The settings dialog, loaded once the window is idle after the first paint, or on first use. */
 export const loadSettingsDialog = () => import('./ui/SettingsDialog');

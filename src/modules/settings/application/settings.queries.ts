@@ -43,11 +43,11 @@ export function useGlobalShortcutStatus() {
 }
 
 /**
- * Changes a setting at once on screen; the backend applies and stores it. Changes run one at a
- * time, in the user's order, so the last one clicked is the one that stays. A failure puts the
- * settings back as the backend has them.
+ * Sends the settings to the backend, which applies and stores them. Changes run one at a time, in
+ * the user's order, so the last one clicked is the one that stays. A failure puts the settings
+ * back as the backend has them.
  */
-export function useUpdateSettings() {
+function useUpdateSettings() {
     const port = useSettingsPort();
     const queryClient = useQueryClient();
     return useMutation({
@@ -88,15 +88,28 @@ export function useShortcutRecording() {
     );
 }
 
+/** A change of the settings: the next ones, from the current. */
+type SettingsChange = (settings: Settings) => Settings;
+
+/** A change the backend refused: the settings it tried, and why. */
+export interface FailedChange {
+    settings: Settings;
+    error: unknown;
+}
+
 /**
  * Changes the settings from what is on screen now, not from what a render saw: two changes in a
  * row (two `⌥Z`, a drag ending as another lands) each keep the other's. Shown at once, then sent.
+ * `failed`: the last change, when the backend refused it, until the next one starts.
  */
-export function useChangeSettings() {
+export function useChangeSettings(): {
+    change: (change: SettingsChange) => void;
+    failed: FailedChange | null;
+} {
     const queryClient = useQueryClient();
-    const { mutate } = useUpdateSettings();
-    return useCallback(
-        (change: (settings: Settings) => Settings) => {
+    const { mutate, isError, variables, error } = useUpdateSettings();
+    const change = useCallback(
+        (change: SettingsChange) => {
             const current = queryClient.getQueryData<Settings>(settingsKey);
             if (!current) return;
             const next = change(current);
@@ -105,4 +118,5 @@ export function useChangeSettings() {
         },
         [queryClient, mutate],
     );
+    return { change, failed: isError && variables ? { settings: variables, error } : null };
 }

@@ -1,9 +1,10 @@
 import { Tooltip } from '@base-ui/react/tooltip';
-import { IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
+import { IconInfoCircle } from '@tabler/icons-react';
 import { useEffect, useEffectEvent, useId, useRef, useState } from 'react';
 import { DEFAULT_COPY_TEMPLATE, isCopyTemplate } from '@/shared/copy/copy-template';
 import { RichText, useTranslation } from '@/shared/i18n';
-import { useSettings, useUpdateSettings } from '../application/settings.queries';
+import { useChangeSettings, useSettings } from '../application/settings.queries';
+import { SettingWarning } from './Setting';
 
 /** A pause in typing after which the template is stored. */
 const SAVE_AFTER_MS = 400;
@@ -59,13 +60,13 @@ export function CopyTemplateSetting() {
  * holds a placeholder and differs from the one stored.
  */
 function useTemplateDraft() {
-    const settings = useSettings().data;
-    const update = useUpdateSettings();
-    const [draft, setDraft] = useState(settings.copyTemplate);
+    const stored = useSettings().data.copyTemplate;
+    const { change } = useChangeSettings();
+    const [draft, setDraft] = useState(stored);
 
     const save = useEffectEvent((template: string) => {
-        if (isCopyTemplate(template) && template !== settings.copyTemplate) {
-            update.mutate({ ...settings, copyTemplate: template });
+        if (isCopyTemplate(template) && template !== stored) {
+            change((settings) => ({ ...settings, copyTemplate: template }));
         }
     });
     // stored once typing pauses
@@ -91,16 +92,9 @@ const PLACEHOLDERS = {
 function MissingPlaceholder({ id }: { id: string }) {
     const { t } = useTranslation();
     return (
-        <p
-            id={id}
-            role="alert"
-            className="mt-2 flex items-start gap-1.5 text-xs text-ui-warning-soft-text"
-        >
-            <IconAlertTriangle size={14} className="mt-px shrink-0 text-ui-warning" />
-            <span>
-                <RichText text={t('copyTemplate.missing')} parts={PLACEHOLDERS} />
-            </span>
-        </p>
+        <SettingWarning id={id}>
+            <RichText text={t('copyTemplate.missing')} parts={PLACEHOLDERS} />
+        </SettingWarning>
     );
 }
 

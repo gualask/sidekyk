@@ -1,17 +1,8 @@
 import { errorMessage, hasErrorCode } from '@/shared/errors/app-error';
 import type { Translator } from '@/shared/i18n';
 import { keysLabel } from '@/shared/platform/keys';
-import type { GlobalShortcutStatuses, Settings, ShortcutAction } from './settings.types';
-
-/** Every global shortcut, the window's first: the settings' rows and the top bar's problems. */
-export const SHORTCUT_ACTIONS: readonly ShortcutAction[] = ['toggle', 'capture', 'note'];
-
-/** The setting each shortcut is stored in. */
-export const SHORTCUT_SETTING = {
-    toggle: 'globalShortcut',
-    capture: 'captureShortcut',
-    note: 'noteShortcut',
-} as const satisfies Record<ShortcutAction, keyof Settings>;
+import { SHORTCUT_ACTIONS } from './global-shortcuts';
+import type { GlobalShortcutStatuses, ShortcutAction } from './settings.types';
 
 /** A shortcut that does not work, by what it does. */
 const OFF = {
@@ -58,11 +49,6 @@ function inUseMessage(
     return holder ? i18n.t(IN_USE_BY[holder], shown) : i18n.t('shortcut.inUse', shown);
 }
 
-/** Why a shortcut registered may still not reach Sidekyk. */
-function conflictMessage(keys: string, mac: boolean, i18n: Translator): string {
-    return i18n.t('shortcut.conflict', { keys: keysLabel(keys, mac) });
-}
-
 /** What is wrong with a global shortcut, for the top bar's problems; null when nothing is. */
 export function shortcutProblem(
     action: ShortcutAction,
@@ -81,9 +67,10 @@ export function shortcutProblem(
         };
     }
     if (status?.kind === 'active' && status.conflict) {
+        // registered, but macOS may get the keys first
         return {
             title: i18n.t(MAY_NOT_WORK[action]),
-            detail: conflictMessage(status.keys, mac, i18n),
+            detail: i18n.t('shortcut.conflict', { keys: keysLabel(status.keys, mac) }),
         };
     }
     return null;

@@ -82,7 +82,7 @@ export function AppProviders({
  */
 function TranslationBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
-    const change = useChangeSettings();
+    const { change } = useChangeSettings();
     const locale = settings?.language ?? detectLocale(navigator.languages);
     const translator = useMemo(
         () => createTranslator(locale, formatTag(locale, navigator.languages)),
@@ -109,7 +109,7 @@ function TranslationBridge({ children }: { children: ReactNode }) {
  */
 function RepositorySettingsBridge({ children }: { children: ReactNode }) {
     const settings = useSettingsWhenRead();
-    const change = useChangeSettings();
+    const { change } = useChangeSettings();
     const value = useMemo(
         () => ({
             diffView: settings?.diffView ?? null,
@@ -129,7 +129,7 @@ function RepositorySettingsBridge({ children }: { children: ReactNode }) {
 /** How Notes shows long lines, from the settings, and how it switches them (`⌥Z`). */
 function NotesSettingsBridge({ children }: { children: ReactNode }) {
     const lines = useSettingsWhenRead()?.noteLines ?? DEFAULT_VIEW_SETTINGS.noteLines;
-    const change = useChangeSettings();
+    const { change } = useChangeSettings();
     const value = useMemo(
         () => ({
             lines,
@@ -158,7 +158,7 @@ const NO_WIDTHS: Readonly<Record<string, number>> = {};
  */
 function SidebarWidthsBridge({ children }: { children: ReactNode }) {
     const widths = useSettingsWhenRead()?.sidebarWidths ?? NO_WIDTHS;
-    const change = useChangeSettings();
+    const { change } = useChangeSettings();
     const value = useMemo(
         () => ({
             widths,

@@ -1,11 +1,11 @@
 import {
+    DEFAULT_VIEW_SETTINGS,
     type GlobalShortcutStatuses,
     type Settings,
     type SettingsPort,
     SHORTCUT_ACTIONS,
     SHORTCUT_SETTING,
 } from '@/modules/settings';
-import { DEFAULT_COPY_TEMPLATE } from '@/shared/copy/copy-template';
 import { failure, type Scenario } from './scenario';
 
 /** Shortcuts macOS keeps on by default: registered, but macOS gets them first. */
@@ -29,13 +29,8 @@ export function fixtureSettings(scenario: Scenario): SettingsPort {
         captureShortcut: { enabled: true, keys: STORED_CAPTURE_SHORTCUT },
         noteShortcut: { enabled: true, keys: STORED_NOTE_SHORTCUT },
         diffView: 'changes',
-        fileView: 'preview',
-        diffScrollbar: 'narrow',
-        codeLines: 'scroll',
-        copyTemplate: DEFAULT_COPY_TEMPLATE,
         sidebarWidths: {},
-        commitsPlace: 'sidebar',
-        noteLines: 'wrap',
+        ...DEFAULT_VIEW_SETTINGS,
     };
     // in `problems`, another app holds the stored shortcut since startup
     const taken = scenario === 'problems' ? [...TAKEN_SHORTCUTS, STORED_SHORTCUT] : TAKEN_SHORTCUTS;

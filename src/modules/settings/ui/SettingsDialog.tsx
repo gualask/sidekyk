@@ -12,8 +12,9 @@ import { type Locale, type MessageKey, useTranslation } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 import { keysLabel, withKeys } from '@/shared/platform/keys';
 import { KeyHint } from '@/shared/ui/KeyCaps';
-import { useSettings, useUpdateSettings } from '../application/settings.queries';
-import type { Theme } from '../model/settings.types';
+import { useChangeSettings, useSettings } from '../application/settings.queries';
+import { SHORTCUT_ACTIONS } from '../model/global-shortcuts';
+import type { Settings, Theme } from '../model/settings.types';
 import { AboutSetting } from './AboutSetting';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
@@ -68,7 +69,12 @@ export function SettingsDialog({
     onOpenChange: (open: boolean) => void;
 }) {
     const settings = useSettings().data;
-    const update = useUpdateSettings();
+    const { change, failed } = useChangeSettings();
+    // a choice's change, made to the settings as they are then
+    const set =
+        <K extends keyof Settings>(key: K) =>
+        (value: Settings[K]) =>
+            change((current) => ({ ...current, [key]: value }));
     const current = useRef<HTMLElement>(null);
     const i18n = useTranslation();
     const { t } = i18n;
@@ -95,9 +101,9 @@ export function SettingsDialog({
                             <IconX size={16} />
                         </Dialog.Close>
                     </div>
-                    {update.isError ? (
+                    {failed ? (
                         <p role="alert" className="px-4 pt-3 text-ui-danger">
-                            {errorMessage(update.error, i18n)}
+                            {errorMessage(failed.error, i18n)}
                         </p>
                     ) : null}
                     <Section title={t('settings.appearance')}>
@@ -107,14 +113,14 @@ export function SettingsDialog({
                             options={translated(THEMES)}
                             value={settings.theme}
                             current={current}
-                            onChange={(theme) => update.mutate({ ...settings, theme })}
+                            onChange={set('theme')}
                         />
                         <ChoiceSetting
                             label={t('settings.language.label')}
                             description={t('settings.language.description')}
                             options={LANGUAGES}
                             value={i18n.locale}
-                            onChange={(language) => update.mutate({ ...settings, language })}
+                            onChange={set('language')}
                         />
                     </Section>
                     <Section title={t('settings.diff')}>
@@ -123,23 +129,21 @@ export function SettingsDialog({
                             description={t('settings.diffView.description')}
                             options={translated(DIFF_VIEWS)}
                             value={settings.diffView}
-                            onChange={(diffView) => update.mutate({ ...settings, diffView })}
+                            onChange={set('diffView')}
                         />
                         <ChoiceSetting
                             label={t('settings.scrollbar.label')}
                             description={t('settings.scrollbar.description')}
                             options={translated(DIFF_SCROLLBARS)}
                             value={settings.diffScrollbar}
-                            onChange={(diffScrollbar) =>
-                                update.mutate({ ...settings, diffScrollbar })
-                            }
+                            onChange={set('diffScrollbar')}
                         />
                         <ChoiceSetting
                             label={t('settings.lines.label')}
                             description={t('settings.codeLines.description')}
                             options={translated(CODE_LINES)}
                             value={settings.codeLines}
-                            onChange={(codeLines) => update.mutate({ ...settings, codeLines })}
+                            onChange={set('codeLines')}
                         />
                         <CopyTemplateSetting />
                     </Section>
@@ -149,7 +153,7 @@ export function SettingsDialog({
                             description={t('settings.fileView.description')}
                             options={translated(FILE_VIEWS)}
                             value={settings.fileView}
-                            onChange={(fileView) => update.mutate({ ...settings, fileView })}
+                            onChange={set('fileView')}
                         />
                     </Section>
                     <Section title={t('panel.notes')}>
@@ -160,13 +164,13 @@ export function SettingsDialog({
                             })}
                             options={translated(NOTE_LINES)}
                             value={settings.noteLines}
-                            onChange={(noteLines) => update.mutate({ ...settings, noteLines })}
+                            onChange={set('noteLines')}
                         />
                     </Section>
                     <Section title={t('common.shortcuts')}>
-                        <GlobalShortcutSetting action="toggle" />
-                        <GlobalShortcutSetting action="capture" />
-                        <GlobalShortcutSetting action="note" />
+                        {SHORTCUT_ACTIONS.map((action) => (
+                            <GlobalShortcutSetting key={action} action={action} />
+                        ))}
                     </Section>
                     <Section title={t('settings.about')}>
                         <AboutSetting />
