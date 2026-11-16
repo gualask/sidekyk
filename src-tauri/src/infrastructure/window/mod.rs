@@ -1,8 +1,8 @@
 //! The main window as each system shows and hides it: macOS hides the whole app and brings the
 //! window back from the Dock, elsewhere the window alone hides. The window as a compact view: its
 //! opacity and its buttons, the app that was in front before it, the display under the pointer or
-//! a capture's. When the window shows,
-//! resizes and hides is the session's (`desktop/window.rs`, `desktop/compact_window.rs`).
+//! a capture's. When the window shows, resizes and hides is the session's (`desktop/window.rs`,
+//! `desktop/compact_window.rs`).
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -11,6 +11,14 @@ use tauri::{AppHandle, Manager, Monitor, RunEvent};
 
 #[cfg(target_os = "macos")]
 pub(crate) use macos::{activate, front_app, set_buttons_hidden, set_opacity, AppId};
+
+/// The main window's label (`tauri.conf.json`): the window the app shows, its views included.
+pub(crate) const MAIN_WINDOW: &str = "main";
+
+/// The main window, once created.
+pub(crate) fn main_window(app: &AppHandle) -> Option<tauri::WebviewWindow> {
+    app.get_webview_window(MAIN_WINDOW)
+}
 
 /// Whether the quick note is built on this system: its global shortcut and tray item.
 pub(crate) const QUICK_NOTE_BUILT: bool = cfg!(target_os = "macos");
@@ -54,7 +62,7 @@ pub(crate) fn hide(app: &AppHandle) {
 /// Elsewhere the window hides and the system brings the next one to the front.
 #[cfg(not(target_os = "macos"))]
 pub(crate) fn hide(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = main_window(app) {
         let _ = window.hide();
     }
 }
@@ -64,7 +72,7 @@ pub(crate) fn hide(app: &AppHandle) {
 pub(crate) fn bring_back(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     let _ = app.show();
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = main_window(app) {
         let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();

@@ -6,7 +6,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::infrastructure::tray::TrayLabels;
-use sidekyk_core::modules::notes::ExportWords;
+use sidekyk_core::modules::notes::{ExportWords, FIRST_LIST_NAME};
 use sidekyk_core::modules::settings::Language;
 
 pub(crate) struct Texts {
@@ -56,7 +56,7 @@ static ENGLISH: Texts = Texts {
         no_notes: "No notes.",
         done: "Done",
     },
-    first_list: "General",
+    first_list: FIRST_LIST_NAME,
 };
 
 static ITALIAN: Texts = Texts {

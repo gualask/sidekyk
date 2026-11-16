@@ -87,7 +87,7 @@ fn min_size(app: &AppHandle) -> Option<Size> {
         .app
         .windows
         .iter()
-        .find(|w| w.label == "main")?;
+        .find(|w| w.label == system::MAIN_WINDOW)?;
     let (width, height) = (config.min_width?, config.min_height?);
     Some(LogicalSize::new(width, height).into())
 }
@@ -113,17 +113,20 @@ fn centered(
 ) -> PhysicalPosition<i32> {
     let width = (size.width * scale).round() as i64;
     let height = (size.height * scale).round() as i64;
-    let x = i64::from(area.position.x) + (i64::from(area.size.width) - width) / 2;
     let y = i64::from(area.position.y) + (i64::from(area.size.height) - height) / 2;
-    PhysicalPosition::new(x as i32, y as i32)
+    PhysicalPosition::new(centered_x(area, width) as i32, y as i32)
+}
+
+/// Where a window `width` pixels wide starts, centered across `area`.
+fn centered_x(area: &PhysicalRect<i32, u32>, width: i64) -> i64 {
+    i64::from(area.position.x) + (i64::from(area.size.width) - width) / 2
 }
 
 /// Where the quick note goes: centered on its display, a quarter down.
 fn place(area: &PhysicalRect<i32, u32>, scale: f64) -> PhysicalPosition<i32> {
     let width = (WIDTH * scale).round() as i64;
-    let x = i64::from(area.position.x) + (i64::from(area.size.width) - width) / 2;
     let y = i64::from(area.position.y) + i64::from(area.size.height) / 4;
-    PhysicalPosition::new(x as i32, y as i32)
+    PhysicalPosition::new(centered_x(area, width) as i32, y as i32)
 }
 
 #[cfg(test)]

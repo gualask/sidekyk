@@ -27,8 +27,9 @@ use super::files::write_touched;
 use super::ports::NotesStorage;
 use crate::shared::sync::lock;
 
-/// The list a book starts with, until `name_first_lists` names it in the UI's language.
-const FIRST_LIST_NAME: &str = "General";
+/// The list a book starts with, until `name_first_lists` names it in the UI's language: the
+/// English one.
+pub const FIRST_LIST_NAME: &str = "General";
 /// The id of a book's first list: the same each time a book with nothing written is read, so the
 /// list the frontend was given is still there when it writes.
 const FIRST_LIST_ID: &str = "0000000000000000";

@@ -171,7 +171,7 @@ pub(crate) fn open_capture(app: &AppHandle, image: (u32, u32), display: u32) {
 
 /// Opens the view of `opening`, unless a view is open.
 fn open(app: &AppHandle, opening: Opening) {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = system::main_window(app) else {
         return;
     };
     // read before the lock: off the main thread a getter waits for it
@@ -222,7 +222,7 @@ fn before(window: &WebviewWindow) -> Before {
 
 /// Closes the view open, if any, and says whether one was.
 pub(crate) fn close(app: &AppHandle, then: Then) -> bool {
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = system::main_window(app) else {
         return false;
     };
     let state = app.state::<CompactWindow>();
@@ -292,7 +292,7 @@ pub(crate) fn shown(app: &AppHandle) {
             before, painted, ..
         },
         Some(window),
-    ) = (&mut *stage, app.get_webview_window("main"))
+    ) = (&mut *stage, system::main_window(app))
     {
         *painted = true;
         system::set_opacity(&window, 1.0);
@@ -311,7 +311,7 @@ pub(crate) fn restored(app: &AppHandle) {
         return;
     }
     *stage = Stage::Off;
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = system::main_window(app) {
         system::set_opacity(&window, 1.0);
     }
 }
@@ -321,7 +321,7 @@ pub(crate) fn restored(app: &AppHandle) {
 pub(crate) fn forget(app: &AppHandle) {
     let state = app.state::<CompactWindow>();
     let mut stage = lock(&state.0);
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = system::main_window(app) else {
         return;
     };
     match std::mem::take(&mut *stage) {
@@ -348,7 +348,7 @@ fn opaque_by_deadline(app: &AppHandle, since: Instant) {
             if matches!(*stage, Stage::Restoring(_)) {
                 *stage = Stage::Off;
             }
-            if let Some(window) = handle.get_webview_window("main") {
+            if let Some(window) = system::main_window(&handle) {
                 system::set_opacity(&window, 1.0);
             }
             tracing::warn!("the page did not paint in time: the window turned opaque anyway");

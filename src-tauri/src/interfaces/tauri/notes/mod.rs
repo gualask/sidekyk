@@ -1,5 +1,6 @@
-//! The notes' commands, their images' in `note_images.rs`, their lists' in `note_lists.rs`. Every
-//! command names a book: the Inbox, or a project of the list.
+//! The notes' commands, their images' in `images.rs`, their lists' in `lists.rs`, their images for
+//! the webview in `image_scheme.rs`. Every command names a book: the Inbox, or a project of the
+//! list.
 
 pub(crate) mod image_scheme;
 pub(crate) mod images;

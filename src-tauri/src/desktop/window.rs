@@ -125,7 +125,7 @@ pub(crate) fn toggle(app: &AppHandle) {
     if compact_window::on_show_request(app) {
         return;
     }
-    let Some(window) = app.get_webview_window("main") else {
+    let Some(window) = system::main_window(app) else {
         return;
     };
     let in_front = window.is_visible().unwrap_or(false)

@@ -70,14 +70,16 @@ pub(crate) async fn search_files(
 }
 
 #[tauri::command]
-/// Stops the search in contents going on: the palette closed.
+/// Stops the search in contents going on: one no longer wanted (the text changed, the palette went
+/// back to names or closed).
 pub(crate) fn stop_content_search(projects: tauri::State<'_, Projects>) {
     projects.stop_content_search();
 }
 
 #[tauri::command]
-/// The names that match `query`, best first, by their index: the Move dialog's projects and lists.
-/// A few names, ranked at once on the async runtime.
+/// The names that match `query`, best first, by their index, as the palette ranks projects: the
+/// pickers' (`docs/features/search.md`, `rank_names`). A few names, ranked at once on the async
+/// runtime.
 pub(crate) async fn rank_names(query: String, names: Vec<String>) -> Vec<usize> {
     let names: Vec<&str> = names.iter().map(String::as_str).collect();
     search::rank_names(&query, &names)

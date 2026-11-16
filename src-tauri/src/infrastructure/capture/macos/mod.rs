@@ -5,8 +5,8 @@
 //! frame, so a drag moves layers and repaints nothing (`.local/capture-overlay/`: on glass in
 //! 63-84 ms, ~10 MB). The panel is made for one capture and dropped after it; the area last taken
 //! on the same display, given by the caller, shows picked at the start. Here the display is read;
-//! the panel is `macos_panel.rs`, its view `macos_view.rs`, the view's layers `macos_layers.rs`,
-//! the area taken as a note's image `macos_image.rs`.
+//! the panel is `panel.rs`, its view `view.rs`, the view's layers `layers.rs`, the area taken as a
+//! note's image `image.rs`.
 
 mod image;
 mod layers;
