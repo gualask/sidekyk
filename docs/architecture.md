@@ -153,7 +153,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     session), the folder on screen and its watch, the window's visibility, a folder opened, a
     folder's reader by id (`FolderReader`). `notes.rs`: the list's books, a project removed or
     merged with its notes, a note's copy, the export (`ExportFiles` port). `palette.rs`: the
-    palette's search across projects, files and notes; the folders holding a file a note names.
+    palette's search across projects, files and notes. `note_references.rs`: the folders holding a
+    file a note names.
   - `infrastructure/`: `git_cli.rs` (the disk read in `worktree_files.rs`), `folder_walk.rs`
     (`ignore`), `process.rs` (a child within an output size and a time), `watcher.rs` (notify; its
     throttled reports in `watch_reports.rs`), `agent/`, `machines/` (`local.rs`, `wsl.rs`,

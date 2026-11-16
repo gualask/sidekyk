@@ -1,10 +1,10 @@
-//! The folders holding a file a note names (`app::palette::folders_holding`), read by git in
+//! The folders holding a file a note names (`app::note_references::folders_holding`), read by git in
 //! repositories on this machine.
 
 use std::sync::Arc;
 
 use sidekyk_core::app::machines::Machines;
-use sidekyk_core::app::palette::folders_holding;
+use sidekyk_core::app::note_references::folders_holding;
 use sidekyk_core::app::projects::{Projects, ProjectsStorage};
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::machines::local::LocalMachine;

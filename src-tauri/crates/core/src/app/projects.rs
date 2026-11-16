@@ -124,13 +124,10 @@ impl Projects {
     pub fn folder_choice(&self, path: &Path) -> anyhow::Result<FolderChoice> {
         let found = self.machines.folder_at(path)?;
         let inside = self.machines.repositories_inside(&found)?;
-        // given back to `create_project` as a string, as every path a client holds
-        let path = path
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("the folder's path is not Unicode"))?
-            .to_string();
         let case = self.machines.name_case();
-        Ok(self.list().folder_choice(path, found, inside, case))
+        Ok(self
+            .list()
+            .folder_choice(client_path(path)?, found, inside, case))
     }
 
     /// Puts on screen the project following `candidate`'s folder (inside a repository, the
@@ -142,7 +139,7 @@ impl Projects {
         let case = self.machines.name_case();
         if self.list().at(&found.location, case).is_none() {
             let inside = self.machines.repositories_inside(&found)?;
-            let path = candidate.to_string_lossy().into_owned();
+            let path = client_path(candidate)?;
             let choice = self.list().folder_choice(path, found.clone(), inside, case);
             if choice.holds_free_repositories() {
                 return Ok(Opened::Choice { choice });
@@ -235,6 +232,14 @@ impl Projects {
     pub fn stop_content_search(&self) {
         self.machines.stop_content_search();
     }
+}
+
+/// A folder's path as a client holds it, to give back as it is (`create_project`): one that is not
+/// Unicode would come back naming another folder, so it is refused.
+fn client_path(path: &Path) -> anyhow::Result<String> {
+    path.to_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("the folder's path is not Unicode"))
 }
 
 #[cfg(test)]

@@ -5,6 +5,7 @@
 #[cfg(test)]
 mod fake;
 pub mod machines;
+pub mod note_references;
 pub mod notes;
 pub mod palette;
 pub mod projects;
