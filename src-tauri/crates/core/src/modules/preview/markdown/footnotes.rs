@@ -1,12 +1,18 @@
 //! Footnotes: numbered by their first reference, gathered at the end.
 
 use super::super::contracts::{Block, Footnote, Inline};
+use super::nesting::footnote_key;
 use super::Reader;
+
+/// The number of the footnote first referred to at `index` (from 0): from 1.
+fn number(index: usize) -> u32 {
+    u32::try_from(index + 1).unwrap_or(u32::MAX)
+}
 
 impl<'a> Reader<'_, 'a> {
     /// A reference to a defined footnote, numbered by the first reference to each.
     pub(super) fn reference(&mut self, label: &str) -> Option<Inline> {
-        let label = label.to_lowercase();
+        let label = footnote_key(label);
         let index = match self.notes.iter().position(|(known, _)| *known == label) {
             Some(index) => index,
             None if self.definitions.contains_key(&label) => {
@@ -17,7 +23,7 @@ impl<'a> Reader<'_, 'a> {
         };
         self.notes[index].1 += 1;
         Some(Inline::FootnoteRef {
-            number: u32::try_from(index + 1).unwrap_or(u32::MAX),
+            number: number(index),
             nth: self.notes[index].1,
         })
     }
@@ -32,7 +38,7 @@ impl<'a> Reader<'_, 'a> {
                 .remove(label)
                 .expect("only defined footnotes are numbered");
             notes.push(Footnote {
-                number: u32::try_from(index + 1).unwrap_or(u32::MAX),
+                number: number(index),
                 line: self.line(start),
                 references: 0,
                 blocks: self.blocks(children),

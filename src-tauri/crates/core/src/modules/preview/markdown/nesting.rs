@@ -60,8 +60,13 @@ impl Node<'_> {
     }
 }
 
-/// Footnote definitions by their label (case ignored, as GitHub): where it starts, what it holds.
+/// Footnote definitions by their label's key (`footnote_key`): where it starts, what it holds.
 pub(super) type Definitions<'a> = HashMap<String, (usize, Vec<Node<'a>>)>;
+
+/// A footnote's label as definitions and references are matched by: case ignored, as GitHub.
+pub(super) fn footnote_key(label: &str) -> String {
+    label.to_lowercase()
+}
 
 /// Tags nested deeper are left out, what they hold kept in the deepest: the tree is walked and
 /// dropped recursively, and 10,000 quotes one in the other would overflow the stack.
@@ -111,7 +116,7 @@ fn close<'a>(open: &mut Open<'a>, definitions: &mut Definitions<'a>) -> Option<N
     let (tag, start, children) = open.pop()?;
     if let Tag::FootnoteDefinition(label) = &tag {
         definitions
-            .entry(label.to_lowercase())
+            .entry(footnote_key(label))
             .or_insert((start, children));
         return None;
     }
