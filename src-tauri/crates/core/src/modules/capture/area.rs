@@ -66,8 +66,8 @@ impl Area {
         let to_pixel = |value: f64, limit: u32| (value * scale).clamp(0.0, f64::from(limit));
         let left = to_pixel(self.x, pixels.0).floor() as u32;
         let top = to_pixel(self.y, pixels.1).floor() as u32;
-        let right = to_pixel(self.x + self.width, pixels.0).ceil() as u32;
-        let bottom = to_pixel(self.y + self.height, pixels.1).ceil() as u32;
+        let right = to_pixel(self.right(), pixels.0).ceil() as u32;
+        let bottom = to_pixel(self.bottom(), pixels.1).ceil() as u32;
         (right > left && bottom > top).then(|| PixelRect {
             x: left,
             y: top,
@@ -87,9 +87,8 @@ impl Area {
     /// Where a label of `label` size goes: below the area's right edge, above it when the display
     /// ends first, inside the display either way.
     pub fn label_origin(&self, label: Size, display: Size) -> Point {
-        let x =
-            (self.x + self.width - label.width).clamp(0.0, (display.width - label.width).max(0.0));
-        let below = self.y + self.height + LABEL_GAP;
+        let x = (self.right() - label.width).clamp(0.0, (display.width - label.width).max(0.0));
+        let below = self.bottom() + LABEL_GAP;
         let y = if below + label.height <= display.height {
             below
         } else {
