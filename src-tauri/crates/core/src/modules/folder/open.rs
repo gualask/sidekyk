@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use super::contracts::RepositoryInfo;
 use super::name_order::compare_names;
 use super::ports::RepositoryBackend;
-use super::{folder_kind, FolderKind};
+use super::{folder_kind, holds_git, FolderKind};
 use crate::shared::error::{user_facing, UserFacingErrorCode};
 
 /// Two paths, one per line.
@@ -120,7 +120,7 @@ pub fn repositories_inside(
         .folders(folder, Path::new(""))
         .unwrap_or_default()
         .into_iter()
-        .filter(|name| backend.has_entry(&folder.join(name), Path::new(".git")))
+        .filter(|name| holds_git(backend, folder, name))
         .filter_map(|name| {
             let root = folder.join(name).into_os_string().into_string().ok()?;
             Some(RepositoryInfo {

@@ -42,7 +42,7 @@ pub fn cut_at_line(mut bytes: Vec<u8>) -> Vec<u8> {
     bytes
 }
 
-/// A NUL in the first 8 KiB: the heuristic git uses to call a file binary.
+/// A NUL in the first 8,000 bytes: the heuristic git uses to call a file binary.
 pub fn looks_binary(bytes: &[u8]) -> bool {
     bytes[..bytes.len().min(8000)].contains(&0)
 }

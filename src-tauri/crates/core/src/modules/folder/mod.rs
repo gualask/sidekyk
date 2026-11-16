@@ -55,20 +55,29 @@ pub enum FolderKind {
     Plain,
 }
 
+/// What makes a folder a repository, at its root: a folder, or a file for linked worktrees and
+/// submodules.
+pub const GIT_ENTRY: &str = ".git";
+
+/// Whether `folder` (relative to `root`, empty for `root` itself) has a `.git` at its root.
+pub(crate) fn holds_git(backend: &dyn RepositoryBackend, root: &Path, folder: &Path) -> bool {
+    backend.has_entry(root, &folder.join(GIT_ENTRY))
+}
+
 /// What the folder at `root` is, without git; one moved or deleted is `repository_missing`.
 pub fn folder_kind(backend: &dyn RepositoryBackend, root: &Path) -> anyhow::Result<FolderKind> {
     existing_folder(backend, root)?;
-    Ok(if backend.has_entry(root, Path::new(".git")) {
+    Ok(if holds_git(backend, root, Path::new("")) {
         FolderKind::Repository
     } else {
         FolderKind::Plain
     })
 }
 
-/// Never listed, wherever they are: version control's own folders and the files the OS leaves in
-/// folders (the VCS folders and OS files of Zed's `file_scan_exclusions`).
+/// Never listed, wherever they are: version control's own folders (git, Mercurial, Subversion,
+/// Jujutsu, Sapling, repo, CVS) and the files the OS leaves in folders.
 const ALWAYS_HIDDEN: [&str; 9] = [
-    ".git",
+    GIT_ENTRY,
     ".hg",
     ".svn",
     ".jj",

@@ -9,7 +9,7 @@ use std::path::Path;
 use super::contracts::{Directory, RepositoryInfo, TreeEntry};
 use super::name_order::compare_names;
 use super::open::existing_root;
-use super::ports::{git_checked, joined, RepositoryBackend};
+use super::ports::{git_checked, joined, nul_paths, RepositoryBackend};
 use super::reading::MAX_TREE_PATHS;
 use super::watch::git_path;
 
@@ -202,11 +202,7 @@ fn child_path(folder: &str, name: &str) -> String {
 
 /// The paths of a NUL-separated list, without the last when the list was cut in it.
 fn listed(bytes: &[u8], truncated: bool) -> Vec<String> {
-    let mut paths: Vec<String> = bytes
-        .split(|&b| b == 0)
-        .filter(|path| !path.is_empty())
-        .map(|path| String::from_utf8_lossy(path).into_owned())
-        .collect();
+    let mut paths: Vec<String> = nul_paths(bytes).collect();
     if truncated {
         paths.pop();
     }

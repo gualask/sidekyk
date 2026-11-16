@@ -7,7 +7,7 @@ use super::visibility::Visibility;
 use super::LocalRepositories;
 use crate::modules::folder::{
     classify, folder_kind, Changed, FolderChanges, FolderKind, IgnoredPaths, RepositoryBackend,
-    RepositoryChange, Visible, WatchedChanges,
+    RepositoryChange, Visible, WatchedChanges, GIT_ENTRY,
 };
 use crate::shared::sync::lock;
 
@@ -35,7 +35,7 @@ impl Watching {
             FolderKind::Plain
         };
         let git_touched = match changed {
-            Changed::Paths(paths) => paths.contains(&self.folder.join(".git")),
+            Changed::Paths(paths) => paths.contains(&self.folder.join(GIT_ENTRY)),
             // the `.git` may have come or gone among the events dropped
             Changed::Unknown => true,
         };

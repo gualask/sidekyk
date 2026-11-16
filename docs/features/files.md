@@ -76,5 +76,6 @@ change.
   time, which changes only when an entry comes or goes, and touched files stay in closed folders.
   Computed whole at each read: a batch patching the times is left until the cost shows (in the
   worst case it is below the walk a folder without git already does again on a file added).
-- Hidden rules as Zed (every `.gitignore` it meets); the always-hidden names are the VCS folders
-  and OS files of Zed's `file_scan_exclusions`.
+- Hidden rules as Zed (every `.gitignore` it meets); always hidden: version control's own folders
+  (`.git`, `.hg`, `.svn`, `.jj`, `.sl`, `.repo`, `CVS`) and the files the OS leaves (`.DS_Store`,
+  `Thumbs.db`).

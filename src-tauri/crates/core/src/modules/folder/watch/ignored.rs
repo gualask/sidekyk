@@ -1,7 +1,8 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::modules::folder::ports::RepositoryBackend;
+use crate::modules::folder::holds_git;
+use crate::modules::folder::ports::{nul_paths, RepositoryBackend};
 
 /// The changes of a batch that show: git does not ignore them, or, in a folder without git, the
 /// walk's rules do not hide them.
@@ -150,7 +151,7 @@ pub(in crate::modules::folder) fn is_inner_repository(
     root: &Path,
     folder: &Path,
 ) -> bool {
-    !folder.as_os_str().is_empty() && backend.has_entry(root, &folder.join(".git"))
+    !folder.as_os_str().is_empty() && holds_git(backend, root, folder)
 }
 
 /// The repositories inside the root met by a batch: a change inside one shows nothing, as on
@@ -226,13 +227,7 @@ pub(in crate::modules::folder) fn check_ignore(
     if out.truncated || (out.code != 0 && out.code != 1) {
         return None;
     }
-    Some(
-        out.stdout
-            .split(|&b| b == 0)
-            .filter(|path| !path.is_empty())
-            .map(|path| PathBuf::from(String::from_utf8_lossy(path).into_owned()))
-            .collect(),
-    )
+    Some(nul_paths(&out.stdout).map(PathBuf::from).collect())
 }
 
 #[cfg(test)]

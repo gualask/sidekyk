@@ -181,6 +181,15 @@ pub fn git_checked(
     )
 }
 
+/// The paths of a list git writes with `-z`: NUL between them, a name that is not UTF-8 read
+/// lossily.
+pub(crate) fn nul_paths(bytes: &[u8]) -> impl Iterator<Item = String> + '_ {
+    bytes
+        .split(|&b| b == 0)
+        .filter(|path| !path.is_empty())
+        .map(|path| String::from_utf8_lossy(path).into_owned())
+}
+
 /// The result of git run on a thread of its own, or a failure if the thread panicked.
 pub fn joined<T>(
     handle: std::thread::ScopedJoinHandle<'_, anyhow::Result<T>>,

@@ -10,6 +10,7 @@ use std::sync::Arc;
 use super::ignored::{changes_rules, check_ignore, is_inner_repository};
 use super::GIT_DIR_FOLDERS;
 use crate::modules::folder::ports::{FolderAdded, FolderRules, FolderWatcher, RepositoryBackend};
+use crate::modules::folder::GIT_ENTRY;
 
 /// What keeps a folder out of the watch.
 pub enum Hiding {
@@ -169,7 +170,7 @@ impl WatchedFolders {
             .folders(&self.root, folder)
             .unwrap_or_default()
             .into_iter()
-            .filter(|name| name.as_path() != Path::new(".git"))
+            .filter(|name| name.as_path() != Path::new(GIT_ENTRY))
             .map(|name| folder.join(name))
             .collect()
     }
