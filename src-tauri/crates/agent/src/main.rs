@@ -9,20 +9,20 @@ mod older;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use sidekyk_core::infrastructure::agent::serve;
+use sidekyk_core::infrastructure::agent::{serve, SERVE_COMMAND, VERSION_COMMAND};
 use sidekyk_core::infrastructure::git_cli::LocalRepositoryBackend;
 use sidekyk_core::infrastructure::watcher::LocalRepositoryWatcher;
 use sidekyk_core::modules::reader::LocalRepositories;
 
 fn main() -> ExitCode {
     match std::env::args().nth(1).as_deref() {
-        Some("version") => {
+        Some(VERSION_COMMAND) => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
         }
-        Some("serve") => serve_app(),
+        Some(SERVE_COMMAND) => serve_app(),
         _ => {
-            eprintln!("usage: sidekyk-agent version | serve");
+            eprintln!("usage: sidekyk-agent {VERSION_COMMAND} | {SERVE_COMMAND}");
             ExitCode::from(2)
         }
     }

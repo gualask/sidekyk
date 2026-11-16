@@ -10,6 +10,11 @@ use std::process::Command;
 pub use client::AgentRepositories;
 pub use server::serve;
 
+/// The helper's command that answers the app over stdin and stdout until it closes stdin.
+pub const SERVE_COMMAND: &str = "serve";
+/// The helper's command that prints its version: the app runs it to know the helper runs there.
+pub const VERSION_COMMAND: &str = "version";
+
 /// The helper beside this process's binary, to serve: as a dev build of the app runs it for
 /// local projects (`SIDEKYK_AGENT=local`).
 pub fn helper_beside_this_binary() -> Command {
@@ -18,6 +23,6 @@ pub fn helper_beside_this_binary() -> Command {
         .map(|this| this.with_file_name(&name))
         .unwrap_or_else(|_| name.into());
     let mut command = Command::new(binary);
-    command.arg("serve");
+    command.arg(SERVE_COMMAND);
     command
 }

@@ -10,17 +10,21 @@ use std::time::Duration;
 
 use anyhow::Context;
 
+use crate::infrastructure::agent::{SERVE_COMMAND, VERSION_COMMAND};
 use crate::infrastructure::process;
 
 /// Where the helper is installed, under the machine's user's home.
 pub const SERVER_DIR: &str = ".sidekyk-server";
+/// The start of an installed helper's name (`installed_name`).
+const HELPER_PREFIX: &str = "sidekyk-agent-";
 /// The machine may start first (a stopped WSL distro) before it runs anything.
 const START_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_OUTPUT: usize = 64 * 1024;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Writes the helper read from stdin, under a temporary name first, so a copy cut short is never
-/// taken for the helper. `$1` the folder, `$2` the helper's name.
+/// Writes the helper read from stdin, under a temporary name first (`.<name>.<pid>`, as
+/// `is_helper_file` knows it), so a copy cut short is never taken for the helper. `$1` the folder, `$2` the helper's
+/// name.
 const STREAM: &str = r#"set -e; mkdir -p "$1"; tmp="$1/.$2.$$"; cat > "$tmp"; chmod 755 "$tmp"; mv -f "$tmp" "$1/$2""#;
 
 /// A Linux machine the app reaches by starting a process there.
@@ -58,7 +62,7 @@ impl LinuxHelper {
     /// not.
     pub fn serve(&self, machine: &dyn LinuxMachine) -> anyhow::Result<Command> {
         let mut command = machine.command(&self.installed(machine)?);
-        command.arg("serve");
+        command.arg(SERVE_COMMAND);
         Ok(command)
     }
 
@@ -121,7 +125,7 @@ impl LinuxHelper {
 /// Whether the helper at `path` (from the home) runs on `machine`: its name says which build it is.
 fn runs(machine: &dyn LinuxMachine, path: &str) -> anyhow::Result<bool> {
     let mut version = machine.command(path);
-    version.arg("version");
+    version.arg(VERSION_COMMAND);
     let output = process::run(&mut version, None, MAX_OUTPUT, START_TIMEOUT)
         .with_context(|| format!("{} did not answer", machine.name()))?;
     Ok(output.code == 0)
@@ -131,7 +135,15 @@ fn runs(machine: &dyn LinuxMachine, path: &str) -> anyhow::Result<bool> {
 fn installed_name(helper: &[u8]) -> String {
     let mut hasher = DefaultHasher::new();
     hasher.write(helper);
-    format!("sidekyk-agent-{VERSION}-{:016x}", hasher.finish())
+    format!("{HELPER_PREFIX}{VERSION}-{:016x}", hasher.finish())
+}
+
+/// Whether a file in `SERVER_DIR` is a helper: one installed (`installed_name`), or a copy cut
+/// short under its temporary name (`.<name>.<pid>`).
+pub fn is_helper_file(name: &str) -> bool {
+    name.strip_prefix('.')
+        .unwrap_or(name)
+        .starts_with(HELPER_PREFIX)
 }
 
 #[cfg(test)]
@@ -144,5 +156,13 @@ mod tests {
         assert!(name.starts_with(&format!("sidekyk-agent-{VERSION}-")));
         assert_eq!(name, installed_name(b"one build"));
         assert_ne!(name, installed_name(b"another build"));
+    }
+
+    #[test]
+    fn a_helper_is_known_by_its_name_installed_or_cut_short() {
+        let name = installed_name(b"one build");
+        assert!(is_helper_file(&name));
+        assert!(is_helper_file(&format!(".{name}.42")));
+        assert!(!is_helper_file("notes"));
     }
 }

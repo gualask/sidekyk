@@ -17,8 +17,9 @@ use crate::shared::error::{user_facing, UserFacingErrorCode};
 const LIST_TIMEOUT: Duration = Duration::from_secs(10);
 const MAX_OUTPUT: usize = 64 * 1024;
 
-/// Copies the helper from Windows' side through `/mnt`, under a temporary name first, so a copy
-/// cut short is never taken for the helper. `$1` the folder, `$2` the helper's name, `$3` its
+/// Copies the helper from Windows' side through `/mnt`, under a temporary name first
+/// (`.<name>.<pid>`, as `linux_helper::is_helper_file` knows it), so a copy cut short is never
+/// taken for the helper. `$1` the folder, `$2` the helper's name, `$3` its
 /// Windows path. A distro that does not mount Windows' drives gets it through stdin.
 const COPY: &str = r#"set -e; mkdir -p "$1"; tmp="$1/.$2.$$"; cp "$(wslpath -u "$3")" "$tmp"; chmod 755 "$tmp"; mv -f "$tmp" "$1/$2""#;
 

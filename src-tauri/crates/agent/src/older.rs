@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use sidekyk_core::infrastructure::machines::linux_helper::SERVER_DIR;
+use sidekyk_core::infrastructure::machines::linux_helper::{is_helper_file, SERVER_DIR};
 
 /// Run by the helper as it starts: in the folder the app installs it in, every other helper (an
 /// older build) and any copy left halfway goes. Elsewhere, such as beside a dev build, nothing.
@@ -19,8 +19,7 @@ pub(crate) fn remove_other_helpers(this: &Path) -> std::io::Result<()> {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
-        let helper = name.trim_start_matches('.').starts_with("sidekyk-agent-");
-        if helper && path != this {
+        if is_helper_file(name) && path != this {
             std::fs::remove_file(&path)?;
         }
     }
