@@ -2,10 +2,10 @@
 //! new note on top of a list or a note there; files first, then the note, so a failure leaves
 //! the book as it was.
 
-use super::images::{image_of_note, write_image, write_marked};
-use super::notes::new_note_id;
+use super::images::{image_of_note, with_marks, write_image};
+use super::notes::target_note;
 use super::{now, NotesStore};
-use crate::modules::notes::book::Touched;
+use crate::modules::notes::book::NoteBook;
 use crate::modules::notes::contracts::{Book, ImageTarget, Mark, Note, NoteImage};
 use crate::modules::notes::images::PreparedImage;
 use crate::modules::notes::ports::NotesStorage;
@@ -54,81 +54,15 @@ impl NotesStore {
         }
         self.change_kept(storage, book, |kept| {
             let folder = self.folder(storage, book, kept)?;
-            let mut added: Vec<NoteImage> = Vec::new();
-            let mut remarked: Vec<(String, NoteImage)> = Vec::new();
+            let mut written = Written::default();
             for image in images {
-                match image {
-                    CaptureImage::New {
-                        image,
-                        marks,
-                        drawn,
-                    } => {
-                        let given = write_image(storage, &folder, &kept.notes, &added, image)?;
-                        added.push(given.clone());
-                        let kept_image = match marked(marks, drawn)? {
-                            None => given,
-                            Some((marks, drawn)) => write_marked(
-                                storage,
-                                &folder,
-                                &kept.notes,
-                                &added,
-                                given,
-                                marks,
-                                drawn,
-                            )?,
-                        };
-                        // the image as the note keeps it, under its marks when marked
-                        if let Some(last) = added.last_mut() {
-                            *last = kept_image;
-                        }
-                    }
-                    CaptureImage::Remarked { id, marks, drawn } => {
-                        let ImageTarget::Note { id: note } = &target else {
-                            anyhow::bail!("a new note has no image to mark anew");
-                        };
-                        let source = image_of_note(&kept.notes, note, &id)?.source();
-                        let replacement = match marked(marks, drawn)? {
-                            None => source,
-                            Some((marks, drawn)) => {
-                                let taken: Vec<NoteImage> = added
-                                    .iter()
-                                    .chain(remarked.iter().map(|(_, i)| i))
-                                    .cloned()
-                                    .collect();
-                                write_marked(
-                                    storage,
-                                    &folder,
-                                    &kept.notes,
-                                    &taken,
-                                    source,
-                                    marks,
-                                    drawn,
-                                )?
-                            }
-                        };
-                        remarked.push((id, replacement));
-                    }
-                }
+                written.write(storage, &folder, &kept.notes, &target, image)?;
             }
             let notes = &mut kept.notes;
             let now = now();
-            let mut touched: Vec<Touched> = Vec::new();
-            let id = match target {
-                ImageTarget::New { list } => {
-                    let id = new_note_id(notes);
-                    let (_, more) = notes.add(id.clone(), &list, text.unwrap_or_default(), now)?;
-                    touched.extend(more);
-                    id
-                }
-                ImageTarget::Note { id } => {
-                    if let Some(text) = text {
-                        touched.extend(notes.set_text(&id, text, now)?.1);
-                    }
-                    id
-                }
-            };
-            touched.extend(notes.add_images(&id, added, now)?.1);
-            for (replaced, image) in remarked {
+            let (id, mut touched) = target_note(notes, target, text, now)?;
+            touched.extend(notes.add_images(&id, written.added, now)?.1);
+            for (replaced, image) in written.remarked {
                 touched.extend(notes.replace_image(&id, &replaced, image, now)?.1);
             }
             touched.dedup();
@@ -137,16 +71,54 @@ impl NotesStore {
     }
 }
 
-/// Marks and the PNG drawn with them, or none without marks.
-fn marked(
-    marks: Vec<Mark>,
-    drawn: Option<PreparedImage>,
-) -> anyhow::Result<Option<(Vec<Mark>, PreparedImage)>> {
-    if marks.is_empty() {
-        return Ok(None);
+/// A capture's images written so far: the crops added, in order, and the note's images marked
+/// anew, by the id they replace.
+#[derive(Default)]
+struct Written {
+    added: Vec<NoteImage>,
+    remarked: Vec<(String, NoteImage)>,
+}
+
+impl Written {
+    /// Writes `image`'s files in `folder`, under ids none of `book`'s images has nor one written
+    /// before it.
+    fn write(
+        &mut self,
+        storage: &dyn NotesStorage,
+        folder: &str,
+        book: &NoteBook,
+        target: &ImageTarget,
+        image: CaptureImage<'_>,
+    ) -> anyhow::Result<()> {
+        match image {
+            CaptureImage::New {
+                image,
+                marks,
+                drawn,
+            } => {
+                let given = write_image(storage, folder, book, &self.added, image)?;
+                self.added.push(given.clone());
+                // the image as the note keeps it, under its marks when marked
+                let kept = with_marks(storage, folder, book, &self.added, given, marks, drawn)?;
+                *self.added.last_mut().expect("just added") = kept;
+            }
+            CaptureImage::Remarked { id, marks, drawn } => {
+                let ImageTarget::Note { id: note } = target else {
+                    anyhow::bail!("a new note has no image to mark anew");
+                };
+                let source = image_of_note(book, note, &id)?.source();
+                let taken: Vec<NoteImage> = self
+                    .added
+                    .iter()
+                    .chain(self.remarked.iter().map(|(_, i)| i))
+                    .cloned()
+                    .collect();
+                let replacement = with_marks(storage, folder, book, &taken, source, marks, drawn)?;
+                self.remarked.push((id, replacement));
+            }
+        }
+        Ok(())
     }
-    let drawn = drawn.ok_or_else(|| anyhow::anyhow!("marks come with their image"))?;
-    Ok(Some((marks, drawn)))
 }
 
 #[cfg(test)]

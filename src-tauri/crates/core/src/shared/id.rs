@@ -18,6 +18,15 @@ pub fn new_id() -> String {
     format!("{:016x}", hasher.finish())
 }
 
+/// A new id that `used` does not already have.
+pub fn new_id_unused(used: impl Fn(&str) -> bool) -> String {
+    let mut id = new_id();
+    while used(&id) {
+        id = new_id();
+    }
+    id
+}
+
 /// Whether `id` is one `new_id` makes: the only names let through to files.
 pub fn is_id(id: &str) -> bool {
     id.len() == 16 && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))

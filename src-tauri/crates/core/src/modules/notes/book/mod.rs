@@ -164,14 +164,25 @@ impl NoteBook {
 
     /// The open notes of a list but `except`, from the top.
     pub(super) fn open_notes(&self, list: &str, except: &str) -> Vec<&Note> {
-        let mut open: Vec<&Note> = self
-            .notes
-            .iter()
-            .filter(|n| n.list == list && n.done.is_none() && n.id != except)
-            .collect();
-        open.sort_by(|a, b| a.position.total_cmp(&b.position));
-        open
+        open_notes_of(&self.notes, list, except)
     }
+
+    /// The position on top of a list's open notes, `except` left out.
+    pub(super) fn top_position(&self, list: &str, except: &str) -> f64 {
+        self.open_notes(list, except)
+            .first()
+            .map_or(0.0, |top| top.position - 1.0)
+    }
+}
+
+/// The open notes of `list` among `notes`, but `except`, from the top.
+pub(super) fn open_notes_of<'a>(notes: &'a [Note], list: &str, except: &str) -> Vec<&'a Note> {
+    let mut open: Vec<&Note> = notes
+        .iter()
+        .filter(|n| n.list == list && n.done.is_none() && n.id != except)
+        .collect();
+    open.sort_by(|a, b| a.position.total_cmp(&b.position));
+    open
 }
 
 #[cfg(test)]

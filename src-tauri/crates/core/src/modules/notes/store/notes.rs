@@ -2,18 +2,38 @@
 
 use super::lists::new_list_id;
 use super::{now, project_only, NotesStore};
-use crate::modules::notes::book::NoteBook;
-use crate::modules::notes::contracts::{Book, ListTarget, MovedNote, Note};
+use crate::modules::notes::book::{NoteBook, Touched};
+use crate::modules::notes::contracts::{Book, ImageTarget, ListTarget, MovedNote, Note};
 use crate::modules::notes::ports::NotesStorage;
-use crate::shared::id::new_id;
+use crate::shared::id::new_id_unused;
 
 /// A new id no note of `book` has.
 pub(super) fn new_note_id(book: &NoteBook) -> String {
-    let mut id = new_id();
-    while book.note(&id).is_some() {
-        id = new_id();
+    new_id_unused(|id| book.note(id).is_some())
+}
+
+/// The id of the note `target` names: a new one on top of its list, written with `text`, or a
+/// note there, given `text` when some. What it touched comes back too.
+pub(super) fn target_note(
+    book: &mut NoteBook,
+    target: ImageTarget,
+    text: Option<String>,
+    now: u64,
+) -> anyhow::Result<(String, Vec<Touched>)> {
+    match target {
+        ImageTarget::New { list } => {
+            let id = new_note_id(book);
+            let (_, touched) = book.add(id.clone(), &list, text.unwrap_or_default(), now)?;
+            Ok((id, touched))
+        }
+        ImageTarget::Note { id } => {
+            let touched = match text {
+                Some(text) => book.set_text(&id, text, now)?.1,
+                None => Vec::new(),
+            };
+            Ok((id, touched))
+        }
     }
-    id
 }
 
 impl NotesStore {
@@ -142,6 +162,7 @@ mod tests {
     use super::*;
     use crate::modules::notes::INBOX_BOOK;
     use crate::shared::error::{user_facing_code, UserFacingErrorCode};
+    use crate::shared::id::new_id;
 
     #[test]
     fn a_note_moves_between_books_keeping_its_id() {

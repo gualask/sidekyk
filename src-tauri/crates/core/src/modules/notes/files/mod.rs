@@ -45,6 +45,11 @@ pub(super) fn note_file(id: &str) -> String {
     format!("{id}.json")
 }
 
+/// The note `file` is the file of (`note_file`), if it is a note's.
+fn note_of_file(file: &str) -> Option<&str> {
+    file.strip_suffix(".json").filter(|id| is_id(id))
+}
+
 /// A folder for a project's notes, named after it to be found by hand: `sidekyk-3f9a2c`.
 pub(super) fn folder_name(project: &str) -> String {
     let name: String = project
@@ -207,7 +212,7 @@ pub(super) fn read_folder(storage: &dyn NotesStorage, folder: &str) -> anyhow::R
             read.lists = read_lists(storage, folder)?;
         } else if file == STATE_FILE {
             read.open_list = read_open_list(storage, folder);
-        } else if let Some(id) = file.strip_suffix(".json").filter(|id| is_id(id)) {
+        } else if let Some(id) = note_of_file(&file) {
             read.notes.extend(read_note(storage, folder, &file, id)?);
         } else if image_of_file(&file).is_some() {
             read.images.push(file);

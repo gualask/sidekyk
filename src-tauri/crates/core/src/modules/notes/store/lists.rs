@@ -6,15 +6,11 @@ use crate::modules::notes::contracts::{
     Book, DeletedList, MovedList, Note, NoteList, ProjectNotes,
 };
 use crate::modules::notes::ports::NotesStorage;
-use crate::shared::id::new_id;
+use crate::shared::id::new_id_unused;
 
 /// A new id no list of `book` has.
 pub(super) fn new_list_id(book: &NoteBook) -> String {
-    let mut id = new_id();
-    while book.lists.iter().any(|l| l.id == id) {
-        id = new_id();
-    }
-    id
+    new_id_unused(|id| book.lists.iter().any(|l| l.id == id))
 }
 
 impl NotesStore {

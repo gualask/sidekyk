@@ -1,7 +1,7 @@
 //! The store's images of notes: added, marked or taken out, written before the notes that name
 //! them, read back, and copied with a note moved to another book.
 
-use super::notes::new_note_id;
+use super::notes::target_note;
 use super::{now, KeptBook, NotesStore};
 use crate::modules::notes::book::{NoteBook, Touched};
 use crate::modules::notes::contracts::{
@@ -12,24 +12,19 @@ use crate::modules::notes::images::{
     MAX_IMAGE_BYTES,
 };
 use crate::modules::notes::ports::NotesStorage;
-use crate::shared::id::new_id;
+use crate::shared::id::new_id_unused;
 use crate::shared::sync::lock;
 
 /// A new id no image of `book` has, nor one of `taken`.
 pub(super) fn new_image_id(book: &NoteBook, taken: &[NoteImage]) -> String {
-    let used = |id: &str| {
+    new_id_unused(|id| {
         taken.iter().any(|i| i.ids().any(|used| used == id))
             || book
                 .notes
                 .iter()
                 .flat_map(|n| &n.images)
                 .any(|i| i.ids().any(|used| used == id))
-    };
-    let mut id = new_id();
-    while used(&id) {
-        id = new_id();
-    }
-    id
+    })
 }
 
 impl NotesStore {
@@ -52,16 +47,10 @@ impl NotesStore {
             }
             let notes = &mut kept.notes;
             let now = now();
-            match target {
-                ImageTarget::Note { id } => notes.add_images(&id, added, now),
-                ImageTarget::New { list } => {
-                    let id = new_note_id(notes);
-                    let (_, mut touched) = notes.add(id.clone(), &list, String::new(), now)?;
-                    let (note, more) = notes.add_images(&id, added, now)?;
-                    touched.extend(more);
-                    Ok((note, touched))
-                }
-            }
+            let (id, mut touched) = target_note(notes, target, None, now)?;
+            let (note, more) = notes.add_images(&id, added, now)?;
+            touched.extend(more);
+            Ok((note, touched))
         })
     }
 
@@ -90,14 +79,10 @@ impl NotesStore {
     ) -> anyhow::Result<Note> {
         self.change_kept(storage, book, |kept| {
             let source = image_of_note(&kept.notes, id, image)?.source();
-            let replacement = if marks.is_empty() {
-                source
-            } else {
-                let marked =
-                    marked.ok_or_else(|| anyhow::anyhow!("marks come with their image"))?;
-                let folder = self.folder(storage, book, kept)?;
-                write_marked(storage, &folder, &kept.notes, &[], source, marks, marked)?
-            };
+            // the note has an image: its folder is written already
+            let folder = self.folder(storage, book, kept)?;
+            let replacement =
+                with_marks(storage, &folder, &kept.notes, &[], source, marks, marked)?;
             kept.notes.replace_image(id, image, replacement, now())
         })
     }
@@ -200,6 +185,24 @@ impl NotesStore {
         }
         Ok(())
     }
+}
+
+/// `source` as a note keeps it with `marks`: as it is without marks, else the PNG `drawn` with them
+/// over it, written in `folder` (`write_marked`), which marks come with.
+pub(super) fn with_marks(
+    storage: &dyn NotesStorage,
+    folder: &str,
+    book: &NoteBook,
+    taken: &[NoteImage],
+    source: NoteImage,
+    marks: Vec<Mark>,
+    drawn: Option<PreparedImage>,
+) -> anyhow::Result<NoteImage> {
+    if marks.is_empty() {
+        return Ok(source);
+    }
+    let drawn = drawn.ok_or_else(|| anyhow::anyhow!("marks come with their image"))?;
+    write_marked(storage, folder, book, taken, source, marks, drawn)
 }
 
 /// Writes in `folder` the files of `marked`, drawn with `marks` over `source`: the image that

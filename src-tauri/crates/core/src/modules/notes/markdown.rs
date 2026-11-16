@@ -2,6 +2,7 @@
 //! the user's order, open notes by place, then the done ones, the last done first. A note's
 //! images follow its text, linked from `images/` beside the file.
 
+use super::book::open_notes_of;
 use super::contracts::{Note, NoteList};
 use super::images::image_file;
 
@@ -68,11 +69,7 @@ fn push_list(out: &mut String, list: &NoteList, notes: &[Note], words: &ExportWo
 
 /// A list's open notes by place, and its done ones, the last done first.
 fn list_notes<'a>(list: &NoteList, notes: &'a [Note]) -> (Vec<&'a Note>, Vec<&'a Note>) {
-    let mut open: Vec<&Note> = notes
-        .iter()
-        .filter(|n| n.list == list.id && n.done.is_none())
-        .collect();
-    open.sort_by(|a, b| a.position.total_cmp(&b.position));
+    let open = open_notes_of(notes, &list.id, "");
     let mut done: Vec<&Note> = notes
         .iter()
         .filter(|n| n.list == list.id && n.done.is_some())

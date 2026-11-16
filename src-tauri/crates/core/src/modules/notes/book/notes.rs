@@ -18,10 +18,7 @@ impl NoteBook {
     ) -> anyhow::Result<(Note, Vec<Touched>)> {
         checked_text(&text)?;
         self.list_index(list)?;
-        let position = self
-            .open_notes(list, "")
-            .first()
-            .map_or(0.0, |top| top.position - 1.0);
+        let position = self.top_position(list, "");
         let note = Note {
             id,
             list: list.into(),
@@ -229,10 +226,7 @@ impl NoteBook {
     ) -> anyhow::Result<(Note, Vec<Touched>)> {
         checked_note(&note)?;
         let (list, mut touched) = self.target_list(target, new_list)?;
-        let position = self
-            .open_notes(&list, &note.id)
-            .first()
-            .map_or(0.0, |top| top.position - 1.0);
+        let position = self.top_position(&list, &note.id);
         let note = Note {
             list,
             position,
