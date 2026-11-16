@@ -91,8 +91,10 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     `desktop/` or a Tauri plugin (dialog, opener): the commands and URI schemes (a capability's
     together: `notes/`, `projects/`, each scheme beside its commands), `tray.rs` and
     `shortcuts.rs` (what an item or a press does), `cli.rs` (a folder, `--toggle`, else show),
-    `lifecycle.rs` (page load, close, run events). `blocking.rs`, the one file the others import:
-    work off the async runtime, logged; a folder by its id; a book's notes; the `Ports`.
+    `lifecycle.rs` (page load, close, run events). No entry point imports another; they share the
+    layer's helpers, none an entry point: `blocking.rs` (work off the async runtime, logged; a
+    folder by its id; a book's notes; the `Ports`) and `raw.rs` (what crosses without being JSON:
+    the URI schemes' images, a body of a line of JSON then raw bytes).
   - `desktop/`: the window's session: the first show, showing and hiding it, closing into the tray
     (`window.rs`), the compact window's views and stages, the quick note and the capture window
     (`compact_window.rs`), and their frames (`compact_frame.rs`), one capture at a time and its

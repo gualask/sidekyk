@@ -2,11 +2,9 @@
 //! `<crop>.thumb.png` (`http://capture-image.localhost/…` on Windows): a crop is no book's until
 //! its note is written, so `note-image` has none (`notes/image_scheme.rs`).
 
-use std::borrow::Cow;
-
-use tauri::http::{header, Response, StatusCode};
 use tauri::UriSchemeResponder;
 
+use super::super::raw::{image, not_found};
 use crate::desktop::capture;
 
 pub(crate) const SCHEME: &str = "capture-image";
@@ -21,12 +19,12 @@ pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSche
     };
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let image = capture::crops(&app, &[crop])
+        let crop = capture::crops(&app, &[crop])
             .ok()
             .and_then(|mut crops| crops.pop());
-        responder.respond(match image {
-            Some(image) if thumb => found(image.thumb.clone()),
-            Some(image) => found(image.original.clone()),
+        responder.respond(match crop {
+            Some(crop) if thumb => image("image/png", crop.thumb.clone()),
+            Some(crop) => image("image/png", crop.original.clone()),
             None => not_found(),
         });
     });
@@ -41,22 +39,6 @@ fn target(uri_path: &str) -> Option<(String, bool)> {
     };
     let named = !crop.is_empty() && crop.chars().all(|c| c.is_ascii_alphanumeric());
     named.then(|| (crop.into(), thumb))
-}
-
-/// A crop's PNG, kept by the WebView for good: a crop's id names its bytes.
-fn found(bytes: Vec<u8>) -> Response<Cow<'static, [u8]>> {
-    Response::builder()
-        .header(header::CONTENT_TYPE, "image/png")
-        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-        .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
-        .body(Cow::Owned(bytes))
-        .unwrap_or_else(|_| not_found())
-}
-
-fn not_found() -> Response<Cow<'static, [u8]>> {
-    let mut response = Response::new(Cow::Borrowed(&[][..]));
-    *response.status_mut() = StatusCode::NOT_FOUND;
-    response
 }
 
 #[cfg(test)]

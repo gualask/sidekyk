@@ -4,6 +4,22 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { type CaptureEvent, type ImageDrop, imageFile, type NotesPort } from '@/modules/notes';
 import { attachListener, onTauriEvent } from './events';
 
+/**
+ * A command's body that is a line of JSON, then `parts` raw, back to back: what the backend's
+ * `raw.rs` reads (`json_line`), the bytes crossing as they are.
+ */
+function jsonLineThen(json: unknown, parts: readonly Uint8Array[]): Uint8Array {
+    const line = new TextEncoder().encode(`${JSON.stringify(json)}\n`);
+    const body = new Uint8Array(line.length + parts.reduce((sum, part) => sum + part.length, 0));
+    body.set(line);
+    let at = line.length;
+    for (const part of parts) {
+        body.set(part, at);
+        at += part.length;
+    }
+    return body;
+}
+
 /** The last part of a path, whichever separator it uses. */
 function fileName(path: string): string {
     return path.split(/[\\/]/).pop() ?? path;
@@ -62,14 +78,9 @@ export const tauriNotes: NotesPort = {
         invoke('add_note_image', bytes, {
             headers: { 'x-book': encodeURIComponent(book), 'x-target': JSON.stringify(target) },
         }),
-    // `mark_note_image`: the marking as a line of JSON, then the PNG raw
-    markImage: (book, id, image, marks, drawn) => {
-        const line = new TextEncoder().encode(`${JSON.stringify({ book, id, image, marks })}\n`);
-        const body = new Uint8Array(line.length + (drawn?.length ?? 0));
-        body.set(line);
-        if (drawn) body.set(drawn, line.length);
-        return invoke('mark_note_image', body);
-    },
+    // `mark_note_image`: the marking, then the PNG drawn with its marks, none without
+    markImage: (book, id, image, marks, drawn) =>
+        invoke('mark_note_image', jsonLineThen({ book, id, image, marks }, drawn ? [drawn] : [])),
     removeImage: (book, id, image) => invoke('remove_note_image', { book, id, image }),
     copyNote: (book, id) => invoke('copy_note', { book, id }),
     imagePng: async (book, image) =>
@@ -88,22 +99,11 @@ export const tauriNotes: NotesPort = {
     canCapture: () => invoke('can_capture'),
     startCapture: (into) => invoke('start_capture', { into }),
     onCapture: (listener) => onTauriEvent<CaptureEvent>('capture', listener),
-    // `write_capture`: the note as a line of JSON, each image's PNG told by its length, then the
-    // PNGs raw, back to back
+    // `write_capture`: the note, each image's PNG told by its length, then the PNGs
     writeCapture: ({ book, target, text, images }) => {
         const told = images.map(({ drawn, ...image }) => ({ ...image, png: drawn?.length ?? 0 }));
-        const line = new TextEncoder().encode(
-            `${JSON.stringify({ book, target, text, images: told })}\n`,
-        );
         const pngs = images.flatMap((image) => (image.drawn ? [image.drawn] : []));
-        const body = new Uint8Array(line.length + pngs.reduce((sum, png) => sum + png.length, 0));
-        body.set(line);
-        let at = line.length;
-        for (const png of pngs) {
-            body.set(png, at);
-            at += png.length;
-        }
-        return invoke('write_capture', body);
+        return invoke('write_capture', jsonLineThen({ book, target, text, images: told }, pngs));
     },
     dropCrops: (crops) => invoke('drop_crops', { crops }),
     cropPng: async (crop) =>

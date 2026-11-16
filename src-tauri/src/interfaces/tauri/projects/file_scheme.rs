@@ -3,14 +3,12 @@
 //! as any image, so the WebView decodes them itself and no copy goes through the JS heap. The
 //! file of the tree, or with `?blob=<id>` that git object, a side of the image's diff.
 
-use std::borrow::Cow;
-
 use sidekyk_core::modules::preview::image_type;
 use sidekyk_core::shared::url::percent_decoded;
-use tauri::http::{header, Response, StatusCode};
 use tauri::UriSchemeResponder;
 
 use super::super::blocking::on_folder;
+use super::super::raw::{image, not_found};
 use sidekyk_core::app::machines::Start;
 
 pub(crate) const SCHEME: &str = "project-file";
@@ -37,12 +35,12 @@ pub(crate) fn respond(
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         // a project shown is read: this never starts a stopped WSL distro
-        let image = on_folder("project_file", app, folder_id, Start::Never, move |on| {
+        let read = on_folder("project_file", app, folder_id, Start::Never, move |on| {
             on.reader.image(&on.info, &path, blob.as_deref())
         })
         .await;
-        responder.respond(match image {
-            Ok(bytes) => found(kind, bytes),
+        responder.respond(match read {
+            Ok(bytes) => image(kind, bytes),
             Err(_) => not_found(),
         });
     });
@@ -65,27 +63,6 @@ fn blob(query: &str) -> Option<String> {
         .map(percent_decoded)
 }
 
-/// An image's bytes, `kind` their type, no script run, kept by the WebView for good: the URL
-/// names the file's stamp or the object, so changed bytes are another URL.
-fn found(kind: &'static str, bytes: Vec<u8>) -> Response<Cow<'static, [u8]>> {
-    Response::builder()
-        .header(header::CONTENT_TYPE, kind)
-        .header(
-            header::CONTENT_SECURITY_POLICY,
-            "default-src 'none'; style-src 'unsafe-inline'",
-        )
-        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-        .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
-        .body(Cow::Owned(bytes))
-        .unwrap_or_else(|_| not_found())
-}
-
-fn not_found() -> Response<Cow<'static, [u8]>> {
-    let mut response = Response::new(Cow::Borrowed(&[][..]));
-    *response.status_mut() = StatusCode::NOT_FOUND;
-    response
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -103,20 +80,6 @@ mod tests {
         );
         assert_eq!(target("/b0000000000000a1"), None);
         assert_eq!(target("/"), None);
-    }
-
-    #[test]
-    fn an_image_is_answered_with_no_script_and_kept_for_good() {
-        let response = found("image/svg+xml", b"<svg/>".to_vec());
-        let header = |name| response.headers()[name].to_str().unwrap();
-        assert_eq!(header(header::CONTENT_TYPE), "image/svg+xml");
-        assert_eq!(
-            header(header::CONTENT_SECURITY_POLICY),
-            "default-src 'none'; style-src 'unsafe-inline'"
-        );
-        assert_eq!(header(header::X_CONTENT_TYPE_OPTIONS), "nosniff");
-        assert_eq!(header(header::CACHE_CONTROL), "max-age=31536000, immutable");
-        assert_eq!(response.body().as_ref(), b"<svg/>");
     }
 
     #[test]

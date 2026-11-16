@@ -3,12 +3,10 @@
 //! viewer the image (`<id>.<ext>`), as any image, so the WebView decodes them itself and no copy
 //! goes through the JS heap.
 
-use std::borrow::Cow;
-
-use tauri::http::{header, Response, StatusCode};
 use tauri::{Manager, UriSchemeResponder};
 
 use super::super::blocking::{notes, ports};
+use super::super::raw::{image, not_found};
 use sidekyk_core::modules::notes::NotesStore;
 use sidekyk_core::shared::url::percent_decoded;
 
@@ -24,11 +22,11 @@ pub(crate) fn respond(app: &tauri::AppHandle, uri_path: &str, responder: UriSche
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let store = app.state::<NotesStore>();
-        let image = notes(&app)
+        let read = notes(&app)
             .book(&book)
             .and_then(|book| store.image(&*ports(&app).notes, &book, &file));
-        responder.respond(match image {
-            Ok(Some((kind, bytes))) => found(kind.mime(), bytes),
+        responder.respond(match read {
+            Ok(Some((kind, bytes))) => image(kind.mime(), bytes),
             Ok(None) => not_found(),
             Err(error) => {
                 tracing::debug!(error = %format!("{error:#}"), "note image not read");
@@ -45,23 +43,6 @@ fn target(uri_path: &str) -> Option<(String, String)> {
     let (book, file) = decoded.split_once('/')?;
     let book = percent_decoded(book);
     (!book.is_empty() && !file.is_empty() && !file.contains('/')).then(|| (book, file.into()))
-}
-
-/// An image's bytes, `kind` their type, kept by the WebView for good: an image's id names its
-/// bytes.
-fn found(kind: &'static str, bytes: Vec<u8>) -> Response<Cow<'static, [u8]>> {
-    Response::builder()
-        .header(header::CONTENT_TYPE, kind)
-        .header(header::X_CONTENT_TYPE_OPTIONS, "nosniff")
-        .header(header::CACHE_CONTROL, "max-age=31536000, immutable")
-        .body(Cow::Owned(bytes))
-        .unwrap_or_else(|_| not_found())
-}
-
-fn not_found() -> Response<Cow<'static, [u8]>> {
-    let mut response = Response::new(Cow::Borrowed(&[][..]));
-    *response.status_mut() = StatusCode::NOT_FOUND;
-    response
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@
 //! Every command names a book: the Inbox, or a project of the list.
 
 use super::super::blocking::{notes, ports, with_notes, with_store};
+use super::super::raw::json_line;
 use sidekyk_core::modules::notes::{as_png, given_images, prepare, ImageTarget, Mark, Note};
 use sidekyk_core::shared::error::AppError;
 use sidekyk_core::shared::url::percent_decoded;
@@ -74,7 +75,8 @@ pub(crate) async fn mark_note_image(
     let tauri::ipc::InvokeBody::Raw(body) = request.body() else {
         return Err(anyhow::anyhow!("a marking comes raw").into());
     };
-    let (marking, png) = marking(body).map_err(AppError::from)?;
+    let (marking, png) = json_line::<Marking>(body).map_err(AppError::from)?;
+    let png = png.to_vec();
     let Marking {
         book,
         id,
@@ -86,18 +88,6 @@ pub(crate) async fn mark_note_image(
         store.mark_image(files, book, &id, &image, marks, drawn)
     })
     .await
-}
-
-/// A marking's JSON and its PNG, from the body that carries them.
-fn marking(body: &[u8]) -> anyhow::Result<(Marking, Vec<u8>)> {
-    let end = body
-        .iter()
-        .position(|byte| *byte == b'\n')
-        .ok_or_else(|| anyhow::anyhow!("a marking ends its line"))?;
-    Ok((
-        serde_json::from_slice(&body[..end])?,
-        body[end + 1..].to_vec(),
-    ))
 }
 
 #[tauri::command]
@@ -129,30 +119,4 @@ pub(crate) async fn note_image_png(
         Ok(tauri::ipc::Response::new(as_png(kind, bytes)?))
     })
     .await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_marking_is_a_line_of_json_then_the_png() {
-        let json = r#"{"book":"inbox","id":"a","image":"b","marks":[{"x":1,"y":2,"text":"A\nB","tail":null}]}"#;
-        let png = [0x89, b'P', b'\n', b'G'];
-        let (read, drawn) = marking(&[json.as_bytes(), b"\n", &png].concat()).unwrap();
-        assert_eq!(
-            (read.book.as_str(), read.id.as_str(), read.image.as_str()),
-            ("inbox", "a", "b")
-        );
-        assert_eq!(read.marks[0].text, "A\nB");
-        assert_eq!(drawn, png);
-
-        let (read, drawn) = marking(
-            br#"{"book":"inbox","id":"a","image":"b","marks":[]}
-"#,
-        )
-        .unwrap();
-        assert!(read.marks.is_empty() && drawn.is_empty());
-        assert!(marking(b"{}").is_err());
-    }
 }

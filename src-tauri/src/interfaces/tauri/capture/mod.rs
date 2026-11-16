@@ -9,6 +9,7 @@ use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
 use super::blocking::with_notes;
+use super::raw::json_line;
 use crate::desktop::capture::{self, CAPTURE_BUILT, SETTINGS_URL};
 use sidekyk_core::modules::capture::CaptureInto;
 use sidekyk_core::modules::notes::{prepare, CaptureImage, CaptureWrite, ImageTarget, Mark, Note};
@@ -132,12 +133,7 @@ pub(crate) async fn write_capture(
 
 /// A capture's note and the PNGs of its images, from the body that carries them.
 fn written(body: &[u8]) -> anyhow::Result<(Written, Vec<Vec<u8>>)> {
-    let end = body
-        .iter()
-        .position(|byte| *byte == b'\n')
-        .ok_or_else(|| anyhow::anyhow!("a capture's note ends its line"))?;
-    let written: Written = serde_json::from_slice(&body[..end])?;
-    let mut rest = &body[end + 1..];
+    let (written, mut rest) = json_line::<Written>(body)?;
     let mut pngs = Vec::with_capacity(written.images.len());
     for image in &written.images {
         anyhow::ensure!(image.png() <= rest.len(), "a PNG shorter than told");
