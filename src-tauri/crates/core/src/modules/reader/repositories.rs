@@ -2,7 +2,6 @@
 //! modules make them, with the caches around them.
 
 use std::path::Path;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use super::{LocalRepositories, OnChange, Repositories};
@@ -199,7 +198,8 @@ impl Repositories for LocalRepositories {
     }
 
     fn stop_content_search(&self) {
-        self.content_runs.fetch_add(1, Ordering::Relaxed);
+        // a newer turn stops the search going on
+        self.next_content_search();
     }
 
     fn retain(&self, roots: &[String]) {

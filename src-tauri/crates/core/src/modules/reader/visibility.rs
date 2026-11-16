@@ -82,25 +82,17 @@ impl LocalRepositories {
     /// Watches the folders created while hidden, off the caller's thread: the app reports the
     /// window showing on its main thread, and the folders wait for the watcher to start.
     fn watch_missed_folders(&self, missed: MissedPaths) {
-        let repositories = self.this.clone();
-        let spawned = std::thread::Builder::new()
-            .name("missed-folders".to_string())
-            .spawn(move || {
-                let Some(repositories) = repositories.upgrade() else {
-                    return;
-                };
-                let backend = &*repositories.backend;
-                let mut folders = lock(&repositories.folders);
-                let Some(folders) = folders.as_mut() else {
-                    return;
-                };
-                match missed {
-                    MissedPaths::Paths(paths) => folders.add_missed(backend, &paths),
-                    MissedPaths::TooMany => folders.rescan(backend),
-                }
-            });
-        if let Err(error) = spawned {
-            tracing::warn!(%error, "the folders created while hidden are not watched");
-        }
+        let lost = "the folders created while hidden are not watched";
+        self.on_own_thread("missed-folders", lost, move |this| {
+            let backend = &*this.backend;
+            let mut folders = lock(&this.folders);
+            let Some(folders) = folders.as_mut() else {
+                return;
+            };
+            match missed {
+                MissedPaths::Paths(paths) => folders.add_missed(backend, &paths),
+                MissedPaths::TooMany => folders.rescan(backend),
+            }
+        });
     }
 }

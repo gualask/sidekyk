@@ -26,8 +26,9 @@ pub(super) struct Watched {
 }
 
 impl LocalRepositories {
-    /// `Repositories::watch`.
-    pub(super) fn watch_on_screen(
+    /// Watches as `Repositories::watch`, unless a watch asked later was done already: `turn` taken
+    /// by `next_watch` as the watch was asked.
+    pub fn watch_in_turn(
         &self,
         turn: WatchTurn,
         repository: Option<&RepositoryInfo>,
@@ -84,38 +85,32 @@ impl LocalRepositories {
         drop(visibility);
         // every tree is read again when asked for, and one read meanwhile is not kept
         for cached in lock(&self.trees).values_mut() {
-            cached.tree = None;
-            cached.changes += 1;
+            cached.forget();
         }
     }
 
     /// The folder on screen became a repository, or stopped being one: it is watched again as the
     /// other kind, then the change is told. Off the watcher's thread, which stops with its watch.
     pub(super) fn watch_other_kind(&self, generation: u64, root: &str) {
-        let repositories = self.this.clone();
         let root = root.to_string();
-        let spawned = std::thread::Builder::new()
-            .name("kind-changed".to_string())
-            .spawn(move || {
-                let Some(repositories) = repositories.upgrade() else {
-                    return;
-                };
-                let mut watched = lock(&repositories.watched);
+        self.on_own_thread(
+            "kind-changed",
+            "the folder's new kind is not watched",
+            move |this| {
+                let mut watched = lock(&this.watched);
                 // another folder put on screen meanwhile, or a batch before this one saw it
-                if repositories.generation.load(Ordering::Relaxed) != generation {
+                if this.generation.load(Ordering::Relaxed) != generation {
                     return;
                 }
                 let Some(on_change) = watched.as_ref().map(|w| w.on_change.clone()) else {
                     return;
                 };
-                repositories.watch_anew(&mut watched, &root, on_change.clone());
+                this.watch_anew(&mut watched, &root, on_change.clone());
                 drop(watched);
                 tracing::info!(root, "the project's folder changed kind");
                 on_change(RepositoryChange::kind(root));
-            });
-        if let Err(error) = spawned {
-            tracing::warn!(%error, "the folder's new kind is not watched");
-        }
+            },
+        );
     }
 
     /// Watches the folder at `root`, the root the caller names it by: what is kept of it and the

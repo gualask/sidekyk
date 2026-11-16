@@ -17,6 +17,15 @@ pub(super) struct CachedTree {
     pub(super) changes: u64,
 }
 
+impl CachedTree {
+    /// The files may have changed: the tree is read again when next asked for, and one read
+    /// meanwhile is not kept.
+    pub(super) fn forget(&mut self) {
+        self.tree = None;
+        self.changes += 1;
+    }
+}
+
 impl LocalRepositories {
     /// A project's files, read again only when they may have changed, sharing the read in flight:
     /// those git lists in a repository, those the walk lists in a folder without git.
@@ -72,9 +81,9 @@ impl LocalRepositories {
 
     /// The files of a repository may have changed: its tree is read again when next asked for.
     pub(super) fn forget_tree(&self, root: &str) {
-        let mut trees = lock(&self.trees);
-        let entry = trees.entry(root.to_string()).or_default();
-        entry.tree = None;
-        entry.changes += 1;
+        lock(&self.trees)
+            .entry(root.to_string())
+            .or_default()
+            .forget();
     }
 }

@@ -17,9 +17,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 
-use crate::modules::folder::{
-    FileTree, RepositoryBackend, RepositoryInfo, RepositoryWatcher, WatchedFolders,
-};
+use crate::modules::folder::{FileTree, RepositoryBackend, RepositoryWatcher, WatchedFolders};
 use crate::modules::repository::{ChangedFile, RepositorySnapshot, RepositorySummary};
 use crate::modules::syntax::ColorCache;
 
@@ -99,13 +97,25 @@ impl LocalRepositories {
         WatchTurn(self.watch_turns.fetch_add(1, Ordering::Relaxed) + 1)
     }
 
-    /// Watches as `Repositories::watch`, unless a watch asked later was done already.
-    pub fn watch_in_turn(
+    /// Runs `work` on a thread of its own, `name`d, while these repositories last: for a caller
+    /// that must not wait (the app's main thread, a watcher's). `lost` is logged when no thread
+    /// starts.
+    fn on_own_thread(
         &self,
-        turn: WatchTurn,
-        repository: Option<&RepositoryInfo>,
-        on_change: OnChange,
+        name: &str,
+        lost: &'static str,
+        work: impl FnOnce(&Self) + Send + 'static,
     ) {
-        self.watch_on_screen(turn, repository, on_change);
+        let this = self.this.clone();
+        let spawned = std::thread::Builder::new()
+            .name(name.to_string())
+            .spawn(move || {
+                if let Some(this) = this.upgrade() {
+                    work(&this);
+                }
+            });
+        if let Err(error) = spawned {
+            tracing::warn!(%error, "{lost}");
+        }
     }
 }
