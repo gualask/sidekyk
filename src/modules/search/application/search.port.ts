@@ -24,7 +24,10 @@ export interface SearchPort {
      * note's `@` suggests. None for an empty query.
      */
     searchFiles(folderId: string, query: string): Promise<FileMatches>;
-    /** Stops the search in contents going on: the palette closed. */
+    /**
+     * Stops the search in contents going on: one no longer wanted (the text changed, the palette
+     * went back to names or closed).
+     */
     stopContentSearch(): Promise<void>;
     /**
      * The names that match `query`, best first, by their index, as the palette ranks projects;

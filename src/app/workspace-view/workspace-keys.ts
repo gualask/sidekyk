@@ -1,13 +1,10 @@
 import { useEffect, useEffectEvent } from 'react';
 import { neighbourProject, type ProjectList } from '@/modules/projects';
-import type { PaletteMode } from '@/modules/search';
+import { type PaletteMode, paletteModeForKey } from '@/modules/search';
 import type { PanelDefinition } from '@/shared/panels/panel';
 import { shortcutKey } from '@/shared/platform/shortcut';
 import { isField, isInOverlay, isKeyTaken } from '@/shared/ui/keys';
 import { panelForKey } from '../panels';
-
-/** The palette's keys with `⌘` (`Ctrl`), by what they look for. */
-const PALETTE_KEYS: Record<string, PaletteMode | undefined> = { k: 'names', f: 'contents' };
 
 /** A control that `↵` already presses: the key is its, not a zoom. */
 const PRESSABLE = 'button, a[href], [role="button"], [role="radio"], [role="menuitem"]';
@@ -73,7 +70,7 @@ function shortcutAction(event: KeyboardEvent, actions: WorkspaceKeys): (() => vo
     const shortcut = shortcutKey(event);
     if (shortcut === ',') return actions.toggleSettings;
     if (shortcut === 'n' && !isInOverlay(event.target)) return actions.newNote;
-    const paletteKey = shortcut === null ? undefined : PALETTE_KEYS[shortcut];
+    const paletteKey = shortcut === null ? undefined : paletteModeForKey(shortcut);
     return paletteKey ? () => actions.togglePalette(paletteKey) : null;
 }
 

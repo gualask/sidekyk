@@ -1,17 +1,12 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import type { Virtualizer } from '@tanstack/react-virtual';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { PickerDialog, PickerKeys } from '@/shared/ui/PickerDialog';
-import { MIN_CONTENT_QUERY } from '../application/content-search';
-import type {
-    PaletteBook,
-    PaletteItem,
-    PalettePanel,
-    PaletteRow as Row,
-} from '../model/palette-rows';
-import { PaletteField, type PaletteMode } from './PaletteField';
-import { PaletteRow } from './PaletteRow';
+import type { PaletteBook, PaletteItem, PalettePanel, PaletteRow } from '../model/palette-items';
+import type { PaletteMode } from '../model/palette-modes';
+import { PaletteField } from './PaletteField';
+import { PaletteRowView } from './PaletteRowView';
 import { contentsNotice, contentsStatus, fieldPlaceholder } from './palette-texts';
 import { usePaletteRows, usePaletteVirtualizer } from './use-palette-list';
 
@@ -51,8 +46,9 @@ interface PaletteProps {
 
 /**
  * The command palette: one field to go to a project or a list or note of any book (at all
- * projects), a panel of the project on screen or one of its files, lists or notes (`⌘K`), or to find a text in that project's files (`⌘F`); the other key, or
- * a tab, switches while keeping what is typed. Names are ranked in the backend, the best first;
+ * projects), a panel of the project on screen or one of its files, lists or notes (`⌘K`), or to
+ * find a text in that project's files (`⌘F`); the other key, or a tab, switches while keeping
+ * what is typed. Names are ranked in the backend, the best first;
  * lines found come under their files as they are read, the file shown first. The list is
  * virtualized. `↑`/`↓` move, `↵` opens, `Esc` empties the field, then closes. Loaded with Base
  * UI's dialog and autocomplete once the window is idle after the first paint.
@@ -132,12 +128,7 @@ function Palette({
         books,
         i18n,
     });
-    // the row of each item, to bring the one highlighted into view
-    const itemRows = useMemo(
-        () => rows.flatMap((row, rowIndex) => (row.kind === 'item' ? [rowIndex] : [])),
-        [rows],
-    );
-    const { scroller, virtualizer } = usePaletteVirtualizer(rows);
+    const { scroller, virtualizer, revealItem } = usePaletteVirtualizer(rows);
     const empty = contents
         ? contentsNotice(filesOf, query, found, i18n)
         : names && rows.length === 0
@@ -157,9 +148,7 @@ function Palette({
             autoHighlight="always"
             keepHighlight
             onItemHighlighted={(item, { reason, index }) => {
-                if (!item || reason === 'pointer') return;
-                const row = itemRows[index];
-                if (row !== undefined) virtualizer.scrollToIndex(row, { align: 'auto' });
+                if (item && reason !== 'pointer') revealItem(index);
             }}
         >
             <PaletteField
@@ -193,7 +182,7 @@ function Palette({
                 ) : null}
             </Autocomplete.List>
             <PickerKeys enter={t('common.enterOpens')}>
-                {contents && filesOf && query.trim().length >= MIN_CONTENT_QUERY ? (
+                {found ? (
                     <span className="ml-auto" aria-live="polite">
                         {contentsStatus(found, query, i18n)}
                     </span>
@@ -211,7 +200,7 @@ function VirtualRows({
     onOpen,
 }: {
     virtualizer: Virtualizer<HTMLDivElement, Element>;
-    rows: readonly Row[];
+    rows: readonly PaletteRow[];
     count: number;
     onOpen: (item: PaletteItem) => void;
 }) {
@@ -222,7 +211,7 @@ function VirtualRows({
             style={{ height: virtualizer.getTotalSize() }}
         >
             {virtualizer.getVirtualItems().map((virtual) => (
-                <PaletteRow
+                <PaletteRowView
                     key={virtual.key}
                     row={rows[virtual.index]}
                     count={count}

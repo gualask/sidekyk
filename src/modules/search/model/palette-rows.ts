@@ -1,95 +1,7 @@
-import type { Highlight } from '@/shared/format/highlight-parts';
-import type { ChangeMark } from '@/shared/git/change-mark';
 import type { Translator } from '@/shared/i18n';
-import type { PanelDefinition } from '@/shared/panels/panel';
-import {
-    type ProjectAvatar,
-    type ProjectLocation,
-    projectFolder,
-} from '@/shared/projects/project-info';
-import type { ContentFile, SearchResults } from './search.types';
-
-/** A panel as the palette offers it. */
-export interface PalettePanel {
-    id: string;
-    title: string;
-    /** As on its tile. */
-    icon: PanelDefinition['icon'];
-    /** The key that opens it full screen. */
-    shortcut: string;
-}
-
-/**
- * The book of a list or note found at all projects, as its row names it: a project, or the Inbox
- * (its one list never named).
- */
-export interface PaletteBook {
-    name: string;
-    inbox: boolean;
-}
-
-/** Something the palette opens. */
-export type PaletteItem =
-    | {
-          kind: 'project';
-          projectId: string;
-          /** Its folder, under the name; its machine the row's hint when not this one. */
-          folder: ProjectLocation | null;
-          /** In place of the other rows' icon. */
-          avatar: ProjectAvatar;
-          label: string;
-          highlights: Highlight[];
-      }
-    | {
-          kind: 'panel';
-          id: string;
-          icon: PalettePanel['icon'];
-          shortcut: string;
-          label: string;
-          highlights: Highlight[];
-      }
-    | {
-          kind: 'file';
-          path: string;
-          mark: ChangeMark | null;
-          label: string;
-          highlights: Highlight[];
-      }
-    | {
-          kind: 'list';
-          book: string;
-          id: string;
-          /** Its project's name at all projects: the row's hint. */
-          hint: string | null;
-          label: string;
-          highlights: Highlight[];
-      }
-    | {
-          kind: 'note';
-          book: string;
-          id: string;
-          list: string;
-          /** Its list's name, in its project's at all projects, or the Inbox's: the row's hint. */
-          hint: string;
-          /** Its first line, or the part of it where the text typed is. */
-          label: string;
-          highlights: Highlight[];
-      }
-    | {
-          kind: 'line';
-          path: string;
-          /** The line's number in the file. */
-          number: number;
-          label: string;
-          highlights: Highlight[];
-      };
-
-/** The list as one flat run of rows, so only the rows on screen are rendered. */
-export type PaletteRow =
-    | { kind: 'group'; label: string }
-    | { kind: 'item'; item: PaletteItem; index: number }
-    | { kind: 'more'; count: number }
-    | { kind: 'file'; path: string; count: number };
+import { projectFolder } from '@/shared/projects/project-info';
+import type { PaletteBook, PaletteItem, PalettePanel, PaletteRow } from './palette-items';
+import type { SearchResults } from './search.types';
 
 /** Typed, this many of each kind come first, so a kind found by the dozen hides no other. */
 const FIRST_OF_EACH = 2;
@@ -268,44 +180,6 @@ function rowsOf(groups: readonly RankedGroup[]): { items: PaletteItem[]; rows: P
             rows.push({ kind: 'item', item, index: items.length });
             items.push(item);
         }
-    }
-    return { items, rows };
-}
-
-/**
- * The lines found in the files' contents, under their files: those of the file shown first, as
- * "In this file", then the others' in their order.
- */
-export function contentRows(
-    files: readonly ContentFile[],
-    current: string | null,
-    { t }: Translator,
-): { items: PaletteItem[]; rows: PaletteRow[] } {
-    const items: PaletteItem[] = [];
-    const rows: PaletteRow[] = [];
-    const addLines = (file: ContentFile) => {
-        for (const line of file.lines) {
-            const item: PaletteItem = {
-                kind: 'line',
-                path: file.path,
-                number: line.number,
-                label: line.text,
-                highlights: line.highlights,
-            };
-            rows.push({ kind: 'item', item, index: items.length });
-            items.push(item);
-        }
-    };
-    const shown = files.find((file) => file.path === current);
-    if (shown) {
-        rows.push({ kind: 'group', label: t('palette.inThisFile') });
-        addLines(shown);
-    }
-    const others = files.filter((file) => file !== shown);
-    if (shown && others.length > 0) rows.push({ kind: 'group', label: t('palette.otherFiles') });
-    for (const file of others) {
-        rows.push({ kind: 'file', path: file.path, count: file.lines.length });
-        addLines(file);
     }
     return { items, rows };
 }

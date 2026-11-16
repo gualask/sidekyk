@@ -1,15 +1,11 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import type { Translator } from '@/shared/i18n';
 import { useContentSearch } from '../application/content-search';
 import { useSearch } from '../application/search.queries';
-import {
-    contentRows,
-    type PaletteBook,
-    type PalettePanel,
-    type PaletteRow,
-    paletteRows,
-} from '../model/palette-rows';
+import { contentRows } from '../model/content-rows';
+import type { PaletteBook, PalettePanel, PaletteRow } from '../model/palette-items';
+import { paletteRows } from '../model/palette-rows';
 
 const ROW_HEIGHT = { group: 28, item: 34, more: 30, file: 28 } as const;
 /** A project: its name, and its folder under it. */
@@ -66,7 +62,10 @@ export function usePaletteRows({
     return { names: names.data, found, items, rows };
 }
 
-/** The list's scrolled box and its virtualizer: only the rows on screen render. */
+/**
+ * The list's scrolled box and its virtualizer, only the rows on screen rendered, and how to bring
+ * an item (by its index among the items) into view.
+ */
 export function usePaletteVirtualizer(rows: readonly PaletteRow[]) {
     const scroller = useRef<HTMLDivElement>(null);
     const virtualizer = useVirtualizer({
@@ -77,7 +76,19 @@ export function usePaletteVirtualizer(rows: readonly PaletteRow[]) {
         paddingStart: 6,
         paddingEnd: 6,
     });
-    return { scroller, virtualizer };
+    // the row of each item
+    const itemRows = useMemo(
+        () => rows.flatMap((row, rowIndex) => (row.kind === 'item' ? [rowIndex] : [])),
+        [rows],
+    );
+    const revealItem = useCallback(
+        (index: number) => {
+            const row = itemRows[index];
+            if (row !== undefined) virtualizer.scrollToIndex(row, { align: 'auto' });
+        },
+        [itemRows, virtualizer],
+    );
+    return { scroller, virtualizer, revealItem };
 }
 
 /** A row's height before it renders: a project has its folder under it, a line found is lower. */

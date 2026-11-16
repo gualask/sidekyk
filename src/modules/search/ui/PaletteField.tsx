@@ -1,15 +1,14 @@
 import { Autocomplete } from '@base-ui/react/autocomplete';
 import { IconFileSearch, IconSearch } from '@tabler/icons-react';
-import { type MessageKey, useTranslation } from '@/shared/i18n';
+import { useTranslation } from '@/shared/i18n';
 import { withKeys } from '@/shared/platform/keys';
+import { PALETTE_MODE_ORDER, PALETTE_MODES, type PaletteMode } from '../model/palette-modes';
 
-/** What the palette looks for: places to go by name (`⌘K`), or a text in the files (`⌘F`). */
-export type PaletteMode = 'names' | 'contents';
-
-const MODES: { mode: PaletteMode; label: MessageKey; key: string }[] = [
-    { mode: 'names', label: 'common.goTo', key: 'K' },
-    { mode: 'contents', label: 'common.findInFiles', key: 'F' },
-];
+/** The field's icon: what the palette looks for. */
+const MODE_ICONS: Record<PaletteMode, typeof IconSearch> = {
+    names: IconSearch,
+    contents: IconFileSearch,
+};
 
 /**
  * The palette's field, its icon telling what it looks for, and a tab per mode on its right. `Esc`
@@ -29,16 +28,12 @@ export function PaletteField({
     placeholder: string;
 }) {
     const { t } = useTranslation();
-    const contents = mode === 'contents';
+    const Icon = MODE_ICONS[mode];
     return (
         <div className="flex items-center gap-2.5 border-b border-ui-border pr-3 pl-[18px]">
-            {contents ? (
-                <IconFileSearch size={16} className="shrink-0 text-ui-text-muted" aria-hidden />
-            ) : (
-                <IconSearch size={16} className="shrink-0 text-ui-text-muted" aria-hidden />
-            )}
+            <Icon size={16} className="shrink-0 text-ui-text-muted" aria-hidden />
             <Autocomplete.Input
-                aria-label={t(contents ? 'common.findInFiles' : 'common.goTo')}
+                aria-label={t(PALETTE_MODES[mode].label)}
                 placeholder={placeholder}
                 spellCheck={false}
                 autoComplete="off"
@@ -53,20 +48,23 @@ export function PaletteField({
                 }}
             />
             <div className="flex shrink-0 gap-0.5 rounded-md bg-ui-surface-subtle p-0.5">
-                {MODES.map((choice) => (
+                {PALETTE_MODE_ORDER.map((choice) => (
                     <button
-                        key={choice.mode}
+                        key={choice}
                         type="button"
-                        title={withKeys(t(choice.label), `Mod+${choice.key}`)}
-                        aria-pressed={choice.mode === mode}
-                        onClick={() => onModeChange(choice.mode)}
+                        title={withKeys(
+                            t(PALETTE_MODES[choice].label),
+                            `Mod+${PALETTE_MODES[choice].key.toUpperCase()}`,
+                        )}
+                        aria-pressed={choice === mode}
+                        onClick={() => onModeChange(choice)}
                         className={`h-6 rounded px-2 text-xs ${
-                            choice.mode === mode
+                            choice === mode
                                 ? 'bg-ui-surface text-ui-text shadow-sm'
                                 : 'text-ui-text-muted hover:text-ui-text'
                         }`}
                     >
-                        {t(choice.label)}
+                        {t(PALETTE_MODES[choice].label)}
                     </button>
                 ))}
             </div>

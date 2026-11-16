@@ -1,7 +1,11 @@
 import { errorMessage } from '@/shared/errors/app-error';
 import type { Translator } from '@/shared/i18n';
-import { type ContentResults, MIN_CONTENT_QUERY } from '../application/content-search';
-import type { PaletteMode } from './PaletteField';
+import {
+    type ContentResults,
+    longEnoughToSearch,
+    MIN_CONTENT_QUERY,
+} from '../application/content-search';
+import type { PaletteMode } from '../model/palette-modes';
 
 /** What the empty field asks for: names or a text, and where it looks, or why it cannot. */
 export function fieldPlaceholder(
@@ -34,7 +38,7 @@ export function contentsNotice(
     i18n: Translator,
 ): string | null {
     if (!folderId || !query.trim()) return null;
-    if (query.trim().length < MIN_CONTENT_QUERY) {
+    if (!longEnoughToSearch(query)) {
         return i18n.t('palette.typeMore', { count: MIN_CONTENT_QUERY });
     }
     if (!found || found.files.length > 0) return null;
@@ -44,11 +48,11 @@ export function contentsNotice(
 
 /** How far the search went: still reading, or what it found. */
 export function contentsStatus(
-    found: ContentResults | null,
+    found: ContentResults,
     query: string,
     { t, tp, formatTag }: Translator,
 ): string {
-    if (!found || found.status === 'searching' || found.query !== query) {
+    if (found.status === 'searching' || found.query !== query) {
         return t('palette.searching');
     }
     if (found.status === 'failed') return '';

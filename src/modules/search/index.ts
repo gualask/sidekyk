@@ -1,6 +1,7 @@
 export { type SearchPort, SearchProvider } from './application/search.port';
 export { useFileSearch, useNameRanking } from './application/search.queries';
-export type { PaletteBook } from './model/palette-rows';
+export type { PaletteBook } from './model/palette-items';
+export { type PaletteMode, paletteModeForKey } from './model/palette-modes';
 export type {
     ContentEnd,
     ContentFile,
@@ -9,7 +10,6 @@ export type {
     SearchResults,
 } from './model/search.types';
 export type { PaletteActions } from './ui/CommandPalette';
-export type { PaletteMode } from './ui/PaletteField';
 
 /** The command palette, loaded once the window is idle after the first paint, or on first use. */
 export const loadCommandPalette = () => import('./ui/CommandPalette');

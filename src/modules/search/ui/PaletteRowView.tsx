@@ -9,20 +9,20 @@ import { ProjectAvatar } from '@/shared/projects/ProjectAvatar';
 import { RemoteTag } from '@/shared/projects/RemoteTag';
 import { KeyCap } from '@/shared/ui/KeyCaps';
 import { MatchedText } from '@/shared/ui/MatchedText';
-import type { PaletteItem, PaletteRow as Row } from '../model/palette-rows';
+import type { PaletteItem, PaletteRow } from '../model/palette-items';
 
 /**
  * A row of the virtualized list, placed at `start`: a group's or a file's heading, the files left
  * out, or an item to open.
  */
-export function PaletteRow({
+export function PaletteRowView({
     row,
     count,
     start,
     size,
     onOpen,
 }: {
-    row: Row;
+    row: PaletteRow;
     count: number;
     start: number;
     size: number;
