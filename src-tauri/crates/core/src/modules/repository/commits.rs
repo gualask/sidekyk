@@ -1,7 +1,6 @@
 //! The commits of the graph, HEAD's and its upstream's as VS Code's graph shows them, the files
 //! each one changed, and their diffs. Read when the list is opened, never in the background.
 
-use std::collections::HashMap;
 use std::path::Path;
 
 use super::contracts::{
@@ -9,8 +8,9 @@ use super::contracts::{
     CommitRequest, FileChange, RecentCommits, UnifiedDiff,
 };
 use super::diff::{context_option, unified_diff};
+use super::diff_counts::by_path;
 use super::limits::{MAX_CHANGED_PATHS, MAX_DIFF_BYTES, MAX_NUMSTAT_BYTES};
-use super::numstat::{parse_numstat_z, Counts};
+use super::numstat::parse_numstat_z;
 use super::status::{kind_of, object_id};
 use crate::modules::folder::{
     checked_path, existing_root, git_checked, RepositoryBackend, RepositoryInfo, LITERAL_PATHSPECS,
@@ -30,6 +30,11 @@ const MAX_LOG_BYTES: usize = 1024 * 1024;
 
 /// A full ref name, `refs/remotes/origin/main`.
 const MAX_REF_BYTES: usize = 4096;
+
+/// The end of a `git log` of HEAD's commits: `log.showSignature` in the user's config would run
+/// gpg for every commit; before the first commit HEAD names nothing, which is no commits, not a
+/// failure.
+pub(super) const LOG_OF_HEAD: [&str; 3] = ["--no-show-signature", "--ignore-missing", "HEAD"];
 
 /// What git takes for a commit: a whole or abbreviated hash. Anything else is refused before
 /// git runs, so the frontend cannot pass an option or a revision expression.
@@ -139,12 +144,8 @@ pub fn load_recent_commits(
         // does not walk the whole history (VS Code's graph sorts so too)
         "--topo-order",
         "--decorate=full",
-        // `log.showSignature` in the user's config would run gpg for every commit
-        "--no-show-signature",
-        // before the first commit HEAD names nothing: an empty list, not a failure
-        "--ignore-missing",
-        "HEAD",
     ];
+    args.extend(LOG_OF_HEAD);
     args.extend(upstream.as_deref());
     args.push("--");
     let out = git_checked(backend, root, &args, &[0], MAX_LOG_BYTES)?;
@@ -230,8 +231,7 @@ fn parse_diff_tree_z(bytes: &[u8], truncated: bool) -> Vec<FileChange> {
     if truncated {
         numstat.pop();
     }
-    let mut counts: HashMap<String, Counts> =
-        numstat.into_iter().map(|c| (c.path, c.counts)).collect();
+    let mut counts = by_path(numstat);
     for file in &mut files {
         let found = counts.remove(&file.path).unwrap_or_default();
         file.additions = found.additions;

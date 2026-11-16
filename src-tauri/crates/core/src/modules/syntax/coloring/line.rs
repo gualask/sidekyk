@@ -56,7 +56,7 @@ pub(super) fn line_colors(
     if line.len() > MAX_COLORED_LINE_BYTES {
         return Some(uncolored(line));
     }
-    let shown = line.strip_suffix('\n').unwrap_or(line);
+    let shown = shown(line);
     let spans = color_line(line, shown, state, highlighter, &SYNTAXES)?;
     Some(LineColors {
         check: line_check(shown),
@@ -67,7 +67,12 @@ pub(super) fn line_colors(
 /// A line, with its newline, in the text's color.
 pub(super) fn uncolored(line: &str) -> LineColors {
     LineColors {
-        check: line_check(line.strip_suffix('\n').unwrap_or(line)),
+        check: line_check(shown(line)),
         spans: Vec::new(),
     }
+}
+
+/// A line as the viewer shows it: without its newline.
+fn shown(line: &str) -> &str {
+    line.strip_suffix('\n').unwrap_or(line)
 }

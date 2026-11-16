@@ -81,7 +81,7 @@ const TONE_SCOPES: &[(&str, Tone)] = &[
 
 /// Scopes in the text's color though a tone's scope holds them: a Markdown file's fenced code is
 /// `markup.raw`, a string's tone, and its plain words keep the text's color, as in the language's
-/// own file (as VS Code shows them; 2026-10-25).
+/// own file (as VS Code shows them).
 const PLAIN_SCOPES: &str = "markup.raw.code-fence";
 
 /// The text's own color, which no tone has.

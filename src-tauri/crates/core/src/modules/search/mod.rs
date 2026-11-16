@@ -1,8 +1,9 @@
 //! The command palette's search: what was typed, ranked against the projects and the note lists and
 //! notes of every book at all projects, or the panels and the files, note lists and notes of the
 //! project on screen (`⌘K`); or looked for in those files' contents (`⌘F`). Names are ranked from
-//! what the caller hands over; contents are read through the repository's port. The Move dialog
-//! ranks its projects and lists the same way (`rank_names`).
+//! what the caller hands over; contents are read through the repository's port. The pickers (Move,
+//! the quick note's destination, the folder dialog, branches) rank their names the same way
+//! (`rank_names`).
 
 mod content_line;
 mod contents;
@@ -110,8 +111,8 @@ fn rank_panels(names: &mut Ranker, panels: &[String]) -> Vec<PanelMatch> {
         .collect()
 }
 
-/// The names that match `query`, best first, as the palette ranks projects: where to move notes
-/// (the Move dialog's projects and lists). With nothing typed, every name in its order.
+/// The names that match `query`, best first, as the palette ranks projects: a picker's. With
+/// nothing typed, every name in its order.
 pub fn rank_names(query: &str, names: &[&str]) -> Vec<usize> {
     let (best, _) = Ranker::new(query, Texts::Names).best(names, usize::MAX);
     best.into_iter().map(|scored| scored.index).collect()

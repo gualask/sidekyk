@@ -60,7 +60,7 @@ function tilesMeeting(met: (need: PanelNeed) => boolean, main?: PanelDefinition)
 /** One value per kind of project, so the panels of a project keep their identity across renders. */
 const TILES = {
     repository: tilesMeeting(() => true),
-    // notes first, the files a tree beside, which opens a file full screen (2026-11-02)
+    // notes first, the files a tree beside, which opens a file full screen
     plain: tilesMeeting((need) => need === 'folder', notesPanel),
     // a folder in a stopped WSL distro: its Start panel in place of the folder's, Notes beside
     stopped: tilesOf([startPanel, notesPanel]),

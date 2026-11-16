@@ -24,7 +24,8 @@ impl Numstat {
     }
 }
 
-fn by_path(counts: Vec<LineCounts>) -> CountsByPath {
+/// A numstat's records by path.
+pub(super) fn by_path(counts: Vec<LineCounts>) -> CountsByPath {
     counts.into_iter().map(|c| (c.path, c.counts)).collect()
 }
 

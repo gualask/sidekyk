@@ -1,7 +1,7 @@
 import { MACOS } from './macos';
 
 /**
- * How keys read to the user, the one place that names them (2026-11-04): macOS's symbols for
+ * How keys read to the user, the one place that names them: macOS's symbols for
  * modifiers there, joined (`⇧⌘Z`), words joined by `+` elsewhere (`Ctrl+Shift+Z`), as each
  * system's menus write them. A combination is written as the settings store a global shortcut:
  * modifiers, then a key, joined by `+` (`Shift+Enter`, `Control+Alt+KeyC`); `Mod` is the app's

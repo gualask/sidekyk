@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-/// The app's colors. It no longer follows the system's.
+/// The app's colors: a choice of its own, never the system's.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Theme {
@@ -130,12 +130,19 @@ pub struct GlobalShortcut {
     pub keys: String,
 }
 
-impl Default for GlobalShortcut {
-    fn default() -> Self {
+impl GlobalShortcut {
+    /// A shortcut on, with these keys.
+    fn on(keys: &str) -> Self {
         Self {
             enabled: true,
-            keys: DEFAULT_GLOBAL_SHORTCUT.to_string(),
+            keys: keys.to_string(),
         }
+    }
+}
+
+impl Default for GlobalShortcut {
+    fn default() -> Self {
+        Self::on(DEFAULT_GLOBAL_SHORTCUT)
     }
 }
 
@@ -173,14 +180,8 @@ impl Default for Settings {
             language: None,
             theme: Theme::default(),
             global_shortcut: GlobalShortcut::default(),
-            capture_shortcut: GlobalShortcut {
-                enabled: true,
-                keys: DEFAULT_CAPTURE_SHORTCUT.to_string(),
-            },
-            note_shortcut: GlobalShortcut {
-                enabled: true,
-                keys: DEFAULT_NOTE_SHORTCUT.to_string(),
-            },
+            capture_shortcut: GlobalShortcut::on(DEFAULT_CAPTURE_SHORTCUT),
+            note_shortcut: GlobalShortcut::on(DEFAULT_NOTE_SHORTCUT),
             diff_view: DiffView::default(),
             file_view: FileView::default(),
             diff_scrollbar: DiffScrollbar::default(),

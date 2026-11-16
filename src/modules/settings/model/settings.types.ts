@@ -11,7 +11,7 @@ import type { FileView } from '@/shared/git/file-view';
 import type { Locale } from '@/shared/i18n';
 import type { NoteLines } from '@/shared/notes/note-lines';
 
-/** The app's colors. Dark by default; it no longer follows the system's. */
+/** The app's colors: a choice of its own, never the system's; dark by default. */
 export type Theme = 'dark' | 'light';
 
 /**

@@ -1,5 +1,6 @@
-//! The browser fixtures' Mermaid diagrams (`src/infrastructure/fixtures/fixture-files/diagrams.json`), drawn by the
-//! real renderer in the app's two themes, so the fixtures show what the app shows: each
+//! The browser fixtures' Mermaid diagrams
+//! (`src/infrastructure/fixtures/fixture-files/diagrams.json`), drawn by the real renderer in the
+//! app's two themes, so the fixtures show what the app shows: each
 //! ` ```mermaid ` block of the Vault's Markdown and each `.mmd` file, their later versions
 //! (`edits/vault/`) too. The colors are the page's: `theme.css`'s tokens, picked as
 //! `diagram-tokens.json` says. The font each diagram carries is stored once in `styles`, the

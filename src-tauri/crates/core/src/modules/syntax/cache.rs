@@ -44,8 +44,8 @@ struct Running {
 
 #[derive(Default)]
 struct Shared {
-    /// The lines of the texts kept, least recently colored first, one per key.
-    kept: Mutex<Vec<(String, u64, Lines)>>,
+    /// The lines of the texts kept, by key with their text's hash, least recently colored first.
+    kept: Mutex<Vec<(String, (u64, Lines))>>,
     running: Mutex<Option<Running>>,
 }
 
@@ -54,17 +54,12 @@ impl Shared {
     fn kept(&self, key: &str, hash: Option<u64>) -> Option<Lines> {
         lock(&self.kept)
             .iter()
-            .find(|(k, h, _)| k == key && hash.is_none_or(|hash| *h == hash))
-            .map(|(_, _, lines)| lines.clone())
+            .find(|(k, (h, _))| k == key && hash.is_none_or(|hash| *h == hash))
+            .map(|(_, (_, lines))| lines.clone())
     }
 
     fn keep(&self, key: &str, hash: u64, lines: Lines) {
-        let mut kept = lock(&self.kept);
-        kept.retain(|(k, _, _)| k != key);
-        kept.push((key.to_string(), hash, lines));
-        if kept.len() > KEPT {
-            kept.remove(0);
-        }
+        keep_latest(&mut lock(&self.kept), key, (hash, lines));
     }
 }
 
@@ -167,7 +162,7 @@ fn run<C: Coloring>(jobs: &mpsc::Receiver<Job>, shared: &Shared, color: Colorer<
             continue;
         };
         let lines = state.lines().clone();
-        keep_state(&mut states, &job.key, state);
+        keep_latest(&mut states, &job.key, state);
         shared.keep(&job.key, job.hash, lines.clone());
         let _ = job.reply.send(Some(lines));
     }
@@ -220,13 +215,13 @@ fn color_caught<C>(
     )
 }
 
-/// Keeps what a text of `key` left in place of the one before, the least recently colored going
-/// past `KEPT`.
-fn keep_state<C>(states: &mut Vec<(String, C)>, key: &str, state: C) {
-    states.retain(|(k, _)| k != key);
-    states.push((key.to_string(), state));
-    if states.len() > KEPT {
-        states.remove(0);
+/// Keeps what a text of `key` left in place of the one before, last: the least recently colored
+/// goes past `KEPT`.
+fn keep_latest<T>(kept: &mut Vec<(String, T)>, key: &str, value: T) {
+    kept.retain(|(k, _)| k != key);
+    kept.push((key.to_string(), value));
+    if kept.len() > KEPT {
+        kept.remove(0);
     }
 }
 

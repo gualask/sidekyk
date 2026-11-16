@@ -1,6 +1,7 @@
 //! How many lines the branch on screen changed, commit by commit, since a time: the week of work
 //! on a project's row. Read when the row shows, never in the background.
 
+use super::commits::LOG_OF_HEAD;
 use super::contracts::{CommitActivity, CommittedLines};
 use crate::modules::folder::{existing_root, git_checked, RepositoryBackend, RepositoryInfo};
 
@@ -24,27 +25,18 @@ pub fn load_commit_activity(
     let since = format!("--since=@{since} +0000");
     // one more than read, to know whether there are more
     let count = format!("-n{}", MAX_COMMITS + 1);
-    let out = git_checked(
-        backend,
-        root,
-        &[
-            "log",
-            "--format=%x00%ct",
-            // git runs with `LC_ALL=C`: the summary line is not translated
-            "--shortstat",
-            "--no-merges",
-            &since,
-            &count,
-            // `log.showSignature` in the user's config would run gpg for every commit
-            "--no-show-signature",
-            // before the first commit HEAD names nothing: no commits, not a failure
-            "--ignore-missing",
-            "HEAD",
-            "--",
-        ],
-        &[0],
-        MAX_ACTIVITY_BYTES,
-    )?;
+    let mut args = vec![
+        "log",
+        "--format=%x00%ct",
+        // git runs with `LC_ALL=C`: the summary line is not translated
+        "--shortstat",
+        "--no-merges",
+        &since,
+        &count,
+    ];
+    args.extend(LOG_OF_HEAD);
+    args.push("--");
+    let out = git_checked(backend, root, &args, &[0], MAX_ACTIVITY_BYTES)?;
     let mut commits = parse_activity(&out.stdout, out.truncated);
     let more = out.truncated || commits.len() > MAX_COMMITS;
     commits.truncate(MAX_COMMITS);
