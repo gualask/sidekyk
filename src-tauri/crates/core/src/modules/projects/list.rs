@@ -28,10 +28,26 @@ impl ProjectList {
     }
 
     pub fn find(&self, id: &str) -> anyhow::Result<&Project> {
+        Ok(&self.projects[self.index_of(id)?])
+    }
+
+    /// Where the project `id` is in the list: any other id is `project_not_found`.
+    fn index_of(&self, id: &str) -> anyhow::Result<usize> {
         self.projects
             .iter()
-            .find(|p| p.id == id)
+            .position(|p| p.id == id)
             .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))
+    }
+
+    /// The project following the folder at `location` when it is not `id`: a folder is one
+    /// project's, so a project given it gets that one back instead.
+    pub(super) fn other_at(
+        &self,
+        location: &Location,
+        case: NameCase,
+        id: &str,
+    ) -> Option<&Project> {
+        self.at(location, case).filter(|p| p.id != id)
     }
 
     pub fn active(&self) -> Option<&Project> {
@@ -147,10 +163,8 @@ impl ProjectList {
     }
 
     pub(super) fn project_mut(&mut self, id: &str) -> anyhow::Result<&mut Project> {
-        self.projects
-            .iter_mut()
-            .find(|p| p.id == id)
-            .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))
+        let index = self.index_of(id)?;
+        Ok(&mut self.projects[index])
     }
 
     /// The color of a new project: the one fewest projects have.
@@ -194,11 +208,7 @@ impl ProjectList {
     /// Forgets a project; its repository is left as it is. When it was on screen, the one after
     /// it takes its place, or the one before it when it was the last.
     pub fn remove(&mut self, id: &str) -> anyhow::Result<()> {
-        let index = self
-            .projects
-            .iter()
-            .position(|p| p.id == id)
-            .ok_or_else(|| user_facing(UserFacingErrorCode::ProjectNotFound))?;
+        let index = self.index_of(id)?;
         self.projects.remove(index);
         self.layouts.remove(id);
         if self.active.as_deref() == Some(id) {

@@ -19,7 +19,7 @@ impl ProjectList {
         case: NameCase,
     ) -> anyhow::Result<Option<Project>> {
         let project = self.find(id)?;
-        if let Some(other) = self.at(&found.location, case).filter(|p| p.id != id) {
+        if let Some(other) = self.other_at(&found.location, case, id) {
             return Ok(Some(other.clone()));
         }
         checked_beside(&found.location, project.locations(), case)?;
@@ -110,7 +110,7 @@ impl ProjectList {
     ) -> anyhow::Result<Option<Project>> {
         let (project, _) = self.folder(folder)?;
         let id = project.id.clone();
-        if let Some(other) = self.at(&found.location, case).filter(|p| p.id != id) {
+        if let Some(other) = self.other_at(&found.location, case, &id) {
             return Ok(Some(other.clone()));
         }
         let others = project.folders.iter().filter(|f| f.id != folder);
