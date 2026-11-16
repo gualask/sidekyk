@@ -1323,6 +1323,13 @@ mod tests {
         let mut command = backend.command(repo.path(), &["status"]).unwrap();
         // git's own switch for "another user owns this repository"
         command.env("GIT_TEST_ASSUME_DIFFERENT_OWNER", "1");
+        // the machine's config may trust every repository (`safe.directory = *`, as CI runners'
+        // does): only the repository's own is read
+        let no_config = repo.path().join(".git").join("no-global-config");
+        std::fs::write(&no_config, "").unwrap();
+        command
+            .env("GIT_CONFIG_NOSYSTEM", "1")
+            .env("GIT_CONFIG_GLOBAL", &no_config);
         let error = run(&mut command, None, 1000, GIT_TIMEOUT).err().unwrap();
         assert_eq!(
             user_facing_code(&error),
