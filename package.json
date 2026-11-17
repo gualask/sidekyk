@@ -1,7 +1,6 @@
 {
     "name": "sidekyk",
     "private": true,
-    "version": "0.1.0",
     "description": "Lightweight desktop companion for reviewing what changed in a local git working tree, built with Tauri 2.",
     "author": "gualask",
     "license": "MIT",
@@ -23,7 +22,7 @@
         "dev": "vite",
         "build": "pnpm typecheck && vite build",
         "tauri": "tauri",
-        "tauri:dev": "tauri dev",
+        "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
         "tauri:build": "tauri build"
     },
     "dependencies": {

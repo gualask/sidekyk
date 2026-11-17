@@ -20,6 +20,16 @@ export interface SettingsPort {
     getVersion(): Promise<string>;
     /** This session's log selected in the system's file manager, the previous one beside it. */
     revealLog(): Promise<void>;
+    /** A version newer than this one on the release server, or null; none in a development build. */
+    checkUpdate(): Promise<string | null>;
+    /**
+     * Downloads the version `checkUpdate` found, installs it and restarts the app: it resolves
+     * only if another install was already going. Fails when the download, its signature or the
+     * install does.
+     */
+    installUpdate(): Promise<void>;
+    /** Each whole percent of the update downloaded while it installs; null when its size is unknown. */
+    onUpdateProgress(listener: (percent: number | null) => void): () => void;
 }
 
 const SettingsPortContext = createContext<SettingsPort | null>(null);

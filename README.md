@@ -29,6 +29,20 @@ idle when it sits in the background.
 What is left to build: [ROADMAP.md](ROADMAP.md). How Sidekyk works and why it is built that way:
 [docs/](docs/README.md).
 
+## Install
+
+From the [latest release](https://github.com/gualask/sidekyk/releases/latest): the `.dmg` on
+macOS (Apple silicon and Intel), the AppImage, `.deb` or `.rpm` on Linux, the `-setup.exe` or
+`.msi` on Windows. Sidekyk updates itself: it checks when it starts and offers a new version in a
+toast and in Settings, About.
+
+- macOS, first launch: Sidekyk is signed, but not notarized by Apple, so macOS refuses to open it
+  the first time ("Apple could not verify…"). Press Done, then System Settings, Privacy &
+  Security, Open Anyway, and confirm with your password. Or, once in Applications:
+  `xattr -dr com.apple.quarantine /Applications/Sidekyk.app`. Updates open with no prompt.
+- Windows: the installer is not signed, so SmartScreen warns before it runs: More info, Run
+  anyway.
+
 ## Requirements
 
 - macOS, Linux or Windows. Sidekyk is built for all three with Tauri; it is developed and tested
@@ -49,6 +63,16 @@ pnpm tauri:dev
 The app adds and opens the repository of the folder given as its first argument; else it starts
 at all projects, the one it showed last selected.
 
+`pnpm tauri:dev` runs "Sidekyk Dev" (`src-tauri/tauri.dev.conf.json`): identifier
+`io.github.gualask.sidekyk.dev`, so its own projects, notes, settings and logs, and its own single
+instance, beside an installed Sidekyk. Give it other global shortcuts in its own Settings, or
+the two apps hold the same keys. To start from the installed app's data (macOS):
+
+```sh
+ditto ~/Library/Application\ Support/io.github.gualask.sidekyk \
+  ~/Library/Application\ Support/io.github.gualask.sidekyk.dev
+```
+
 ## Logs
 
 Sidekyk writes a log to the app's log directory, and keeps the previous session's next to it:
@@ -58,6 +82,8 @@ Sidekyk writes a log to the app's log directory, and keeps the previous session'
 | macOS | `~/Library/Logs/io.github.gualask.sidekyk/` |
 | Linux | `~/.local/share/io.github.gualask.sidekyk/logs/` (or under `$XDG_DATA_HOME`) |
 | Windows | `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` |
+
+`pnpm tauri:dev` writes under `io.github.gualask.sidekyk.dev` instead.
 
 
 - `sidekyk.log` (release builds): startup, the repository opened, failures and panics. Nothing

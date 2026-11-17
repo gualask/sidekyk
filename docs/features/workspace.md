@@ -41,7 +41,8 @@ problems. Why semantic zoom: `../product.md`.
   language (`languages.md`), diff view and scrollbar width, long lines in code and in notes, copy
   template, how Markdown and SVG open (`previews.md`), the global shortcuts (`background.md`); at
   the end the version and Show log, which selects this session's log in the system's file
-  manager, the previous one beside it (`tauri-plugin-opener`'s reveal). Not in the tray: a page
+  manager, the previous one beside it (`tauri-plugin-opener`'s reveal), then Updates
+  (`updates.md`). Not in the tray: a page
   broken once still shows it after a restart, the previous session kept; one broken at every
   start leaves the folder (`../testing.md`).
 

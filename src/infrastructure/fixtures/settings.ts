@@ -41,6 +41,7 @@ export function fixtureSettings(scenario: Scenario): SettingsPort {
         capture: { kind: 'active', keys: STORED_CAPTURE_SHORTCUT, conflict: false },
         note: { kind: 'active', keys: STORED_NOTE_SHORTCUT, conflict: false },
     };
+    const progressListeners = new Set<(percent: number | null) => void>();
     return {
         getSettings: async () => settings,
         // as the backend: a shortcut's settings unchanged change nothing, even refused
@@ -67,5 +68,23 @@ export function fixtureSettings(scenario: Scenario): SettingsPort {
         getVersion: async () => '0.1.0',
         // a browser tab has no file manager to show it in
         revealLog: async () => undefined,
+        // in `problems`, a newer version waits: its toast, its row in the settings
+        checkUpdate: async () => (scenario === 'problems' ? '0.2.0' : null),
+        // the download told as it goes, then nothing: a browser tab does not restart
+        installUpdate: () =>
+            new Promise((resolve) => {
+                let percent = 0;
+                const step = setInterval(() => {
+                    percent += 10;
+                    for (const listener of progressListeners) listener(percent);
+                    if (percent < 100) return;
+                    clearInterval(step);
+                    resolve();
+                }, 150);
+            }),
+        onUpdateProgress: (listener) => {
+            progressListeners.add(listener);
+            return () => progressListeners.delete(listener);
+        },
     };
 }

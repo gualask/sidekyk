@@ -4,6 +4,7 @@ export {
     useGlobalShortcutStatus,
     useSettingsWhenRead,
 } from './application/settings.queries';
+export { useUpdateNotice } from './application/updates';
 export { SHORTCUT_ACTIONS, SHORTCUT_SETTING } from './model/global-shortcuts';
 export type {
     GlobalShortcutStatuses,

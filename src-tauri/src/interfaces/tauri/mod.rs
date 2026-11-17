@@ -22,4 +22,5 @@ pub(crate) mod search;
 pub(crate) mod settings;
 pub(crate) mod shortcuts;
 pub(crate) mod tray;
+pub(crate) mod update;
 pub(crate) mod window;

@@ -12,6 +12,7 @@ use crate::desktop::capture::CaptureSession;
 use crate::desktop::compact_window::CompactWindow;
 use crate::desktop::launch::Launch;
 use crate::desktop::settings::{apply_language, AppliedSettings};
+use crate::desktop::update::Updates;
 use crate::desktop::window::{self, FirstShow};
 use crate::infrastructure::files::HostFiles;
 use crate::infrastructure::notes_files::NotesFiles;
@@ -79,6 +80,7 @@ pub(crate) fn run() {
     builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .register_asynchronous_uri_scheme_protocol(
             tauri_commands::projects::file_scheme::SCHEME,
             |context, request, responder| {
@@ -115,6 +117,7 @@ pub(crate) fn run() {
         .manage(FirstShow::default())
         .manage(CaptureSession::default())
         .manage(CompactWindow::default())
+        .manage(Updates::default())
         .setup(setup)
         .on_page_load(lifecycle::page_loading)
         .on_window_event(lifecycle::window_event)
@@ -255,5 +258,7 @@ fn commands() -> impl Fn(::tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
         tauri_commands::diagnostics::log_frontend_error,
         tauri_commands::diagnostics::get_version,
         tauri_commands::diagnostics::reveal_log,
+        tauri_commands::update::check_update,
+        tauri_commands::update::install_update,
     ]
 }

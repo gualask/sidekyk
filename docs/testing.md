@@ -24,17 +24,19 @@ Commands: `AGENTS.md`, Commands. This file says what each covers.
 
 ## CI
 
-On demand only (Actions, Run workflow): the checks run on the Mac day to day, every
-platform before a release. Actions pinned to a commit, the version in a comment.
+On demand only (Actions, Run workflow), or a release's tag: the checks run on the Mac day to
+day, every platform before a release. Actions pinned to a commit, the version in a comment.
 
 - `ci.yml`: the frontend checks and rustfmt on Linux; clippy and `cargo test` on Linux, macOS and
   Windows, so `#[cfg]` code and each real watcher are built and tried. The Mac cannot type-check
   for Windows (`onig_sys` builds C).
 - `build.yml`: an unsigned Windows x64 build, NSIS and MSI as artifacts (14 days; SmartScreen
-  warns). Linux jobs build the static helper first (musl, `musl-gcc` for its C; x64, and arm64 on
-  an arm64 runner for the container fixture); the x64 one goes into the installer's resources
+  warns). `helper.yml` builds the static helper first (musl, `musl-gcc` for its C; x64, and arm64
+  on an arm64 runner for the container fixture); the x64 one goes into the installer's resources
   (`tauri build --config src-tauri/tauri.helper.conf.json`). Other builds have no helper: WSL
   projects fail with `helper_failed`.
+- `release.yml`: on a `v*` tag, `ci.yml` and every platform's build into a release
+  (`features/updates.md`).
 
 ## Trying it on Windows and Linux
 
@@ -51,7 +53,7 @@ for reading.
 - Logs: Settings, Show log; by hand `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's
-  beside it.
+  beside it. `pnpm tauri:dev` is "Sidekyk Dev": the same under `io.github.gualask.sidekyk.dev`.
 - What each build writes: `architecture.md`, Logs; a debug build also tells `watcher batch while
   hidden`.
 - Visibility (the webview must report it, or the watcher runs git while nobody looks):

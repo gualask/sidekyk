@@ -29,6 +29,7 @@ the others point to it.
   - `quick-note.md`: a note for the Inbox from any app, the window shrunk to a field.
   - `background.md`: tray, global shortcuts, hidden window, the app icon.
   - `languages.md`: English and Italian, catalogs, `i18n:check`.
+  - `updates.md`: the app's own updates, the release workflow, signatures, macOS's first launch.
 - `testing.md`: what the checks, fixtures and timing tests cover; the container fixture.
 - Plans, designs agreed but not built, are local and not versioned: `../.cflow/plans/`; specs
   made from them in `../.cflow/specs/`.

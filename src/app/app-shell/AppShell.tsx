@@ -13,7 +13,7 @@ import {
     useReadFolderAgain,
     useRepositoryChangeSubscription,
 } from '@/modules/repository';
-import { useSettingsWhenRead } from '@/modules/settings';
+import { useSettingsWhenRead, useUpdateNotice } from '@/modules/settings';
 import { errorMessage } from '@/shared/errors/app-error';
 import { useTranslation } from '@/shared/i18n';
 import type { ProjectFolder } from '@/shared/projects/project-info';
@@ -95,6 +95,7 @@ export function AppShell() {
     // a capture with no place of its own goes to the project whose panels show, before any is
     // chosen
     useCaptures(() => (level > 0 && project ? project.id : null));
+    useUpdateNotice();
 
     // a file a note names: in Files full screen, at its lines; in another folder of the project
     // when only that one has it, which comes on screen first (asked which, when several do)

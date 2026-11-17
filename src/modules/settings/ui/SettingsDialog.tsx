@@ -19,6 +19,7 @@ import { AboutSetting } from './AboutSetting';
 import { CopyTemplateSetting } from './CopyTemplateSetting';
 import { GlobalShortcutSetting } from './GlobalShortcutSetting';
 import { Setting } from './Setting';
+import { UpdateSetting } from './UpdateSetting';
 
 /** Each language by its own name, as anyone looking for theirs reads it. */
 const LANGUAGES: { value: Locale; label: string }[] = [
@@ -174,6 +175,7 @@ export function SettingsDialog({
                     </Section>
                     <Section title={t('settings.about')}>
                         <AboutSetting />
+                        <UpdateSetting />
                     </Section>
                     <div className="dialog-foot">
                         <span>{t('settings.applyAtOnce')}</span>

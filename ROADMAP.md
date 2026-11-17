@@ -11,11 +11,6 @@ rule (`AGENTS.md`); out of scope: `docs/product.md`.
 - [ ] Waiting for notify 9 stable (9.0.0-rc.7 on 2026-10-31), with its `notify-debouncer-mini`
       (0.8): installed as soon as it is out, before anything else; on Windows the system's
       dropped events become a rescan (notify-rs#964; `docs/architecture.md`, Watching)
-- [ ] Liquid Glass icon for macOS 26 and later: an Icon Composer `.icon` in `bundle.icon`, which
-      the bundler compiles with `actool` into `Assets.car` (`icon.icns` stays the fallback). Needs
-      Xcode 26, not the Command Line Tools; under the Node CLI `actool` crashes
-      (tauri-apps/tauri#15315, fix in #15991): wait for it, or commit a compiled `Assets.car`
-      (`docs/features/background.md`, App icon)
 
 ## Notes
 
@@ -63,14 +58,12 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 
 ## Platforms and release
 
-- [ ] Signed builds and self-update (as in Fyler; `.cflow/plans/release.md`), built by a release
-      workflow on a `v*` tag that runs `ci.yml` first; update check at startup or on demand only.
-      macOS: one universal `.dmg` (`--target universal-apple-darwin`: Intel Macs too,
-      which stop at macOS 26, at no runtime cost, since only the native slice loads)
+- [ ] The first release (`docs/features/updates.md`): the four secrets in the repository, a
+      `v*` tag's `release.yml` run whole; then an update from it on each system (Linux AppImage,
+      `.deb` and `.rpm` through `pkexec`; Windows NSIS and MSI)
 - [ ] Verify on the packaged app and other systems:
   - macOS, capture (`docs/features/capture.md`): on another Space, two displays (the one under
-    the pointer), the monthly "bypass the system private window picker" prompt, the permission
-    kept across an update of a signed build
+    the pointer), the monthly "bypass the system private window picker" prompt
   - macOS, capture window (`docs/features/capture-window.md`): two displays, the pointer moved
     to another before `↵`; `⌘↵` pasted into Claude Code
   - macOS, quick note (`docs/features/quick-note.md`): on a second display, on another Space, no

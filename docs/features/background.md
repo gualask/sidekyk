@@ -26,7 +26,8 @@ hidden.
   824 px on the 1024 grid. `pnpm tauri icon src-tauri/icons/source/icon.svg` makes every
   platform's files; its `android/` and `ios/` folders are not kept. macOS 26 and later show it
   whole, unlike a bare mark, which they put in a grey tile (checked on macOS 27.2 with
-  `NSWorkspace`'s icon of a test bundle). No Liquid Glass `.icon` yet (`ROADMAP.md`).
+  `NSWorkspace`'s icon of a test bundle). No Liquid Glass `.icon`: it adds only the glass
+  and our own dark, tinted and clear variants, and needs Xcode 26 in the build.
   `generate_context!` and `include_image!` read the files at compile time and Cargo does not
   track them: after new icons, touch `bootstrap/mod.rs` and `infrastructure/tray.rs`.
 - Tray: on macOS a template glyph, `icons/tray-template.png`: 18 pt drawn at 36 px, the mark's

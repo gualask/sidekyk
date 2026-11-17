@@ -4,6 +4,7 @@ members = ["crates/core", "crates/agent"]
 default-members = [".", "crates/core", "crates/agent"]
 
 # The app and the crates it ships are versioned together: one commit, no compatibility matrix.
+# The one version: `tauri.conf.json` has none, so the bundle, the updater and the log read this.
 [workspace.package]
 version = "0.1.0"
 authors = ["gualask"]
@@ -62,6 +63,10 @@ tracing-subscriber.workspace = true
 # which allows `http`, `https` and `mailto` only (2026-10-25: Tauri's own, over the `open` crate or
 # a child process per OS; it also reveals a file in the file manager).
 tauri-plugin-opener = "2"
+# The app's own updates (`desktop/update.rs`), driven from Rust only: no JS package, no
+# `tauri-plugin-process` (`AppHandle::restart`). Default features: rustls, the system's proxy, and
+# `zip` (tar and gzip), which the macOS bundle's archive needs.
+tauri-plugin-updater = "2"
 
 [dev-dependencies]
 tempfile.workspace = true
