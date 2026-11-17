@@ -58,9 +58,9 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
 
 ## Platforms and release
 
-- [ ] The first release (`docs/features/updates.md`): the four secrets in the repository, a
-      `v*` tag's `release.yml` run whole; then an update from it on each system (Linux AppImage,
-      `.deb` and `.rpm` through `pkexec`; Windows NSIS and MSI)
+- [ ] An update through GitHub Releases on each system, at the next release
+      (`docs/features/updates.md`): macOS from an installed 0.1.0; Linux AppImage, `.deb` and
+      `.rpm` through `pkexec`; Windows NSIS and MSI
 - [ ] Verify on the packaged app and other systems:
   - macOS, capture (`docs/features/capture.md`): on another Space, two displays (the one under
     the pointer), the monthly "bypass the system private window picker" prompt

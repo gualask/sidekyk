@@ -1,6 +1,7 @@
 # A release on a tag `vX.Y.Z`, the workspace Cargo.toml's version (docs/features/updates.md):
-# the checks (ci.yml), then macOS (universal), Linux and Windows x64 built into a draft release
-# with the updater's latest.json, published once latest.json names every installer.
+# macOS (universal), Linux and Windows x64 built into a draft release with the updater's
+# latest.json while the checks (ci.yml) run; published once both pass and latest.json names every
+# installer. A failed check leaves the draft unpublished.
 name: Release
 
 on:
@@ -41,10 +42,12 @@ jobs:
 
   helper:
     uses: ./.github/workflows/helper.yml
+    with:
+      arm64: false
 
   # made before the builds: each uploads into it, and a draft cannot be found by its tag
   draft:
-    needs: [version, checks]
+    needs: version
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -146,7 +149,9 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && env.SIGNING_CERTIFICATE_SHA1 || '' }}
         with:
           releaseId: ${{ needs.draft.outputs.id }}
-          args: ${{ matrix.args }}
+          # the app alone: cargo would build the workspace's default members, `sidekyk-agent`
+          # among them, which ships prebuilt from helper.yml
+          args: ${{ matrix.args }} -- --bin sidekyk
       # Screen Recording outlives an update only if the designated requirement pins our leaf
       # certificate: the draft stays unpublished otherwise.
       - name: Check the signature
@@ -159,7 +164,7 @@ jobs:
             | grep -F "certificate leaf = H\"$leaf\""
 
   publish:
-    needs: [draft, build]
+    needs: [draft, build, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:

@@ -6,6 +6,11 @@ name: Helper
 
 on:
   workflow_call:
+    inputs:
+      arm64:
+        description: arm64 too, for the container fixture; a release ships x64 alone
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -14,15 +19,11 @@ jobs:
   helper-linux:
     strategy:
       matrix:
-        include:
-          - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-musl
-            arch: x64
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-musl
-            arch: arm64
-    runs-on: ${{ matrix.runner }}
+        arch: ${{ fromJSON(inputs.arm64 && '["x64", "arm64"]' || '["x64"]') }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 30
+    env:
+      TARGET: ${{ matrix.arch == 'arm64' && 'aarch64-unknown-linux-musl' || 'x86_64-unknown-linux-musl' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install musl
@@ -32,13 +33,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
         with:
           toolchain: stable
-          targets: ${{ matrix.target }}
+          targets: ${{ env.TARGET }}
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: src-tauri
       # static, so it runs on any distro; C dependencies (oniguruma) built with musl's compiler
       - run: >-
-          cargo build --release --locked -p sidekyk-agent --target ${{ matrix.target }}
+          cargo build --release --locked -p sidekyk-agent --target ${{ env.TARGET }}
           --manifest-path src-tauri/Cargo.toml
         env:
           CC_x86_64_unknown_linux_musl: musl-gcc
@@ -46,6 +47,6 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sidekyk-agent-linux-${{ matrix.arch }}
-          path: src-tauri/target/${{ matrix.target }}/release/sidekyk-agent
+          path: src-tauri/target/${{ env.TARGET }}/release/sidekyk-agent
           if-no-files-found: error
           retention-days: 14

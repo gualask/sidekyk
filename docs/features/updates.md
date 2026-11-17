@@ -33,13 +33,19 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
 ## Release
 
 - To release: the version in `src-tauri/Cargo.toml` (`Cargo.lock` follows), commit, push a tag
-  `vX.Y.Z` of that version. `release.yml` then: the tag checked against the version, `ci.yml`,
-  the WSL helper (`helper.yml`, shared with `build.yml`), a draft release with generated notes,
-  the builds into it (`tauri-action`), published only when its `latest.json` names every
-  installer. A failed run leaves the draft: delete it and the tag before tagging again.
+  `vX.Y.Z` of that version. `release.yml` then: the tag checked against the version; a draft
+  release with generated notes; the builds into it (`tauri-action`) while `ci.yml` runs, after
+  the x64 WSL helper (`helper.yml`, shared with `build.yml`, which adds arm64); published only
+  when the checks pass and its `latest.json` names every installer. Checks alongside, not first:
+  the builds are the long part, and a failed check costs only their runner time. A failed run
+  leaves the draft: delete it and the tag before tagging again.
 - Builds: macOS one universal `.dmg` and `.app.tar.gz` (`--target universal-apple-darwin`); Linux
   on Ubuntu 22.04, the oldest runner, for the oldest glibc: AppImage, `.deb`, `.rpm`; Windows x64,
-  NSIS and MSI with the helper. Each update has its `.sig`.
+  NSIS and MSI with the helper. Each update has its `.sig`. Only the app's binary is compiled
+  (`-- --bin sidekyk`): cargo would build every default member, `sidekyk-agent` among them.
+- Duration, v0.1.0 with cold caches and the checks first: 48 min from the tag. Checks and helper
+  8 min; builds, release profile (LTO, one codegen unit), Linux 16, Windows 24, macOS 39 (arm64
+  19.8 and x86_64 16.0 compiling, one after the other), under its 60-minute limit.
 - `tauri.release.conf.json` turns `createUpdaterArtifacts` on for releases only: no other build
   has the updater's private key, and the bundler refuses a public key without it.
 - The three build jobs each rewrite `latest.json` (download, merge, upload), so two finishing
