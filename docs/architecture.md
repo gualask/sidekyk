@@ -151,8 +151,9 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
     the policy over them: which reads a folder, what each watches and keeps, the window's
     visibility, how this machine compares names (`NameCase`), whether a call may start a machine
     (`Start`) (`features/wsl.md`). `projects.rs`: the list (ids outside it refused, stored in
-    order after each change through the `ProjectsStorage` port, a failed save kept for the
-    session), the folder on screen and its watch, the window's visibility, a folder opened, a
+    order after each change through the `ProjectsStorage` port; a change that cannot be stored
+    fails and changes nothing, so the list never says what the next start would not find), the
+    folder on screen and its watch, the window's visibility, a folder opened, a
     folder's reader by id (`FolderReader`). `notes.rs`: the list's books, a project removed or
     merged with its notes, a note's copy, the export (`ExportFiles` port). `palette.rs`: the
     palette's search across projects, files and notes. `note_references.rs`: the folders holding a
@@ -187,7 +188,8 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   `GIT_LITERAL_PATHSPECS` for every command: `check-ignore` refuses it.
 - Bounded (`limits.rs`): status 8 MiB, numstat 4 MiB, diff 2 MiB, ls-files 32 MiB, `check-ignore`
   its input; past the limit git is killed and the output `truncated` (cut records dropped, diffs cut
-  at a line). stderr 64 KiB. 30 s → `git_timed_out`. The one write, the branch switch
+  at a line). stderr 64 KiB. 30 s → `git_timed_out`, its end waited for too: a git that closed its
+  output and runs on is killed at the deadline. The one write, the branch switch
   (`git_write`), 10 min and 1 MiB: a checkout killed midway leaves `index.lock`.
 
 ### Watching

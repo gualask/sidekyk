@@ -177,13 +177,14 @@ impl Projects {
         change: impl FnOnce(&mut ProjectList, NameCase) -> anyhow::Result<T>,
     ) -> anyhow::Result<(T, ProjectList)> {
         let mut list = lock(&self.list);
-        let value = change(&mut list, self.machines.name_case())?;
+        let mut changed = list.clone();
+        let value = change(&mut changed, self.machines.name_case())?;
         // stored while still locked, so concurrent changes reach the disk in their order; one that
-        // fails stays for the session
-        if let Err(error) = self.storage.save(&list) {
-            tracing::warn!(error = %format!("{error:#}"), "could not store the projects");
-        }
-        Ok((value, list.clone()))
+        // cannot be stored fails and changes nothing, so the list never says what the next start
+        // would not find (a project removed, its notes deleted, back without them)
+        self.storage.save(&changed)?;
+        *list = changed.clone();
+        Ok((value, changed))
     }
 
     /// Watches the folder on screen, if it is not watched yet where it is, and stops watching the
@@ -283,7 +284,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn each_change_is_stored_and_one_not_stored_stays_for_the_session() {
+    fn each_change_is_stored_and_one_not_stored_fails_and_changes_nothing() {
         let told = Arc::new(Told::default());
         let (projects, storage) = projects(ProjectList::default(), &told);
         let shop = shop();
@@ -300,11 +301,10 @@ pub(crate) mod tests {
 
         *lock(&storage.refuse) = true;
         let avatar = Avatar::of_color(AvatarColor::FIRST);
-        let renamed = projects
+        assert!(projects
             .update_stored(|list| list.edit(&shop.id, "store", avatar))
-            .unwrap();
-        assert_eq!(renamed.projects[0].name, "store");
-        assert_eq!(projects.project(&shop.id).unwrap().name, "store");
+            .is_err());
+        assert_eq!(projects.project(&shop.id).unwrap().name, "shop");
         assert_eq!(lock(&storage.saved).len(), 1);
     }
 

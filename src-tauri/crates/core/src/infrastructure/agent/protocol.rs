@@ -123,6 +123,9 @@ pub enum Request {
         query: String,
     },
     StopContentSearch,
+    /// Answered as it is read: whether the helper still reads and answers (`client`, a request
+    /// long without a reply).
+    Ping,
     Retain {
         roots: Vec<String>,
     },

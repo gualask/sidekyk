@@ -4,6 +4,7 @@
 use std::io::{self, BufRead, BufReader};
 use std::process::{Child, ChildStdout};
 use std::sync::atomic::Ordering;
+use std::sync::Mutex;
 use std::time::Instant;
 
 use super::super::protocol::{read_bytes, read_frame, Message};
@@ -14,9 +15,16 @@ use crate::shared::error::UserFacingErrorCode;
 use crate::shared::sync::lock;
 
 /// Hands each message of the helper to whom waits for it, until the helper stops.
-pub(super) fn read_messages(stdout: ChildStdout, replies: &Replies, kept: &Kept, mut child: Child) {
+pub(super) fn read_messages(
+    stdout: ChildStdout,
+    replies: &Replies,
+    kept: &Kept,
+    child: &Mutex<Child>,
+) {
     let started = Instant::now();
-    if let Err(error) = hand_messages(BufReader::new(stdout), replies, kept) {
+    let read = hand_messages(BufReader::new(stdout), replies, kept);
+    let mut child = lock(child);
+    if let Err(error) = read {
         tracing::warn!(%error, "the helper's output cannot be read: stopping it");
         let _ = child.kill();
     }

@@ -62,7 +62,8 @@ impl<'a> Notes<'a> {
     }
 
     /// Forgets a project and deletes its notes; its folder is left as it is. The notes go first:
-    /// if they cannot, the project stays, so nothing is left on disk without it.
+    /// if they cannot, the project stays, so nothing is left on disk without it. A list that
+    /// cannot be stored then fails the removal, the project left without notes.
     pub fn remove_project(&self, id: &str) -> anyhow::Result<ProjectList> {
         let project = self.projects.project(id)?;
         self.store
@@ -136,7 +137,8 @@ impl<'a> Notes<'a> {
 
     /// Writes a project's notes as Markdown at `path`, chosen by the user: with images, a folder,
     /// the Markdown file named after it, the images in `images/` inside it. Never inside a
-    /// project's folder: Sidekyk writes in none (`export_in_repository`).
+    /// project's folder: Sidekyk writes in none (`export_in_repository`). What is written is
+    /// checked, not only the path chosen: an `images/` already there may link into a project's.
     pub fn export(
         &self,
         project_id: &str,
@@ -144,25 +146,33 @@ impl<'a> Notes<'a> {
         words: &ExportWords,
         files: &dyn ExportFiles,
     ) -> anyhow::Result<()> {
-        if self.projects.holds_host_path(path) {
-            return Err(user_facing(UserFacingErrorCode::ExportInRepository));
-        }
         let project = self.projects.project(project_id)?;
         let book = project_book(&project);
         let images = self.images(&book)?;
+        let (markdown_file, images_folder) = if images.is_empty() {
+            (path.to_path_buf(), None)
+        } else {
+            // a folder: the name chosen names the Markdown file in it too
+            let name = path.file_name().map_or_else(
+                || project.name.clone(),
+                |name| name.to_string_lossy().into_owned(),
+            );
+            (
+                path.join(format!("{name}.md")),
+                Some(path.join(EXPORT_IMAGES)),
+            )
+        };
+        let mut targets = std::iter::once(&markdown_file).chain(&images_folder);
+        if targets.any(|target| self.projects.holds_host_path(target)) {
+            return Err(user_facing(UserFacingErrorCode::ExportInRepository));
+        }
         let markdown = self.store.with_notes(self.storage, &book, |lists, notes| {
             to_markdown(&project.name, lists, notes, words)
         })?;
-        if images.is_empty() {
-            return files.write_whole(path, markdown.as_bytes());
-        }
-        // a folder: the name chosen names the Markdown file in it too
-        let name = path.file_name().map_or_else(
-            || project.name.clone(),
-            |name| name.to_string_lossy().into_owned(),
-        );
-        files.write_whole(&path.join(format!("{name}.md")), markdown.as_bytes())?;
-        let folder = path.join(EXPORT_IMAGES);
+        files.write_whole(&markdown_file, markdown.as_bytes())?;
+        let Some(folder) = images_folder else {
+            return Ok(());
+        };
         for image in &images {
             // one at a time: an export holds one image in memory at most
             if let Some((_, bytes)) = self.store.image(self.storage, &book, image)? {
@@ -201,8 +211,10 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use super::*;
-    use crate::app::fake::{Shelf, Told};
+    use crate::app::fake::{Kept, Shelf, Told};
     use crate::app::projects::tests::{projects, shop};
+    use crate::modules::notes::{ImageKind, ImageTarget, PreparedImage};
+    use crate::modules::projects::AvatarColor;
     use crate::shared::error::{user_facing_code, UserFacingErrorCode};
     use crate::shared::sync::lock;
 
@@ -217,26 +229,32 @@ mod tests {
         }
     }
 
-    /// The shop's project, with a note.
-    fn shop_with_a_note(store: &NotesStore, shelf: &Shelf) -> (Projects, Project) {
+    const WORDS: ExportWords = ExportWords {
+        notes: "notes",
+        no_notes: "none",
+        done: "done",
+    };
+
+    /// The shop's project, with a note, and where the list is stored.
+    fn shop_with_a_note(store: &NotesStore, shelf: &Shelf) -> (Projects, Project, Arc<Kept>) {
         let shop = shop();
         let list = ProjectList {
             projects: vec![shop.clone()],
             ..ProjectList::default()
         };
-        let (projects, _) = projects(list, &Arc::new(Told::default()));
+        let (projects, storage) = projects(list, &Arc::new(Told::default()));
         let book = project_book(&shop);
         let open = store.notes(shelf, &book).unwrap().open_list;
         store
             .add_note(shelf, &book, &open, "try it".into())
             .unwrap();
-        (projects, shop)
+        (projects, shop, storage)
     }
 
     #[test]
     fn a_project_whose_notes_cannot_be_deleted_stays() {
         let (store, shelf) = (NotesStore::default(), Shelf::default());
-        let (projects, shop) = shop_with_a_note(&store, &shelf);
+        let (projects, shop, _) = shop_with_a_note(&store, &shelf);
         let notes = Notes::new(&projects, &store, &shelf);
         *lock(&shelf.refuse_removal) = true;
         assert!(notes.remove_project(&shop.id).is_err());
@@ -247,19 +265,25 @@ mod tests {
     }
 
     #[test]
+    fn a_removal_whose_list_cannot_be_stored_fails() {
+        let (store, shelf) = (NotesStore::default(), Shelf::default());
+        let (projects, shop, storage) = shop_with_a_note(&store, &shelf);
+        let notes = Notes::new(&projects, &store, &shelf);
+        *lock(&storage.refuse) = true;
+        assert!(notes.remove_project(&shop.id).is_err());
+        // as the next start finds it
+        assert!(projects.project(&shop.id).is_ok());
+    }
+
+    #[test]
     fn an_export_is_never_written_in_a_projects_folder() {
         let (store, shelf) = (NotesStore::default(), Shelf::default());
-        let (projects, shop) = shop_with_a_note(&store, &shelf);
+        let (projects, shop, _) = shop_with_a_note(&store, &shelf);
         let notes = Notes::new(&projects, &store, &shelf);
         let written = Written::default();
-        let words = ExportWords {
-            notes: "notes",
-            no_notes: "none",
-            done: "done",
-        };
         let inside = Path::new("/dev/shop/notes.md");
         let refused = notes
-            .export(&shop.id, inside, &words, &written)
+            .export(&shop.id, inside, &WORDS, &written)
             .unwrap_err();
         assert_eq!(
             user_facing_code(&refused),
@@ -268,8 +292,50 @@ mod tests {
         assert!(lock(&written.0).is_empty());
 
         let outside = Path::new("/home/me/shop-notes.md");
-        notes.export(&shop.id, outside, &words, &written).unwrap();
+        notes.export(&shop.id, outside, &WORDS, &written).unwrap();
         assert_eq!(*lock(&written.0), [outside.to_path_buf()]);
+    }
+
+    #[test]
+    fn an_export_with_images_is_refused_when_its_images_folder_is_a_projects() {
+        let (store, shelf) = (NotesStore::default(), Shelf::default());
+        let (projects, shop, _) = shop_with_a_note(&store, &shelf);
+        // as an `images/` linking into a project's folder resolves
+        let linked = Project::new(
+            "linked".into(),
+            [Location::Local {
+                root: "/home/me/notes/images".into(),
+            }],
+            AvatarColor::FIRST,
+        );
+        projects
+            .update(|list, _| {
+                list.projects.push(linked);
+                Ok(())
+            })
+            .unwrap();
+        let book = project_book(&shop);
+        let open = store.notes(&shelf, &book).unwrap().open_list;
+        let image = PreparedImage {
+            kind: ImageKind::Png,
+            width: 1,
+            height: 1,
+            original: vec![1],
+            thumb: vec![1],
+        };
+        store
+            .add_images(&shelf, &book, ImageTarget::New { list: open }, vec![image])
+            .unwrap();
+        let notes = Notes::new(&projects, &store, &shelf);
+        let written = Written::default();
+        let refused = notes
+            .export(&shop.id, Path::new("/home/me/notes"), &WORDS, &written)
+            .unwrap_err();
+        assert_eq!(
+            user_facing_code(&refused),
+            Some(UserFacingErrorCode::ExportInRepository)
+        );
+        assert!(lock(&written.0).is_empty());
     }
 
     #[test]

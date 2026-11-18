@@ -149,13 +149,15 @@ export function useNoteActions(book: string) {
                 });
             },
             add,
+            /** Saves a note's text; whether it was saved, so a failure is tried again. */
             setText: async (id: string, text: string) => {
                 patch(id, { text });
-                await send(
+                const saved = await send(
                     t('notes.saveFailed'),
                     () => port.setNoteText(book, id, text),
                     (note) => updated([note]),
                 );
+                return saved !== undefined;
             },
             /** Done, with Undo; or open again. */
             setDone: async (note: Note, done: boolean) => {

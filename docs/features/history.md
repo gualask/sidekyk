@@ -48,6 +48,8 @@ Sidekyk makes.
   the pages read.
 - Branches: `git for-each-ref --sort=-committerdate` over `refs/heads` and `refs/remotes`, read as
   the picker opens (`origin/HEAD` and remotes a local branch tracks left out). Switch: `git switch
-  --no-guess -- <branch>` or `git switch --track -- <remote>` through `git_write`, given 10 min
+  --no-guess -- <branch>` or `git switch --track -- <remote>` through `git_write`, given 10 min,
+  both with `--no-overwrite-ignore`: git's default replaces an ignored file the branch tracks (a
+  local `.env`), so it is refused as a changed file is (`branch_switch_blocked`)
   (a checkout killed midway leaves `index.lock`); hooks run as in a terminal (git-lfs fetches on
   `post-checkout`). Then the watcher sees HEAD move.

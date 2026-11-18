@@ -87,17 +87,21 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   the name, a folder when there are images), then the export to the path chosen, written through
   the `ExportFiles` port; a section per list, notes between `---`, done ones under `### Done`;
   refused inside a project's repository (`export_in_repository`, `Machines::holds_host_path`: the
-  machine whose path it is resolves it, `ProjectList::holds` and `holds_in_wsl` compare).
+  machine whose path it is resolves it, `ProjectList::holds` and `holds_in_wsl` compare), checked
+  for the Markdown file and `images/`, not only the path chosen: an `images/` there may link into
+  a repository.
   Removing a project deletes its notes first; if they cannot go, the project stays
-  (`RemoveProjectDialog`).
+  (`RemoveProjectDialog`); a list that cannot be stored then fails the removal, the project left
+  without notes.
 - Frontend: `NotesWorkspace` (lazy), cards virtualized with measured heights (`useCardRows`);
   `InboxColumn` (the app places it at level 0) with the same `Composer` and `NoteCard`.
   `useNotes` reads a book once (`['notes', book]`, never stale: only the app writes);
   `useNoteActions` changes the cache at once, then sends the change after those before it
   (`ChangeQueue`, per book); only the last answer is shown, a skipped or failed one rereads the
-  notes. A card saves 500 ms after typing stops and on close. A book's count (`count_notes`:
-  open and done) is asked by a project's row, its open notes shown from the last count while read
-  again, and before a removal, never from an earlier count.
+  notes. A card saves 500 ms after typing stops and on close; a save that failed is tried again
+  on close (`use-text-saving.ts`). A book's count (`count_notes`: open and done) is asked by a
+  project's row, its open notes shown from the last count while read again, and before a
+  removal, never from an earlier count.
 - Measured (release, ~470-character notes): 1,000 notes read 26 ms, a change 5 ms (mostly
   `sync_all`); every book kept (2026-10-24, 1,000 / 9,000 / 30,000 notes): 0.65 / 6.2 / 18.6 MB,
   every book read (once a session: the palette's first search at all projects) 23 / 280 /

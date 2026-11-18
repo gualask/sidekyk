@@ -317,11 +317,77 @@ fn a_helper_that_stops_at_once_is_not_started_at_every_request() {
     );
 }
 
-/// Waits until the client's helper is closed.
-fn closed(agent: &AgentRepositories) {
+#[test]
+fn a_request_long_without_a_reply_waits_on_while_the_helper_answers() {
+    let dir = scratch_repo();
+    // asked at once whether it answers: every request runs past this
+    let agent = AgentRepositories::new(|| Ok(helper()))
+        .probing(Duration::from_nanos(1), Duration::from_secs(5));
+    let info = agent.resolve(dir.path()).unwrap();
+    agent.summary(&info).unwrap();
+    assert!(agent.is_running());
+}
+
+/// A client of a helper that never answers, `script` run by `sh`, which Windows lacks; asking
+/// whether it answers soon.
+#[cfg(unix)]
+fn silent(script: &'static str) -> AgentRepositories {
+    const PROBE: Duration = Duration::from_millis(300);
+    AgentRepositories::new(move || {
+        let mut command = Command::new("sh");
+        command.args(["-c", script]);
+        Ok(command)
+    })
+    .probing(PROBE, PROBE)
+}
+
+#[cfg(unix)]
+#[test]
+fn a_helper_that_stops_answering_is_killed_and_the_request_fails() {
+    // reads, never answers
+    let agent = silent("exec cat > /dev/null");
+    let started = Instant::now();
+    let error = agent.resolve(Path::new(".")).unwrap_err();
+    assert!(started.elapsed() < DEADLINE, "{error:#}");
+    assert_eq!(
+        user_facing_code(&error),
+        Some(UserFacingErrorCode::HelperFailed)
+    );
+    stopped(&agent);
+}
+
+#[cfg(unix)]
+#[test]
+fn what_is_told_to_a_helper_that_stopped_reading_never_waits_and_it_is_killed() {
+    // never reads its input
+    let agent = Arc::new(silent("exec sleep 60"));
+    let asking = agent.clone();
+    let request = std::thread::spawn(move || asking.resolve(Path::new(".")));
+    let deadline = Instant::now() + DEADLINE;
+    while !agent.is_running() {
+        assert!(Instant::now() < deadline, "the helper never started");
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    // far more than its pipe holds: told as the window's visibility is, on the main thread
+    let started = Instant::now();
+    let roots = vec!["/a/root/the/helper/never/reads".repeat(1024); 64];
+    for _ in 0..8 {
+        agent.retain(&roots);
+    }
+    assert!(started.elapsed() < Duration::from_secs(1));
+    let error = request.join().unwrap().unwrap_err();
+    assert_eq!(
+        user_facing_code(&error),
+        Some(UserFacingErrorCode::HelperFailed)
+    );
+    stopped(&agent);
+}
+
+/// Waits until the client's helper is seen stopped: closed, or killed.
+fn stopped(agent: &AgentRepositories) {
     let deadline = Instant::now() + DEADLINE;
     while agent.is_running() {
-        assert!(Instant::now() < deadline, "the helper was never closed");
+        assert!(Instant::now() < deadline, "the helper never stopped");
         std::thread::sleep(Duration::from_millis(10));
     }
 }
@@ -352,7 +418,7 @@ fn an_idle_helper_is_closed_unless_it_watches() {
     let dir = scratch_repo();
     let (agent, starts) = counting(IDLE);
     let info = agent.resolve(dir.path()).unwrap();
-    closed(&agent);
+    stopped(&agent);
     agent.summary(&info).unwrap();
     assert_eq!(
         starts.load(Ordering::Relaxed),
@@ -367,7 +433,7 @@ fn an_idle_helper_is_closed_unless_it_watches() {
     assert_eq!(starts.load(Ordering::Relaxed), 2, "kept while it watches");
 
     agent.watch(None, Box::new(|_| {}));
-    closed(&agent);
+    stopped(&agent);
     agent.summary(&info).unwrap();
     assert_eq!(
         starts.load(Ordering::Relaxed),

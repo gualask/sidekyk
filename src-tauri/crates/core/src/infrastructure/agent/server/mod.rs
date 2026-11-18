@@ -45,6 +45,7 @@ fn answer(repositories: &Arc<LocalRepositories>, output: &Output, id: u64, reque
             repositories.stop_content_search();
             reply(output, id, value(()));
         }
+        Request::Ping => reply(output, id, value(())),
         // the app does not wait: a change missed while hidden comes up as one
         Request::SetVisible { visible } => {
             set_visible(repositories, output, visible);
@@ -284,6 +285,7 @@ fn request_name(request: &Request) -> &'static str {
         Request::SearchFiles { .. } => "searchFiles",
         Request::SearchContents { .. } => "searchContents",
         Request::StopContentSearch => "stopContentSearch",
+        Request::Ping => "ping",
         Request::Retain { .. } => "retain",
         Request::Watch { .. } => "watch",
         Request::SetVisible { .. } => "setVisible",

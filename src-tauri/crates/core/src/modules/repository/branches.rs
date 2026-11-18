@@ -1,7 +1,8 @@
 //! The branches to switch to, and the switch: the one write Sidekyk makes to a repository, when
 //! the user asks for it. As VS Code's "Checkout to...": a remote branch makes the local branch
 //! that tracks it. Sidekyk never stashes, forces or fetches: git refuses a switch that would
-//! overwrite changes, and says why.
+//! overwrite changes, ignored files too (`--no-overwrite-ignore`: a local `.env` the branch
+//! tracks), and says why.
 
 use std::collections::HashSet;
 
@@ -95,9 +96,9 @@ pub fn switch_branch(
     );
     // `--`: a name is never read as an option
     let args = if request.remote {
-        ["switch", "--track", "--", name]
+        ["switch", "--no-overwrite-ignore", "--track", "--", name]
     } else {
-        ["switch", "--no-guess", "--", name]
+        ["switch", "--no-overwrite-ignore", "--no-guess", "--", name]
     };
     let out = backend.git_write(root, &args)?;
     if out.code == 0 {
@@ -115,7 +116,7 @@ pub fn switch_branch(
 /// Why git refused a switch, when the user can act on it; under `LC_ALL=C`.
 fn switch_refusal(stderr: &str) -> Option<UserFacingErrorCode> {
     if stderr.contains("would be overwritten by checkout") {
-        // changed files, or untracked ones the branch has
+        // changed files, or untracked or ignored ones the branch has
         Some(UserFacingErrorCode::BranchSwitchBlocked)
     } else if stderr.contains("index.lock") {
         // another git (the agent's) holds the index

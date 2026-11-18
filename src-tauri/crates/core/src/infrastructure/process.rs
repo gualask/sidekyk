@@ -1,7 +1,7 @@
 //! A child process run within limits: its output read up to a size, the whole within a time.
 
 use std::io::{Read, Write};
-use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStderr, ChildStdout, Command, ExitStatus, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::time::{Duration, Instant};
 
@@ -38,8 +38,7 @@ pub(crate) fn run(
     let code = if stdout.truncated {
         -1
     } else {
-        // both pipes closed: the child has ended, or is ending, so this wait is short
-        child.wait()?.code().unwrap_or(-1)
+        wait_until(&mut child, deadline)?.code().unwrap_or(-1)
     };
     Ok(ProcessOutput {
         code,
@@ -113,6 +112,25 @@ fn wait_for_pipes(
     Ok((stdout, stderr))
 }
 
+/// Waits for the child to end until `deadline`, killing it then: one that closed its output may
+/// still run. Called once both pipes closed, when the child has almost always ended: the first
+/// look finds it, and the pauses between looks stay short.
+fn wait_until(child: &mut Child, deadline: Instant) -> anyhow::Result<ExitStatus> {
+    let mut pause = Duration::from_millis(1);
+    loop {
+        if let Some(status) = child.try_wait()? {
+            return Ok(status);
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            kill(child);
+            return Err(TimedOut.into());
+        }
+        std::thread::sleep(pause.min(left));
+        pause = (pause * 2).min(Duration::from_millis(50));
+    }
+}
+
 /// A pipe of the child, read to its end on a thread of its own.
 enum Pipe {
     Stdout(std::io::Result<Stdout>),
@@ -179,6 +197,19 @@ mod tests {
             (out.stdout.as_slice(), out.truncated, out.code),
             (&b"abc"[..], false, 0)
         );
+    }
+
+    #[test]
+    fn a_process_that_closed_its_output_is_killed_at_the_deadline() {
+        let started = Instant::now();
+        let result = run(
+            &mut shell("exec >&- 2>&-; sleep 10"),
+            None,
+            1000,
+            Duration::from_millis(200),
+        );
+        assert!(result.is_err_and(|error| error.is::<TimedOut>()));
+        assert!(started.elapsed() < Duration::from_secs(5));
     }
 
     #[test]

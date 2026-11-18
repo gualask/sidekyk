@@ -11,7 +11,7 @@
     "splitter.tree": "Drag to resize; double click to fit the whole tree, again to go back",
     "splitter.list": "Drag to resize; double click to fit the whole list, again to go back",
     "splitter.inbox": "Drag to resize; double click to go back to the starting width",
-    "error.branchSwitchBlocked": "Switching would overwrite changes not committed. Commit or stash them, then switch.",
+    "error.branchSwitchBlocked": "Switching would overwrite local files: changes not committed, or untracked or ignored files the branch has. Commit, stash or move them, then switch.",
     "error.distroMissing": "This project's WSL distro is not installed anymore: see the top bar's warning.",
     "error.distroStopped": "This project's WSL distro is not running. Start it from the project.",
     "error.exportInRepository": "Sidekyk never writes inside a project's folder: pick a folder outside your projects.",

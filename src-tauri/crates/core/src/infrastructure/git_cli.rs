@@ -762,6 +762,25 @@ mod tests {
         assert!(names().contains(&("fix-login".into(), false, true)));
         assert!(!names().iter().any(|(name, ..)| name == "origin/fix-login"));
 
+        // an ignored file the branch tracks: refused, kept
+        git(root, &["switch", "-q", "-c", "with-env"]);
+        write(root, ".env", "tracked\n");
+        git(root, &["add", ".env"]);
+        git(root, &["commit", "-q", "-m", "Track the env"]);
+        git(root, &["switch", "-q", "fix-login"]);
+        write(root, ".git/info/exclude", ".env\n");
+        write(root, ".env", "mine\n");
+        let blocked = switch("with-env", false).unwrap_err();
+        assert_eq!(
+            user_facing_code(&blocked),
+            Some(UserFacingErrorCode::BranchSwitchBlocked)
+        );
+        assert_eq!(
+            std::fs::read_to_string(root.join(".env")).unwrap(),
+            "mine\n"
+        );
+        std::fs::remove_file(root.join(".env")).unwrap();
+
         // a change the switch would overwrite: refused, kept
         write(root, "src/cart.ts", "mine\n");
         git(root, &["commit", "-q", "-am", "Change the cart"]);

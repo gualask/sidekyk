@@ -70,7 +70,13 @@ Windows yet, `ROADMAP.md`). Containers will reuse the helper
   requests waiting; the next starts a new one, told the repository watched and the visibility. One
   that ran 10 s or more makes the app read the project on screen again; one that dies sooner is not
   started again for 10 s. No acks, replay, heartbeat or reconnection: over a local pipe a dead
-  helper is end of file.
+  helper is end of file. Requests are queued and one thread per helper writes them in order: no
+  caller waits on the pipe (visibility is told on the main thread), however full a stuck helper
+  left it. A stuck one (a distro frozen) is not end of file: a request 30 s without a word asks
+  it a `Ping`, answered as it is read; none in 30 s more kills it, failing the requests waiting
+  and ending a write blocked on its pipe.
+  Only while a request waits, and a slow request is never cut: a search in contents or a switch
+  running hooks has no bound of its own.
 - Measured (2026-10-18, release): through the helper on the Mac (`agent_timings`), a round trip
   20-35 µs, a snapshot unchanged (a 4,366-file Rust repository 36.2 ms), the palette's files 173 → 254 µs, a 2 MiB
   diff 32.2 → 36.9 ms. In the container fixture (aarch64, 1 CPU): installed and first answer

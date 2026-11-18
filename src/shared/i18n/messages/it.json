@@ -11,7 +11,7 @@
     "splitter.tree": "Trascina per ridimensionare; doppio clic per mostrare tutto l'albero, di nuovo per tornare indietro",
     "splitter.list": "Trascina per ridimensionare; doppio clic per mostrare tutta la lista, di nuovo per tornare indietro",
     "splitter.inbox": "Trascina per ridimensionare; doppio clic per tornare alla larghezza iniziale",
-    "error.branchSwitchBlocked": "Il cambio sovrascriverebbe modifiche non committate. Committale o mettile da parte con uno stash, poi cambia branch.",
+    "error.branchSwitchBlocked": "Il cambio sovrascriverebbe file locali: modifiche non committate, o file non tracciati o ignorati che il branch contiene. Committali, mettili in uno stash o spostali, poi cambia branch.",
     "error.distroMissing": "La distro WSL di questo progetto non è più installata: vedi l'avviso nella barra in alto.",
     "error.distroStopped": "La distro WSL di questo progetto non è avviata. Avviala dal progetto.",
     "error.exportInRepository": "Sidekyk non scrive mai dentro la cartella di un progetto: scegli una cartella fuori dai tuoi progetti.",

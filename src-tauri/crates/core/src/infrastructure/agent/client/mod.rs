@@ -2,7 +2,8 @@
 //! asked what `Repositories` asks (`requests`). A helper that stops is started again on the next
 //! request that waits for a reply, told first the repository watched and whether the window shows,
 //! as they are then. Each helper is a `connection`, its output read by `output`; one that watches
-//! nothing and was asked nothing for a while is closed by `idle`.
+//! nothing and was asked nothing for a while is closed by `idle`; one that stops answering is
+//! killed by the request waiting on it.
 
 mod connection;
 mod idle;
@@ -11,7 +12,7 @@ mod requests;
 
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc;
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -33,6 +34,15 @@ use output::read_again;
 /// the app read the repository on screen again, which starts the next.
 const STABLE_RUN: Duration = Duration::from_secs(10);
 
+/// A request waiting this long with nothing from the helper asks whether it still answers (a
+/// `Ping`): a request may last, a search in contents or a switch running hooks, a helper may not
+/// stop reading. Only while a request waits: an idle helper is never asked.
+const PROBE_AFTER: Duration = Duration::from_secs(30);
+
+/// A helper that answers no ping in this long is stuck (a WSL distro frozen): killed, the requests
+/// waiting on it fail, and the next starts another. Generous: a busy machine answers in far less.
+const PROBE_WAIT: Duration = Duration::from_secs(30);
+
 /// A watch's `OnChange`, shared with the thread reading the helper's messages.
 type SharedOnChange = Arc<dyn Fn(RepositoryChange) + Send + Sync>;
 
@@ -50,6 +60,15 @@ pub struct AgentRepositories {
     next_id: Arc<AtomicU64>,
     kept: Arc<Kept>,
     idle: Arc<Idle>,
+    probe: Probe,
+}
+
+/// When a request asks whether its helper still answers, and how long it waits for the answer:
+/// `PROBE_AFTER` and `PROBE_WAIT`, shorter in a test.
+#[derive(Clone, Copy)]
+struct Probe {
+    after: Duration,
+    wait: Duration,
 }
 
 /// What outlives one helper.
@@ -89,6 +108,10 @@ impl AgentRepositories {
             next_id: Arc::new(AtomicU64::new(1)),
             kept: Arc::default(),
             idle: Arc::new(Idle::new(after)),
+            probe: Probe {
+                after: PROBE_AFTER,
+                wait: PROBE_WAIT,
+            },
         };
         let (idle, slot, kept) = (
             this.idle.clone(),
@@ -97,6 +120,13 @@ impl AgentRepositories {
         );
         std::thread::spawn(move || close_when_idle(&idle, &slot, &kept));
         this
+    }
+
+    /// As this client, asking a helper silent for `after` whether it answers, and killing it when
+    /// it does not answer within `wait`.
+    pub fn probing(mut self, after: Duration, wait: Duration) -> Self {
+        self.probe = Probe { after, wait };
+        self
     }
 
     /// Sends `request` and waits for its reply, giving `contents` the files a search in contents
@@ -137,27 +167,33 @@ impl AgentRepositories {
             None => self.start()?,
         };
         let id = self.next_id.fetch_add(1, Ordering::Relaxed);
-        let (sender, receiver) = mpsc::channel();
-        {
-            let mut waiting = lock(&connection.replies.waiting);
-            if connection.replies.stopped.load(Ordering::Relaxed) {
-                return Err(helper_failed(anyhow::anyhow!("the helper stopped")));
-            }
-            waiting.insert(id, sender);
-        }
-        if let Err(error) = connection.write(id, request) {
-            lock(&connection.replies.waiting).remove(&id);
-            return Err(helper_failed(error));
-        }
+        let waiting = connection.send(id, request).map_err(helper_failed)?;
         loop {
-            match receiver.recv() {
+            match waiting.next(self.probe.after) {
                 Ok(Incoming::Contents(files)) => contents(files),
                 Ok(Incoming::Reply(Ok(value))) => return Ok(Answer::Value(value)),
                 Ok(Incoming::Bytes(bytes)) => return Ok(Answer::Bytes(bytes)),
                 Ok(Incoming::Reply(Err(error))) => return Err(error.into()),
-                Err(_) => return Err(helper_failed(anyhow::anyhow!("the helper stopped"))),
+                Err(RecvTimeoutError::Timeout) => {
+                    if !self.answers(&connection) {
+                        tracing::warn!("the helper does not answer: stopping it");
+                        connection.kill();
+                        return Err(helper_failed(anyhow::anyhow!("the helper does not answer")));
+                    }
+                }
+                Err(RecvTimeoutError::Disconnected) => {
+                    return Err(helper_failed(anyhow::anyhow!("the helper stopped")));
+                }
             }
         }
+    }
+
+    /// Whether `connection`'s helper still reads and answers: a `Ping`, answered as it is read.
+    fn answers(&self, connection: &Connection) -> bool {
+        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
+        connection
+            .send(id, Request::Ping)
+            .is_ok_and(|ping| matches!(ping.next(self.probe.wait), Ok(Incoming::Reply(Ok(_)))))
     }
 
     /// Whether a helper runs now: a request would not start one.
