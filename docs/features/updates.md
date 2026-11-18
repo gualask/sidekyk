@@ -11,7 +11,8 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
 - A newer version: a toast once per version, with Update; the Settings row says it too. Update
   downloads it (the percent in the row's button), checks its signature, puts it in place of the
   app and restarts it. On Windows its installer takes over (passive mode) and the app exits. A
-  failure is a toast and leaves the app as it was.
+  failure is a toast, leaves the app as it was and checks again at once: the next Update takes
+  what the server offers now (a release that replaced a broken one), not the one that failed.
 - The source: `latest.json` of the latest published release (`plugins.updater.endpoints`); a
   draft is never offered.
 
@@ -39,8 +40,10 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
   Each build uploads its installers and signatures to that draft while `ci.yml` runs. Checks
   alongside, not first: the builds are the long part, and a failed check costs only their runner
   time.
-- If the tag and workspace version differ, the version check fails before draft creation.
-  Correct the mismatch and push the matching tag. To reuse a tag after a failed release,
+- The version check fails before draft creation if the tag and workspace version differ, if
+  the tag is not a plain `vX.Y.Z` (a prerelease would become the latest release, offered to every
+  copy), or if it is not above the latest release's (an older one would hide the newest). Correct
+  the mismatch and push the matching tag. To reuse a tag after a failed release,
   delete any draft for that tag and the tag itself before pushing it again.
 - Builds: macOS one universal `.dmg` and `.app.tar.gz` (`--target universal-apple-darwin`); Linux
   on Ubuntu 22.04, the oldest runner, for the oldest glibc: AppImage, `.deb`, `.rpm`; Windows x64,
@@ -53,7 +56,8 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
   has the updater's private key, and the bundler refuses a public key without it.
 - After all builds and checks pass, `publish` generates `latest.json` from the draft's uploaded
   installer and signature pairs. Each entry uses the installer's asset URL and its matching
-  `.sig` contents. A missing or ambiguous installer or missing signature blocks publication.
+  `.sig` contents. A missing or ambiguous installer or missing signature blocks publication; so
+  does the `.dmg`, which no update uses but the README's first install does.
   The job uploads the manifest, reads it back and checks the bytes before publishing. After a
   transient manifest upload or read error, re-run the failed job against the same draft.
 

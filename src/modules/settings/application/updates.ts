@@ -1,4 +1,4 @@
-import { useIsMutating, useMutation, useQuery } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@/shared/i18n';
 import { errorToast, useShowToast } from '@/shared/ui/toasts';
@@ -27,16 +27,23 @@ export function useAvailableUpdate(enabled = true) {
     });
 }
 
-/** Installs the version found and restarts the app; a failure is a toast. */
+/**
+ * Installs the version found and restarts the app. A failure is a toast and checks again at once:
+ * the next install takes what the release server offers now, such as a release that replaced a
+ * broken one, not the update that failed.
+ */
 export function useInstallUpdate() {
     const port = useSettingsPort();
+    const queryClient = useQueryClient();
     const showToast = useShowToast();
     const i18n = useTranslation();
     return useMutation({
         mutationKey: installKey,
         mutationFn: () => port.installUpdate(),
-        onError: (error) =>
-            showToast(errorToast(i18n.t('settings.update.installFailed'), error, i18n)),
+        onError: (error) => {
+            showToast(errorToast(i18n.t('settings.update.installFailed'), error, i18n));
+            void queryClient.invalidateQueries({ queryKey: updateKey, exact: true });
+        },
     });
 }
 

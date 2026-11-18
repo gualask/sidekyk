@@ -18,6 +18,8 @@ PLATFORMS = {
     ".msi": ("windows-x86_64", "windows-x86_64-msi"),
     "-setup.exe": ("windows-x86_64-nsis",),
 }
+# Installed by hand only, as the README says: no update entry, but the release needs one.
+FIRST_INSTALL = (".dmg",)
 
 
 def read_signature(asset):
@@ -30,6 +32,13 @@ def read_signature(asset):
     return signature
 
 
+def only_installer(assets, suffix):
+    matches = [name for name in assets if name.endswith(suffix)]
+    if len(matches) != 1:
+        raise ValueError(f"Expected one uploaded {suffix} installer, found {matches}")
+    return matches[0]
+
+
 def manifest(release, tag):
     if not release["draft"] or release["tag_name"] != tag or not tag.startswith("v"):
         raise ValueError(f"Expected the draft for {tag}")
@@ -38,12 +47,11 @@ def manifest(release, tag):
         asset["name"]: asset for asset in release["assets"]
         if asset["state"] == "uploaded" and asset["size"] > 0
     }
+    for suffix in FIRST_INSTALL:
+        only_installer(assets, suffix)
     platforms = {}
     for suffix, keys in PLATFORMS.items():
-        matches = [name for name in assets if name.endswith(suffix)]
-        if len(matches) != 1:
-            raise ValueError(f"Expected one uploaded {suffix} installer, found {matches}")
-        name = matches[0]
+        name = only_installer(assets, suffix)
         signature = assets.get(name + ".sig")
         if signature is None:
             raise ValueError(f"Missing uploaded signature for {name}")

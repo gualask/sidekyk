@@ -30,6 +30,30 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME, but src-tauri/Cargo.toml is at $version"
             exit 1
           fi
+      # Published, a release becomes the latest one, whose latest.json every installed copy
+      # reads: a prerelease would reach them all, an older version hide the newest.
+      - name: The tag is a stable version above the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::tag $GITHUB_REF_NAME is not vX.Y.Z"
+            exit 1
+          fi
+          # none before the first release; any other failure stops the release
+          if ! latest=$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name \
+            2> latest.err); then
+            grep -q 'HTTP 404' latest.err || { cat latest.err; exit 1; }
+            latest=
+          fi
+          if [ -n "$latest" ]; then
+            highest=$(printf '%s\n%s\n' "${latest#v}" "${GITHUB_REF_NAME#v}" | sort -V | tail -n1)
+            if [ "$latest" = "$GITHUB_REF_NAME" ] || [ "$highest" != "${GITHUB_REF_NAME#v}" ]; then
+              echo "::error::tag $GITHUB_REF_NAME is not above the latest release, $latest"
+              exit 1
+            fi
+          fi
+        shell: bash
 
   checks:
     uses: ./.github/workflows/ci.yml
