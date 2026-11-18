@@ -31,10 +31,10 @@ day, every platform before a release. Actions pinned to a commit, the version in
   Windows, so `#[cfg]` code and each real watcher are built and tried. The Mac cannot type-check
   for Windows (`onig_sys` builds C).
 - `build.yml`: an unsigned Windows x64 build, NSIS and MSI as artifacts (14 days; SmartScreen
-  warns). `helper.yml` builds the static helper first (musl, `musl-gcc` for its C; x64, and arm64
-  on an arm64 runner for the container fixture); the x64 one goes into the installer's resources
-  (`tauri build --config src-tauri/tauri.helper.conf.json`). Other builds have no helper: WSL
-  projects fail with `helper_failed`.
+  warns). `helper.yml` builds the static x64 helper for the installer (musl, `musl-gcc` for
+  its C). An independent arm64 job builds the helper natively for the container fixture.
+  Both this workflow and `release.yml` bundle the x64 helper in their Windows installers
+  through `src-tauri/tauri.helper.conf.json`.
 - `release.yml`: on a `v*` tag, `ci.yml` and every platform's build into a release
   (`features/updates.md`).
 
@@ -43,13 +43,14 @@ day, every platform before a release. Actions pinned to a commit, the version in
 What the Mac cannot show (ROADMAP, Verify on the packaged app), tried by hand; the log comes back
 for reading.
 
-- Builds: on Windows the installer from `build.yml` (a release with the helper: the app as a
-  user gets it, WSL projects included, CI above), or on the machine from a clone; Linux has
-  none in CI. From a clone, with Tauri's prerequisites (Tauri's docs, Prerequisites; WebKitGTK
+- On Windows, use the installer from `build.yml` to test the packaged app with WSL projects.
+  On Linux x64, download the package for your distribution from the
+  [latest release](https://github.com/gualask/sidekyk/releases/latest).
+- From a clone, with Tauri's prerequisites (Tauri's docs, Prerequisites; WebKitGTK
   4.1 and the rest on Linux): `pnpm install`, then `pnpm tauri:dev`, or `pnpm tauri build
   --debug` for the installed app (installer under `src-tauri/target/debug/bundle/`). Both write
   the development log and have the WebView's devtools, unoptimized, so for behaviour, never
-  timings; neither has the helper, so WSL projects fail there.
+  timings; neither bundles the helper, so opening a WSL project fails with `helper_failed`.
 - Logs: Settings, Show log; by hand `%LOCALAPPDATA%\io.github.gualask.sidekyk\logs\` on Windows,
   `~/.local/share/io.github.gualask.sidekyk/logs/` on Linux (Tauri's `app_log_dir`):
   `sidekyk.log` from a release, `sidekyk-dev.log` from a debug build, the previous session's

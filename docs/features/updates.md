@@ -32,13 +32,16 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
 
 ## Release
 
-- To release: the version in `src-tauri/Cargo.toml` (`Cargo.lock` follows), commit, push a tag
-  `vX.Y.Z` of that version. `release.yml` then: the tag checked against the version; a draft
-  release with generated notes; the builds into it (`tauri-action`) while `ci.yml` runs, after
-  the x64 WSL helper (`helper.yml`, shared with `build.yml`, which adds arm64); published only
-  when the checks pass and its `latest.json` names every installer. Checks alongside, not first:
-  the builds are the long part, and a failed check costs only their runner time. A failed run
-  leaves the draft: delete it and the tag before tagging again.
+- To release, commit the version in `src-tauri/Cargo.toml` and `Cargo.lock`, then push the
+  matching `vX.Y.Z` tag. The release queue runs one tag at a time and holds up to 100 pending
+  runs. After the version check, `release.yml` creates a draft with generated notes.
+- macOS and Linux can build as soon as the draft exists. Windows also needs the x64 WSL helper.
+  Each build uploads its installers and signatures to that draft while `ci.yml` runs. Checks
+  alongside, not first: the builds are the long part, and a failed check costs only their runner
+  time.
+- If the tag and workspace version differ, the version check fails before draft creation.
+  Correct the mismatch and push the matching tag. To reuse a tag after a failed release,
+  delete any draft for that tag and the tag itself before pushing it again.
 - Builds: macOS one universal `.dmg` and `.app.tar.gz` (`--target universal-apple-darwin`); Linux
   on Ubuntu 22.04, the oldest runner, for the oldest glibc: AppImage, `.deb`, `.rpm`; Windows x64,
   NSIS and MSI with the helper. Each update has its `.sig`. Only the app's binary is compiled
@@ -48,9 +51,11 @@ The app updates itself from GitHub Releases; a tag builds and publishes a releas
   19.8 and x86_64 16.0 compiling, one after the other), under its 60-minute limit.
 - `tauri.release.conf.json` turns `createUpdaterArtifacts` on for releases only: no other build
   has the updater's private key, and the bundler refuses a public key without it.
-- The three build jobs each rewrite `latest.json` (download, merge, upload), so two finishing
-  together can drop one's entries: the check before publishing catches it; re-running that build
-  job adds them again.
+- After all builds and checks pass, `publish` generates `latest.json` from the draft's uploaded
+  installer and signature pairs. Each entry uses the installer's asset URL and its matching
+  `.sig` contents. A missing or ambiguous installer or missing signature blocks publication.
+  The job uploads the manifest, reads it back and checks the bytes before publishing. After a
+  transient manifest upload or read error, re-run the failed job against the same draft.
 
 ## Signatures
 

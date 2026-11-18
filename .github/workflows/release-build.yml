@@ -1,0 +1,103 @@
+name: Build release installers
+
+on:
+  workflow_call:
+    inputs:
+      release-id:
+        required: true
+        type: string
+      runner:
+        required: true
+        type: string
+      args:
+        required: true
+        type: string
+      rust-targets:
+        type: string
+        default: ''
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: true
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+      MACOS_CERTIFICATE:
+        required: false
+      MACOS_CERTIFICATE_PASSWORD:
+        required: false
+
+env:
+  # "Sidekyk Release Signing", the self-signed certificate of every macOS release (public): its
+  # SHA-1 names the identity to `codesign`, and the designated requirement pins it
+  SIGNING_CERTIFICATE_SHA1: BF298F34411C70D3240747F8E28CE8D6EC3C6272
+
+jobs:
+  build:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install Tauri and AppImage build dependencies
+        if: runner.os == 'Linux'
+        run: bash .github/scripts/install-tauri-linux-deps.sh patchelf
+      - if: runner.os == 'Windows'
+        uses: ./.github/actions/download-wsl-helper
+      # Into a keychain of its own, found by `codesign` through the search list. Not Tauri's
+      # `APPLE_CERTIFICATE`: it names the identity by the certificate's team (its organizational
+      # unit), which a self-signed certificate has not.
+      - name: Import the signing certificate
+        if: runner.os == 'macOS'
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password=$(openssl rand -hex 24)
+          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 3600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -f pkcs12 \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/signing.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" \
+            "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" \
+            $(security list-keychains -d user | tr -d '"')
+          security find-identity -p codesigning "$keychain" | grep -F "$SIGNING_CERTIFICATE_SHA1"
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: package.json
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
+        with:
+          toolchain: stable
+          targets: ${{ inputs.rust-targets }}
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: src-tauri
+      - run: pnpm install --frozen-lockfile
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && env.SIGNING_CERTIFICATE_SHA1 || '' }}
+        with:
+          uploadUpdaterJson: false
+          releaseId: ${{ inputs.release-id }}
+          # the app alone: cargo would build the workspace's default members, `sidekyk-agent`
+          # among them, which ships prebuilt from helper.yml
+          args: ${{ inputs.args }} -- --bin sidekyk
+      # Screen Recording outlives an update only if the designated requirement pins our leaf
+      # certificate: the draft stays unpublished otherwise.
+      - name: Check the signature
+        if: runner.os == 'macOS'
+        run: |
+          app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Sidekyk.app
+          codesign --verify --deep --strict "$app"
+          leaf=$(printf '%s' "$SIGNING_CERTIFICATE_SHA1" | tr 'A-F' 'a-f')
+          codesign -d -r- "$app" 2>&1 | tee /dev/stderr \
+            | grep -F "certificate leaf = H\"$leaf\""

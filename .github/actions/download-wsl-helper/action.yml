@@ -1,0 +1,9 @@
+name: Download WSL helper
+description: Place the Linux x64 helper in the resources directory for the Windows installer.
+runs:
+  using: composite
+  steps:
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: sidekyk-agent-linux-x64
+        path: src-tauri/resources/linux

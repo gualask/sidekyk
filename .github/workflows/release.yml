@@ -1,7 +1,7 @@
 # A release on a tag `vX.Y.Z`, the workspace Cargo.toml's version (docs/features/updates.md):
-# macOS (universal), Linux and Windows x64 built into a draft release with the updater's
-# latest.json while the checks (ci.yml) run; published once both pass and latest.json names every
-# installer. A failed check leaves the draft unpublished.
+# macOS (universal), Linux and Windows x64 built into a draft release while the checks (ci.yml)
+# run; once both pass, latest.json is made from the draft's installers and the draft published.
+# A failed build or check leaves the draft unpublished.
 name: Release
 
 on:
@@ -11,15 +11,9 @@ on:
 permissions:
   contents: read
 
-# the build jobs of two tags would rewrite one another's latest.json
 concurrency:
   group: release
-  cancel-in-progress: false
-
-env:
-  # "Sidekyk Release Signing", the self-signed certificate of every macOS release (public): its
-  # SHA-1 names the identity to `codesign`, and the designated requirement pins it
-  SIGNING_CERTIFICATE_SHA1: BF298F34411C70D3240747F8E28CE8D6EC3C6272
+  queue: max
 
 jobs:
   version:
@@ -42,8 +36,6 @@ jobs:
 
   helper:
     uses: ./.github/workflows/helper.yml
-    with:
-      arm64: false
 
   # made before the builds: each uploads into it, and a draft cannot be found by its tag
   draft:
@@ -64,107 +56,50 @@ jobs:
             -F draft=true -F generate_release_notes=true --jq .id)
           echo "id=$id" >> "$GITHUB_OUTPUT"
 
-  build:
-    needs: [draft, helper]
+  unix:
+    needs: draft
     strategy:
       fail-fast: false
       matrix:
         include:
-          # one universal app: Intel Macs too, at no runtime cost (only the native slice loads)
           - runner: macos-latest
-            rust-targets: aarch64-apple-darwin,x86_64-apple-darwin
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
             args: --target universal-apple-darwin --config src-tauri/tauri.release.conf.json
-          # the oldest Ubuntu runner: the AppImage and the packages need its glibc or a newer one
           - runner: ubuntu-22.04
-            rust-targets: ''
+            targets: ''
             args: --config src-tauri/tauri.release.conf.json
-          # with the WSL helper in the installers' resources
-          - runner: windows-latest
-            rust-targets: ''
-            args: >-
-              --config src-tauri/tauri.helper.conf.json
-              --config src-tauri/tauri.release.conf.json
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 60
+    uses: ./.github/workflows/release-build.yml
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # ci.yml's, and `patchelf` for the AppImage (Tauri's docs, GitHub pipeline)
-      - name: Install Tauri's Linux dependencies
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev librsvg2-dev patchelf
-      # where tauri.helper.conf.json takes it into the installers' resources
-      - if: runner.os == 'Windows'
-        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: sidekyk-agent-linux-x64
-          path: src-tauri/resources/linux
-      # Into a keychain of its own, found by `codesign` through the search list. Not Tauri's
-      # `APPLE_CERTIFICATE`: it names the identity by the certificate's team (its organizational
-      # unit), which a self-signed certificate has not.
-      - name: Import the signing certificate
-        if: runner.os == 'macOS'
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
-        run: |
-          keychain="$RUNNER_TEMP/signing.keychain-db"
-          password=$(openssl rand -hex 24)
-          printf '%s' "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/signing.p12"
-          security create-keychain -p "$password" "$keychain"
-          security set-keychain-settings -lut 3600 "$keychain"
-          security unlock-keychain -p "$password" "$keychain"
-          security import "$RUNNER_TEMP/signing.p12" -k "$keychain" -f pkcs12 \
-            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-          rm "$RUNNER_TEMP/signing.p12"
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$password" \
-            "$keychain" > /dev/null
-          security list-keychains -d user -s "$keychain" \
-            $(security list-keychains -d user | tr -d '"')
-          security find-identity -p codesigning "$keychain" | grep -F "$SIGNING_CERTIFICATE_SHA1"
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: package.json
-          cache: pnpm
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master, 2026-10-16
-        with:
-          toolchain: stable
-          targets: ${{ matrix.rust-targets }}
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: src-tauri
-      - run: pnpm install --frozen-lockfile
-      # Builds, signs each update with the updater's key, uploads the installers, the updates and
-      # their `.sig` into the draft, and adds this system's entries to its latest.json.
-      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && env.SIGNING_CERTIFICATE_SHA1 || '' }}
-        with:
-          releaseId: ${{ needs.draft.outputs.id }}
-          # the app alone: cargo would build the workspace's default members, `sidekyk-agent`
-          # among them, which ships prebuilt from helper.yml
-          args: ${{ matrix.args }} -- --bin sidekyk
-      # Screen Recording outlives an update only if the designated requirement pins our leaf
-      # certificate: the draft stays unpublished otherwise.
-      - name: Check the signature
-        if: runner.os == 'macOS'
-        run: |
-          app=src-tauri/target/universal-apple-darwin/release/bundle/macos/Sidekyk.app
-          codesign --verify --deep --strict "$app"
-          leaf=$(printf '%s' "$SIGNING_CERTIFICATE_SHA1" | tr 'A-F' 'a-f')
-          codesign -d -r- "$app" 2>&1 | tee /dev/stderr \
-            | grep -F "certificate leaf = H\"$leaf\""
+    with:
+      release-id: ${{ needs.draft.outputs.id }}
+      runner: ${{ matrix.runner }}
+      rust-targets: ${{ matrix.targets }}
+      args: ${{ matrix.args }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      # the macOS job alone gets the code-signing certificate
+      MACOS_CERTIFICATE: >-
+        ${{ matrix.runner == 'macos-latest' && secrets.MACOS_CERTIFICATE || '' }}
+      MACOS_CERTIFICATE_PASSWORD: >-
+        ${{ matrix.runner == 'macos-latest' && secrets.MACOS_CERTIFICATE_PASSWORD || '' }}
+
+  windows:
+    needs: [draft, helper]
+    uses: ./.github/workflows/release-build.yml
+    permissions:
+      contents: write
+    with:
+      release-id: ${{ needs.draft.outputs.id }}
+      runner: windows-latest
+      args: --config src-tauri/tauri.helper.conf.json --config src-tauri/tauri.release.conf.json
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   publish:
-    needs: [draft, build, checks]
+    needs: [draft, unix, windows, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
@@ -173,20 +108,22 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       RELEASE: repos/${{ github.repository }}/releases/${{ needs.draft.outputs.id }}
     steps:
-      # The build jobs each rewrite latest.json, so two finishing together can drop one's entries.
-      # Each installed copy looks for `{os}-{arch}-{installer}` first, then `{os}-{arch}`.
-      - name: latest.json names every installer
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Generate the updater manifest from the draft
         run: |
-          asset=$(gh api "$RELEASE" --jq '.assets[] | select(.name == "latest.json") | .id')
-          gh api -H 'Accept: application/octet-stream' \
-            "repos/$GITHUB_REPOSITORY/releases/assets/$asset" > latest.json
-          jq --arg version "${GITHUB_REF_NAME#v}" -e '.version == $version' latest.json
-          missing=$(jq -r '$ARGS.positional - (.platforms | keys) | join(" ")' latest.json --args \
-            darwin-aarch64 darwin-aarch64-app darwin-x86_64 darwin-x86_64-app \
-            linux-x86_64 linux-x86_64-appimage linux-x86_64-deb linux-x86_64-rpm \
-            windows-x86_64 windows-x86_64-msi windows-x86_64-nsis)
-          if [ -n "$missing" ]; then
-            echo "::error::latest.json lacks $missing: re-run the build job that made it"
-            exit 1
+          gh api "$RELEASE" > draft.json
+          python3 .github/scripts/updater-manifest.py draft.json "$GITHUB_REF_NAME" > latest.json
+      - name: Upload and verify the manifest before publishing
+        run: |
+          previous=$(jq -r '.assets[] | select(.name == "latest.json") | .id' draft.json)
+          if [ -n "$previous" ]; then
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$previous"
           fi
-      - run: gh api --method PATCH "$RELEASE" -F draft=false > /dev/null
+          upload=$(jq -r '.upload_url | split("{")[0]' draft.json)
+          asset=$(curl --fail-with-body --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" -H 'Content-Type: application/json' \
+            --data-binary @latest.json "$upload?name=latest.json" | jq -er '.id')
+          gh api -H 'Accept: application/octet-stream' \
+            "repos/$GITHUB_REPOSITORY/releases/assets/$asset" | cmp - latest.json
+          gh api --method PATCH "$RELEASE" -F draft=false > /dev/null
+        shell: bash

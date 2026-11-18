@@ -12,17 +12,18 @@ jobs:
   helper-linux:
     uses: ./.github/workflows/helper.yml
 
+  fixture-helper:
+    uses: ./.github/workflows/helper.yml
+    with:
+      arm64: true
+
   windows:
     needs: helper-linux
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # where tauri.helper.conf.json takes it into the installer's resources
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: sidekyk-agent-linux-x64
-          path: src-tauri/resources/linux
+      - uses: ./.github/actions/download-wsl-helper
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -35,7 +36,8 @@ jobs:
         with:
           workspaces: src-tauri
       - run: pnpm install --frozen-lockfile
-      # only this build ships the helper: any other (cargo test, clippy, tauri dev) builds without it
+      # only this build and release.yml's ship the helper: any other (cargo test, clippy,
+      # tauri dev) builds without it
       - run: pnpm tauri build --config src-tauri/tauri.helper.conf.json
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
