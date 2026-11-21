@@ -14,13 +14,15 @@ const CHECK_AGAIN_AFTER_MS = 24 * 60 * 60 * 1000;
 /**
  * A version newer than this one, or null; `undefined` until checked. Checked once `enabled`, then
  * again when the window shows a day after the last check (the page's `visibilitychange`), or
- * when asked (`refetch`).
+ * when asked (`refetch`). Over the network: offline, it waits for the connection instead of
+ * failing.
  */
 export function useAvailableUpdate(enabled = true) {
     const port = useSettingsPort();
     return useQuery({
         queryKey: updateKey,
         queryFn: () => port.checkUpdate(),
+        networkMode: 'online',
         staleTime: CHECK_AGAIN_AFTER_MS,
         refetchOnWindowFocus: true,
         enabled,

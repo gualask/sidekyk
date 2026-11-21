@@ -27,7 +27,9 @@ shows them: `overview.md`.
   none; a folder above repositories opens New project on it instead.
 - What a folder is: a repository when a `.git` (folder, or file for worktrees and
   submodules) is at its root, else a folder without git. Never stored: `git init` or `.git`
-  removed changes the panels while the app runs (`workspace.md`).
+  removed changes the panels while the app runs (`workspace.md`). A linked worktree's watch sees
+  its own git dir, not the refs it shares with the main one: a fetch or a commit from elsewhere
+  shows at its next change.
 - Top bar facts: branch, ahead/behind, changed files and lines against HEAD (`1.2k changed +1.2k
   −340`), or "clean".
 - A folder moved or deleted: problem `repository_missing` with Locate… (the project follows the

@@ -172,10 +172,15 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
 - The `git` CLI, no libgit2: every answer is what the user's git prints. Found on the PATH, else in
   `/opt/homebrew/bin`, `/usr/local/bin`, `/usr/bin` or `C:\Program Files\Git\cmd`; on Windows
   without a console window (`CREATE_NO_WINDOW`). No git runs for a folder without git.
-- `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (a repository's config cannot make Sidekyk run
-  a command), `-c diff.autoRefreshIndex=false` (`git diff` against the working tree rewrites the
-  index on a stat-only change, the lock variable notwithstanding), `GIT_TERMINAL_PROMPT=0`,
-  `LC_ALL=C`.
+- `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` (no fsmonitor command from a repository's
+  config on every refresh), `-c diff.autoRefreshIndex=false` (`git diff` against the working tree
+  rewrites the index on a stat-only change, the lock variable notwithstanding),
+  `GIT_NO_LAZY_FETCH=1` on reads (a partial clone's read fails rather than fetch an object and
+  write a pack; git 2.45 on, ignored before; the branch switch may fetch, its checkout needs the
+  files), `GIT_TERMINAL_PROMPT=0`, `LC_ALL=C`.
+- Not every command a repository's config names is off: a `filter.<driver>.clean` runs when a diff
+  or numstat reads the working tree, so a folder whose `.git` came from someone else runs what it
+  names, as git in a terminal does.
 - Diffs: `--no-ext-diff --no-textconv`. `git diff` alone runs a `diff=<driver>` textconv
   (numstat, diff-tree and log do not): its diff would show what that program prints, not the file
   the viewer reads. VS Code and Zed diff the blobs as stored.

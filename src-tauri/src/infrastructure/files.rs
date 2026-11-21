@@ -36,7 +36,11 @@ pub(crate) fn read_within(path: &Path, limit: u64) -> anyhow::Result<Option<Vec<
 pub(crate) struct HostFiles;
 
 impl ExportFiles for HostFiles {
+    /// An export goes in a folder the user chose: a file already where its copy beside goes is
+    /// theirs, never written over nor removed.
     fn write_whole(&self, path: &Path, bytes: &[u8]) -> anyhow::Result<()> {
+        let temp = temp_path(path);
+        anyhow::ensure!(!temp.exists(), "{} is in the way", temp.display());
         write_whole(path, bytes)
     }
 }
@@ -105,6 +109,16 @@ mod tests {
             .is_err());
         assert_eq!(HostFiles.read(&file, 5).unwrap(), b"12345");
         assert_eq!(HostFiles.read(&file, 3).unwrap(), b"1234");
+    }
+
+    #[test]
+    fn an_export_leaves_a_file_where_its_copy_goes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("notes.md");
+        fs::write(temp_path(&path), b"mine").unwrap();
+        assert!(HostFiles.write_whole(&path, b"notes").is_err());
+        assert_eq!(fs::read(temp_path(&path)).unwrap(), b"mine");
+        assert!(!path.exists());
     }
 
     #[test]

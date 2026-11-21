@@ -2,7 +2,7 @@
 //! merged takes its notes first, a note's copy names its images as the project's machine does, an
 //! export never writes in a project's folder (`docs/features/notes.md`).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use super::machines::Start;
 use super::projects::Projects;
@@ -149,19 +149,7 @@ impl<'a> Notes<'a> {
         let project = self.projects.project(project_id)?;
         let book = project_book(&project);
         let images = self.images(&book)?;
-        let (markdown_file, images_folder) = if images.is_empty() {
-            (path.to_path_buf(), None)
-        } else {
-            // a folder: the name chosen names the Markdown file in it too
-            let name = path.file_name().map_or_else(
-                || project.name.clone(),
-                |name| name.to_string_lossy().into_owned(),
-            );
-            (
-                path.join(format!("{name}.md")),
-                Some(path.join(EXPORT_IMAGES)),
-            )
-        };
+        let (markdown_file, images_folder) = export_paths(path, &project.name, !images.is_empty());
         let mut targets = std::iter::once(&markdown_file).chain(&images_folder);
         if targets.any(|target| self.projects.holds_host_path(target)) {
             return Err(user_facing(UserFacingErrorCode::ExportInRepository));
@@ -170,14 +158,26 @@ impl<'a> Notes<'a> {
             to_markdown(&project.name, lists, notes, words)
         })?;
         files.write_whole(&markdown_file, markdown.as_bytes())?;
-        let Some(folder) = images_folder else {
-            return Ok(());
-        };
-        for image in &images {
-            // one at a time: an export holds one image in memory at most
-            if let Some((_, bytes)) = self.store.image(self.storage, &book, image)? {
-                files.write_whole(&folder.join(image), &bytes)?;
-            }
+        match images_folder {
+            Some(folder) => self.export_images(&book, &images, &folder, files),
+            None => Ok(()),
+        }
+    }
+
+    /// Writes `images` of `book` in `folder`, one at a time: an export holds one image in memory
+    /// at most. One gone from the notes' folder fails it, rather than leave a link to nothing.
+    fn export_images(
+        &self,
+        book: &Book,
+        images: &[String],
+        folder: &Path,
+        files: &dyn ExportFiles,
+    ) -> anyhow::Result<()> {
+        for image in images {
+            let Some((_, bytes)) = self.store.image(self.storage, book, image)? else {
+                anyhow::bail!("the image {image} of a note is missing");
+            };
+            files.write_whole(&folder.join(image), &bytes)?;
         }
         Ok(())
     }
@@ -191,6 +191,22 @@ impl<'a> Notes<'a> {
                 .collect()
         })
     }
+}
+
+/// Where an export at `path` writes its Markdown file, and its images' folder if it has images:
+/// with images `path` is a folder, the name chosen naming the Markdown file in it too.
+fn export_paths(path: &Path, project_name: &str, with_images: bool) -> (PathBuf, Option<PathBuf>) {
+    if !with_images {
+        return (path.to_path_buf(), None);
+    }
+    let name = path.file_name().map_or_else(
+        || project_name.to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    );
+    (
+        path.join(format!("{name}.md")),
+        Some(path.join(EXPORT_IMAGES)),
+    )
 }
 
 /// A note's text, then its images' paths, a line each; without images, the text as it is.
@@ -207,7 +223,6 @@ fn copy_text(text: &str, images: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
     use std::sync::{Arc, Mutex};
 
     use super::*;
@@ -336,6 +351,39 @@ mod tests {
             Some(UserFacingErrorCode::ExportInRepository)
         );
         assert!(lock(&written.0).is_empty());
+    }
+
+    #[test]
+    fn an_export_whose_image_is_gone_fails() {
+        let (store, shelf) = (NotesStore::default(), Shelf::default());
+        let (projects, shop, _) = shop_with_a_note(&store, &shelf);
+        let book = project_book(&shop);
+        let open = store.notes(&shelf, &book).unwrap().open_list;
+        let image = PreparedImage {
+            kind: ImageKind::Png,
+            width: 1,
+            height: 1,
+            original: vec![1],
+            thumb: vec![1],
+        };
+        store
+            .add_images(&shelf, &book, ImageTarget::New { list: open }, vec![image])
+            .unwrap();
+        // the image's files deleted by hand from the notes' folder
+        let folders = shelf.folders().unwrap();
+        let pngs = folders.iter().flat_map(|folder| {
+            let files = shelf.files(folder).unwrap();
+            files.into_iter().map(move |file| (folder, file))
+        });
+        for (folder, file) in pngs.filter(|(_, file)| file.ends_with(".png")) {
+            shelf.remove(folder, &file).unwrap();
+        }
+        let notes = Notes::new(&projects, &store, &shelf);
+        let written = Written::default();
+        let failed = notes
+            .export(&shop.id, Path::new("/home/me/notes"), &WORDS, &written)
+            .unwrap_err();
+        assert!(format!("{failed:#}").contains("is missing"), "{failed:#}");
     }
 
     #[test]

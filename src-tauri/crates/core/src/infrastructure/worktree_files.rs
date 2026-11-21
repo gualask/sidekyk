@@ -12,13 +12,21 @@ use crate::shared::threads::threads;
 /// Fewer last changes than this are read on the caller's thread: a thread costs more than them.
 const MIN_TIMES_PER_THREAD: usize = 1_024;
 
-/// `RepositoryBackend::read_file`.
+/// `RepositoryBackend::read_file`. Checked before it is opened, which would wait on a FIFO, and
+/// skipped when already too long; the read stops one byte past `limit`, so a file still growing
+/// is never read further.
 pub(super) fn read_file(path: &Path, limit: u64) -> Option<Vec<u8>> {
     let meta = std::fs::metadata(path).ok()?;
     if !meta.is_file() || meta.len() > limit {
         return None;
     }
-    std::fs::read(path).ok()
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .ok()?
+        .take(limit + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    (bytes.len() as u64 <= limit).then_some(bytes)
 }
 
 /// `RepositoryBackend::read_entry`.
@@ -208,6 +216,17 @@ mod tests {
         let path = root.join(rel);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, body).unwrap();
+    }
+
+    #[test]
+    fn a_file_is_read_whole_within_its_limit_or_not_at_all() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.txt", "12345");
+        let file = dir.path().join("a.txt");
+        assert_eq!(read_file(&file, 5).as_deref(), Some(&b"12345"[..]));
+        assert_eq!(read_file(&file, 4), None);
+        assert_eq!(read_file(dir.path(), 5), None);
+        assert_eq!(read_file(&dir.path().join("gone.txt"), 5), None);
     }
 
     #[test]

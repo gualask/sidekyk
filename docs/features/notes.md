@@ -89,7 +89,8 @@ in notes: `note-images.md`; files and addresses in their text: `note-references.
   refused inside a project's repository (`export_in_repository`, `Machines::holds_host_path`: the
   machine whose path it is resolves it, `ProjectList::holds` and `holds_in_wsl` compare), checked
   for the Markdown file and `images/`, not only the path chosen: an `images/` there may link into
-  a repository.
+  a repository. It fails rather than leave less than asked: an image gone from the notes' folder,
+  or a file already where a file's copy beside goes (`<name>.tmp`, never written over).
   Removing a project deletes its notes first; if they cannot go, the project stays
   (`RemoveProjectDialog`); a list that cannot be stored then fails the removal, the project left
   without notes.
