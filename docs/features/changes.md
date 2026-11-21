@@ -30,6 +30,10 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   `Esc`); `⌘F` in the bar or its icon opens the palette's search in contents with its text. Top
   right as VS Code's find widget; the match read is never under it.
 - Syntax colors on both sides: `syntax-colors.md`.
+- In a replacement, a stronger background marks the changed stretch on each side, including
+  adjacent ASCII letters, digits and underscores. Two edits on one line share one stretch.
+  The viewer computes the stretch for mounted rows, and only for equal-sized replacement blocks with both lines
+  at most 1,024 UTF-16 units. Find matches take precedence over the changed background.
 - Formatting: when changed lines differ only in whitespace or line endings, a strip
   pinned above the diff says so: "Only formatting changed" or "6 of 8 changed lines differ only in
   formatting" (a commit's file too). On those lines spaces (`•`), tabs (`→`, Zed's glyphs) and the
@@ -98,5 +102,4 @@ What changed in the working tree against HEAD, and the viewer every panel uses f
   VS Code normalize line endings before diffing and VS Code's `diffEditor.ignoreTrimWhitespace` is
   on by default, right for an editor, wrong for a review before a commit. No mark in the list: a `-w` numstat per snapshot is +30% CPU, +47% with 300 files
   reformatted (`.local/format-cost/`). Paired in TS, not Rust as planned: the diff is parsed there
-  already, the cost is of the order of Rust's 4.6 ms, and there is no second parser. Whitespace
-  drawn whole and a label on every such line: no character diff to pay for.
+  already, the cost is of the order of Rust's 4.6 ms, and there is no second parser.

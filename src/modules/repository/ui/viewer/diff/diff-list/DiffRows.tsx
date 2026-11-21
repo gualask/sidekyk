@@ -1,5 +1,6 @@
 import { Fragment, memo, type ReactNode } from 'react';
 import { useTranslation } from '@/shared/i18n';
+import { type ChangedRange, changedRange } from '../../../../model/diff/changed-range';
 import type { DiffHunk, DiffLine, LineEnd } from '../../../../model/diff/diff-parser';
 import type { LineBreaks } from '../../../../model/text/soft-wrap/wrap';
 import { type LineSpans, textParts } from '../../../../model/text/syntax';
@@ -20,10 +21,18 @@ const ROW_TONE: Record<DiffLine['kind'], string> = {
     note: 'text-ui-text-muted italic',
 };
 
+/** A changed line's stronger background: its gutter's, and its changed stretch's. */
+const STRONG_TONE: Record<DiffLine['kind'], string> = {
+    context: '',
+    add: 'bg-ui-diff-add-gutter',
+    del: 'bg-ui-diff-del-gutter',
+    note: '',
+};
+
 const GUTTER_TONE: Record<DiffLine['kind'], string> = {
     context: 'text-ui-text-muted',
-    add: 'bg-ui-diff-add-gutter text-ui-diff-add-mark',
-    del: 'bg-ui-diff-del-gutter text-ui-diff-del-mark',
+    add: `${STRONG_TONE.add} text-ui-diff-add-mark`,
+    del: `${STRONG_TONE.del} text-ui-diff-del-mark`,
     note: 'text-ui-text-muted',
 };
 
@@ -109,27 +118,48 @@ function LineText({
     found,
     wrap,
     whitespace,
+    changed,
+    highlight,
 }: {
     text: string;
     colors: LineSpans;
     found: LineFound | undefined;
     wrap: LineBreaks | undefined;
     whitespace: boolean;
+    changed: ChangedRange | undefined;
+    highlight: string;
 }) {
+    if (changed && !colors.length && !found && !wrap?.breaks.length) {
+        return changedStretch(text, changed, highlight);
+    }
     const indent = ' '.repeat(wrap?.indent ?? 0);
     let at = 0;
-    return textParts(text, colors, found?.ranges ?? [], wrap?.breaks).map((part) => {
+    return textParts(text, colors, found?.ranges ?? [], wrap?.breaks, changed).map((part) => {
         const key = at;
         at += part.text.length;
         const tone = part.tone ? TONE_CLASS[part.tone] : undefined;
+        // a match looked for shows over the changed stretch
+        const inChanged = changed && key >= changed[0] && key < changed[1] && part.found === null;
+        const partTone = inChanged ? (tone ? `${tone} ${highlight}` : highlight) : tone;
         const content = whitespace ? shownWhitespace(part.text) : part.text;
         return (
             <Fragment key={key}>
                 {part.breakBefore ? <span className="soft-break" data-indent={indent} /> : null}
-                {tonedPart(content, tone, part.found, found?.current)}
+                {tonedPart(content, partTone, part.found, found?.current)}
             </Fragment>
         );
     });
+}
+
+/** A line without colors, matches or rows, its changed stretch marked: no parts to cut. */
+function changedStretch(text: string, [start, end]: ChangedRange, highlight: string): ReactNode {
+    return (
+        <>
+            {text.slice(0, start)}
+            {tonedPart(text.slice(start, end), highlight, null, null)}
+            {text.slice(end)}
+        </>
+    );
 }
 
 /**
@@ -202,17 +232,7 @@ export const DiffLineRow = memo(function DiffLineRow({
                 }`}
                 style={{ paddingLeft: TEXT_PADDING_LEFT, paddingRight: TEXT_PADDING_RIGHT }}
             >
-                {colors || found || rows > 1 || line.formatting ? (
-                    <LineText
-                        text={line.text}
-                        colors={colors ?? []}
-                        found={found}
-                        wrap={wrap}
-                        whitespace={line.formatting !== undefined}
-                    />
-                ) : (
-                    line.text
-                )}
+                {lineContent(line, colors, found, wrap)}
                 {lineEnd ? (
                     <span
                         className="shown-line-end ml-1.5 inline-block rounded-[3px] bg-ui-surface-hover px-1 align-[1px] font-sans text-[9.5px] leading-[14px] font-medium text-ui-text-muted"
@@ -223,3 +243,26 @@ export const DiffLineRow = memo(function DiffLineRow({
         </div>
     );
 });
+
+/** A line's text as it shows: plain, unless it has colors, matches, rows, marks or a change. */
+function lineContent(
+    line: DiffLine,
+    colors: LineSpans | undefined,
+    found: LineFound | undefined,
+    wrap: LineBreaks | undefined,
+): ReactNode {
+    const changed =
+        line.pairedText === undefined ? undefined : changedRange(line.text, line.pairedText);
+    if (!colors && !found && !wrap?.breaks.length && !line.formatting && !changed) return line.text;
+    return (
+        <LineText
+            changed={changed}
+            highlight={STRONG_TONE[line.kind]}
+            text={line.text}
+            colors={colors ?? []}
+            found={found}
+            wrap={wrap}
+            whitespace={line.formatting !== undefined}
+        />
+    );
+}

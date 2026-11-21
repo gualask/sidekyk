@@ -92,8 +92,13 @@ function cutsOf(
     spans: LineSpans,
     found: readonly Range[],
     breaks: readonly number[],
+    changed?: Range,
 ): number[] {
     const cuts = new Set([0, length, ...breaks]);
+    if (changed) {
+        cuts.add(changed[0]);
+        cuts.add(changed[1]);
+    }
     for (const [start, end] of [...spans, ...found]) {
         cuts.add(Math.min(start, length));
         cuts.add(Math.min(end, length));
@@ -103,21 +108,22 @@ function cutsOf(
 
 /**
  * A line cut where its colors and the matches of the find bar start and end, so a match marks the
- * colored text under it, and where its wrapped rows start (`breaks`, see `soft-wrap/wrap.ts`). Every
- * list is in order and without overlaps.
+ * colored text under it, where its wrapped rows start (`breaks`, see `soft-wrap/wrap.ts`), and at
+ * the ends of its `changed` stretch. Every list is in order and without overlaps.
  */
 export function textParts(
     text: string,
     spans: LineSpans,
     found: readonly Range[],
     breaks: readonly number[] = [],
+    changed?: Range,
 ): TextPart[] {
     let nextBreak = 0;
     const parts: TextPart[] = [];
     let span = 0;
     let match = 0;
     let start = 0;
-    for (const end of cutsOf(text.length, spans, found, breaks)) {
+    for (const end of cutsOf(text.length, spans, found, breaks, changed)) {
         if (end === start) continue;
         while ((spans[span]?.[1] ?? Number.POSITIVE_INFINITY) <= start) span++;
         while ((found[match]?.[1] ?? Number.POSITIVE_INFINITY) <= start) match++;

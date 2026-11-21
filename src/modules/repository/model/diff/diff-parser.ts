@@ -1,5 +1,7 @@
 import { splitLines } from '@/shared/format/text-lines';
 
+import { MAX_PAIRED_LENGTH } from './changed-range';
+
 type DiffLineKind = 'context' | 'add' | 'del' | 'note';
 
 export type LineEnd = 'crlf' | 'lf' | 'none';
@@ -13,10 +15,12 @@ export interface DiffLine {
     newNumber: number | null;
     /**
      * A removed line, or the added line it pairs with, that differs from the other only in
-     * whitespace or line ending (`markFormatting`): its line end, `none` on a file's last line
+     * whitespace or line ending (`pairReplacements`): its line end, `none` on a file's last line
      * without one.
      */
     formatting?: LineEnd;
+    /** The opposite line of a short replacement, for a mounted row to compare. */
+    pairedText?: string;
 }
 
 export interface DiffHunk {
@@ -99,11 +103,11 @@ function lineEnd(lines: readonly DiffLine[], index: number): LineEnd {
 }
 
 /**
- * Marks the lines that differ only in formatting, and returns how many: in each block of removed
- * then added lines of equal counts, the n-th removed with the n-th added. Blocks of unequal
- * counts are left alone, as lines moved or rewritten: pairing them would guess.
+ * Pairs the replaced lines, and returns how many differ only in formatting: in each block of
+ * removed then added lines of equal counts, the n-th removed with the n-th added (`pairBlock`).
+ * Blocks of unequal counts are left alone, as lines moved or rewritten: pairing them would guess.
  */
-function markFormatting(lines: readonly DiffLine[]): number {
+function pairReplacements(lines: readonly DiffLine[]): number {
     let marked = 0;
     let index = 0;
     const removed: number[] = [];
@@ -116,25 +120,38 @@ function markFormatting(lines: readonly DiffLine[]): number {
         removed.length = 0;
         added.length = 0;
         index = takeRun(lines, takeRun(lines, index, 'del', removed), 'add', added);
-        if (removed.length === added.length) marked += markPairs(lines, removed, added);
+        if (removed.length === added.length) marked += pairBlock(lines, removed, added);
     }
     return marked;
 }
 
-/** Marks each n-th removed line and n-th added line that differ only in whitespace; how many. */
-function markPairs(lines: readonly DiffLine[], removed: number[], added: number[]): number {
+/**
+ * Pairs each n-th removed line with the n-th added: marked when they differ only in whitespace,
+ * and counted; otherwise given each other's text (`pairTexts`).
+ */
+function pairBlock(lines: readonly DiffLine[], removed: number[], added: number[]): number {
     let marked = 0;
     for (let n = 0; n < removed.length; n++) {
         const was = removed[n] as number;
         const now = added[n] as number;
         const old = lines[was] as DiffLine;
         const line = lines[now] as DiffLine;
-        if (!sameButWhitespace(old.text, line.text)) continue;
+        if (!sameButWhitespace(old.text, line.text)) {
+            pairTexts(old, line);
+            continue;
+        }
         old.formatting = lineEnd(lines, was);
         line.formatting = lineEnd(lines, now);
         marked += 2;
     }
     return marked;
+}
+
+/** Gives each of two short lines the other's text, which a mounted row compares. */
+function pairTexts(old: DiffLine, line: DiffLine) {
+    if (old.text.length > MAX_PAIRED_LENGTH || line.text.length > MAX_PAIRED_LENGTH) return;
+    old.pairedText = line.text;
+    line.pairedText = old.text;
 }
 
 /** A hunk from its header (`@@`, or one `@` more per parent past the first of a combined diff). */
@@ -232,6 +249,6 @@ export function parseUnifiedDiff(text: string): ParsedDiff {
 
     // a combined diff's lines have a side per parent: no pair to compare
     let formattingLines = 0;
-    if (parents === 1) for (const hunk of hunks) formattingLines += markFormatting(hunk.lines);
+    if (parents === 1) for (const hunk of hunks) formattingLines += pairReplacements(hunk.lines);
     return { binary, hunks, changedLines, formattingLines };
 }
