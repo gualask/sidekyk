@@ -496,6 +496,8 @@
     "preview.zoomOut": "Zoom out",
     "preview.zoomFit": "Fit",
     "tree.hasChanges": "has changes",
+    "tree.ignoredFile": "ignored",
+    "tree.ignoredFolder": "ignored",
     "tree.more": "{count} more, not listed",
     "files.collapse": "Collapse folders",
     "files.of": "Files of {name}",

@@ -1,48 +1,66 @@
 //! The files of a folder as the Files panel shows them: what git lists in a repository, tracked
-//! and untracked, or the walk of a folder without git, as folders.
+//! and untracked, or the walk of a folder without git, as folders; and what the rules hide, each
+//! at the top of what it hides, dimmed, an ignored folder read from disk when opened.
 
+mod ignored;
+mod load;
 mod recent;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::Path;
 
-use super::contracts::{Directory, RepositoryInfo, TreeEntry};
+use super::contracts::{Directory, TreeEntry};
 use super::name_order::compare_names;
-use super::open::existing_root;
-use super::ports::{git_checked, joined, nul_paths, RepositoryBackend};
-use super::reading::MAX_TREE_PATHS;
+use super::ports::RepositoryBackend;
 use super::watch::git_path;
 
+use ignored::{add_ignored, ignored_entries};
+pub use ignored::{load_ignored_directory, IgnoredChanges};
+pub use load::{load_file_tree, load_folder_tree};
 pub use recent::load_recent_files;
-
-/// Output read from `git ls-files`, well past what `MAX_TREE_PATHS` paths take.
-const MAX_LS_FILES_BYTES: usize = 32 * 1024 * 1024;
 
 /// A folder lists at most this many entries, folders first; the rest are counted.
 const MAX_DIRECTORY_ENTRIES: usize = 10_000;
 
-#[derive(Default)]
-struct Folder {
-    /// Names, in the order the tree shows them.
-    folders: Vec<String>,
-    files: Vec<String>,
+/// A name in a folder of the tree.
+struct Child {
+    name: String,
+    /// Hidden by the rules: shown dimmed, and, for a folder, read from disk when opened.
+    ignored: bool,
 }
 
-/// Every file git lists in a repository, tracked or untracked and not ignored, as folders. A
-/// tracked file deleted from disk is left out, as VS Code does: the Changes panel lists it.
+#[derive(Default)]
+struct Folder {
+    /// In the order the tree shows them.
+    folders: Vec<Child>,
+    files: Vec<Child>,
+}
+
+/// Every file git lists in a repository, tracked or untracked and not ignored, as folders, and
+/// what git ignores at the top of what it ignores. A tracked file deleted from disk is left out,
+/// as VS Code does: the Changes panel lists it.
 pub struct FileTree {
-    /// By path, `""` for the root.
+    /// By path, `""` for the root; an ignored folder is not one of them.
     folders: HashMap<String, Folder>,
-    /// Every file's path, sorted by its bytes: the palette searches them in this order.
+    /// Every file's path, sorted by its bytes: the palette searches them in this order. No ignored
+    /// file: the palette, Recent and the searches leave them out.
     files: Vec<String>,
+    /// What the rules hide, each at the top of what it hides, by path: whether it is a folder.
+    ignored: HashMap<String, bool>,
     /// More files were listed than `MAX_TREE_PATHS`: the tree stops there.
     truncated: bool,
 }
 
 impl FileTree {
-    /// The tree of these paths, relative to the root with `/` between names. The same path may
-    /// come more than once (a conflict lists each stage).
-    pub fn from_paths<'a>(paths: impl IntoIterator<Item = &'a str>) -> Self {
+    /// The tree of these paths, relative to the root with `/` between names (the same path may
+    /// come more than once: a conflict lists each stage), and of what the rules hide, as `git
+    /// ls-files --ignored --directory` lists it: a folder ends in `/`, and a folder listed with
+    /// entries under it holds files it does not hide, so it is not ignored itself. VCS folders and
+    /// OS files never show.
+    pub fn new<'a>(
+        paths: impl IntoIterator<Item = &'a str>,
+        ignored: impl IntoIterator<Item = &'a str>,
+    ) -> Self {
         let mut files: Vec<String> = paths
             .into_iter()
             .filter(|path| !path.is_empty())
@@ -50,9 +68,19 @@ impl FileTree {
             .collect();
         files.sort_unstable();
         files.dedup();
+        let mut folders = folders_of(&files);
+        let ignored = ignored_entries(ignored, &files, &folders);
+        for (path, folder) in &ignored {
+            add_ignored(&mut folders, path, *folder);
+        }
+        for folder in folders.values_mut() {
+            sort_by_name(&mut folder.folders, |child| &child.name);
+            sort_by_name(&mut folder.files, |child| &child.name);
+        }
         Self {
-            folders: folders_of(&files),
+            folders,
             files,
+            ignored,
             truncated: false,
         }
     }
@@ -84,6 +112,22 @@ impl FileTree {
         self.contains_file(path) || self.folders.contains_key(path)
     }
 
+    /// The ignored entry that is `path` or holds it, and whether it is a folder.
+    fn ignored_at<'p>(&self, path: &'p str) -> Option<(&'p str, bool)> {
+        prefixes(path).find_map(|prefix| self.ignored.get(prefix).map(|&folder| (prefix, folder)))
+    }
+
+    /// Whether `path` is an ignored folder or inside one: what it holds is read from disk.
+    pub fn in_ignored_folder(&self, path: &str) -> bool {
+        self.ignored_at(path).is_some_and(|(_, folder)| folder)
+    }
+
+    /// Whether the Files panel may show the file at `path`: one of the tree, or one the rules
+    /// hide, which the panel lists dimmed.
+    pub fn shows_file(&self, path: &str) -> bool {
+        self.contains_file(path) || self.ignored_at(path).is_some()
+    }
+
     /// Whether these changed paths (relative to `root`, not ignored) may have added or removed a
     /// file: one on disk the tree does not have, or one the tree has that is gone. An edit to a
     /// file the tree has changes nothing.
@@ -110,22 +154,21 @@ impl FileTree {
                 truncated: self.truncated,
             };
         };
-        let count = folder.folders.len() + folder.files.len();
-        let folders = folder
-            .folders
-            .iter()
-            .map(|name| self.folder_entry(name, child_path(path, name)));
-        let files = folder.files.iter().map(|name| TreeEntry {
-            name: name.clone(),
-            path: child_path(path, name),
-            folder: false,
+        let folders = folder.folders.iter().map(|child| {
+            let at = child_path(path, &child.name);
+            if child.ignored {
+                TreeEntry::ignored(child.name.clone(), at, true)
+            } else {
+                self.folder_entry(&child.name, at)
+            }
         });
-        let entries: Vec<TreeEntry> = folders.chain(files).take(MAX_DIRECTORY_ENTRIES).collect();
-        Directory {
-            more: u32::try_from(count - entries.len()).unwrap_or(u32::MAX),
-            entries,
-            truncated: self.truncated,
-        }
+        let files = folder.files.iter().map(|child| TreeEntry {
+            name: child.name.clone(),
+            path: child_path(path, &child.name),
+            folder: false,
+            ignored: child.ignored,
+        });
+        directory_of(folders, files, self.truncated)
     }
 
     /// The entry of the folder `name` at `path`, shared with the folders down to one that holds
@@ -140,43 +183,75 @@ impl FileTree {
             name: label,
             path,
             folder: true,
+            ignored: false,
         }
     }
 
-    /// The name of the only thing in a folder, when it is a folder.
+    /// The name of the only thing in a folder, when it is a folder the rules do not hide: an
+    /// ignored one keeps a row of its own, dimmed.
     fn only_folder_in(&self, path: &str) -> Option<&str> {
         let folder = self.folders.get(path)?;
         match (folder.folders.as_slice(), folder.files.is_empty()) {
-            ([only], true) => Some(only),
+            ([only], true) if !only.ignored => Some(&only.name),
             _ => None,
         }
     }
 }
 
-/// The folders holding `files`, `""` for the root, each with what it holds in the tree's order.
+/// Names in the tree's order, VS Code's: case ignored, numbers by value.
+fn sort_by_name<T>(items: &mut [T], name: impl Fn(&T) -> &str) {
+    items.sort_by(|a, b| compare_names(name(a), name(b)));
+}
+
+/// What a folder lists: its folders, then its files, each already in the tree's order; at most
+/// `MAX_DIRECTORY_ENTRIES`, the rest counted.
+fn directory_of(
+    folders: impl ExactSizeIterator<Item = TreeEntry>,
+    files: impl ExactSizeIterator<Item = TreeEntry>,
+    truncated: bool,
+) -> Directory {
+    let count = folders.len() + files.len();
+    let entries: Vec<TreeEntry> = folders.chain(files).take(MAX_DIRECTORY_ENTRIES).collect();
+    Directory {
+        more: u32::try_from(count - entries.len()).unwrap_or(u32::MAX),
+        entries,
+        truncated,
+    }
+}
+
+/// `path` and the folders above it, as paths, outermost first: `a`, `a/b`, `a/b/c`.
+fn prefixes(path: &str) -> impl Iterator<Item = &str> {
+    path.match_indices('/')
+        .map(|(at, _)| &path[..at])
+        .chain(std::iter::once(path))
+}
+
+/// The folders holding `files`, `""` for the root, each with what it holds, not sorted yet.
 fn folders_of(files: &[String]) -> HashMap<String, Folder> {
     let mut folders: HashMap<String, Folder> = HashMap::new();
     folders.insert(String::new(), Folder::default());
     // the folders a path brings, each with the folder above it, filled in once they exist
     let mut new_folders = Vec::new();
     for path in files {
-        add_file(&mut folders, &mut new_folders, path);
-    }
-    for folder in folders.values_mut() {
-        folder.folders.sort_by(|a, b| compare_names(a, b));
-        folder.files.sort_by(|a, b| compare_names(a, b));
+        let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
+        add_folders(&mut folders, &mut new_folders, parent);
+        let parent = folders.get_mut(parent).expect("inserted above");
+        parent.files.push(Child {
+            name: name.to_string(),
+            ignored: false,
+        });
     }
     folders
 }
 
-/// The file at `path` in its folder, and each folder it brings in the one above it.
-fn add_file<'a>(
+/// The folder at `path` and each folder above it the tree does not have yet, each in the one
+/// above it.
+fn add_folders<'a>(
     folders: &mut HashMap<String, Folder>,
     new_folders: &mut Vec<(&'a str, &'a str)>,
     path: &'a str,
 ) {
-    let (parent, name) = path.rsplit_once('/').unwrap_or(("", path));
-    let mut folder = parent;
+    let mut folder = path;
     while !folders.contains_key(folder) {
         folders.insert(folder.to_string(), Folder::default());
         let (above, folder_name) = folder.rsplit_once('/').unwrap_or(("", folder));
@@ -185,10 +260,11 @@ fn add_file<'a>(
     }
     for (above, folder_name) in new_folders.drain(..) {
         let above = folders.get_mut(above).expect("inserted above");
-        above.folders.push(folder_name.to_string());
+        above.folders.push(Child {
+            name: folder_name.to_string(),
+            ignored: false,
+        });
     }
-    let parent = folders.get_mut(parent).expect("inserted above");
-    parent.files.push(name.to_string());
 }
 
 /// The path of `name` in the folder at `folder`, `""` for the root.
@@ -200,64 +276,9 @@ fn child_path(folder: &str, name: &str) -> String {
     }
 }
 
-/// The paths of a NUL-separated list, without the last when the list was cut in it.
-fn listed(bytes: &[u8], truncated: bool) -> Vec<String> {
-    let mut paths: Vec<String> = nul_paths(bytes).collect();
-    if truncated {
-        paths.pop();
-    }
-    paths
-}
-
-/// Reads the files git lists: tracked and untracked ones not ignored, as `git status` sees them,
-/// without the tracked files deleted from disk.
-pub fn load_file_tree(
-    backend: &dyn RepositoryBackend,
-    repository: &RepositoryInfo,
-) -> anyhow::Result<FileTree> {
-    let root = existing_root(backend, repository)?;
-    let ls_files = |args: &[&str]| ls_files(backend, root, args);
-    let (all, deleted) = std::thread::scope(|scope| {
-        let deleted = scope.spawn(|| ls_files(&["ls-files", "-z", "--deleted"]));
-        let all = ls_files(&[
-            "ls-files",
-            "-z",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-        ]);
-        (all, joined(deleted))
-    });
-    let (paths, cut) = all?;
-    let (deleted, _) = deleted?;
-    let deleted: HashSet<&str> = deleted.iter().map(String::as_str).collect();
-    let mut present = paths
-        .iter()
-        .map(String::as_str)
-        .filter(|path| !deleted.contains(path));
-    let tree = FileTree::from_paths(present.by_ref().take(MAX_TREE_PATHS));
-    Ok(tree.with_truncated(cut || present.next().is_some()))
-}
-
-/// The paths `git ls-files` with `args` lists, and whether the list was cut.
-fn ls_files(
-    backend: &dyn RepositoryBackend,
-    root: &Path,
-    args: &[&str],
-) -> anyhow::Result<(Vec<String>, bool)> {
-    let out = git_checked(backend, root, args, &[0], MAX_LS_FILES_BYTES)?;
-    Ok((listed(&out.stdout, out.truncated), out.truncated))
-}
-
-/// The files of a folder without git, as the Files panel shows them: at most `MAX_TREE_PATHS`,
-/// past them the tree says it stops.
-pub fn load_folder_tree(backend: &dyn RepositoryBackend, root: &Path) -> FileTree {
-    let walked = backend.walk(root, MAX_TREE_PATHS);
-    FileTree::from_paths(walked.paths.iter().map(String::as_str)).with_truncated(walked.truncated)
-}
-
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
     use std::sync::Mutex;
 
     use super::*;
@@ -273,14 +294,17 @@ mod tests {
 
     #[test]
     fn folders_come_first_and_a_lone_folder_shares_its_entry() {
-        let tree = FileTree::from_paths([
-            "README.md",
-            "src/modules/changes/a.ts",
-            "src/modules/changes/b.ts",
-            "src/main.ts",
-            "docs/deep/only/x.md",
-            ".github/ci.yml",
-        ]);
+        let tree = FileTree::new(
+            [
+                "README.md",
+                "src/modules/changes/a.ts",
+                "src/modules/changes/b.ts",
+                "src/main.ts",
+                "docs/deep/only/x.md",
+                ".github/ci.yml",
+            ],
+            [],
+        );
         assert_eq!(
             names(&tree.directory("")),
             [
@@ -330,7 +354,7 @@ mod tests {
     #[test]
     fn only_a_file_added_or_removed_changes_the_tree() {
         let disk = OnDisk(Mutex::new(HashSet::from(["src", "src/a.ts"])));
-        let tree = FileTree::from_paths(["src/a.ts", "src/gone.ts"]);
+        let tree = FileTree::new(["src/a.ts", "src/gone.ts"], []);
         let changed = |rels: &[&'static str]| {
             let rels: Vec<&Path> = rels.iter().map(|rel| Path::new(*rel)).collect();
             tree.may_have_changed(&disk, Path::new("/r"), &rels)
@@ -346,7 +370,7 @@ mod tests {
 
     #[test]
     fn a_path_listed_twice_shows_once() {
-        let tree = FileTree::from_paths(["a/x.ts", "a/x.ts", "a/y.ts", "b.ts"]);
+        let tree = FileTree::new(["a/x.ts", "a/x.ts", "a/y.ts", "b.ts"], []);
         assert_eq!(
             names(&tree.directory("a")),
             [("x.ts", "a/x.ts", false), ("y.ts", "a/y.ts", false)]
@@ -359,15 +383,9 @@ mod tests {
         let paths: Vec<String> = (0..MAX_DIRECTORY_ENTRIES + 5)
             .map(|i| format!("f{i}"))
             .collect();
-        let tree = FileTree::from_paths(paths.iter().map(String::as_str));
+        let tree = FileTree::new(paths.iter().map(String::as_str), []);
         let directory = tree.directory("");
         assert_eq!(directory.entries.len(), MAX_DIRECTORY_ENTRIES);
         assert_eq!(directory.more, 5);
-    }
-
-    #[test]
-    fn a_cut_list_drops_its_last_path() {
-        assert_eq!(listed(b"a\0b\0c", true), ["a", "b"]);
-        assert_eq!(listed(b"a\0b\0", false), ["a", "b"]);
     }
 }

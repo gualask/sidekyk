@@ -11,7 +11,7 @@ use std::path::{Component, Path, PathBuf};
 pub use changes::FolderChanges;
 pub use folders::{Hiding, WatchedFolders};
 pub(super) use ignored::git_path;
-pub use ignored::{IgnoredPaths, Visible};
+pub use ignored::{IgnoredPaths, Sorted, Visible};
 
 /// The parts of the git dir that change what the app shows: the index (staging), HEAD and refs
 /// (branch, commits, ahead/behind), and `info/exclude` (which files are untracked). Objects and

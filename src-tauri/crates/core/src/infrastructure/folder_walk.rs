@@ -1,13 +1,16 @@
 //! The files of a folder without git, by ripgrep's walker (`ignore`): the walk lists them, the
-//! rules answer for one path at a time, both from the same settings so they never disagree.
+//! rules answer for one path at a time, both from the same settings so they never disagree. What
+//! the rules hide is what each folder walked holds that the walk left out.
 
+use std::collections::HashSet;
+use std::ffi::{OsStr, OsString};
 use std::path::{Component, Path};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use ignore::{DirEntry, IncrementalIgnore, WalkBuilder, WalkState};
 
-use crate::modules::folder::{always_hidden, FolderRules, Walked};
+use crate::modules::folder::{always_hidden, always_hidden_path, FolderRules, Walked};
 use crate::shared::sync::lock;
 use crate::shared::threads::threads;
 
@@ -29,7 +32,8 @@ fn walker(root: &Path) -> WalkBuilder {
 }
 
 /// `RepositoryBackend::walk`: in parallel, stopped once `max` files are found, so past it which
-/// files are kept may differ from one walk to the next.
+/// files are kept may differ from one walk to the next. Each folder walked is also read on its
+/// own: what it holds that the walk did not enter or list is what the rules hide.
 pub fn walk(root: &Path, max: usize) -> Walked {
     let found = Found::new(max);
     walker(root)
@@ -40,10 +44,19 @@ pub fn walk(root: &Path, max: usize) -> Walked {
     found.into_walked()
 }
 
-/// The files a parallel walk finds, from each of its threads, up to `max`.
+/// A folder the walk entered, relative to the root, with what it holds: each name, and whether
+/// it is a folder.
+struct Entered {
+    folder: String,
+    held: Vec<(OsString, bool)>,
+}
+
+/// The files a parallel walk finds, from each of its threads, up to `max`, and the folders it
+/// enters.
 struct Found {
     max: usize,
     paths: Mutex<Vec<String>>,
+    folders: Mutex<Vec<Entered>>,
     found: AtomicUsize,
     truncated: AtomicBool,
 }
@@ -53,18 +66,21 @@ impl Found {
         Self {
             max,
             paths: Mutex::new(Vec::new()),
+            folders: Mutex::new(Vec::new()),
             found: AtomicUsize::new(0),
             truncated: AtomicBool::new(false),
         }
     }
 
-    /// Keeps `entry` if it is a file, relative to `root`; the walk quits past `max`.
+    /// Keeps `entry` if it is a file, relative to `root`, or what it holds if it is a folder; the
+    /// walk quits past `max`.
     fn visit(&self, root: &Path, entry: Result<DirEntry, ignore::Error>) -> WalkState {
         let Ok(entry) = entry else {
             return WalkState::Continue;
         };
         // a link is listed as a file, whatever it points to
         if entry.file_type().is_none_or(|kind| kind.is_dir()) {
+            self.enter(root, entry.path());
             return WalkState::Continue;
         }
         if self.found.fetch_add(1, Ordering::Relaxed) >= self.max {
@@ -77,10 +93,68 @@ impl Found {
         WalkState::Continue
     }
 
+    /// Keeps what the folder at `path` holds, as the walk will find it or leave it out.
+    fn enter(&self, root: &Path, path: &Path) {
+        let (Ok(rel), Ok(read)) = (path.strip_prefix(root), std::fs::read_dir(path)) else {
+            return;
+        };
+        let held = read
+            .filter_map(Result::ok)
+            .map(|entry| {
+                let folder = entry.file_type().is_ok_and(|kind| kind.is_dir());
+                (entry.file_name(), folder)
+            })
+            .collect();
+        lock(&self.folders).push(Entered {
+            folder: slash_path(rel),
+            held,
+        });
+    }
+
     fn into_walked(self) -> Walked {
+        let paths = self.paths.into_inner().unwrap_or_else(|e| e.into_inner());
+        let folders = self.folders.into_inner().unwrap_or_else(|e| e.into_inner());
+        let truncated = self.truncated.into_inner();
+        // past `max` the walk left out what it did not reach, not only what the rules hide
+        let ignored = if truncated {
+            Vec::new()
+        } else {
+            left_out(&paths, &folders)
+        };
         Walked {
-            paths: self.paths.into_inner().unwrap_or_else(|e| e.into_inner()),
-            truncated: self.truncated.into_inner(),
+            paths,
+            ignored,
+            truncated,
+        }
+    }
+}
+
+/// What the folders entered hold that the walk neither entered nor listed, `folder::always_hidden`
+/// aside, as git lists what it ignores: a folder ends in `/`.
+fn left_out(paths: &[String], folders: &[Entered]) -> Vec<String> {
+    let walked: HashSet<&str> = paths
+        .iter()
+        .chain(folders.iter().map(|entered| &entered.folder))
+        .map(String::as_str)
+        .collect();
+    folders
+        .iter()
+        .flat_map(|entered| entered.held.iter().map(move |held| (entered, held)))
+        .filter(|(_, (name, _))| !always_hidden(name))
+        .map(|(entered, (name, is_folder))| (entered.path_of(name), *is_folder))
+        .filter(|(path, _)| !walked.contains(path.as_str()))
+        .map(|(path, is_folder)| if is_folder { format!("{path}/") } else { path })
+        .collect()
+}
+
+impl Entered {
+    /// The path of `name` in this folder, relative to the root with `/` between names.
+    fn path_of(&self, name: &OsStr) -> String {
+        let name = name.to_string_lossy();
+        if self.folder.is_empty() {
+            name.into_owned()
+        } else {
+            format!("{}/{name}", self.folder)
         }
     }
 }
@@ -102,10 +176,7 @@ struct LocalFolderRules(IncrementalIgnore);
 impl FolderRules for LocalFolderRules {
     fn is_hidden(&mut self, path: &Path) -> bool {
         // the walk's `filter_entry`, which the matcher does not apply
-        if path
-            .components()
-            .any(|name| always_hidden(name.as_os_str()))
-        {
+        if always_hidden_path(path) {
             return true;
         }
         // a link is a file, as the walk lists it
@@ -152,6 +223,10 @@ mod tests {
         (walked.paths.into_iter().collect(), walked.truncated)
     }
 
+    fn left_out_by(root: &Path, max: usize) -> BTreeSet<String> {
+        walk(root, max).ignored.into_iter().collect()
+    }
+
     /// Names a user's global excludes are unlikely to hide.
     fn sample(root: &Path) {
         write(root, ".gitignore", "*.log\nbuild/\n");
@@ -194,6 +269,24 @@ mod tests {
             "vendor/lib.c",
         ];
         assert_eq!(paths, expected.iter().map(|p| p.to_string()).collect());
+    }
+
+    #[test]
+    fn what_the_rules_hide_is_listed_at_its_top_as_git_lists_it() {
+        let dir = tempfile::tempdir().unwrap();
+        sample(dir.path());
+        let expected = [
+            "build/",
+            "dropped.log",
+            "src/deep/note.tmp",
+            "src/secret.txt",
+        ];
+        assert_eq!(
+            left_out_by(dir.path(), 100),
+            expected.iter().map(|p| p.to_string()).collect()
+        );
+        // a walk cut short leaves out more than the rules hide: nothing is told
+        assert!(left_out_by(dir.path(), 2).is_empty());
     }
 
     #[test]

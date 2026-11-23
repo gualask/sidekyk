@@ -25,6 +25,13 @@ pub(super) struct Watched {
     _watch: Option<Box<dyn Send>>,
 }
 
+impl Watched {
+    /// Whether this is the watch of the folder at `root`, as the caller names it.
+    pub(super) fn is_of(&self, root: &str) -> bool {
+        self.root == root
+    }
+}
+
 impl LocalRepositories {
     /// Watches as `Repositories::watch`, unless a watch asked later was done already: `turn` taken
     /// by `next_watch` as the watch was asked.

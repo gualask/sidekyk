@@ -107,11 +107,12 @@ export function fixtureRepository(
         if (!shown) throw new Error(`No project ${name} with a folder`);
         written.set(`${shown.id}\0${path}`, text);
         const event: RepositoryChangedEvent = {
-            version: 5,
+            version: 6,
             folderId: shown.id,
             gitDir: false,
             paths: [path],
             kindChanged: false,
+            ignored: false,
         };
         for (const listener of repositoryChanged) listener(event);
     };
@@ -121,11 +122,12 @@ export function fixtureRepository(
         if (!shown) throw new Error(`No project ${name} with a folder`);
         folders.setKind(shown.id, kind);
         const event: RepositoryChangedEvent = {
-            version: 5,
+            version: 6,
             folderId: shown.id,
             gitDir: true,
             paths: null,
             kindChanged: true,
+            ignored: false,
         };
         for (const listener of repositoryChanged) listener(event);
     };

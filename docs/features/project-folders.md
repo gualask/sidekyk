@@ -42,7 +42,7 @@ screen at a time; its notes are the project's. Identity and kind: `projects.md`;
 
 - Folder ids: `ProjectFolder { id, …Location }`, made once (`new_id`), kept when the
   folder moves (Locate…) or its project merges. Every repository command, the
-  `project-file:` URL and `repository-changed` (version 5, `folderId`) name the folder, so each
+  `project-file:` URL and `repository-changed` (its `folderId`) name the folder, so each
   repository has its own cache: back to a folder is instant. A folder stored without id was its
   project's only one and takes the project's id; nothing is migrated.
 - `ProjectList::folder(id)` finds a folder of a project of the list, any other id refused;

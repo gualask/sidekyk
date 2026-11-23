@@ -14,23 +14,25 @@ import {
 const DIRECTORIES: Record<string, Directory> = {
     '': {
         entries: [
-            { name: 'src/modules', path: 'src/modules', folder: true },
-            { name: 'docs', path: 'docs', folder: true },
-            { name: 'README.md', path: 'README.md', folder: false },
+            { name: 'src/modules', path: 'src/modules', folder: true, ignored: false },
+            { name: 'docs', path: 'docs', folder: true, ignored: false },
+            { name: 'README.md', path: 'README.md', folder: false, ignored: false },
         ],
         more: 0,
         truncated: false,
     },
     'src/modules': {
         entries: [
-            { name: 'cart', path: 'src/modules/cart', folder: true },
-            { name: 'index.ts', path: 'src/modules/index.ts', folder: false },
+            { name: 'cart', path: 'src/modules/cart', folder: true, ignored: false },
+            { name: 'index.ts', path: 'src/modules/index.ts', folder: false, ignored: false },
         ],
         more: 2,
         truncated: false,
     },
     'src/modules/cart': {
-        entries: [{ name: 'total.ts', path: 'src/modules/cart/total.ts', folder: false }],
+        entries: [
+            { name: 'total.ts', path: 'src/modules/cart/total.ts', folder: false, ignored: false },
+        ],
         more: 0,
         truncated: false,
     },
@@ -47,6 +49,28 @@ function shown(rows: readonly TreeRow[]): string[] {
 }
 
 describe('treeRows', () => {
+    it('keeps what git ignores on its rows, to dim them', () => {
+        const directories: Record<string, Directory> = {
+            '': {
+                entries: [
+                    { name: 'node_modules', path: 'node_modules', folder: true, ignored: true },
+                    { name: 'src', path: 'src', folder: true, ignored: false },
+                ],
+                more: 0,
+                truncated: false,
+            },
+            node_modules: {
+                entries: [
+                    { name: 'react', path: 'node_modules/react', folder: true, ignored: true },
+                ],
+                more: 0,
+                truncated: false,
+            },
+        };
+        const rows = treeRows(new Set(['node_modules']), (path) => directories[path]);
+        expect(rows.map((row) => row.kind !== 'more' && row.ignored)).toEqual([true, true, false]);
+    });
+
     it('lists the open folders under their folder, and what a large one leaves out', () => {
         const open = new Set(['src/modules', 'src/modules/cart']);
         expect(shown(treeRows(open, read))).toEqual([

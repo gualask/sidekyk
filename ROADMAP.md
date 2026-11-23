@@ -82,7 +82,7 @@ tried as a child process on the Mac and, built for Linux by `build.yml`, in the 
   - Linux: `--toggle` from a desktop shortcut; tray with/without appindicator; which WebKitGTK
     runs View Transitions
   - Linux and the WSL helper: the watcher one folder at a time (`folders watched` in the debug
-    log; a new folder's files told, an ignored folder silent); a WSL folder without git through
+    log; a new folder's files told, an ignored folder silent until opened in Files, then told); a WSL folder without git through
     the real `wsl.exe` (its row without starting the distro, "Starting …" on opening it)
   - Linux and Windows, Mermaid diagrams (`docs/features/diagrams.md`): labels whole in WebKitGTK
     and WebView2 (the font embedded in an SVG shown as an image, HTML labels in

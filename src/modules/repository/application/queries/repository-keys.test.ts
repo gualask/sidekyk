@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { FileDiffRequest } from '../../model/repository.types';
-import { commitKeys, folderOfKey, repositoryKeys, worktreeChangeTouches } from './repository-keys';
+import {
+    commitKeys,
+    folderOfKey,
+    ignoredChangeTouches,
+    repositoryKeys,
+    worktreeChangeTouches,
+} from './repository-keys';
 
 const diff = (area: FileDiffRequest['area'], path: string, origPath: string | null = null) =>
     repositoryKeys.diff('p', { area, path, origPath, wholeFile: false });
@@ -47,6 +53,28 @@ describe('a change in the working tree', () => {
         expect(worktreeChangeTouches(repositoryKeys.snapshot('p'), [])).toBe(true);
         expect(worktreeChangeTouches(repositoryKeys.directory('p', 'src'), [])).toBe(true);
         expect(worktreeChangeTouches(repositoryKeys.file('p', 'README.md'), null)).toBe(true);
+    });
+});
+
+describe('a change to ignored paths only', () => {
+    it('reads again the folders holding them and an open file of theirs', () => {
+        const changed = ['node_modules/pkg/index.js'];
+        expect(ignoredChangeTouches(repositoryKeys.directory('p', 'node_modules'), changed)).toBe(
+            true,
+        );
+        expect(ignoredChangeTouches(repositoryKeys.directory('p', 'src'), changed)).toBe(false);
+        expect(ignoredChangeTouches(repositoryKeys.file('p', changed[0] ?? ''), changed)).toBe(
+            true,
+        );
+        expect(ignoredChangeTouches(repositoryKeys.file('p', 'README.md'), changed)).toBe(false);
+    });
+
+    it('leaves alone what git status, Recent and the commits read', () => {
+        expect(ignoredChangeTouches(repositoryKeys.snapshot('p'), null)).toBe(false);
+        expect(ignoredChangeTouches(repositoryKeys.summary('p'), null)).toBe(false);
+        expect(ignoredChangeTouches(repositoryKeys.recent('p'), null)).toBe(false);
+        expect(ignoredChangeTouches(repositoryKeys.commits('p'), null)).toBe(false);
+        expect(ignoredChangeTouches(repositoryKeys.directory('p', 'dist'), null)).toBe(true);
     });
 });
 

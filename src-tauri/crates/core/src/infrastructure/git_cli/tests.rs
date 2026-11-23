@@ -5,10 +5,10 @@ use crate::modules::folder::{
     folder_kind, load_folder_tree, repositories_inside, resolve_folder, FolderKind,
 };
 use crate::modules::folder::{
-    load_file_content, load_file_stamp, load_file_tree, load_image, load_recent_files,
-    repository_name, resolve_repository, Changed, FileContent, FolderAdded, FolderWatcher, Hiding,
-    IgnoredPaths, RepositoryChange, RepositoryInfo, RepositoryWatcher, Visible, Watch,
-    WatchedFolders, MAX_IMAGE_BYTES,
+    load_file_content, load_file_stamp, load_file_tree, load_ignored_directory, load_image,
+    load_recent_files, repository_name, resolve_repository, Changed, FileContent, FolderAdded,
+    FolderWatcher, Hiding, IgnoredPaths, RepositoryChange, RepositoryInfo, RepositoryWatcher,
+    TreeEntry, Visible, Watch, WatchedFolders, MAX_IMAGE_BYTES,
 };
 use crate::modules::preview::parse_markdown;
 use crate::modules::repository::{
@@ -802,13 +802,34 @@ fn the_tree_lists_what_git_shows_and_files_read_without_following_links() {
     std::fs::remove_file(root.join("README.md")).unwrap();
 
     let tree = load_file_tree(&backend, &repo.info).unwrap();
-    let top: Vec<String> = tree
+    let top: Vec<(String, bool)> = tree
         .directory("")
         .entries
         .into_iter()
-        .map(|e| e.path)
+        .map(|e| (e.path, e.ignored))
         .collect();
-    assert_eq!(top, ["src", ".gitignore", "big.txt", "logo.png"]);
+    let shown = |paths: &[(&str, bool)]| -> Vec<(String, bool)> {
+        paths.iter().map(|(p, i)| (p.to_string(), *i)).collect()
+    };
+    assert_eq!(
+        top,
+        shown(&[
+            ("src", false),
+            ("target", true),
+            (".gitignore", false),
+            ("big.txt", false),
+            ("logo.png", false)
+        ])
+    );
+    // what git ignores is read from disk when its folder is opened, never in the palette's list
+    assert!(tree.in_ignored_folder("target"));
+    let target = load_ignored_directory(&backend, &repo.info, &tree, "target").unwrap();
+    assert_eq!(
+        target.entries,
+        [TreeEntry::ignored("a.o".into(), "target/a.o".into(), false)]
+    );
+    assert!(tree.shows_file("target/a.o"));
+    assert!(!tree.contains_file("target/a.o"));
     let src: Vec<String> = tree
         .directory("src")
         .entries
@@ -1004,17 +1025,12 @@ fn changes_git_ignores_do_not_count_unless_the_file_is_tracked() {
 
     let mut ignored = IgnoredPaths::new(root.to_path_buf());
     let changed = |rels: &[&str]| rels.iter().map(|rel| root.join(rel)).collect::<Vec<_>>();
-    assert!(!ignored
-        .visible(
-            &backend,
-            &changed(&["target/debug/a.o", "src/debug.log", "vendor/new.js"])
-        )
-        .any());
-    assert!(ignored
-        .visible(&backend, &changed(&["vendor/kept.js"]))
-        .any());
+    let all_ignored = changed(&["target/debug/a.o", "src/debug.log", "vendor/new.js"]);
+    assert!(!ignored.sort(&backend, &all_ignored).visible.any());
+    let tracked = changed(&["vendor/kept.js"]);
+    assert!(ignored.sort(&backend, &tracked).visible.any());
     let mixed = changed(&["target/a.o", "src/cart.ts"]);
-    let Visible::Paths(visible) = ignored.visible(&backend, &mixed) else {
+    let Visible::Paths(visible) = ignored.sort(&backend, &mixed).visible else {
         panic!("git answers");
     };
     assert_eq!(visible, [Path::new("src/cart.ts")]);
@@ -1557,7 +1573,7 @@ fn a_folder_without_git_is_watched_one_folder_at_a_time_as_on_linux() {
 
 fn folder_without_git_watched(watcher: LocalRepositoryWatcher) {
     let dir = tempfile::tempdir().unwrap();
-    write(dir.path(), ".gitignore", "build/\n");
+    write(dir.path(), ".gitignore", "build/\n*.log\n");
     write(dir.path(), "notes/a.md", "a\n");
     write(dir.path(), "build/out.o", "");
     let repositories = LocalRepositories::new(
@@ -1570,7 +1586,7 @@ fn folder_without_git_watched(watcher: LocalRepositoryWatcher) {
         let directory = repositories.directory(&info, folder).unwrap();
         directory.entries.into_iter().map(|e| e.path).collect()
     };
-    assert_eq!(paths(""), ["notes", ".gitignore"]);
+    assert_eq!(paths(""), ["build", "notes", ".gitignore"]);
 
     let received = watch_on_screen(&repositories, &info);
     let kind_changed = || {
@@ -1589,8 +1605,22 @@ fn folder_without_git_watched(watcher: LocalRepositoryWatcher) {
 
     write(root, "build/more.o", "");
     if let Ok(event) = received.recv_timeout(QUIET) {
-        panic!("a path the rules hide shows nothing: {event:?}");
+        panic!("a path the rules hide shows nothing while its folder is closed: {event:?}");
     }
+    // opened in Files, the folder shows what is written in it, told as ignored
+    assert_eq!(paths("build"), ["build/more.o", "build/out.o"]);
+    written_and_told(&received, root, "build/new.o");
+    assert_eq!(
+        paths("build"),
+        ["build/more.o", "build/new.o", "build/out.o"]
+    );
+    settle(&received);
+    // an ignored file where the tree shows: the tree is read again, git's status is not
+    write(root, "debug.log", "");
+    let event = received.recv_timeout(DEADLINE).unwrap();
+    assert!(event.ignored && event.paths.is_none(), "{event:?}");
+    assert_eq!(paths(""), ["build", "notes", ".gitignore", "debug.log"]);
+    settle(&received);
     write(root, "notes/b.md", "b\n");
     let event = received.recv_timeout(DEADLINE).unwrap();
     assert!(!event.kind_changed);

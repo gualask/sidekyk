@@ -29,6 +29,10 @@ pub struct RepositoryChange {
     /// A `.git` came or went at the root: the folder is now the other kind, and what was read of
     /// it is dropped rather than read again.
     pub kind_changed: bool,
+    /// Only paths the rules hide changed, those the Files panel shows: in an ignored folder it
+    /// read, or an ignored file in a folder that shows. Only what lists or shows them is read
+    /// again; git's status leaves them out.
+    pub ignored: bool,
 }
 
 impl RepositoryChange {
@@ -39,6 +43,7 @@ impl RepositoryChange {
             git_dir: true,
             paths: None,
             kind_changed: false,
+            ignored: false,
         }
     }
 
@@ -56,8 +61,8 @@ impl RepositoryChange {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RepositoryChangedEvent {
-    /// 5 names the folder by its id; 4: with a change of kind; 3 brought the paths that changed;
-    /// 2 named the project by its id, 1 by its root.
+    /// 6 tells a change to ignored paths only; 5 names the folder by its id; 4: with a change of
+    /// kind; 3 brought the paths that changed; 2 named the project by its id, 1 by its root.
     pub version: u8,
     pub folder_id: String,
     /// As in `RepositoryChange`.
@@ -66,16 +71,19 @@ pub struct RepositoryChangedEvent {
     pub paths: Option<Vec<String>>,
     /// As in `RepositoryChange`.
     pub kind_changed: bool,
+    /// As in `RepositoryChange`.
+    pub ignored: bool,
 }
 
 impl RepositoryChangedEvent {
     pub fn new(folder_id: &str, change: RepositoryChange) -> Self {
         Self {
-            version: 5,
+            version: 6,
             folder_id: folder_id.to_string(),
             git_dir: change.git_dir,
             paths: change.paths,
             kind_changed: change.kind_changed,
+            ignored: change.ignored,
         }
     }
 }
@@ -90,6 +98,21 @@ pub struct TreeEntry {
     /// From the root, with `/` between names; for a shared entry, the deepest folder's.
     pub path: String,
     pub folder: bool,
+    /// Hidden by the rules (git's, or without git `.gitignore` and `.ignore`): shown dimmed, as in
+    /// VS Code. What an ignored folder holds is ignored too.
+    pub ignored: bool,
+}
+
+impl TreeEntry {
+    /// An entry the rules hide.
+    pub fn ignored(name: String, path: String, folder: bool) -> Self {
+        Self {
+            name,
+            path,
+            folder,
+            ignored: true,
+        }
+    }
 }
 
 /// What a folder holds, folders first, each in the order of VS Code's explorer.
@@ -163,27 +186,30 @@ mod tests {
             ))
             .unwrap(),
             serde_json::json!({
-                "version": 5,
+                "version": 6,
                 "folderId": "/r",
                 "gitDir": true,
                 "paths": null,
-                "kindChanged": false
+                "kindChanged": false,
+                "ignored": false
             })
         );
         let change = RepositoryChange {
             root: "/r".into(),
             git_dir: false,
-            paths: Some(vec!["src/a.ts".into()]),
+            paths: Some(vec!["node_modules/a/index.js".into()]),
             kind_changed: false,
+            ignored: true,
         };
         assert_eq!(
             serde_json::to_value(RepositoryChangedEvent::new("p", change)).unwrap(),
             serde_json::json!({
-                "version": 5,
+                "version": 6,
                 "folderId": "p",
                 "gitDir": false,
-                "paths": ["src/a.ts"],
-                "kindChanged": false
+                "paths": ["node_modules/a/index.js"],
+                "kindChanged": false,
+                "ignored": true
             })
         );
         assert_eq!(
@@ -199,18 +225,25 @@ mod tests {
     #[test]
     fn the_tree_and_its_files_serialize_with_the_frontend_field_names() {
         let directory = Directory {
-            entries: vec![TreeEntry {
-                name: "modules/changes".into(),
-                path: "src/modules/changes".into(),
-                folder: true,
-            }],
+            entries: vec![
+                TreeEntry {
+                    name: "modules/changes".into(),
+                    path: "src/modules/changes".into(),
+                    folder: true,
+                    ignored: false,
+                },
+                TreeEntry::ignored("dist".into(), "src/dist".into(), true),
+            ],
             more: 2,
             truncated: false,
         };
         assert_eq!(
             serde_json::to_value(directory).unwrap(),
             serde_json::json!({
-                "entries": [{ "name": "modules/changes", "path": "src/modules/changes", "folder": true }],
+                "entries": [
+                    { "name": "modules/changes", "path": "src/modules/changes", "folder": true, "ignored": false },
+                    { "name": "dist", "path": "src/dist", "folder": true, "ignored": true }
+                ],
                 "more": 2,
                 "truncated": false
             })

@@ -5,11 +5,18 @@ import type { ChangedFile, ChangeKind, Directory } from '../repository.types';
 /**
  * The Files panel's tree as one flat list, so only the rows on screen are rendered: the entries of
  * the open folders, each under its folder. `more` stands for the entries a large folder does not
- * list.
+ * list. `ignored`: hidden by git's rules, shown dimmed.
  */
 export type TreeRow =
-    | { kind: 'folder'; name: string; path: string; depth: number; open: boolean }
-    | { kind: 'file'; name: string; path: string; depth: number }
+    | {
+          kind: 'folder';
+          name: string;
+          path: string;
+          depth: number;
+          open: boolean;
+          ignored: boolean;
+      }
+    | { kind: 'file'; name: string; path: string; depth: number; ignored: boolean }
     | { kind: 'more'; count: number; depth: number; path: string };
 
 /** What a folder holds, once read. */
@@ -33,13 +40,13 @@ export function treeRows(open: ReadonlySet<string>, read: ReadDirectory): TreeRo
     const walk = (path: string, depth: number) => {
         const directory = read(path);
         if (!directory) return;
-        for (const { name, path: entryPath, folder } of directory.entries) {
+        for (const { name, path: entryPath, folder, ignored } of directory.entries) {
             if (!folder) {
-                rows.push({ kind: 'file', name, path: entryPath, depth });
+                rows.push({ kind: 'file', name, path: entryPath, depth, ignored });
                 continue;
             }
             const isOpen = open.has(entryPath);
-            rows.push({ kind: 'folder', name, path: entryPath, depth, open: isOpen });
+            rows.push({ kind: 'folder', name, path: entryPath, depth, open: isOpen, ignored });
             if (isOpen) walk(entryPath, depth + 1);
         }
         if (directory.more > 0) {

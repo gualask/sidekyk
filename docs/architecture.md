@@ -10,20 +10,24 @@ agent edits files ─▶ watcher of the project on screen (notify, 250 ms quiet 
                        at most one report per second while changes go on)
                        └─▶ reads dropped (inotify reports them: git's own reads would loop)
                        └─▶ hidden window: batch dropped, project only marked
-                       └─▶ paths git ignores skipped (check-ignore, cached per directory);
-                           without git, those the walk's rules hide
+                       └─▶ paths git ignores sorted out (check-ignore, cached per directory);
+                           without git, those the walk's rules hide; they count only where
+                           Files shows them (an ignored folder opened, an ignored entry
+                           coming or going)
                        └─▶ `.git` come or gone at the root: watched again as the other kind
-                       └─▶ "repository-changed" { version: 5, folderId, gitDir, paths,
-                                                  kindChanged }
+                       └─▶ "repository-changed" { version: 6, folderId, gitDir, paths,
+                                                  kindChanged, ignored }
                              └─▶ frontend invalidates ['repository', folderId, …]
                                  (kindChanged: reset; commits and staged diffs only when
                                  gitDir; the open file, diff and colors only when paths touch
-                                 them; paths null over 100 or when unknown)
+                                 them; ignored: only folders and the open file they touch;
+                                 paths null over 100 or when unknown)
                                    ├─▶ get_repository_snapshot   status + numstats, with summary
                                    ├─▶ get_repository_summary    level 0 only
                                    ├─▶ get_file_diff             one file, one area
                                    ├─▶ get_recent_commits        only while unfolded
-                                   ├─▶ get_directory             each open folder, from memory
+                                   ├─▶ get_directory             each open folder, from memory;
+                                   │                             an ignored one from disk
                                    ├─▶ get_recent_files          only while Recent shows
                                    ├─▶ get_file_content          the unchanged file shown
                                    ├─▶ get_markdown_preview      a Markdown file as it reads
@@ -218,7 +222,12 @@ A Cargo workspace (`src-tauri/Cargo.toml`), crates versioned together; commands 
   1.5 s even; first change ~360 ms, the last ≤ 0.75 s after the agent stops. Not 1.5 s (the last
   1.7 s late), not the debouncer's timeout at 1 s (the first in 1.4 s), not 5 s (too stale to
   watch an agent).
-- A folder without git: no git dir; `FolderChanges` drops what the walk's rules hide
+- Ignored paths: the filter sorts them out (`Sorted`); `FileTree::ignored_changes` keeps those
+  in an ignored folder Files read since the tree was, and an edit to an ignored file in a shown
+  folder, told as `ignored`; an ignored entry coming or going where the tree shows drops the
+  tree. While hidden, those already known ignored mark the project the same way, no git run. On
+  Linux an opened ignored folder is watched, not what it holds.
+- A folder without git: no git dir; `FolderChanges` sorts out what the walk's rules hide
   (`folder_rules`: `ignore`'s `IncrementalIgnore` from the walk's own builder, so both agree,
   global excludes included); on Linux `watch/folders.rs` keeps those folders out too. An ignore
   file changed: rules read again.

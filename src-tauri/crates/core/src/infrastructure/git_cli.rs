@@ -13,7 +13,7 @@ use super::hide_console;
 use super::process::{self, TimedOut};
 use super::worktree_files;
 use crate::modules::folder::{
-    FileStamp, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
+    FileStamp, FolderEntry, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry,
 };
 use crate::shared::error::{user_facing, user_facing_code, UserFacingError, UserFacingErrorCode};
 
@@ -220,8 +220,8 @@ impl RepositoryBackend for LocalRepositoryBackend {
         std::fs::symlink_metadata(root.join(path)).is_ok()
     }
 
-    fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>> {
-        worktree_files::folders(root, path)
+    fn entries(&self, root: &Path, path: &Path) -> Option<Vec<FolderEntry>> {
+        worktree_files::entries(root, path)
     }
 
     fn walk(&self, root: &Path, max: usize) -> Walked {

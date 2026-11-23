@@ -34,6 +34,23 @@ const REVIEW_PATHS = [
     'vendor/payments-sdk',
 ];
 
+/**
+ * What the review scenario's `.gitignore` hides, each at the top of what it hides, as git lists
+ * them; and the files under them, read from disk when their folder is opened.
+ */
+const IGNORED_ENTRIES = ['node_modules', 'dist', 'debug.log'];
+const IGNORED_FILES = [
+    'debug.log',
+    'dist/assets/index-4f2a.js',
+    'dist/assets/index-9c1e.css',
+    'dist/index.html',
+    'node_modules/.vite/deps/react.js',
+    'node_modules/react/index.js',
+    'node_modules/react/package.json',
+    'node_modules/zod/index.js',
+    'node_modules/zod/package.json',
+];
+
 /** In the large scenario: enough files that the tree is virtualized, and a folder too large to list. */
 function largePaths(): string[] {
     const paths: string[] = [];
@@ -56,7 +73,11 @@ class FixtureTree {
     /** Every file's path, sorted: the palette searches them. */
     readonly files: readonly string[];
 
-    constructor(paths: Iterable<string>) {
+    constructor(
+        paths: Iterable<string>,
+        private readonly ignored: readonly string[] = [],
+        private readonly ignoredFiles: readonly string[] = [],
+    ) {
         // UTF-16 order: the backend's byte order, but past U+FFFF
         this.files = [...new Set(paths)].sort((a, b) => (a < b ? -1 : Number(a > b)));
         this.folder('');
@@ -79,31 +100,104 @@ class FixtureTree {
         return folder;
     }
 
+    /** Whether `path` is an ignored entry or inside an ignored folder. */
+    private isIgnored(path: string): boolean {
+        return this.ignored.some((entry) => path === entry || path.startsWith(`${entry}/`));
+    }
+
+    /** The ignored entries right in the folder at `path`, as git lists them. */
+    private ignoredIn(path: string): string[] {
+        return this.ignored.filter((entry) => splitPath(entry).dir === path);
+    }
+
+    /** What an ignored folder holds, as read from disk: all ignored, no folders sharing a row. */
+    private ignoredDirectory(path: string): Directory {
+        const folders = new Set<string>();
+        const files = new Set<string>();
+        for (const file of this.ignoredFiles) {
+            if (!file.startsWith(`${path}/`)) continue;
+            const [name = '', ...rest] = file.slice(path.length + 1).split('/');
+            (rest.length > 0 ? folders : files).add(name);
+        }
+        const entry = (folder: boolean) => (name: string) => ({
+            name,
+            path: `${path}/${name}`,
+            folder,
+            ignored: true,
+        });
+        return {
+            entries: [
+                ...[...folders].sort(byName).map(entry(true)),
+                ...[...files].sort(byName).map(entry(false)),
+            ],
+            more: 0,
+            truncated: false,
+        };
+    }
+
     directory(path: string): Directory {
         const folder = this.folders.get(path);
-        if (!folder) return { entries: [], more: 0, truncated: false };
+        if (!folder) {
+            return this.isIgnored(path)
+                ? this.ignoredDirectory(path)
+                : { entries: [], more: 0, truncated: false };
+        }
         const child = (name: string) => (path ? `${path}/${name}` : name);
-        const folders = [...folder.folders].sort(byName).map((name): TreeEntry => {
-            let label = name;
-            let at = child(name);
-            for (;;) {
-                const inside = this.folders.get(at);
-                const only = inside && inside.files.length === 0 ? [...inside.folders] : [];
-                if (only.length !== 1 || !only[0]) break;
-                label = `${label}/${only[0]}`;
-                at = `${at}/${only[0]}`;
-            }
-            return { name: label, path: at, folder: true };
-        });
-        const files = [...new Set(folder.files)]
+        const ignored = this.ignoredNames(path);
+        const folders = [...folder.folders, ...ignored.folders]
             .sort(byName)
-            .map((name): TreeEntry => ({ name, path: child(name), folder: false }));
+            .map(
+                (name): TreeEntry =>
+                    ignored.folders.includes(name)
+                        ? { name, path: child(name), folder: true, ignored: true }
+                        : this.folderEntry(name, child(name)),
+            );
+        const files = [...new Set(folder.files), ...ignored.files].sort(byName).map(
+            (name): TreeEntry => ({
+                name,
+                path: child(name),
+                folder: false,
+                ignored: ignored.files.includes(name),
+            }),
+        );
         const entries = [...folders, ...files];
         return {
             entries: entries.slice(0, MAX_ENTRIES),
             more: Math.max(0, entries.length - MAX_ENTRIES),
             truncated: false,
         };
+    }
+
+    /** The names of the ignored folders and files right in the folder at `path`. */
+    private ignoredNames(path: string): { folders: string[]; files: string[] } {
+        const names = this.ignoredIn(path);
+        const isFolder = (entry: string) =>
+            this.ignoredFiles.some((file) => file.startsWith(`${entry}/`));
+        const name = (entry: string) => splitPath(entry).name;
+        return {
+            folders: names.filter(isFolder).map(name),
+            files: names.filter((entry) => !isFolder(entry)).map(name),
+        };
+    }
+
+    /**
+     * The entry of the folder `name` at `path`, shared with the folders down to one that holds
+     * files, ignored entries or several folders.
+     */
+    private folderEntry(name: string, path: string): TreeEntry {
+        let label = name;
+        let at = path;
+        for (;;) {
+            const inside = this.folders.get(at);
+            const only =
+                inside && inside.files.length === 0 && this.ignoredIn(at).length === 0
+                    ? [...inside.folders]
+                    : [];
+            if (only.length !== 1 || !only[0]) break;
+            label = `${label}/${only[0]}`;
+            at = `${at}/${only[0]}`;
+        }
+        return { name: label, path: at, folder: true, ignored: false };
     }
 
     /**
@@ -128,9 +222,11 @@ class FixtureTree {
         };
     }
 
+    /** Whether `path` is a file the viewer shows: one of the tree, or an ignored one. */
     has(path: string): boolean {
         const { name, dir } = splitPath(path);
-        return this.folders.get(dir)?.files.includes(name) ?? false;
+        const listed = this.folders.get(dir)?.files.includes(name) ?? false;
+        return listed || (this.isIgnored(path) && this.ignoredFiles.includes(path));
     }
 }
 
@@ -154,7 +250,8 @@ export function fixtureFolderTree() {
 export function fixtureTree(large: boolean, changes: readonly ChangedFile[]) {
     const deleted = new Set(changes.filter((c) => c.kind === 'deleted').map((c) => c.path));
     const changed = changes.map((c) => c.path).filter((path) => !deleted.has(path));
-    return new FixtureTree([...(large ? largePaths() : REVIEW_PATHS), ...changed]);
+    if (large) return new FixtureTree([...largePaths(), ...changed]);
+    return new FixtureTree([...REVIEW_PATHS, ...changed], IGNORED_ENTRIES, IGNORED_FILES);
 }
 
 /** Lines that look like the file they are in. */

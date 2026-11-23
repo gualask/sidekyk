@@ -104,7 +104,7 @@ impl Repositories for LocalRepositories {
     }
 
     fn directory(&self, info: &RepositoryInfo, path: &str) -> anyhow::Result<Directory> {
-        Ok(self.file_tree(info)?.directory(path))
+        self.tree_directory(info, path)
     }
 
     fn recent_files(&self, info: &RepositoryInfo) -> anyhow::Result<RecentFiles> {
@@ -158,7 +158,7 @@ impl Repositories for LocalRepositories {
                 FileContent::Text { text, truncated } => Some(preview::parse_markdown(
                     &text,
                     path,
-                    &|other| tree.contains_file(other),
+                    &|other| tree.shows_file(other),
                     truncated,
                 )),
                 FileContent::Binary | FileContent::Link { .. } | FileContent::Folder => None,

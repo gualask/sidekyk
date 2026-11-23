@@ -57,12 +57,14 @@ pub trait RepositoryBackend: Send + Sync {
     /// Whether anything is at `path` (relative) under `root`, a link there not followed.
     fn has_entry(&self, root: &Path, path: &Path) -> bool;
 
-    /// The names of the folders in `path` (relative) under `root`, links not followed; `None`
-    /// when `path` is not a folder there.
-    fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>>;
+    /// What the folder at `path` (relative) under `root` holds, in no order, links not followed
+    /// (a link to a folder is not one); `None` when `path` is not a folder there or a folder on the
+    /// way is a link.
+    fn entries(&self, root: &Path, path: &Path) -> Option<Vec<FolderEntry>>;
 
     /// The files of a folder without git, at most `max`: what its `.gitignore` and `.ignore` files,
     /// git's global excludes and `folder::always_hidden` do not hide; links listed, not followed.
+    /// And what the rules hide, each at the top of what it hides.
     fn walk(&self, root: &Path, max: usize) -> Walked;
 
     /// The rules `walk` hides files by, asked about one path at a time.
@@ -87,10 +89,21 @@ pub trait FolderRules: Send {
     fn is_rules_file(&self, path: &Path) -> bool;
 }
 
+/// One entry of a folder, as `entries` lists it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FolderEntry {
+    pub name: PathBuf,
+    /// A folder itself, not a link to one.
+    pub folder: bool,
+}
+
 /// What `walk` found.
 pub struct Walked {
     /// Relative to the root, `/` between names, in no order.
     pub paths: Vec<String>,
+    /// What the rules hide (`folder::always_hidden` aside), each at the top of what it hides, as
+    /// `git ls-files --ignored --directory` lists them: a folder ends in `/`. None once truncated.
+    pub ignored: Vec<String>,
     /// More files were there than the walk took.
     pub truncated: bool,
 }

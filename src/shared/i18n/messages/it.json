@@ -496,6 +496,8 @@
     "preview.zoomOut": "Riduci",
     "preview.zoomFit": "Adatta",
     "tree.hasChanges": "contiene modifiche",
+    "tree.ignoredFile": "ignorato",
+    "tree.ignoredFolder": "ignorata",
     "tree.more": "Altri {count}, non elencati",
     "files.collapse": "Comprimi le cartelle",
     "files.of": "File di {name}",

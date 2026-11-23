@@ -102,6 +102,29 @@ export function worktreeChangeTouches(
 }
 
 /**
+ * Whether a change to ignored paths only (`changed`, or any ignored path shown when `null`) may
+ * change what a repository query read: what lists them (a folder of the tree holding them) and
+ * what shows one. Git's status, the recent files and searches leave ignored paths out.
+ */
+export function ignoredChangeTouches(
+    queryKey: QueryKey,
+    changed: readonly string[] | null,
+): boolean {
+    const [, , kind, ...rest] = queryKey;
+    switch (kind) {
+        case 'directory':
+        case 'file':
+        case 'preview':
+        case 'stamp':
+            return touchesPath(changed, rest[0]);
+        case 'colors':
+            return rest[0] === 'worktree' && touchesPath(changed, rest[1]);
+        default:
+            return false;
+    }
+}
+
+/**
  * What a commit changed never changes: kept apart from the repository's keys, so neither a change
  * on disk nor the window showing again reads it twice.
  */

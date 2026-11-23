@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use super::ignored::Visible;
+use super::ignored::{Sorted, Visible};
 use crate::modules::folder::ports::{FolderRules, RepositoryBackend};
 
 /// Which changes the watcher saw in a folder without git show: those its walk would list, by the
@@ -17,29 +17,36 @@ impl FolderChanges {
         Self { root, rules }
     }
 
-    /// Which of these changed paths (absolute) show. Every change counts when one may change
-    /// what shows: an ignore file (its rules are read again), the root itself, a path outside.
-    pub fn visible<'a>(
+    /// Which of these changed paths (absolute) show, and which the rules hide. Every change
+    /// counts when one may change what shows: an ignore file (its rules are read again), the root
+    /// itself, a path outside.
+    pub fn sort<'a>(
         &mut self,
         backend: &dyn RepositoryBackend,
         changed: &'a [PathBuf],
-    ) -> Visible<'a> {
+    ) -> Sorted<'a> {
         let mut shown: Vec<&Path> = Vec::new();
+        let mut hidden: Vec<&Path> = Vec::new();
         for path in changed {
             let Ok(rel) = path.strip_prefix(&self.root) else {
-                return Visible::Unknown;
+                return Sorted::unknown();
             };
             if rel.as_os_str().is_empty() {
-                return Visible::Unknown;
+                return Sorted::unknown();
             }
             if self.rules.is_rules_file(rel) {
                 self.rules = backend.folder_rules(&self.root);
-                return Visible::Unknown;
+                return Sorted::unknown();
             }
-            if !self.rules.is_hidden(rel) {
+            if self.rules.is_hidden(rel) {
+                hidden.push(rel);
+            } else {
                 shown.push(rel);
             }
         }
-        Visible::Paths(shown)
+        Sorted {
+            visible: Visible::Paths(shown),
+            ignored: hidden,
+        }
     }
 }

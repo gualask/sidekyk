@@ -117,12 +117,16 @@ pub fn repositories_inside(
         return Ok(Vec::new());
     }
     let mut found: Vec<RepositoryInfo> = backend
-        .folders(folder, Path::new(""))
+        .entries(folder, Path::new(""))
         .unwrap_or_default()
         .into_iter()
-        .filter(|name| holds_git(backend, folder, name))
-        .filter_map(|name| {
-            let root = folder.join(name).into_os_string().into_string().ok()?;
+        .filter(|entry| entry.folder && holds_git(backend, folder, &entry.name))
+        .filter_map(|entry| {
+            let root = folder
+                .join(entry.name)
+                .into_os_string()
+                .into_string()
+                .ok()?;
             Some(RepositoryInfo {
                 name: repository_name(&root),
                 root,

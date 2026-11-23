@@ -213,6 +213,11 @@ export interface TreeEntry {
     /** From the root, with `/` between names; for a shared entry, the deepest folder's. */
     path: string;
     folder: boolean;
+    /**
+     * Hidden by git's rules (or, without git, by `.gitignore` and `.ignore`): shown dimmed, as in
+     * VS Code. Everything inside an ignored folder is ignored too.
+     */
+    ignored: boolean;
 }
 
 /** What a folder holds, folders first, each in the order of VS Code's explorer. */
@@ -471,10 +476,10 @@ export const REPOSITORY_CHANGED_EVENT = 'repository-changed';
 
 export interface RepositoryChangedEvent {
     /**
-     * 5 names the folder by its id; 4 told a change of kind; 3 brought the paths that changed; 2
-     * named the project by its id, 1 by its root.
+     * 6 tells a change only to ignored paths; 5 names the folder by its id; 4 told a change of
+     * kind; 3 brought the paths that changed; 2 named the project by its id, 1 by its root.
      */
-    version: 5;
+    version: 6;
     folderId: string;
     /** The index, HEAD or refs changed too: only then may the recent commits have. */
     gitDir: boolean;
@@ -488,4 +493,9 @@ export interface RepositoryChangedEvent {
      * is dropped rather than read again.
      */
     kindChanged: boolean;
+    /**
+     * Only paths git ignores changed, shown in Files (in an ignored folder read, or an ignored
+     * file in a folder that shows): only what lists or shows them is read again.
+     */
+    ignored: boolean;
 }

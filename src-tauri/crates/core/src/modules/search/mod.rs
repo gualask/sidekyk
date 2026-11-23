@@ -256,7 +256,7 @@ mod tests {
     /// The files of a project that match `query`, as the holder of its files ranks them.
     fn files(query: &str, paths: &[&str], changed: &[ChangedFile]) -> FileMatches {
         let files = ProjectFiles {
-            tree: Arc::new(FileTree::from_paths(paths.iter().copied())),
+            tree: Arc::new(FileTree::new(paths.iter().copied(), [])),
             changed: changed.into(),
         };
         search_files(query, &files)

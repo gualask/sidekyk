@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use crate::modules::folder::{FileStamp, WorktreeEntry};
+use crate::modules::folder::{FileStamp, FolderEntry, WorktreeEntry};
 use crate::shared::threads::threads;
 
 /// Fewer last changes than this are read on the caller's thread: a thread costs more than them.
@@ -112,8 +112,8 @@ pub(super) fn open_file(root: &Path, path: &Path) -> Option<Box<dyn Read + Send>
     Some(Box::new(file))
 }
 
-/// `RepositoryBackend::folders`.
-pub(super) fn folders(root: &Path, path: &Path) -> Option<Vec<PathBuf>> {
+/// `RepositoryBackend::entries`.
+pub(super) fn entries(root: &Path, path: &Path) -> Option<Vec<FolderEntry>> {
     let folder = if path.as_os_str().is_empty() {
         root.to_path_buf()
     } else {
@@ -124,9 +124,11 @@ pub(super) fn folders(root: &Path, path: &Path) -> Option<Vec<PathBuf>> {
     Some(
         entries
             .filter_map(Result::ok)
-            // the entry's own type: a link to a folder is not one
-            .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
-            .map(|entry| PathBuf::from(entry.file_name()))
+            .map(|entry| FolderEntry {
+                name: PathBuf::from(entry.file_name()),
+                // the entry's own type: a link to a folder is not one
+                folder: entry.file_type().is_ok_and(|kind| kind.is_dir()),
+            })
             .collect(),
     )
 }

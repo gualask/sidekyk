@@ -1,7 +1,7 @@
 //! The folders to watch where the system watches one folder at a time (inotify): every folder of
 //! the working tree git does not ignore, as VS Code and Zed watch on Linux,
 //! and the folders of the git dir whose files `classify` counts; in a folder without git, every
-//! folder its walk would enter.
+//! folder its walk would enter. An ignored folder only once the Files panel opens it.
 
 use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
@@ -72,6 +72,17 @@ impl WatchedFolders {
         self.walk(backend, created);
     }
 
+    /// Watches the ignored folders among `folders` (relative) that the Files panel read, and
+    /// forgets those gone: only them, not what they hold, so their changes show while they are
+    /// open.
+    pub fn add_opened(&mut self, backend: &dyn RepositoryBackend, folders: &[&Path]) {
+        for folder in self.created_folders(backend, folders.iter().copied()) {
+            if !self.add(&self.root.join(folder)) {
+                return;
+            }
+        }
+    }
+
     /// Like `add_created` for paths changed while nobody looked (absolute, maybe hidden), once git
     /// may run again; looks at every folder again when an ignore file was among them.
     pub fn add_missed(&mut self, backend: &dyn RepositoryBackend, paths: &[PathBuf]) {
@@ -119,7 +130,7 @@ impl WatchedFolders {
         for rel in paths {
             let path = self.root.join(rel);
             let watched = self.watched.contains(&path);
-            let folder = backend.folders(&self.root, rel).is_some();
+            let folder = backend.entries(&self.root, rel).is_some();
             if watched && !folder {
                 self.watched.retain(|watched| !watched.starts_with(&path));
             } else if folder && !watched {
@@ -166,10 +177,7 @@ impl WatchedFolders {
         if inner {
             return Vec::new();
         }
-        backend
-            .folders(&self.root, folder)
-            .unwrap_or_default()
-            .into_iter()
+        subfolders(backend, &self.root, folder)
             .filter(|name| name.as_path() != Path::new(GIT_ENTRY))
             .map(|name| folder.join(name))
             .collect()
@@ -179,12 +187,13 @@ impl WatchedFolders {
     fn add_all(&mut self, backend: &dyn RepositoryBackend, base: &Path, folder: PathBuf) {
         let mut pending = vec![folder];
         while let Some(folder) = pending.pop() {
-            let Some(names) = backend.folders(base, &folder) else {
+            if backend.entries(base, &folder).is_none() {
                 continue;
-            };
+            }
             if !self.add(&base.join(&folder)) {
                 return;
             }
+            let names: Vec<PathBuf> = subfolders(backend, base, &folder).collect();
             pending.extend(names.into_iter().map(|name| folder.join(name)));
         }
     }
@@ -239,4 +248,18 @@ impl WatchedFolders {
         }
         true
     }
+}
+
+/// The names of the folders right in `folder` (relative to `base`), links not followed.
+fn subfolders(
+    backend: &dyn RepositoryBackend,
+    base: &Path,
+    folder: &Path,
+) -> impl Iterator<Item = PathBuf> {
+    backend
+        .entries(base, folder)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|entry| entry.folder)
+        .map(|entry| entry.name)
 }

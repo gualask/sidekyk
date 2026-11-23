@@ -5,7 +5,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use super::contracts::FileStamp;
-use super::ports::{FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry};
+use super::ports::{FolderEntry, FolderRules, GitOutput, RepositoryBackend, Walked, WorktreeEntry};
 
 pub(crate) trait FakeBackend: Send + Sync {
     fn git(&self, _cwd: &Path, _args: &[&str], _max: usize) -> anyhow::Result<GitOutput> {
@@ -54,7 +54,7 @@ pub(crate) trait FakeBackend: Send + Sync {
         unreachable!()
     }
 
-    fn folders(&self, _root: &Path, _path: &Path) -> Option<Vec<PathBuf>> {
+    fn entries(&self, _root: &Path, _path: &Path) -> Option<Vec<FolderEntry>> {
         unreachable!()
     }
 
@@ -118,8 +118,8 @@ impl<T: FakeBackend> RepositoryBackend for T {
         FakeBackend::has_entry(self, root, path)
     }
 
-    fn folders(&self, root: &Path, path: &Path) -> Option<Vec<PathBuf>> {
-        FakeBackend::folders(self, root, path)
+    fn entries(&self, root: &Path, path: &Path) -> Option<Vec<FolderEntry>> {
+        FakeBackend::entries(self, root, path)
     }
 
     fn walk(&self, root: &Path, max: usize) -> Walked {

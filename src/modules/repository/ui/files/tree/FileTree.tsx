@@ -17,13 +17,20 @@ import {
 type NamedRow = Exclude<TreeRow, { kind: 'more' }>;
 
 function tooltip(row: NamedRow, mark: ChangeMark | undefined, t: Translator['t']): string {
-    if (!mark) return row.path;
-    return `${row.path}\n${t(row.kind === 'folder' ? 'tree.hasChanges' : CHANGE_MARK_WORD[mark])}`;
+    if (mark) {
+        return `${row.path}\n${t(row.kind === 'folder' ? 'tree.hasChanges' : CHANGE_MARK_WORD[mark])}`;
+    }
+    if (!row.ignored) return row.path;
+    return `${row.path}\n${t(row.kind === 'folder' ? 'tree.ignoredFolder' : 'tree.ignoredFile')}`;
 }
 
-/** The color of a name: its change's, else a file's; a folder keeps the text's. */
+/**
+ * The color of a name: its change's, else dimmed when ignored, else a file's; a folder keeps the
+ * text's.
+ */
 function nameTone(row: NamedRow, mark: ChangeMark | undefined): string {
     if (mark) return CHANGE_MARK_TONE[mark];
+    if (row.ignored) return 'text-ui-text-muted';
     return row.kind === 'file' ? 'text-ui-text-secondary' : '';
 }
 
@@ -46,8 +53,8 @@ function Name({ row }: { row: NamedRow }) {
 
 /**
  * The files of a project as a tree, folders first, of which only the rows on screen render. A
- * change colors a name as in VS Code, with no letter or mark; the tooltip says it in words. A row
- * that does not fit ends in "…", its path in the tooltip.
+ * change colors a name as in VS Code, with no letter or mark, and an ignored entry is dimmed; the
+ * tooltip says it in words. A row that does not fit ends in "…", its path in the tooltip.
  */
 export function FileTree({
     rows,

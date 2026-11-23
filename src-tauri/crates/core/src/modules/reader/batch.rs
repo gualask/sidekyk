@@ -6,8 +6,8 @@ use std::sync::atomic::Ordering;
 use super::visibility::Visibility;
 use super::LocalRepositories;
 use crate::modules::folder::{
-    classify, folder_kind, Changed, FolderChanges, FolderKind, IgnoredPaths, RepositoryBackend,
-    RepositoryChange, Visible, WatchedChanges, GIT_ENTRY,
+    classify, folder_kind, Changed, FolderChanges, FolderKind, IgnoredChanges, IgnoredPaths,
+    RepositoryBackend, RepositoryChange, Sorted, Visible, WatchedChanges, GIT_ENTRY,
 };
 use crate::shared::sync::lock;
 
@@ -62,22 +62,20 @@ pub(super) enum Filter {
 }
 
 impl Filter {
-    fn visible<'a>(
-        &mut self,
-        backend: &dyn RepositoryBackend,
-        changed: &'a [PathBuf],
-    ) -> Visible<'a> {
+    /// Which of these changes show, and which the rules hide.
+    fn sort<'a>(&mut self, backend: &dyn RepositoryBackend, changed: &'a [PathBuf]) -> Sorted<'a> {
         match self {
-            Self::Git(ignored) => ignored.visible(backend, changed),
-            Self::Rules(changes) => changes.visible(backend, changed),
+            Self::Git(ignored) => ignored.sort(backend, changed),
+            Self::Rules(changes) => changes.sort(backend, changed),
         }
     }
 
-    /// Whether any of these changes may show, while the window is hidden: no git runs.
-    fn any_maybe_visible(&mut self, backend: &dyn RepositoryBackend, changed: &[PathBuf]) -> bool {
+    /// Which of these changes may show, and which the rules hide for sure, while the window is
+    /// hidden: no git runs.
+    fn guess<'a>(&mut self, backend: &dyn RepositoryBackend, changed: &'a [PathBuf]) -> Sorted<'a> {
         match self {
-            Self::Git(ignored) => ignored.any_maybe_visible(backend, changed),
-            Self::Rules(changes) => changes.visible(backend, changed).any(),
+            Self::Git(ignored) => ignored.guess(backend, changed),
+            Self::Rules(changes) => changes.sort(backend, changed),
         }
     }
 
@@ -134,7 +132,7 @@ impl LocalRepositories {
             return;
         }
         if visibility.hidden {
-            self.mark_while_hidden(&mut visibility, &watched.root, filter, &changes);
+            self.mark_while_hidden(&mut visibility, watched, filter, &changes);
             return;
         }
         drop(visibility);
@@ -145,13 +143,18 @@ impl LocalRepositories {
     fn mark_while_hidden(
         &self,
         visibility: &mut Visibility,
-        root: &str,
+        watched: &Watching,
         filter: &mut Filter,
         changes: &WatchedChanges,
     ) {
+        let root = watched.root.as_str();
+        let sorted = filter.guess(&*self.backend, &changes.worktree);
+        let ignored = self.ignored_changes(watched, &sorted.ignored);
         let marked = changes.git_dir
             || changes.lost
-            || filter.any_maybe_visible(&*self.backend, &changes.worktree);
+            || sorted.visible.any()
+            || ignored.tree
+            || !ignored.shown.is_empty();
         if marked {
             visibility.mark_missed(root, changes);
             self.forget_tree(root);
@@ -176,14 +179,16 @@ impl LocalRepositories {
         on_change: &dyn Fn(RepositoryChange),
     ) {
         let root = watched.root.as_str();
-        let worktree = if changes.lost {
-            Visible::Unknown
+        let sorted = if changes.lost {
+            Sorted::unknown()
         } else {
-            filter.visible(&*self.backend, &changes.worktree)
+            filter.sort(&*self.backend, &changes.worktree)
         };
-        self.watch_created_folders(&worktree);
+        let worktree = sorted.visible;
+        let ignored = self.ignored_changes(watched, &sorted.ignored);
+        self.watch_batch_folders(&worktree, &ignored.opened);
         let visible = changes.git_dir || worktree.any();
-        let files = self.batch_changes_tree(watched, changes.git_dir, &worktree);
+        let files = ignored.tree || self.batch_changes_tree(watched, changes.git_dir, &worktree);
         if files {
             self.forget_tree(root);
         }
@@ -193,24 +198,40 @@ impl LocalRepositories {
             lost = changes.lost,
             visible,
             files,
+            ignored_shown = ignored.shown.len(),
             "watcher batch"
         );
-        if !visible {
+        let Some(change) = change_told(root, changes.git_dir, worktree, ignored) else {
             return;
+        };
+        // a search in contents leaves ignored files out
+        if !change.ignored {
+            self.forget_contents();
         }
-        self.forget_contents();
-        on_change(RepositoryChange {
-            root: root.to_string(),
-            git_dir: changes.git_dir,
-            paths: worktree.git_paths(MAX_CHANGED_PATHS),
-            kind_changed: false,
-        });
+        on_change(change);
     }
 
-    /// Where each folder is watched on its own, watches the folders a batch created, before the
-    /// change is told; every folder is looked at again when what git ignores may have changed, or
-    /// the system dropped events.
-    fn watch_created_folders(&self, worktree: &Visible) {
+    /// What changes to ignored paths mean for the Files panel of the folder watched: nothing
+    /// before its tree is read.
+    fn ignored_changes<'a>(&self, watched: &Watching, ignored: &[&'a Path]) -> IgnoredChanges<'a> {
+        if ignored.is_empty() {
+            return IgnoredChanges::default();
+        }
+        let trees = lock(&self.trees);
+        let Some(cached) = trees.get(&watched.root) else {
+            return IgnoredChanges::default();
+        };
+        let Some(tree) = cached.tree.as_ref() else {
+            return IgnoredChanges::default();
+        };
+        tree.ignored_changes(&*self.backend, &watched.folder, &cached.opened, ignored)
+    }
+
+    /// Where each folder is watched on its own, keeps the watches in step with a batch, before the
+    /// change is told: the folders it created, and the ignored folders the Files panel read that it
+    /// made again; every folder is looked at again when what git ignores may have changed, or the
+    /// system dropped events.
+    fn watch_batch_folders(&self, worktree: &Visible, opened: &[&Path]) {
         let mut folders = lock(&self.folders);
         let Some(folders) = folders.as_mut() else {
             return;
@@ -219,6 +240,7 @@ impl LocalRepositories {
             Visible::Unknown => folders.rescan(&*self.backend),
             Visible::Paths(paths) => folders.add_created(&*self.backend, paths),
         }
+        folders.add_opened(&*self.backend, opened);
     }
 
     /// Whether a batch of the watcher may have added or removed a file of the tree read.
@@ -235,5 +257,89 @@ impl LocalRepositories {
                     tree.may_have_changed(&*self.backend, &watched.folder, paths)
                 }
             }
+    }
+}
+
+/// What a batch tells the frontend, if anything: a change that shows (the git dir, a path not
+/// ignored), with the ignored paths shown beside it; else, as `ignored`, an ignored entry coming
+/// or going (every folder open listed again) or the ignored paths shown.
+fn change_told(
+    root: &str,
+    git_dir: bool,
+    worktree: Visible,
+    ignored: IgnoredChanges,
+) -> Option<RepositoryChange> {
+    let change = |paths, ignored| RepositoryChange {
+        root: root.to_string(),
+        git_dir,
+        paths,
+        kind_changed: false,
+        ignored,
+    };
+    if git_dir || worktree.any() {
+        let paths = match worktree {
+            Visible::Paths(mut paths) => {
+                paths.extend(ignored.shown);
+                Visible::Paths(paths).git_paths(MAX_CHANGED_PATHS)
+            }
+            Visible::Unknown => None,
+        };
+        return Some(change(paths, false));
+    }
+    if ignored.tree {
+        return Some(change(None, true));
+    }
+    if ignored.shown.is_empty() {
+        return None;
+    }
+    let paths = Visible::Paths(ignored.shown).git_paths(MAX_CHANGED_PATHS);
+    Some(change(paths, true))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ignored(tree: bool, shown: &[&'static str]) -> IgnoredChanges<'static> {
+        IgnoredChanges {
+            tree,
+            shown: shown.iter().map(|path| Path::new(*path)).collect(),
+            opened: Vec::new(),
+        }
+    }
+
+    fn told(
+        git_dir: bool,
+        worktree: Visible,
+        ignored: IgnoredChanges,
+    ) -> Option<(Option<Vec<String>>, bool)> {
+        change_told("/r", git_dir, worktree, ignored).map(|change| (change.paths, change.ignored))
+    }
+
+    #[test]
+    fn a_change_that_shows_carries_the_ignored_paths_shown_beside_it() {
+        let worktree = Visible::Paths(vec![Path::new("src/a.ts")]);
+        assert_eq!(
+            told(false, worktree, ignored(false, &["dist/app.js"])),
+            Some((Some(vec!["src/a.ts".into(), "dist/app.js".into()]), false))
+        );
+        assert_eq!(
+            told(true, Visible::Paths(Vec::new()), ignored(false, &[])),
+            Some((Some(Vec::new()), false))
+        );
+    }
+
+    #[test]
+    fn ignored_paths_alone_go_as_ignored_and_nothing_shown_tells_nothing() {
+        let none = || Visible::Paths(Vec::new());
+        assert_eq!(
+            told(false, none(), ignored(true, &["dist/app.js"])),
+            Some((None, true))
+        );
+        assert_eq!(
+            told(false, none(), ignored(false, &["node_modules/a/index.js"])),
+            Some((Some(vec!["node_modules/a/index.js".into()]), true))
+        );
+        assert_eq!(told(false, none(), ignored(false, &[])), None);
     }
 }

@@ -206,8 +206,16 @@ fn a_folder_without_git_is_listed_through_the_helper() {
     let info = agent.resolve(dir.path()).unwrap();
     assert_eq!(agent.folder_kind(&info).unwrap(), FolderKind::Plain);
     let root = agent.directory(&info, "").unwrap();
-    let names: Vec<&str> = root.entries.iter().map(|e| e.name.as_str()).collect();
-    assert_eq!(names, ["notes", ".ignore"]);
+    let names: Vec<(&str, bool)> = root
+        .entries
+        .iter()
+        .map(|e| (e.name.as_str(), e.ignored))
+        .collect();
+    // what `.ignore` hides shows dimmed, as git's ignored files
+    assert_eq!(
+        names,
+        [("notes", false), (".ignore", false), ("draft.md", true)]
+    );
 }
 
 #[test]
@@ -215,7 +223,8 @@ fn a_failure_keeps_its_code_through_the_helper() {
     let dir = scratch_repo();
     let agent = agent();
     let info = agent.resolve(dir.path()).unwrap();
-    let error = agent.file_content(&info, "build/out.o").unwrap_err();
+    // never shown, not even dimmed as what git ignores
+    let error = agent.file_content(&info, ".git/HEAD").unwrap_err();
     assert_eq!(
         user_facing_code(&error),
         Some(UserFacingErrorCode::FileMissing)

@@ -34,6 +34,24 @@ impl Visible<'_> {
     }
 }
 
+/// A batch's changes by whether they show.
+pub struct Sorted<'a> {
+    pub visible: Visible<'a>,
+    /// Changed paths the rules hide, relative to the root: they show only where the Files panel
+    /// shows them (`FileTree::ignored_changes`). None when `visible` is unknown.
+    pub ignored: Vec<&'a Path>,
+}
+
+impl Sorted<'_> {
+    /// Every change counts.
+    pub fn unknown() -> Self {
+        Self {
+            visible: Visible::Unknown,
+            ignored: Vec::new(),
+        }
+    }
+}
+
 /// Tells changes that can alter what Sidekyk shows from changes git ignores, such as a build
 /// writing to `target/` or an install filling `node_modules/`, and from changes inside a
 /// repository within this one (`is_inner_repository`).
@@ -61,18 +79,25 @@ impl IgnoredPaths {
         self.ignored_dirs.clear();
     }
 
-    /// Which of these changed paths (absolute) git does not ignore. When git cannot answer, every
-    /// change counts: a needless refresh is better than a missed one.
-    pub fn visible<'a>(
+    /// Which of these changed paths (absolute) git ignores and which it does not. When git cannot
+    /// answer, every change counts: a needless refresh is better than a missed one.
+    pub fn sort<'a>(
         &mut self,
         backend: &dyn RepositoryBackend,
         changed: &'a [PathBuf],
-    ) -> Visible<'a> {
-        let Some(candidates) = self.unsettled(backend, changed) else {
-            return Visible::Unknown;
+    ) -> Sorted<'a> {
+        let Some(Unsettled {
+            candidates,
+            ignored: mut known,
+        }) = self.unsettled(backend, changed)
+        else {
+            return Sorted::unknown();
         };
         if candidates.is_empty() {
-            return Visible::Paths(candidates);
+            return Sorted {
+                visible: Visible::Paths(candidates),
+                ignored: known,
+            };
         }
 
         // Each path with its parent directories, so the next change under an ignored directory
@@ -83,7 +108,7 @@ impl IgnoredPaths {
             .filter(|path| !path.as_os_str().is_empty())
             .collect();
         let Some(ignored) = check_ignore(backend, &self.root, &asked) else {
-            return Visible::Unknown;
+            return Sorted::unknown();
         };
 
         for dir in candidates.iter().flat_map(|rel| rel.ancestors().skip(1)) {
@@ -91,35 +116,47 @@ impl IgnoredPaths {
                 self.ignored_dirs.insert(dir.to_path_buf());
             }
         }
-        Visible::Paths(
-            candidates
-                .into_iter()
-                .filter(|rel| !ignored.contains(*rel))
-                .collect(),
-        )
+        let (hidden, shown): (Vec<&Path>, Vec<&Path>) = candidates
+            .into_iter()
+            .partition(|rel| ignored.contains(*rel));
+        known.extend(hidden);
+        Sorted {
+            visible: Visible::Paths(shown),
+            ignored: known,
+        }
     }
 
-    /// Whether any of these changed paths may be one git does not ignore, from what was already
-    /// learned: no git runs, so a path never asked about counts.
-    pub fn any_maybe_visible(
+    /// The changed paths (absolute) that may be ones git does not ignore, and those it ignores
+    /// for sure, from what was already learned: no git runs, so a path never asked about may show.
+    pub fn guess<'a>(
         &mut self,
         backend: &dyn RepositoryBackend,
-        changed: &[PathBuf],
-    ) -> bool {
-        self.unsettled(backend, changed)
-            .is_none_or(|candidates| !candidates.is_empty())
+        changed: &'a [PathBuf],
+    ) -> Sorted<'a> {
+        match self.unsettled(backend, changed) {
+            None => Sorted::unknown(),
+            Some(Unsettled {
+                candidates,
+                ignored,
+            }) => Sorted {
+                visible: Visible::Paths(candidates),
+                ignored,
+            },
+        }
     }
 
     /// The changed paths, relative to the root, that are neither inside a directory known to be
-    /// ignored nor inside another repository; `None` when one of them is visible for sure (outside
-    /// the root, the root itself, a `.gitignore`).
+    /// ignored nor inside another repository, and those inside a directory known to be ignored;
+    /// `None` when one of them is visible for sure (outside the root, the root itself, a
+    /// `.gitignore`).
     fn unsettled<'a>(
         &mut self,
         backend: &dyn RepositoryBackend,
         changed: &'a [PathBuf],
-    ) -> Option<Vec<&'a Path>> {
+    ) -> Option<Unsettled<'a>> {
         let mut inner = InnerRepositories::new(backend);
         let mut candidates = Vec::new();
+        let mut ignored = Vec::new();
         for path in changed {
             let rel = path.strip_prefix(&self.root).ok()?;
             if rel.as_os_str().is_empty() {
@@ -130,16 +167,27 @@ impl IgnoredPaths {
                 return None;
             }
             // what is known first: a burst under `node_modules/` asks nothing of the disk
-            if !self.is_in_ignored_dir(rel) && !inner.holds(&self.root, rel) {
+            if self.is_in_ignored_dir(rel) {
+                ignored.push(rel);
+            } else if !inner.holds(&self.root, rel) {
                 candidates.push(rel);
             }
         }
-        Some(candidates)
+        Some(Unsettled {
+            candidates,
+            ignored,
+        })
     }
 
     fn is_in_ignored_dir(&self, rel: &Path) -> bool {
         rel.ancestors().any(|path| self.ignored_dirs.contains(path))
     }
+}
+
+/// The changed paths `unsettled` leaves to git, and those it knows git ignores.
+struct Unsettled<'a> {
+    candidates: Vec<&'a Path>,
+    ignored: Vec<&'a Path>,
 }
 
 /// Whether `folder` (relative to `root`) holds a repository inside this one: a submodule, a clone,
@@ -291,11 +339,16 @@ mod tests {
         let mut ignored = IgnoredPaths::new("/r".into());
 
         assert!(!ignored
-            .visible(&git, &paths(&["target/debug/a.o", "src/app.log"]))
+            .sort(&git, &paths(&["target/debug/a.o", "src/app.log"]))
+            .visible
             .any());
-        assert!(!ignored.visible(&git, &paths(&["target/release/b.o"])).any());
+        assert!(!ignored
+            .sort(&git, &paths(&["target/release/b.o"]))
+            .visible
+            .any());
         assert!(ignored
-            .visible(&git, &paths(&["target/c.o", "src/main.rs"]))
+            .sort(&git, &paths(&["target/c.o", "src/main.rs"]))
+            .visible
             .any());
 
         let asked = git.asked.lock().unwrap();
@@ -319,13 +372,37 @@ mod tests {
     }
 
     #[test]
+    fn what_git_ignores_is_kept_apart_whether_asked_or_known() {
+        let git = FakeGit::default();
+        let mut ignored = IgnoredPaths::new("/r".into());
+        let changed = paths(&["target/debug/a.o", "src/app.log", "src/main.rs"]);
+        let sorted = ignored.sort(&git, &changed);
+        assert_eq!(
+            sorted.ignored,
+            [Path::new("target/debug/a.o"), Path::new("src/app.log")]
+        );
+        let changed = paths(&["target/release/b.o"]);
+        assert_eq!(
+            ignored.guess(&git, &changed).ignored,
+            [Path::new("target/release/b.o")]
+        );
+        assert_eq!(
+            ignored.sort(&git, &changed).ignored,
+            [Path::new("target/release/b.o")]
+        );
+    }
+
+    #[test]
     fn a_gitignore_change_counts_and_forgets_what_was_learned() {
         let git = FakeGit::default();
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
+        assert!(!ignored.sort(&git, &paths(&["target/a.o"])).visible.any());
 
-        assert!(ignored.visible(&git, &paths(&["sub/.gitignore"])).any());
-        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
+        assert!(ignored
+            .sort(&git, &paths(&["sub/.gitignore"]))
+            .visible
+            .any());
+        assert!(!ignored.sort(&git, &paths(&["target/a.o"])).visible.any());
         assert_eq!(git.asked.lock().unwrap().len(), 2);
     }
 
@@ -333,14 +410,20 @@ mod tests {
     fn without_git_only_directories_already_learned_are_settled() {
         let git = FakeGit::default();
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(ignored.any_maybe_visible(&git, &paths(&["target/a.o"])));
+        assert!(ignored.guess(&git, &paths(&["target/a.o"])).visible.any());
 
-        assert!(!ignored.visible(&git, &paths(&["target/a.o"])).any());
-        assert!(!ignored.any_maybe_visible(&git, &paths(&["target/debug/b.o"])));
-        assert!(ignored.any_maybe_visible(&git, &paths(&["target/c.o", "dist/app.js"])));
-        assert!(ignored.any_maybe_visible(&git, &paths(&[".gitignore"])));
+        assert!(!ignored.sort(&git, &paths(&["target/a.o"])).visible.any());
+        assert!(!ignored
+            .guess(&git, &paths(&["target/debug/b.o"]))
+            .visible
+            .any());
+        assert!(ignored
+            .guess(&git, &paths(&["target/c.o", "dist/app.js"]))
+            .visible
+            .any());
+        assert!(ignored.guess(&git, &paths(&[".gitignore"])).visible.any());
         assert!(
-            ignored.any_maybe_visible(&git, &paths(&["target/a.o"])),
+            ignored.guess(&git, &paths(&["target/a.o"])).visible.any(),
             "forgotten"
         );
         assert_eq!(git.asked.lock().unwrap().len(), 1);
@@ -358,13 +441,13 @@ mod tests {
             ".claude/worktrees/feat/src/a.ts",
             ".claude/worktrees/feat/.gitignore",
         ]);
-        assert!(!ignored.visible(&git, &inside).any());
-        assert!(!ignored.any_maybe_visible(&git, &inside));
+        assert!(!ignored.sort(&git, &inside).visible.any());
+        assert!(!ignored.guess(&git, &inside).visible.any());
         assert!(git.asked.lock().unwrap().is_empty());
 
         // the worktree coming or going changes the status; so does the repository's own file
         let outside = paths(&[".claude/worktrees/feat", "src/main.rs"]);
-        let Visible::Paths(shown) = ignored.visible(&git, &outside) else {
+        let Visible::Paths(shown) = ignored.sort(&git, &outside).visible else {
             panic!("git answered");
         };
         assert_eq!(
@@ -383,9 +466,10 @@ mod tests {
             ..FakeGit::default()
         };
         let mut ignored = IgnoredPaths::new("/r".into());
-        assert!(ignored.visible(&git, &paths(&["target/a.o"])).any());
+        assert!(ignored.sort(&git, &paths(&["target/a.o"])).visible.any());
         assert!(ignored
-            .visible(&git, &[PathBuf::from("/elsewhere/a.ts")])
+            .sort(&git, &[PathBuf::from("/elsewhere/a.ts")])
+            .visible
             .any());
     }
 

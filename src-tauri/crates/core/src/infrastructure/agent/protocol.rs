@@ -273,6 +273,7 @@ mod tests {
                 git_dir: false,
                 paths: Some(vec!["src/a.ts".into()]),
                 kind_changed: false,
+                ignored: false,
             }),
         )
         .unwrap();

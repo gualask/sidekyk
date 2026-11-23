@@ -6,7 +6,7 @@ Sidekyk is a Tauri 2 desktop companion (React frontend in `src/`, Rust backend i
 
 Instant when shown, near-zero CPU, memory and battery in the background. This outranks every other preference.
 
-- Do no work nobody will see: nothing on a timer while idle, nothing for git-ignored paths, compute and render only what is on screen.
+- Do no work nobody will see: nothing on a timer while idle, nothing for git-ignored paths but an ignored folder open in Files, compute and render only what is on screen.
 - Measure hot paths before and after a change; do not merge a regression without a reason.
 - Run independent git commands in parallel, bound every read, never block the main thread. Lazy-load what the first paint does not need, virtualize long lists.
 - Prefer a battle-tested crate or library to our own code, but never add a dependency yourself: present the candidates with pros and cons and wait for the maintainer's decision.
@@ -56,5 +56,5 @@ Instant when shown, near-zero CPU, memory and battery in the background. This ou
 - Read-only but one write: the branch switch the user asks for (`git switch`, `RepositoryBackend::git_write`); never stage, commit, revert, stash, fetch or write files in a repository.
 - Git runs with `GIT_OPTIONAL_LOCKS=0`, `-c core.fsmonitor=false` and `-c diff.autoRefreshIndex=false`; its reads with `GIT_NO_LAZY_FETCH=1`.
 - Paths from the frontend pass `checked_path` before reaching git.
-- Only relevant changes refresh the app: never `*.lock` or git-ignored paths.
+- Only relevant changes refresh the app: never `*.lock`; git-ignored paths only where Files shows them (an ignored folder open, an ignored entry coming or going), and never git's status.
 - In a WSL distro the app writes only its helper, under `~/.sidekyk-server/`; the helper runs the same core, so these invariants hold there. `wsl.exe` is a child process, in `infrastructure/`; nothing that waits on it runs on the main thread.

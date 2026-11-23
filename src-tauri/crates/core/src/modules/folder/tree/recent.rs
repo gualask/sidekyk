@@ -65,7 +65,7 @@ mod tests {
         }
 
         fn tree(&self) -> FileTree {
-            FileTree::from_paths(self.0.keys().map(String::as_str))
+            FileTree::new(self.0.keys().map(String::as_str), [])
         }
     }
 

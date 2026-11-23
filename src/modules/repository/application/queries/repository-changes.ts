@@ -1,7 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect } from 'react';
 import { useRepositoryPort } from '../repository.port';
-import { folderOfKey, isOld, repositoryKeys, worktreeChangeTouches } from './repository-keys';
+import {
+    folderOfKey,
+    ignoredChangeTouches,
+    isOld,
+    repositoryKeys,
+    worktreeChangeTouches,
+} from './repository-keys';
 
 /** Reads again what is shown of a folder: after a fix, such as git installed in its distro. */
 export function useReadFolderAgain(): (folderId: string) => void {
@@ -36,7 +42,7 @@ export function useRepositoryChangeSubscription() {
     const queryClient = useQueryClient();
     useEffect(
         () =>
-            port.onRepositoryChanged(({ folderId, gitDir, paths, kindChanged }) => {
+            port.onRepositoryChanged(({ folderId, gitDir, paths, kindChanged, ignored }) => {
                 const queryKey = repositoryKeys.of(folderId);
                 // the folder is now the other kind: what was read of it goes, its kind read again
                 if (kindChanged) {
@@ -45,7 +51,10 @@ export function useRepositoryChangeSubscription() {
                 }
                 void queryClient.invalidateQueries({
                     queryKey,
-                    predicate: ({ queryKey }) => gitDir || worktreeChangeTouches(queryKey, paths),
+                    predicate: ({ queryKey }) =>
+                        ignored
+                            ? ignoredChangeTouches(queryKey, paths)
+                            : gitDir || worktreeChangeTouches(queryKey, paths),
                 });
             }),
         [port, queryClient],
